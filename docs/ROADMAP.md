@@ -130,7 +130,7 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
       subscribers, which resync from a snapshot when they lag
 - [ ] Perf harness (`docs/PERF.md`): RSS/PSS, CPU time, wakeups, binary size;
       `criterion` benches for state writes and event fan-out
-- [ ] Graceful shutdown on SIGTERM + lifecycle events
+- [x] Graceful shutdown on SIGTERM + lifecycle events
       (`homeassistant_start`/`started`/`stop`)
 
 ### M1: Import, registries, config & restore

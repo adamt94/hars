@@ -13,6 +13,7 @@ mod clock;
 mod context;
 mod entity_id;
 mod event;
+mod lifecycle;
 mod service;
 mod state;
 
@@ -20,6 +21,7 @@ pub use clock::{Clock, SimulatedClock};
 pub use context::{Context, ContextId};
 pub use entity_id::{EntityId, EntityIdError};
 pub use event::{Event, EventBus, EventKind};
+pub use lifecycle::CoreState;
 pub use service::{
     EntityTarget, ServiceCall, ServiceData, ServiceError, ServiceRegistry, ServiceResponse,
     SupportsResponse,
@@ -29,6 +31,7 @@ pub use state::{Attributes, State, StateChanges, StateMachine};
 use service::lower;
 
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU8, Ordering};
 
 /// Shared handle to the running instance. Cheap to clone.
 #[derive(Clone, Default)]
@@ -42,6 +45,7 @@ struct HassInner {
     bus: EventBus,
     states: StateMachine,
     services: ServiceRegistry,
+    core_state: AtomicU8,
 }
 
 impl Hass {
@@ -61,6 +65,14 @@ impl Hass {
 
     pub fn clock(&self) -> &Clock {
         &self.inner.clock
+    }
+
+    pub fn core_state(&self) -> CoreState {
+        CoreState::from_u8(self.inner.core_state.load(Ordering::Acquire))
+    }
+
+    pub(crate) fn set_core_state(&self, state: CoreState) {
+        self.inner.core_state.store(state as u8, Ordering::Release);
     }
 
     pub fn bus(&self) -> &EventBus {

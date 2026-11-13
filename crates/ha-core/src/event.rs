@@ -23,6 +23,12 @@ pub enum EventKind {
         service: SmolStr,
         service_data: Arc<ServiceData>,
     },
+    /// Lifecycle events, each with empty `data` as in HA.
+    HomeassistantStart {},
+    HomeassistantStarted {},
+    HomeassistantStop {},
+    HomeassistantFinalWrite {},
+    HomeassistantClose {},
     /// Escape hatch for integration-defined events.
     Custom {
         name: SmolStr,
