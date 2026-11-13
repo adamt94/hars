@@ -63,8 +63,12 @@ impl Default for EventBus {
 
 impl EventBus {
     pub fn fire(&self, event: Event) {
+        self.fire_shared(Arc::new(event));
+    }
+
+    pub(crate) fn fire_shared(&self, event: Arc<Event>) {
         // No subscribers is not an error.
-        let _ = self.tx.send(Arc::new(event));
+        let _ = self.tx.send(event);
     }
 
     pub fn subscribe(&self) -> broadcast::Receiver<Arc<Event>> {

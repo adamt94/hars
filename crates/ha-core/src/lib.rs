@@ -24,7 +24,7 @@ pub use service::{
     EntityTarget, ServiceCall, ServiceData, ServiceError, ServiceRegistry, ServiceResponse,
     SupportsResponse,
 };
-pub use state::{Attributes, State, StateMachine};
+pub use state::{Attributes, State, StateChanges, StateMachine};
 
 use service::lower;
 
@@ -157,25 +157,22 @@ impl Hass {
         attributes: Attributes,
         context: Option<Context>,
     ) -> Arc<State> {
-        let (new, old) = self.inner.states.set(
-            entity_id.clone(),
+        let inner = &*self.inner;
+        inner.states.set(
+            entity_id,
             state.into(),
             attributes,
-            &self.inner.clock,
             context,
-        );
-        let changed = old.as_ref().is_none_or(|o| !Arc::ptr_eq(o, &new));
-        if changed {
-            self.inner.bus.fire(Event::new(
-                EventKind::StateChanged {
-                    entity_id,
-                    old_state: old,
-                    new_state: Some(new.clone()),
-                },
-                new.last_updated,
-                new.context.clone(),
-            ));
-        }
-        new
+            &inner.clock,
+            &inner.bus,
+        )
+    }
+
+    /// Lossless, ordered `state_changed` delivery for internal consumers
+    /// (automations, the recorder), plus a snapshot of every state taken
+    /// atomically with the subscription. API clients use the lossy
+    /// [`Hass::bus`] instead and resync when they lag.
+    pub fn subscribe_state_changes(&self) -> StateChanges {
+        self.inner.states.subscribe()
     }
 }

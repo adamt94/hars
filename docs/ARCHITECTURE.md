@@ -42,9 +42,10 @@ Planned crates (create as they're needed, not before):
 - **`EventBus`** — bounded `tokio::sync::broadcast` of `Arc<Event>`. Slow
   subscribers lag and must resync from the state machine rather than growing
   memory without limit. That is fine for API clients, but not for consumers
-  that must see every transition (automations, recorder): those get lossless,
-  ordered delivery (planned: trigger index keyed by `EntityId`, checked on the
-  state-write path).
+  that must see every transition (automations, recorder): those use
+  `Hass::subscribe_state_changes`, an unbounded, lossless feed with a snapshot
+  taken atomically with the subscription. Writers notify the feeds and the bus
+  while still holding the state lock, so every consumer sees one order.
 - **`Hass`** — cheap-to-clone handle (`Arc`) passed to every integration.
 
 ## Performance toolbox
