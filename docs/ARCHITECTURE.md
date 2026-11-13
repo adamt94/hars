@@ -41,7 +41,10 @@ Planned crates (create as they're needed, not before):
   changes nothing returns the existing `Arc` and fires no event.
 - **`EventBus`** — bounded `tokio::sync::broadcast` of `Arc<Event>`. Slow
   subscribers lag and must resync from the state machine rather than growing
-  memory without limit.
+  memory without limit. That is fine for API clients, but not for consumers
+  that must see every transition (automations, recorder): those get lossless,
+  ordered delivery (planned: trigger index keyed by `EntityId`, checked on the
+  state-write path).
 - **`Hass`** — cheap-to-clone handle (`Arc`) passed to every integration.
 
 ## Performance toolbox
