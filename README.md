@@ -43,8 +43,8 @@ docker run --rm -p 8123:8123 -v hars-config:/config hars
 ```
 
 The image is `FROM scratch`: a static musl binary, CA roots and tzdata, about
-5 MB. `docker stop` sends SIGTERM, which hars handles by draining HTTP and
-exiting 0. For LAN integrations (LIFX broadcast, mDNS) use `--network host`.
+5 MB. `docker stop` sends SIGTERM, which hars handles by draining HTTP for up to
+5 s and exiting 0, well inside Docker's default 10 s grace period. For LAN integrations (LIFX broadcast, mDNS) use `--network host`.
 
 ## Development
 

@@ -9,8 +9,11 @@ FROM rust:1-alpine AS build
 RUN apk add --no-cache musl-dev ca-certificates tzdata
 WORKDIR /src
 COPY . .
+# Build with the image's own toolchain: rust-toolchain.toml says `stable`,
+# which would make rustup download a second copy inside the build.
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/src/target \
+    export RUSTUP_TOOLCHAIN="$(rustup default | cut -d' ' -f1)" && \
     cargo build --release --locked && cp target/release/hars /hars
 
 FROM scratch

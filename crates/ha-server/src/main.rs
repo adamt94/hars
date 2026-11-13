@@ -19,8 +19,10 @@ use tracing_subscriber::EnvFilter;
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
-/// How long in-flight HTTP requests get to finish after a stop signal.
-const HTTP_DRAIN_TIMEOUT: Duration = Duration::from_secs(10);
+/// How long in-flight HTTP requests get to finish after a stop signal. Half
+/// of `docker stop`'s default 10 s grace period, so the final stages still
+/// run before Docker sends SIGKILL.
+const HTTP_DRAIN_TIMEOUT: Duration = Duration::from_secs(5);
 
 fn main() -> anyhow::Result<()> {
     // Before the runtime and its worker threads allocate anything.

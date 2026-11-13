@@ -94,6 +94,31 @@ fn sigterm_stops_cleanly_with_an_idle_keep_alive_connection() {
     assert!(out.contains("hars stopped"), "{out}");
 }
 
+/// A client stuck mid-request must not hold shutdown past the drain
+/// timeout, which has to fit in `docker stop`'s 10 s grace period.
+#[cfg(unix)]
+#[test]
+fn stuck_request_is_cut_off_within_dockers_grace_period() {
+    let port = free_port();
+    let child = spawn_hars(port);
+    let mut conn = TcpStream::connect(("127.0.0.1", port)).unwrap();
+    conn.write_all(
+        b"POST /api/states/sensor.x HTTP/1.1\r\nHost: x\r\nContent-Type: application/json\r\nContent-Length: 100\r\n\r\n{",
+    )
+    .unwrap();
+    std::thread::sleep(Duration::from_millis(100));
+    let start = Instant::now();
+    signal(&child, "-TERM");
+    let (status, out) = wait_with_limit(child, Duration::from_secs(9));
+    assert!(status.success(), "exit {status}: {out}");
+    assert!(out.contains("hars stopped"), "{out}");
+    assert!(
+        start.elapsed() < Duration::from_secs(8),
+        "{:?}",
+        start.elapsed()
+    );
+}
+
 #[cfg(unix)]
 #[test]
 fn sigint_stops_cleanly() {
