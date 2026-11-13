@@ -8,7 +8,7 @@
 //! `"on"` → `true` for a boolean); the handler sees the coerced data, while
 //! the `call_service` event keeps the data as sent, as in HA.
 
-use crate::service::{ServiceData, ServiceError, resolve_entity_ids};
+use crate::service::{ServiceData, ServiceError, validate_entity_ids};
 use serde_json::{Number, Value};
 
 /// What a field accepts, mirroring the HA validator named on each variant.
@@ -135,7 +135,8 @@ impl Schema {
                 if let Err((msg, _)) = check_target(key, value) {
                     return invalid(format!("{msg} for dictionary value @ data['{key}']"));
                 }
-            } else if self.entity_service && key == "metadata" {
+            } else if self.entity_service && key == "metadata" && value.is_object() {
+                // `vol.Remove("metadata"): dict`; anything else is an extra key.
                 drop_metadata = true;
             } else if !self.allow_extra {
                 return invalid(format!("extra keys not allowed @ data['{key}']"));
@@ -182,27 +183,41 @@ fn check(kind: &Kind, value: &Value) -> Checked {
         Kind::Boolean => match value {
             Value::Bool(_) => Ok(None),
             Value::Number(n) => Ok(Some(Value::Bool(n.as_f64() != Some(0.0)))),
-            Value::String(s) => match s.trim().to_ascii_lowercase().as_str() {
+            Value::String(s) => match s.trim().to_lowercase().as_str() {
                 "1" | "true" | "yes" | "on" | "enable" => Ok(Some(Value::Bool(true))),
                 "0" | "false" | "no" | "off" | "disable" => Ok(Some(Value::Bool(false))),
-                _ => err(format!("invalid boolean value {s}")),
+                other => err(format!("invalid boolean value {other}")),
             },
             other => err(format!("invalid boolean value {other}")),
         },
         Kind::Int(range) => {
-            let (n, changed) = match value {
-                Value::Number(n) if n.is_i64() || n.is_u64() => (n.as_f64().unwrap_or(0.0), false),
-                // Python's int() truncates a float.
-                Value::Number(n) => (n.as_f64().unwrap_or(0.0).trunc(), true),
-                Value::Bool(b) => (f64::from(u8::from(*b)), true),
-                Value::String(s) => match s.trim().parse::<i64>() {
-                    Ok(i) => (i as f64, true),
-                    Err(_) => return err("expected int".into()),
+            let expected = || ("expected int".to_owned(), None);
+            let (n, coerced): (i128, bool) = match value {
+                Value::Number(n) => match (n.as_i64(), n.as_u64()) {
+                    (Some(i), _) => (i.into(), false),
+                    (_, Some(u)) => (u.into(), false),
+                    // Python's int() truncates a float.
+                    _ => {
+                        let t = n.as_f64().unwrap_or(f64::NAN).trunc();
+                        if !(t >= i64::MIN as f64 && t < u64::MAX as f64) {
+                            return Err(expected());
+                        }
+                        (t as i128, true)
+                    }
                 },
-                _ => return err("expected int".into()),
+                Value::Bool(b) => (i128::from(*b), true),
+                Value::String(s) => (parse_python_int(s).ok_or_else(expected)?, true),
+                _ => return Err(expected()),
             };
-            in_range(n, range).map_err(|m| (m, None))?;
-            Ok(changed.then(|| Value::from(n as i64)))
+            int_in_range(n, range).map_err(|m| (m, None))?;
+            if !coerced {
+                return Ok(None);
+            }
+            match (i64::try_from(n), u64::try_from(n)) {
+                (Ok(i), _) => Ok(Some(Value::from(i))),
+                (_, Ok(u)) => Ok(Some(Value::from(u))),
+                _ => Err(expected()),
+            }
         }
         Kind::Float(range) => {
             let (n, changed) = match value {
@@ -234,12 +249,18 @@ fn check(kind: &Kind, value: &Value) -> Checked {
         Kind::OneOf(options) => match value {
             Value::String(s) if options.contains(&s.as_str()) => Ok(None),
             _ => {
-                let list: Vec<String> = options.iter().map(|o| format!("'{o}'")).collect();
+                // voluptuous sorts the choices in its message.
+                let mut sorted = options.to_vec();
+                sorted.sort_unstable();
+                let list: Vec<String> = sorted.iter().map(|o| format!("'{o}'")).collect();
                 err(format!("value must be one of [{}]", list.join(", ")))
             }
         },
         Kind::EntityIds => check_target("entity_id", value),
         Kind::List(item) => {
+            if value.is_null() {
+                return Ok(Some(Value::Array(Vec::new()))); // ensure_list(None) == []
+            }
             let Value::Array(items) = value else {
                 // `ensure_list`: wrap a single value, then validate it.
                 let one = check(item, value).map_err(|(m, _)| (m, Some(0)))?;
@@ -261,36 +282,78 @@ fn check(kind: &Kind, value: &Value) -> Checked {
 /// Target keys are validated but kept as sent: handlers resolve them.
 fn check_target(key: &str, value: &Value) -> Checked {
     if key == "entity_id" {
-        return match resolve_entity_ids(Some(value)) {
-            Ok(_) => Ok(None),
+        return match validate_entity_ids(value) {
+            Ok(()) => Ok(None),
             Err(ServiceError::Invalid(msg)) => Err((msg, None)),
             Err(e) => Err((e.to_string(), None)),
         };
     }
+    // `vol.Any("none", vol.All(cv.ensure_list, [str]))`, so null is `[]`.
     match value {
-        Value::String(_) => Ok(None),
+        Value::Null | Value::String(_) => Ok(None),
         Value::Array(items) if items.iter().all(Value::is_string) => Ok(None),
         _ => Err(("value should be a string".into(), None)),
     }
 }
 
-fn in_range(n: f64, range: &Range) -> Result<(), String> {
-    let fmt = |b: f64| {
-        if b.fract() == 0.0 {
-            format!("{}", b as i64)
-        } else {
-            b.to_string()
-        }
+/// Python's `int(str)`: surrounding whitespace, an optional sign, and
+/// digits with single `_` separators.
+fn parse_python_int(s: &str) -> Option<i128> {
+    let t = s.trim();
+    let digits = t.strip_prefix(['+', '-']).unwrap_or(t);
+    let ok = !digits.is_empty()
+        && !digits.starts_with('_')
+        && !digits.ends_with('_')
+        && !digits.contains("__")
+        && digits.bytes().all(|b| b.is_ascii_digit() || b == b'_');
+    if !ok {
+        return None;
+    }
+    t.replace('_', "").parse().ok()
+}
+
+fn int_in_range(n: i128, range: &Range) -> Result<(), String> {
+    // Exact for integral bounds; a fractional bound compares as Python does.
+    let below = |b: f64| match b.fract() == 0.0 && b.abs() < 1e38 {
+        true => n < b as i128,
+        false => (n as f64) < b,
+    };
+    let above = |b: f64| match b.fract() == 0.0 && b.abs() < 1e38 {
+        true => n > b as i128,
+        false => (n as f64) > b,
     };
     if let Some(min) = range.min
-        && n < min
+        && below(min)
     {
-        return Err(format!("value must be at least {}", fmt(min)));
+        return Err(format!("value must be at least {}", fmt_bound(min)));
     }
     if let Some(max) = range.max
-        && n > max
+        && above(max)
     {
-        return Err(format!("value must be at most {}", fmt(max)));
+        return Err(format!("value must be at most {}", fmt_bound(max)));
+    }
+    Ok(())
+}
+
+fn fmt_bound(b: f64) -> String {
+    if b.fract() == 0.0 {
+        format!("{}", b as i64)
+    } else {
+        b.to_string()
+    }
+}
+
+fn in_range(n: f64, range: &Range) -> Result<(), String> {
+    // NaN fails the bound check, as in voluptuous.
+    if let Some(min) = range.min
+        && (n.is_nan() || n < min)
+    {
+        return Err(format!("value must be at least {}", fmt_bound(min)));
+    }
+    if let Some(max) = range.max
+        && (n.is_nan() || n > max)
+    {
+        return Err(format!("value must be at most {}", fmt_bound(max)));
     }
     Ok(())
 }
@@ -390,7 +453,7 @@ mod tests {
             ),
             (
                 json!({ "entity_id": "light.a", "flash": "medium" }),
-                "value must be one of ['short', 'long'] for dictionary value @ data['flash']",
+                "value must be one of ['long', 'short'] for dictionary value @ data['flash']",
             ),
             (
                 json!({ "entity_id": "light.a", "brightnes_pct": 5 }),
@@ -428,6 +491,74 @@ mod tests {
                 .allow_extra()
                 .validate(&data(json!({ "message": "hi", "x": 1 }))),
             Ok(None)
+        );
+    }
+
+    #[test]
+    fn ints_stay_exact() {
+        let s = Schema::new().optional("i", Kind::Int(Range::ANY));
+        let out = |v: Value| {
+            s.validate(&data(json!({ "i": v })))
+                .map(|o| o.map(|d| d["i"].clone()))
+        };
+        assert_eq!(
+            out(json!("9007199254740993")),
+            Ok(Some(json!(9007199254740993_i64)))
+        );
+        assert_eq!(
+            out(json!("18446744073709551615")),
+            Ok(Some(json!(u64::MAX)))
+        );
+        assert_eq!(out(json!(" -1_000 ")), Ok(Some(json!(-1000))));
+        assert_eq!(out(json!(true)), Ok(Some(json!(1))));
+        assert_eq!(out(json!(u64::MAX)), Ok(None));
+        for bad in [
+            json!("1__0"),
+            json!("_1"),
+            json!("1.0"),
+            json!(1e20),
+            json!(""),
+        ] {
+            assert!(out(bad.clone()).is_err(), "{bad}");
+        }
+        let capped = Schema::new().optional("i", Kind::Int(Range::new(0.0, 9007199254740992.0)));
+        assert!(
+            capped
+                .validate(&data(json!({ "i": 9007199254740993_i64 })))
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn nulls_and_metadata_follow_ha() {
+        let s = Schema::entity_service().optional("l", Kind::List(Box::new(Kind::Int(Range::ANY))));
+        let out = s
+            .validate(&data(
+                json!({ "entity_id": "light.a", "area_id": null, "l": null }),
+            ))
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            Value::Object(out),
+            json!({ "entity_id": "light.a", "area_id": null, "l": [] })
+        );
+        assert_eq!(
+            err(&s, json!({ "entity_id": "light.a", "metadata": 42 })),
+            "extra keys not allowed @ data['metadata']"
+        );
+    }
+
+    #[test]
+    fn nan_and_boolean_messages() {
+        let f = Schema::new().optional("f", Kind::Float(Range::new(0.0, 100.0)));
+        assert_eq!(
+            err(&f, json!({ "f": "NaN" })),
+            "value must be at least 0 for dictionary value @ data['f']"
+        );
+        let b = Schema::new().optional("b", Kind::Boolean);
+        assert_eq!(
+            err(&b, json!({ "b": " BAD " })),
+            "invalid boolean value bad for dictionary value @ data['b']"
         );
     }
 }

@@ -84,37 +84,48 @@ impl ServiceCall {
 
 /// [`ServiceCall::entity_ids`] for a raw `entity_id` value.
 pub(crate) fn resolve_entity_ids(value: Option<&Value>) -> Result<EntityTarget, ServiceError> {
-    let parse = |s: &str| {
+    let mut ids = Vec::new();
+    match walk_entity_ids(value, |id| ids.push(id))? {
+        true => Ok(EntityTarget::All),
+        false => Ok(EntityTarget::Ids(ids)),
+    }
+}
+
+/// Check an `entity_id` value without collecting the ids.
+pub(crate) fn validate_entity_ids(value: &Value) -> Result<(), ServiceError> {
+    walk_entity_ids(Some(value), |_| {}).map(|_| ())
+}
+
+/// Visit each id in an `entity_id` value; `Ok(true)` means `all`.
+fn walk_entity_ids(
+    value: Option<&Value>,
+    mut visit: impl FnMut(EntityId),
+) -> Result<bool, ServiceError> {
+    let mut parse = |s: &str| {
         let s = s.trim();
         let id = if s.bytes().any(|b| b.is_ascii_uppercase()) {
             EntityId::parse(&s.to_ascii_lowercase())
         } else {
             EntityId::parse(s)
         };
-        id.map_err(|e| ServiceError::Invalid(e.to_string()))
+        id.map(&mut visit)
+            .map_err(|e| ServiceError::Invalid(e.to_string()))
     };
     match value {
-        None => Ok(EntityTarget::Ids(Vec::new())),
+        None => Ok(false),
         Some(Value::Null) => Err(ServiceError::Invalid("Entity IDs cannot be None".into())),
-        Some(Value::String(s)) if s.eq_ignore_ascii_case("all") => Ok(EntityTarget::All),
-        Some(Value::String(s)) if s.eq_ignore_ascii_case("none") => {
-            Ok(EntityTarget::Ids(Vec::new()))
-        }
-        Some(Value::String(s)) => s
-            .split(',')
-            .map(parse)
-            .collect::<Result<_, _>>()
-            .map(EntityTarget::Ids),
+        Some(Value::String(s)) if s.eq_ignore_ascii_case("all") => Ok(true),
+        Some(Value::String(s)) if s.eq_ignore_ascii_case("none") => Ok(false),
+        Some(Value::String(s)) => s.split(',').try_for_each(parse).map(|_| false),
         Some(Value::Array(items)) => items
             .iter()
-            .map(|v| match v {
+            .try_for_each(|v| match v {
                 Value::String(s) => parse(s),
                 other => Err(ServiceError::Invalid(format!(
                     "entity_id must be a string, got {other}"
                 ))),
             })
-            .collect::<Result<_, _>>()
-            .map(EntityTarget::Ids),
+            .map(|_| false),
         Some(other) => Err(ServiceError::Invalid(format!(
             "entity_id must be a string or list, got {other}"
         ))),
