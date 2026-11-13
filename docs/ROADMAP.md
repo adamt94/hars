@@ -128,8 +128,10 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
 - [x] Lossless, ordered state-change delivery for internal consumers
       (automations, recorder). The lossy broadcast bus is only for API
       subscribers, which resync from a snapshot when they lag
-- [ ] Perf harness (`docs/PERF.md`): RSS/PSS, CPU time, wakeups, binary size;
+- [x] Perf harness (`docs/PERF.md`): RSS/PSS, CPU time, wakeups, binary size;
       `criterion` benches for state writes and event fan-out
+- [ ] Turn off transparent huge pages for mimalloc by default (8 MiB of
+      13 MiB idle RSS on a THP=`always` Linux host; see `docs/PERF.md`)
 - [x] Graceful shutdown on SIGTERM + lifecycle events
       (`homeassistant_start`/`started`/`stop`)
 

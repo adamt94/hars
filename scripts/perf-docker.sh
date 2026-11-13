@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Run scripts/perf.sh in a Linux container (the budgets are defined on Linux).
+#
+#   scripts/perf-docker.sh [warmup_s] [quiet_s]
+#
+# Builds a release binary inside the container; the cargo cache and target
+# dir live in named volumes so reruns are incremental.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+exec docker run --rm \
+  -v "$PWD":/src:ro \
+  -v hars-perf-cargo:/usr/local/cargo/registry \
+  -v hars-perf-target:/target \
+  -e CARGO_TARGET_DIR=/target \
+  -w /src \
+  rust:1 \
+  bash -c "cargo build --release --locked -q && scripts/perf.sh /target/release/hars ${1:-10} ${2:-60}"
