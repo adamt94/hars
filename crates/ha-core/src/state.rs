@@ -1,4 +1,4 @@
-use crate::{Clock, EntityId};
+use crate::{Clock, Context, EntityId};
 use jiff::Timestamp;
 use parking_lot::RwLock;
 use serde::Serialize;
@@ -17,6 +17,7 @@ pub struct State {
     pub attributes: Attributes,
     pub last_changed: Timestamp,
     pub last_updated: Timestamp,
+    pub context: Context,
 }
 
 #[derive(Default)]
@@ -51,6 +52,7 @@ impl StateMachine {
         state: SmolStr,
         attributes: Attributes,
         clock: &Clock,
+        context: Option<Context>,
     ) -> (Arc<State>, Option<Arc<State>>) {
         let mut states = self.states.write();
         let old = states.get(&entity_id).cloned();
@@ -73,6 +75,7 @@ impl StateMachine {
             attributes,
             last_changed,
             last_updated: now,
+            context: context.unwrap_or_else(|| Context::at(now)),
         });
         states.insert(entity_id, new.clone());
         (new, old)
@@ -175,5 +178,30 @@ mod tests {
             state.last_updated,
             state.last_changed
         );
+    }
+
+    #[tokio::test]
+    async fn state_and_event_carry_the_context() {
+        let hass = Hass::new();
+        let mut rx = hass.bus().subscribe();
+        let id = EntityId::parse("light.kitchen").unwrap();
+        let ctx = Context::new().with_user("user1");
+
+        let on =
+            hass.set_state_with_context(id.clone(), "on", Attributes::new(), Some(ctx.clone()));
+        assert_eq!(on.context, ctx);
+        assert_eq!(rx.recv().await.unwrap().context, ctx);
+
+        // An unchanged write keeps the old state and its context.
+        let same = hass.set_state(id.clone(), "on", Attributes::new());
+        assert!(Arc::ptr_eq(&same, &on));
+        assert_eq!(same.context, ctx);
+
+        let off = hass.set_state(id, "off", Attributes::new());
+        assert_ne!(off.context, ctx, "no context given: a fresh one");
+        assert_eq!(off.context.user_id, None);
+        let json = serde_json::to_value(&*off).unwrap();
+        assert_eq!(json["context"]["id"], off.context.id.to_string());
+        assert_eq!(json["context"]["parent_id"], serde_json::Value::Null);
     }
 }

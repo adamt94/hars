@@ -10,12 +10,14 @@
 //! more than necessary and must never block on I/O.
 
 mod clock;
+mod context;
 mod entity_id;
 mod event;
 mod service;
 mod state;
 
 pub use clock::{Clock, SimulatedClock};
+pub use context::{Context, ContextId};
 pub use entity_id::{EntityId, EntityIdError};
 pub use event::{Event, EventBus, EventKind};
 pub use service::{
@@ -78,7 +80,8 @@ impl Hass {
     ///
     /// `target` is merged into `data`, a `call_service` event is fired, then
     /// the handler runs. Response data is returned only when
-    /// `return_response` is set.
+    /// `return_response` is set. The event and the handler's
+    /// [`ServiceCall`] carry `context`, or a new one if it is `None`.
     pub async fn call_service(
         &self,
         domain: &str,
@@ -86,6 +89,7 @@ impl Hass {
         mut data: ServiceData,
         target: Option<ServiceData>,
         return_response: bool,
+        context: Option<Context>,
     ) -> Result<Option<ServiceResponse>, ServiceError> {
         let handler =
             self.inner
@@ -104,11 +108,13 @@ impl Hass {
             data.extend(target);
         }
 
+        let now = self.inner.clock.now();
         let call = ServiceCall {
             domain: lower(domain),
             service: lower(service),
             data: Arc::new(data),
             return_response,
+            context: context.unwrap_or_else(|| Context::at(now)),
         };
         self.inner.bus.fire(Event::new(
             EventKind::CallService {
@@ -116,7 +122,8 @@ impl Hass {
                 service: call.service.clone(),
                 service_data: call.data.clone(),
             },
-            self.inner.clock.now(),
+            now,
+            call.context.clone(),
         ));
 
         let response = handler.call(call).await?;
@@ -128,18 +135,34 @@ impl Hass {
             .ok_or_else(|| ServiceError::Failed("service did not return response data".into()))
     }
 
-    /// Set an entity's state and fire `state_changed` if it actually changed.
+    /// Set an entity's state under a new [`Context`] and fire `state_changed`
+    /// if it actually changed.
     pub fn set_state(
         &self,
         entity_id: EntityId,
         state: impl Into<smol_str::SmolStr>,
         attributes: Attributes,
     ) -> Arc<State> {
+        self.set_state_with_context(entity_id, state, attributes, None)
+    }
+
+    /// Like [`Hass::set_state`], recording `context` (or a new one) as the
+    /// cause. Service handlers pass their call's context, so the change is
+    /// attributed to the call. A write that changes nothing keeps the old
+    /// state, context included, as in HA.
+    pub fn set_state_with_context(
+        &self,
+        entity_id: EntityId,
+        state: impl Into<smol_str::SmolStr>,
+        attributes: Attributes,
+        context: Option<Context>,
+    ) -> Arc<State> {
         let (new, old) = self.inner.states.set(
             entity_id.clone(),
             state.into(),
             attributes,
             &self.inner.clock,
+            context,
         );
         let changed = old.as_ref().is_none_or(|o| !Arc::ptr_eq(o, &new));
         if changed {
@@ -150,6 +173,7 @@ impl Hass {
                     new_state: Some(new.clone()),
                 },
                 new.last_updated,
+                new.context.clone(),
             ));
         }
         new

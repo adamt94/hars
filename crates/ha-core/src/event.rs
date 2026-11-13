@@ -1,4 +1,4 @@
-use crate::{EntityId, ServiceData, State};
+use crate::{Context, EntityId, ServiceData, State};
 use jiff::Timestamp;
 use serde::Serialize;
 use smol_str::SmolStr;
@@ -35,11 +35,16 @@ pub struct Event {
     #[serde(flatten)]
     pub kind: EventKind,
     pub time_fired: Timestamp,
+    pub context: Context,
 }
 
 impl Event {
-    pub fn new(kind: EventKind, time_fired: Timestamp) -> Self {
-        Self { kind, time_fired }
+    pub fn new(kind: EventKind, time_fired: Timestamp, context: Context) -> Self {
+        Self {
+            kind,
+            time_fired,
+            context,
+        }
     }
 }
 

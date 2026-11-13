@@ -7,7 +7,9 @@ use axum::{
     response::{IntoResponse, Response},
     routing::{get, post},
 };
-use ha_core::{Attributes, EntityId, EventKind, Hass, ServiceData, ServiceError, SupportsResponse};
+use ha_core::{
+    Attributes, Context, EntityId, EventKind, Hass, ServiceData, ServiceError, SupportsResponse,
+};
 use serde_json::{Value, json};
 use tokio::sync::broadcast::error::{RecvError, TryRecvError};
 use tracing_subscriber::EnvFilter;
@@ -117,11 +119,8 @@ fn message(status: StatusCode, message: impl std::fmt::Display) -> Response {
 }
 
 /// Same shape as Home Assistant's `POST /api/services/<domain>/<service>`:
-/// returns the states that changed during the call, or with
+/// returns the states the call changed (those carrying its context), or with
 /// `?return_response` `{"changed_states": [...], "service_response": {...}}`.
-///
-/// Until states carry a `Context`, "changed during the call" includes changes
-/// from other sources that land while the call runs.
 async fn call_service(
     State(hass): State<Hass>,
     Path((domain, service)): Path<(String, String)>,
@@ -139,15 +138,25 @@ async fn call_service(
         }
     };
     let return_response = query.iter().any(|(key, _)| key == "return_response");
+    // No auth yet, so no user; HA uses the request's user here.
+    let context = Context::at(hass.clock().now());
 
     // Subscribe before the call so no change it causes is missed.
     let mut rx = hass.bus().subscribe();
     // Like HA, finish the call even if the client disconnects mid-way.
     let mut task = tokio::spawn({
         let hass = hass.clone();
+        let context = context.clone();
         async move {
-            hass.call_service(&domain, &service, data, None, return_response)
-                .await
+            hass.call_service(
+                &domain,
+                &service,
+                data,
+                None,
+                return_response,
+                Some(context),
+            )
+            .await
         }
     });
 
@@ -159,6 +168,7 @@ async fn call_service(
             new_state: Some(state),
             ..
         } = &event.kind
+            && event.context == context
         {
             changed_states.push(state.clone());
         }
@@ -231,7 +241,12 @@ mod tests {
                         attrs.insert("brightness".into(), b.clone());
                     }
                     for id in ids {
-                        h.set_state(id, "on", attrs.clone());
+                        h.set_state_with_context(
+                            id,
+                            "on",
+                            attrs.clone(),
+                            Some(call.context.clone()),
+                        );
                     }
                     Ok(None)
                 }
@@ -399,12 +414,13 @@ mod tests {
         let hass = Hass::new();
         let h = hass.clone();
         hass.services()
-            .register("demo", "flood", SupportsResponse::None, move |_| {
+            .register("demo", "flood", SupportsResponse::None, move |call| {
                 let h = h.clone();
                 async move {
                     for i in 0..N {
                         let id = EntityId::parse(&format!("sensor.s{i}")).unwrap();
-                        h.set_state(id, "on", Attributes::new());
+                        let ctx = Some(call.context.clone());
+                        h.set_state_with_context(id, "on", Attributes::new(), ctx);
                         tokio::task::yield_now().await; // as a real I/O-bound handler would
                     }
                     Ok(None)
@@ -415,5 +431,29 @@ mod tests {
         let changed = body.as_array().unwrap();
         assert_eq!(changed.len(), N);
         assert_eq!(changed[0]["entity_id"], "sensor.s0", "earliest change kept");
+    }
+
+    #[tokio::test]
+    async fn changed_states_exclude_other_sources() {
+        let hass = Hass::new();
+        let h = hass.clone();
+        hass.services()
+            .register("demo", "mixed", SupportsResponse::None, move |call| {
+                let h = h.clone();
+                async move {
+                    let mine = EntityId::parse("light.mine").unwrap();
+                    let other = EntityId::parse("sensor.other").unwrap();
+                    // A change from elsewhere (an integration push) lands mid-call.
+                    h.set_state(other, "42", Attributes::new());
+                    h.set_state_with_context(mine, "on", Attributes::new(), Some(call.context));
+                    Ok(None)
+                }
+            });
+        let (status, body) = send(&hass, "POST", "/api/services/demo/mixed", "").await;
+        assert_eq!(status, StatusCode::OK);
+        let changed = body.as_array().unwrap();
+        assert_eq!(changed.len(), 1, "{body}");
+        assert_eq!(changed[0]["entity_id"], "light.mine");
+        assert_eq!(changed[0]["context"]["user_id"], Value::Null);
     }
 }

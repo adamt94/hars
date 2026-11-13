@@ -11,6 +11,7 @@ rust-version.workspace = true
 workspace = true
 
 [dependencies]
+rand = "0.9.5"
 jiff = { version = "0.2.43", features = ["serde"] }
 parking_lot = "0.12.5"
 serde = { version = "1.0.229", features = ["derive", "rc"] }

@@ -256,6 +256,7 @@ version = "0.1.0"
 dependencies = [
  "jiff",
  "parking_lot",
+ "rand",
  "serde",
  "serde_json",
  "smol_str",

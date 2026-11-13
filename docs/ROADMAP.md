@@ -124,7 +124,7 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
       event, `supports_response`, `entity_id` target resolution; REST
       `GET /api/services` + `POST /api/services/{domain}/{service}`
 - [ ] Per-service data schemas (handlers validate for now and return `Invalid` → 400)
-- [ ] `Context` (id, parent_id, user_id) on states, events and service calls
+- [x] `Context` (id, parent_id, user_id) on states, events and service calls
 - [ ] Lossless, ordered state-change delivery for internal consumers
       (automations, recorder). The lossy broadcast bus is only for API
       subscribers, which resync from a snapshot when they lag

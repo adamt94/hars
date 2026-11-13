@@ -4,7 +4,7 @@
 //! services are keyed by `domain` then `service`, `target` is merged into the
 //! service data, and a `call_service` event is fired before the handler runs.
 
-use crate::EntityId;
+use crate::{Context, EntityId};
 use parking_lot::RwLock;
 use serde_json::Value;
 use smol_str::SmolStr;
@@ -59,6 +59,9 @@ pub struct ServiceCall {
     /// Shared with the `call_service` event, so it is never deep-copied.
     pub data: Arc<ServiceData>,
     pub return_response: bool,
+    /// The caller's context. Handlers pass it to
+    /// [`crate::Hass::set_state_with_context`].
+    pub context: Context,
 }
 
 /// Entities a call targets, resolved from its `entity_id` field.
@@ -232,6 +235,7 @@ mod tests {
             service: "turn_on".into(),
             data: Arc::new(data(json!({ "entity_id": entity_id }))),
             return_response: false,
+            context: Context::new(),
         }
     }
 
@@ -254,6 +258,7 @@ mod tests {
                 }
             });
 
+        let ctx = Context::new().with_user("user1");
         let out = hass
             .call_service(
                 "light",
@@ -261,6 +266,7 @@ mod tests {
                 data(json!({ "brightness_pct": 30 })),
                 Some(data(json!({ "entity_id": "light.hallway" }))),
                 false,
+                Some(ctx.clone()),
             )
             .await;
         assert_eq!(out, Ok(None));
@@ -284,6 +290,9 @@ mod tests {
             Arc::ptr_eq(service_data, &call.data),
             "event shares the data"
         );
+        assert_eq!(call.context, ctx, "handler gets the caller's context");
+        assert_eq!(event.context, ctx, "so does the event");
+        assert_eq!(event.context.user_id.as_deref(), Some("user1"));
         assert_eq!(
             serde_json::to_value(&*event).unwrap()["data"],
             json!({
@@ -299,7 +308,7 @@ mod tests {
         let hass = Hass::new();
         let mut rx = hass.bus().subscribe();
         let err = hass
-            .call_service("Light", "Turn_On", ServiceData::new(), None, false)
+            .call_service("Light", "Turn_On", ServiceData::new(), None, false, None)
             .await
             .unwrap_err();
         assert_eq!(
@@ -321,7 +330,7 @@ mod tests {
             });
         assert!(hass.services().has_service("LIGHT", "Turn_On"));
         let out = hass
-            .call_service("LIGHT", "Turn_On", ServiceData::new(), None, false)
+            .call_service("LIGHT", "Turn_On", ServiceData::new(), None, false, None)
             .await;
         assert_eq!(out, Ok(None));
     }
@@ -353,7 +362,10 @@ mod tests {
 
         let call = |d: &'static str, s: &'static str, r: bool| {
             let hass = hass.clone();
-            async move { hass.call_service(d, s, ServiceData::new(), None, r).await }
+            async move {
+                hass.call_service(d, s, ServiceData::new(), None, r, None)
+                    .await
+            }
         };
         assert_eq!(
             call("light", "turn_on", true).await,
