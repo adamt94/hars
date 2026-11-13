@@ -57,24 +57,21 @@ Idle is truly idle: no CPU time and no voluntary context switches over the quiet
 transparent huge pages (the container's kernel has THP set to `always`, and
 `AnonHugePages` is 8192 kB). With `MIMALLOC_ALLOW_THP=0`, the same binary sits at
 3.7 MiB (`AnonHugePages` 0). mimalloc's `no_thp` Cargo feature does not help,
-because it only skips the `madvise` call. Fixing the default is tracked in
-the roadmap.
+because it only skips the `madvise` call.
 
-Benches on the same Mac, natively (`cargo bench -p ha-core`, median):
+### THP off by default, 2026-11-13
 
-| Bench | Time |
-|---|---|
-| `state_write/changed/no_attributes` | 234 ns |
-| `state_write/unchanged/no_attributes` | 50 ns |
-| `state_write/changed/light_attributes` | 503 ns |
-| `state_write/unchanged/light_attributes` | 403 ns |
-| `fan_out/feeds/0` | 275 ns |
-| `fan_out/feeds/1` | 292 ns |
-| `fan_out/feeds/4` | 357 ns |
-| `fan_out/feeds/16` | 540 ns |
+`hars` now sets `PR_SET_THP_DISABLE` (via `rustix`) and re-execs itself once
+at start-up, so the new image allocates nothing with THP on. Setting the flag
+without re-exec only got to 7.6 MiB, because mimalloc faults 4 MiB of huge
+pages before `main` runs. A build-time mimalloc define was also tried and
+rejected: a plain `CFLAGS` in the environment, or `cargo install --git`,
+silently drops it. The pid is kept across the exec, and
+`MIMALLOC_ALLOW_THP=1` keeps THP on. Same container, built with
+`CFLAGS=-O2`:
 
-The timings include freeing what the write leaves behind: the replaced state
-for a changed write, and the caller's map for an unchanged one. An unchanged
-write with 8 attributes still costs 80 % of a changed one, because comparing
-the maps and freeing the caller's map dominate. Each extra lossless feed adds
-~15 ns.
+| binary | start→/api/ | idle RSS | idle PSS | idle CPU | wakeups/s | threads | run |
+|---|---|---|---|---|---|---|---|
+| 2.02 MiB | 7 ms | 4.1 MiB | 3.1 MiB | 0.000 % | 0.00 | 3 | 5s warm-up, 30s quiet |
+
+Idle RSS went from 13.2 to 4.1 MiB (−69 %), and start-up did not get slower.

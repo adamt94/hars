@@ -22,11 +22,53 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 /// How long in-flight HTTP requests get to finish after a stop signal.
 const HTTP_DRAIN_TIMEOUT: Duration = Duration::from_secs(10);
 
-#[tokio::main]
-async fn main() -> anyhow::Result<()> {
+fn main() -> anyhow::Result<()> {
+    // Before the runtime and its worker threads allocate anything.
+    let thp_disabled = disable_transparent_huge_pages();
+    tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()?
+        .block_on(run(thp_disabled))
+}
+
+/// On a host with transparent huge pages set to `always`, the kernel backs
+/// mimalloc's arena with 2 MiB pages: 8 MiB of what is otherwise ~4 MiB idle
+/// RSS (docs/PERF.md). The first huge pages are faulted before `main` runs,
+/// so this sets `PR_SET_THP_DISABLE` (inherited across `exec`) and re-execs
+/// the binary once: the new image starts with THP off before it allocates.
+/// The pid is unchanged, so this is safe as a container's PID 1. If the
+/// re-exec fails, THP is still off for everything allocated from here on.
+/// `MIMALLOC_ALLOW_THP=1` keeps THP on. `hars` spawns no children, which would
+/// inherit the flag.
+fn disable_transparent_huge_pages() -> std::io::Result<bool> {
+    #[cfg(target_os = "linux")]
+    if std::env::var_os("MIMALLOC_ALLOW_THP").is_none_or(|v| v != "1") {
+        use rustix::thread::{disable_transparent_huge_pages, transparent_huge_pages_are_disabled};
+        if transparent_huge_pages_are_disabled()? {
+            return Ok(true); // already off: inherited, or this is the re-exec
+        }
+        disable_transparent_huge_pages(true)?;
+        use std::os::unix::process::CommandExt;
+        let exe = std::env::current_exe()?;
+        // Only returns on failure.
+        let err = std::process::Command::new(exe)
+            .args(std::env::args_os().skip(1))
+            .exec();
+        return Err(err);
+    }
+    Ok(false)
+}
+
+async fn run(thp_disabled: std::io::Result<bool>) -> anyhow::Result<()> {
     tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()))
         .init();
+
+    match thp_disabled {
+        Ok(true) => tracing::debug!("transparent huge pages disabled"),
+        Ok(false) => {}
+        Err(e) => tracing::warn!("could not start with transparent huge pages off: {e}"),
+    }
 
     let hass = Hass::new();
     let addr = std::env::var("HARS_BIND").unwrap_or_else(|_| "0.0.0.0:8123".into());

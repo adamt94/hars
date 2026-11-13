@@ -114,7 +114,7 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
 
 ## Milestones
 
-### M0: Core (in progress)
+### M0: Core (done)
 - [x] Cargo workspace, CI, perf-tuned release profile
 - [x] `EntityId`, `State`, `StateMachine`, `EventBus`, `Hass`
 - [x] REST: `/api/`, `/api/states`, `/api/states/{entity_id}`
@@ -130,7 +130,7 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
       subscribers, which resync from a snapshot when they lag
 - [x] Perf harness (`docs/PERF.md`): RSS/PSS, CPU time, wakeups, binary size;
       `criterion` benches for state writes and event fan-out
-- [ ] Turn off transparent huge pages for mimalloc by default (8 MiB of
+- [x] Turn off transparent huge pages for mimalloc by default (8 MiB of
       13 MiB idle RSS on a THP=`always` Linux host; see `docs/PERF.md`)
 - [x] Graceful shutdown on SIGTERM + lifecycle events
       (`homeassistant_start`/`started`/`stop`)

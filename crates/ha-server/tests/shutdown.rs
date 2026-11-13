@@ -111,3 +111,21 @@ fn signal_right_after_the_port_opens_still_stops_cleanly() {
         assert!(status.success(), "{sig}: exit {status}: {out}");
     }
 }
+
+/// THP stays off for the whole process (docs/PERF.md): the kernel reports
+/// `THP_enabled: 0`, unless `MIMALLOC_ALLOW_THP=1` asks for it.
+#[cfg(target_os = "linux")]
+#[test]
+fn transparent_huge_pages_are_disabled() {
+    let thp_enabled = |child: &Child| {
+        std::fs::read_to_string(format!("/proc/{}/status", child.id()))
+            .unwrap()
+            .lines()
+            .find_map(|l| l.strip_prefix("THP_enabled:").map(|v| v.trim().to_owned()))
+            .expect("kernel reports THP_enabled")
+    };
+    let child = spawn_hars(free_port());
+    assert_eq!(thp_enabled(&child), "0");
+    signal(&child, "-TERM");
+    wait_with_limit(child, Duration::from_secs(5));
+}
