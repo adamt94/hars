@@ -1,4 +1,4 @@
-use crate::{EntityId, State};
+use crate::{EntityId, ServiceData, State};
 use jiff::Timestamp;
 use serde::Serialize;
 use smol_str::SmolStr;
@@ -16,6 +16,12 @@ pub enum EventKind {
         entity_id: EntityId,
         old_state: Option<Arc<State>>,
         new_state: Option<Arc<State>>,
+    },
+    /// Fired before a service handler runs (HA's `call_service`).
+    CallService {
+        domain: SmolStr,
+        service: SmolStr,
+        service_data: Arc<ServiceData>,
     },
     /// Escape hatch for integration-defined events.
     Custom {
