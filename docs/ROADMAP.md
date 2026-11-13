@@ -247,7 +247,7 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
       service dispatch suppressed and logs the calls it *would* make, and a
       diff tool compares them with HA's `call_service` events. The phone stays
       on HA. One week clean.
-- [ ] Packaging: static musl binary in a `FROM scratch` image with CA roots,
+- [x] Packaging: static musl binary in a `FROM scratch` image with CA roots,
       tzdata, a persistent volume and SIGTERM handling
 - [ ] Promote: stop HA, run the importer on a fresh copy, start `hars` on :8123.
       Rollback = start the untouched HA snapshot again.

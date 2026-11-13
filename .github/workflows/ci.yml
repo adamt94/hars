@@ -21,3 +21,18 @@ jobs:
       - run: cargo fmt --all --check
       - run: cargo clippy --all-targets --locked
       - run: cargo test --workspace --locked
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t hars .
+      - name: Smoke test the image
+        run: |
+          docker run -d --name hars -p 8123:8123 hars
+          for i in $(seq 1 50); do curl -sf localhost:8123/api/ && break; sleep 0.1; done
+          curl -sf localhost:8123/api/ | grep -q "API running."
+          docker stop -t 10 hars
+          test "$(docker inspect hars --format '{{.State.ExitCode}}')" = 0
+          docker logs hars 2>&1 | grep -q "hars stopped"
+          echo "image: $(docker image inspect hars --format '{{.Size}}') bytes"
