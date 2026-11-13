@@ -33,7 +33,11 @@ fn state_write(c: &mut Criterion) {
     g.bench_function("changed/no_attributes", |b| {
         b.iter(|| {
             on = !on;
-            drop(black_box(hass.set_state(id.clone(), if on { "on" } else { "off" }, Attributes::new())))
+            drop(black_box(hass.set_state(
+                id.clone(),
+                if on { "on" } else { "off" },
+                Attributes::new(),
+            )))
         })
     });
     hass.set_state(id.clone(), "on", Attributes::new());
