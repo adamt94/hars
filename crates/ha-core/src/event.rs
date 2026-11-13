@@ -38,23 +38,8 @@ pub struct Event {
 }
 
 impl Event {
-    pub fn state_changed(
-        entity_id: EntityId,
-        old_state: Option<Arc<State>>,
-        new_state: Option<Arc<State>>,
-    ) -> Self {
-        Self::now(EventKind::StateChanged {
-            entity_id,
-            old_state,
-            new_state,
-        })
-    }
-
-    pub fn now(kind: EventKind) -> Self {
-        Self {
-            kind,
-            time_fired: Timestamp::now(),
-        }
+    pub fn new(kind: EventKind, time_fired: Timestamp) -> Self {
+        Self { kind, time_fired }
     }
 }
 

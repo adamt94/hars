@@ -48,6 +48,7 @@ impl StateMachine {
         entity_id: EntityId,
         state: SmolStr,
         attributes: Attributes,
+        now: Timestamp,
     ) -> (Arc<State>, Option<Arc<State>>) {
         let mut states = self.states.write();
         let old = states.get(&entity_id).cloned();
@@ -59,7 +60,6 @@ impl StateMachine {
             return (o.clone(), old);
         }
 
-        let now = Timestamp::now();
         let last_changed = match &old {
             Some(o) if o.state == state => o.last_changed,
             _ => now,
@@ -114,5 +114,33 @@ mod tests {
             }
         ));
         assert_eq!(hass.states().get(&id).unwrap().state, "off");
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn timestamps_come_from_the_injected_clock() {
+        use crate::SimulatedClock;
+        use std::time::Duration;
+
+        let t0: Timestamp = "2026-10-25T00:30:00Z".parse().unwrap();
+        let hass = Hass::with_clock(SimulatedClock::new(t0).clock());
+        let mut rx = hass.bus().subscribe();
+        let id = EntityId::parse("sensor.temp").unwrap();
+
+        let first = hass.set_state(id.clone(), "20", Attributes::new());
+        assert_eq!((first.last_changed, first.last_updated), (t0, t0));
+
+        tokio::time::advance(Duration::from_secs(60)).await;
+        let mut attrs = Attributes::new();
+        attrs.insert("unit_of_measurement".into(), "°C".into());
+        let second = hass.set_state(id, "20", attrs);
+        let t1 = t0 + jiff::SignedDuration::from_secs(60);
+        assert_eq!(second.last_updated, t1);
+        assert_eq!(
+            second.last_changed, t0,
+            "attribute-only change keeps last_changed"
+        );
+
+        assert_eq!(rx.recv().await.unwrap().time_fired, t0);
+        assert_eq!(rx.recv().await.unwrap().time_fired, t1);
     }
 }

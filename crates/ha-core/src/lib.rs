@@ -9,11 +9,13 @@
 //! Design rule: the hot path (state writes + event fan-out) must not allocate
 //! more than necessary and must never block on I/O.
 
+mod clock;
 mod entity_id;
 mod event;
 mod service;
 mod state;
 
+pub use clock::{Clock, SimulatedClock};
 pub use entity_id::{EntityId, EntityIdError};
 pub use event::{Event, EventBus, EventKind};
 pub use service::{
@@ -34,6 +36,7 @@ pub struct Hass {
 
 #[derive(Default)]
 struct HassInner {
+    clock: Clock,
     bus: EventBus,
     states: StateMachine,
     services: ServiceRegistry,
@@ -42,6 +45,20 @@ struct HassInner {
 impl Hass {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// A `Hass` whose timestamps and timers run on `clock`.
+    pub fn with_clock(clock: Clock) -> Self {
+        Self {
+            inner: Arc::new(HassInner {
+                clock,
+                ..HassInner::default()
+            }),
+        }
+    }
+
+    pub fn clock(&self) -> &Clock {
+        &self.inner.clock
     }
 
     pub fn bus(&self) -> &EventBus {
@@ -93,11 +110,14 @@ impl Hass {
             data: Arc::new(data),
             return_response,
         };
-        self.inner.bus.fire(Event::now(EventKind::CallService {
-            domain: call.domain.clone(),
-            service: call.service.clone(),
-            service_data: call.data.clone(),
-        }));
+        self.inner.bus.fire(Event::new(
+            EventKind::CallService {
+                domain: call.domain.clone(),
+                service: call.service.clone(),
+                service_data: call.data.clone(),
+            },
+            self.inner.clock.now(),
+        ));
 
         let response = handler.call(call).await?;
         if !return_response {
@@ -115,15 +135,21 @@ impl Hass {
         state: impl Into<smol_str::SmolStr>,
         attributes: Attributes,
     ) -> Arc<State> {
+        let now = self.inner.clock.now();
         let (new, old) = self
             .inner
             .states
-            .set(entity_id.clone(), state.into(), attributes);
+            .set(entity_id.clone(), state.into(), attributes, now);
         let changed = old.as_ref().is_none_or(|o| !Arc::ptr_eq(o, &new));
         if changed {
-            self.inner
-                .bus
-                .fire(Event::state_changed(entity_id, old, Some(new.clone())));
+            self.inner.bus.fire(Event::new(
+                EventKind::StateChanged {
+                    entity_id,
+                    old_state: old,
+                    new_state: Some(new.clone()),
+                },
+                now,
+            ));
         }
         new
     }

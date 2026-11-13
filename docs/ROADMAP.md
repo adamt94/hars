@@ -118,7 +118,7 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
 - [x] Cargo workspace, CI, perf-tuned release profile
 - [x] `EntityId`, `State`, `StateMachine`, `EventBus`, `Hass`
 - [x] REST: `/api/`, `/api/states`, `/api/states/{entity_id}`
-- [ ] Injectable clock (wall + monotonic) used by states, timers and sun maths,
+- [x] Injectable clock (wall + monotonic) used by states, timers and sun maths,
       so tests run on simulated time
 - [x] Service registry: `call(domain, service, data, target)`, `call_service`
       event, `supports_response`, `entity_id` target resolution; REST
