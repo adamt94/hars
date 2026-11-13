@@ -83,7 +83,11 @@ impl StateMachine {
         // Writers notify while holding the write lock, so holding the read
         // lock here means no change can fall between snapshot and feed.
         let states = self.states.read();
-        self.listeners.lock().push(tx);
+        let mut listeners = self.listeners.lock();
+        // Writes also prune, but an idle system must not pile up dead feeds.
+        listeners.retain(|tx| !tx.is_closed());
+        listeners.push(tx);
+        drop(listeners);
         StateChanges {
             snapshot: states.values().cloned().collect(),
             rx,
@@ -360,33 +364,42 @@ mod tests {
     /// must account for every change exactly once.
     #[test]
     fn snapshot_and_feed_have_no_gap_or_overlap() {
-        const WRITES: usize = 20_000;
         let hass = Hass::new();
         let id = EntityId::parse("sensor.busy").unwrap();
         hass.set_state(id.clone(), "start", Attributes::new());
+        let subscribed = std::sync::atomic::AtomicBool::new(false);
         let feed = std::thread::scope(|s| {
+            // Write until the subscription exists, then 1,000 more: so it is
+            // always taken while writes are in flight.
             let writer = s.spawn(|| {
-                for i in 0..WRITES {
+                let mut i = 0;
+                let mut after = 0;
+                while after < 1_000 {
                     hass.set_state(id.clone(), i.to_string(), Attributes::new());
+                    i += 1;
+                    if subscribed.load(std::sync::atomic::Ordering::Acquire) {
+                        after += 1;
+                    }
                 }
+                i
             });
-            // Subscribe once the writer is under way.
             while hass.states().get(&id).unwrap().state == "start" {
                 std::hint::spin_loop();
             }
             let feed = hass.subscribe_state_changes();
-            writer.join().unwrap();
-            feed
+            subscribed.store(true, std::sync::atomic::Ordering::Release);
+            (feed, writer.join().unwrap())
         });
-        let mut feed = feed;
-        assert!(feed.backlog() > 0, "subscribed mid-write");
+        let (mut feed, writes) = feed;
+        // The write that raced the flag may predate the subscription.
+        assert!(feed.backlog() >= 999, "subscribed mid-write");
         let mut prev = feed.snapshot[0].clone();
         while let Some(event) = feed.try_recv() {
             let (_, old, new) = change(&event);
             assert!(Arc::ptr_eq(old.unwrap(), &prev), "gap or overlap");
             prev = new.clone();
         }
-        assert_eq!(prev.state, (WRITES - 1).to_string());
+        assert_eq!(prev.state, (writes - 1).to_string());
     }
 
     #[test]
@@ -397,6 +410,15 @@ mod tests {
         drop(feed);
         let id = EntityId::parse("light.a").unwrap();
         hass.set_state(id, "on", Attributes::new());
+        assert_eq!(hass.states().listeners.lock().len(), 1);
+    }
+
+    #[test]
+    fn dropped_feeds_do_not_pile_up_while_idle() {
+        let hass = Hass::new();
+        for _ in 0..100 {
+            drop(hass.subscribe_state_changes());
+        }
         assert_eq!(hass.states().listeners.lock().len(), 1);
     }
 }
