@@ -132,8 +132,12 @@ impl Schema {
                     Err((msg, Some(i))) => return invalid(format!("{msg} @ data['{key}'][{i}]")),
                 }
             } else if self.entity_service && TARGET_KEYS.contains(&key) {
-                if let Err((msg, _)) = check_target(key, value) {
-                    return invalid(format!("{msg} for dictionary value @ data['{key}']"));
+                match check_target(key, value) {
+                    Ok(Some(v)) => coerced.push((key, v)),
+                    Ok(None) => {}
+                    Err((msg, _)) => {
+                        return invalid(format!("{msg} for dictionary value @ data['{key}']"));
+                    }
                 }
             } else if self.entity_service && key == "metadata" && value.is_object() {
                 // `vol.Remove("metadata"): dict`; anything else is an extra key.
@@ -288,9 +292,12 @@ fn check_target(key: &str, value: &Value) -> Checked {
             Err(e) => Err((e.to_string(), None)),
         };
     }
-    // `vol.Any("none", vol.All(cv.ensure_list, [str]))`, so null is `[]`.
+    // `vol.Any("none", vol.All(cv.ensure_list, [str]))`: `"none"` is kept,
+    // null becomes `[]` and a single id a one-item list.
     match value {
-        Value::Null | Value::String(_) => Ok(None),
+        Value::String(s) if s == "none" => Ok(None),
+        Value::Null => Ok(Some(Value::Array(Vec::new()))),
+        Value::String(_) => Ok(Some(Value::Array(vec![value.clone()]))),
         Value::Array(items) if items.iter().all(Value::is_string) => Ok(None),
         _ => Err(("value should be a string".into(), None)),
     }
@@ -408,7 +415,7 @@ mod tests {
             .expect("coerced");
         assert_eq!(
             Value::Object(out),
-            json!({ "area_id": "bedroom", "brightness_pct": 50.0, "color_temp_kelvin": 2700 }),
+            json!({ "area_id": ["bedroom"], "brightness_pct": 50.0, "color_temp_kelvin": 2700 }),
             "metadata is dropped; Coerce(int) truncates"
         );
 
@@ -540,7 +547,17 @@ mod tests {
             .unwrap();
         assert_eq!(
             Value::Object(out),
-            json!({ "entity_id": "light.a", "area_id": null, "l": [] })
+            json!({ "entity_id": "light.a", "area_id": [], "l": [] })
+        );
+        let out = s
+            .validate(&data(
+                json!({ "device_id": "abc", "label_id": "none", "floor_id": ["f"] }),
+            ))
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            Value::Object(out),
+            json!({ "device_id": ["abc"], "label_id": "none", "floor_id": ["f"] })
         );
         assert_eq!(
             err(&s, json!({ "entity_id": "light.a", "metadata": 42 })),
