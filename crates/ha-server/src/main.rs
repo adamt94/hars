@@ -49,10 +49,14 @@ fn disable_transparent_huge_pages() -> std::io::Result<bool> {
         }
         disable_transparent_huge_pages(true)?;
         use std::os::unix::process::CommandExt;
-        let exe = std::env::current_exe()?;
+        // `/proc/self/exe` is the running inode, so an upgrade that replaces
+        // or deletes the binary on disk can't swap what gets exec'd.
+        let mut args = std::env::args_os();
+        let arg0 = args.next().unwrap_or_else(|| "hars".into());
         // Only returns on failure.
-        let err = std::process::Command::new(exe)
-            .args(std::env::args_os().skip(1))
+        let err = std::process::Command::new("/proc/self/exe")
+            .arg0(arg0)
+            .args(args)
             .exec();
         return Err(err);
     }

@@ -14,7 +14,13 @@ fn free_port() -> u16 {
 }
 
 fn spawn_hars(port: u16) -> Child {
+    spawn_hars_with(port, &[])
+}
+
+fn spawn_hars_with(port: u16, env: &[(&str, &str)]) -> Child {
     let child = Command::new(env!("CARGO_BIN_EXE_hars"))
+        .env_remove("MIMALLOC_ALLOW_THP")
+        .envs(env.iter().copied())
         .env("HARS_BIND", format!("127.0.0.1:{port}"))
         .env("RUST_LOG", "info")
         .stdout(Stdio::piped())
@@ -112,20 +118,28 @@ fn signal_right_after_the_port_opens_still_stops_cleanly() {
     }
 }
 
-/// THP stays off for the whole process (docs/PERF.md): the kernel reports
-/// `THP_enabled: 0`, unless `MIMALLOC_ALLOW_THP=1` asks for it.
+/// THP is off for the whole process (docs/PERF.md): the kernel reports
+/// `THP_enabled: 0` and the command line is unchanged by the re-exec, unless
+/// `MIMALLOC_ALLOW_THP=1` keeps THP on.
 #[cfg(target_os = "linux")]
 #[test]
 fn transparent_huge_pages_are_disabled() {
-    let thp_enabled = |child: &Child| {
+    let status = |child: &Child, key: &str| {
         std::fs::read_to_string(format!("/proc/{}/status", child.id()))
             .unwrap()
             .lines()
-            .find_map(|l| l.strip_prefix("THP_enabled:").map(|v| v.trim().to_owned()))
-            .expect("kernel reports THP_enabled")
+            .find_map(|l| l.strip_prefix(key).map(|v| v.trim().to_owned()))
+            .unwrap_or_else(|| panic!("kernel reports {key}"))
     };
-    let child = spawn_hars(free_port());
-    assert_eq!(thp_enabled(&child), "0");
-    signal(&child, "-TERM");
-    wait_with_limit(child, Duration::from_secs(5));
+    let cmdline = |child: &Child| std::fs::read(format!("/proc/{}/cmdline", child.id())).unwrap();
+
+    for (env, expected) in [(&[][..], "0"), (&[("MIMALLOC_ALLOW_THP", "1")][..], "1")] {
+        let child = spawn_hars_with(free_port(), env);
+        assert_eq!(status(&child, "THP_enabled:"), expected, "{env:?}");
+        let argv0 = format!("{}\0", env!("CARGO_BIN_EXE_hars")).into_bytes();
+        assert_eq!(cmdline(&child), argv0, "argv[0] survives the re-exec");
+        signal(&child, "-TERM");
+        let (status, out) = wait_with_limit(child, Duration::from_secs(5));
+        assert!(status.success(), "exit {status}: {out}");
+    }
 }
