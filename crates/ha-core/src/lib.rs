@@ -135,11 +135,12 @@ impl Hass {
         state: impl Into<smol_str::SmolStr>,
         attributes: Attributes,
     ) -> Arc<State> {
-        let now = self.inner.clock.now();
-        let (new, old) = self
-            .inner
-            .states
-            .set(entity_id.clone(), state.into(), attributes, now);
+        let (new, old) = self.inner.states.set(
+            entity_id.clone(),
+            state.into(),
+            attributes,
+            &self.inner.clock,
+        );
         let changed = old.as_ref().is_none_or(|o| !Arc::ptr_eq(o, &new));
         if changed {
             self.inner.bus.fire(Event::new(
@@ -148,7 +149,7 @@ impl Hass {
                     old_state: old,
                     new_state: Some(new.clone()),
                 },
-                now,
+                new.last_updated,
             ));
         }
         new
