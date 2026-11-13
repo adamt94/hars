@@ -23,10 +23,13 @@ quiet window:
 | Column | Source |
 |---|---|
 | binary | size of the stripped release binary |
-| start→/api/ | process spawn until the first `200` from `/api/` (2 ms polling) |
-| idle RSS / PSS | `VmRSS` in `/proc/<pid>/status`, `Pss` in `smaps_rollup` |
+| start→/api/ | process spawn until the first `200` from `/api/` (2 ms polling, so ±2 ms) |
+| idle RSS / PSS | `Rss` and `Pss` in `/proc/<pid>/smaps_rollup` (exact, unlike `VmRSS`) |
 | idle CPU | `utime + stime` delta over the quiet window, % of one core |
-| wakeups/s | voluntary + involuntary context switches, summed over all threads |
+| wakeups/s | voluntary context switches summed over all threads: a proxy, since each block is followed by a wakeup. Preemptions are excluded. It warns if threads came or went during the window |
+
+The script refuses to start if something already answers on the port, and
+fails if `/api/` does not answer within 10 s.
 
 ### Hot paths: `cargo bench -p ha-core`
 
@@ -46,9 +49,9 @@ result. Docker on an Apple-silicon Mac (linux/aarch64, 2 vCPUs).
 
 | binary | start→/api/ | idle RSS | idle PSS | idle CPU | wakeups/s | threads | run |
 |---|---|---|---|---|---|---|---|
-| 2.02 MiB | 91 ms | 13.2 MiB | 12.4 MiB | 0.000 % | 0.00 | 3 | 5s warm-up, 30s quiet |
+| 2.02 MiB | 8 ms | 13.2 MiB | 12.4 MiB | 0.000 % | 0.00 | 3 | 5s warm-up, 30s quiet |
 
-Idle is truly idle: no CPU time and no context switches over the quiet window.
+Idle is truly idle: no CPU time and no voluntary context switches over the quiet window.
 
 **RSS finding:** 8 MiB of the 13.2 MiB is a single mimalloc arena backed by
 transparent huge pages (the container's kernel has THP set to `always`, and
@@ -63,14 +66,15 @@ Benches on the same Mac, natively (`cargo bench -p ha-core`, median):
 |---|---|
 | `state_write/changed/no_attributes` | 234 ns |
 | `state_write/unchanged/no_attributes` | 50 ns |
-| `state_write/changed/light_attributes` | 233 ns |
-| `state_write/unchanged/light_attributes` | 404 ns |
-| `fan_out/feeds/0` | 272 ns |
-| `fan_out/feeds/1` | 332 ns |
-| `fan_out/feeds/4` | 361 ns |
-| `fan_out/feeds/16` | 538 ns |
+| `state_write/changed/light_attributes` | 503 ns |
+| `state_write/unchanged/light_attributes` | 403 ns |
+| `fan_out/feeds/0` | 275 ns |
+| `fan_out/feeds/1` | 292 ns |
+| `fan_out/feeds/4` | 357 ns |
+| `fan_out/feeds/16` | 540 ns |
 
-An unchanged write with attributes costs more than a changed one: it compares
-every attribute and then frees the caller's map, while a changed write moves
-the map into the new state. Worth a look once real integrations show how
-often unchanged writes happen.
+The timings include freeing what the write leaves behind: the replaced state
+for a changed write, and the caller's map for an unchanged one. An unchanged
+write with 8 attributes still costs 80 % of a changed one, because comparing
+the maps and freeing the caller's map dominate. Each extra lossless feed adds
+~15 ns.

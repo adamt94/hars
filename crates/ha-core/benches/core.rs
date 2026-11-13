@@ -33,7 +33,7 @@ fn state_write(c: &mut Criterion) {
     g.bench_function("changed/no_attributes", |b| {
         b.iter(|| {
             on = !on;
-            black_box(hass.set_state(id.clone(), if on { "on" } else { "off" }, Attributes::new()))
+            drop(black_box(hass.set_state(id.clone(), if on { "on" } else { "off" }, Attributes::new())))
         })
     });
     hass.set_state(id.clone(), "on", Attributes::new());
@@ -49,7 +49,9 @@ fn state_write(c: &mut Criterion) {
                 brightness = (brightness + 1) % 255;
                 light_attributes(brightness)
             },
-            |attrs| black_box(hass.set_state(id.clone(), "on", attrs)),
+            // Drop the result inside the timing: for a changed write that
+            // frees the replaced state, which would otherwise be deferred.
+            |attrs| drop(black_box(hass.set_state(id.clone(), "on", attrs))),
             BatchSize::SmallInput,
         )
     });
@@ -57,7 +59,9 @@ fn state_write(c: &mut Criterion) {
     g.bench_function("unchanged/light_attributes", |b| {
         b.iter_batched(
             || light_attributes(1),
-            |attrs| black_box(hass.set_state(id.clone(), "on", attrs)),
+            // Drop the result inside the timing: for a changed write that
+            // frees the replaced state, which would otherwise be deferred.
+            |attrs| drop(black_box(hass.set_state(id.clone(), "on", attrs))),
             BatchSize::SmallInput,
         )
     });
