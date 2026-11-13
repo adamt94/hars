@@ -73,15 +73,20 @@ pub enum EntityTarget {
 impl ServiceCall {
     /// Resolve `entity_id` the way HA's `cv.comp_entity_ids` does: a single
     /// id, a comma-separated string, a list of ids, or `all` / `none`.
-    /// Ids are lower-cased before validation.
+    /// Ids are lower-cased before validation. An explicit `null` is invalid.
     pub fn entity_ids(&self) -> Result<EntityTarget, ServiceError> {
         let parse = |s: &str| {
             let s = s.trim();
-            EntityId::parse(&s.to_ascii_lowercase())
-                .map_err(|e| ServiceError::Invalid(e.to_string()))
+            let id = if s.bytes().any(|b| b.is_ascii_uppercase()) {
+                EntityId::parse(&s.to_ascii_lowercase())
+            } else {
+                EntityId::parse(s)
+            };
+            id.map_err(|e| ServiceError::Invalid(e.to_string()))
         };
         match self.data.get("entity_id") {
-            None | Some(Value::Null) => Ok(EntityTarget::Ids(Vec::new())),
+            None => Ok(EntityTarget::Ids(Vec::new())),
+            Some(Value::Null) => Err(ServiceError::Invalid("Entity IDs cannot be None".into())),
             Some(Value::String(s)) if s.eq_ignore_ascii_case("all") => Ok(EntityTarget::All),
             Some(Value::String(s)) if s.eq_ignore_ascii_case("none") => {
                 Ok(EntityTarget::Ids(Vec::new()))
@@ -125,7 +130,7 @@ pub struct ServiceRegistry {
 }
 
 impl ServiceRegistry {
-    /// Register (or replace) `domain.service`.
+    /// Register (or replace) `domain.service`. Names are lower-cased, as in HA.
     pub fn register<F, Fut>(
         &self,
         domain: impl Into<SmolStr>,
@@ -142,20 +147,21 @@ impl ServiceRegistry {
         });
         self.services
             .write()
-            .entry(domain.into())
+            .entry(lower(&domain.into()))
             .or_default()
-            .insert(service.into(), entry);
+            .insert(lower(&service.into()), entry);
     }
 
-    /// Remove `domain.service`. Returns whether it existed.
+    /// Remove `domain.service` (case-insensitive). Returns whether it existed.
     pub fn remove(&self, domain: &str, service: &str) -> bool {
+        let (domain, service) = (lower(domain), lower(service));
         let mut services = self.services.write();
-        let Some(domain_services) = services.get_mut(domain) else {
+        let Some(domain_services) = services.get_mut(&domain) else {
             return false;
         };
-        let removed = domain_services.remove(service).is_some();
+        let removed = domain_services.remove(&service).is_some();
         if domain_services.is_empty() {
-            services.remove(domain);
+            services.remove(&domain);
         }
         removed
     }
@@ -168,14 +174,18 @@ impl ServiceRegistry {
         self.lookup(domain, service).map(|s| s.supports_response)
     }
 
-    /// Every registered service, grouped by domain, both sorted by name.
-    pub fn services(&self) -> Vec<(SmolStr, Vec<SmolStr>)> {
+    /// Every registered service with its response support, grouped by
+    /// domain, both sorted by name.
+    pub fn services(&self) -> Vec<(SmolStr, Vec<(SmolStr, SupportsResponse)>)> {
         let services = self.services.read();
         let mut out: Vec<_> = services
             .iter()
             .map(|(domain, s)| {
-                let mut names: Vec<_> = s.keys().cloned().collect();
-                names.sort_unstable();
+                let mut names: Vec<_> = s
+                    .iter()
+                    .map(|(name, s)| (name.clone(), s.supports_response))
+                    .collect();
+                names.sort_unstable_by(|a, b| a.0.cmp(&b.0));
                 (domain.clone(), names)
             })
             .collect();
@@ -183,8 +193,8 @@ impl ServiceRegistry {
         out
     }
 
-    /// Find a service; like HA, retry lower-cased only on a miss so the
-    /// common (already lower-case) path does not allocate.
+    /// Find a service. Names are stored lower-cased; like HA, retry
+    /// lower-cased only on a miss so the common path does not allocate.
     pub(crate) fn lookup(&self, domain: &str, service: &str) -> Option<Arc<Service>> {
         let services = self.services.read();
         if let Some(s) = services.get(domain).and_then(|d| d.get(service)) {
@@ -194,6 +204,15 @@ impl ServiceRegistry {
             .get(domain.to_ascii_lowercase().as_str())
             .and_then(|d| d.get(service.to_ascii_lowercase().as_str()))
             .cloned()
+    }
+}
+
+/// Lower-case `s`, without allocating when it already is (the common case).
+pub(crate) fn lower(s: &str) -> SmolStr {
+    if s.bytes().any(|b| b.is_ascii_uppercase()) {
+        SmolStr::new(s.to_ascii_lowercase())
+    } else {
+        SmolStr::new(s)
     }
 }
 
@@ -358,23 +377,31 @@ mod tests {
         let reg = ServiceRegistry::default();
         for (d, s) in [
             ("light", "turn_on"),
-            ("light", "toggle"),
+            ("Light", "Toggle"),
             ("hue", "activate_scene"),
         ] {
             reg.register(d, s, SupportsResponse::None, |_| async { Ok(None) });
         }
+        let none = SupportsResponse::None;
         assert_eq!(
             reg.services(),
             vec![
-                ("hue".into(), vec!["activate_scene".into()]),
-                ("light".into(), vec!["toggle".into(), "turn_on".into()]),
-            ]
+                ("hue".into(), vec![("activate_scene".into(), none)]),
+                (
+                    "light".into(),
+                    vec![("toggle".into(), none), ("turn_on".into(), none)]
+                ),
+            ],
+            "names are stored lower-cased"
         );
+        assert!(reg.has_service("light", "toggle"));
+        assert!(reg.remove("LIGHT", "TOGGLE"), "remove is case-insensitive");
+        assert!(!reg.has_service("light", "toggle"));
         assert!(reg.remove("hue", "activate_scene"));
         assert!(!reg.remove("hue", "activate_scene"));
         assert_eq!(reg.services().len(), 1, "empty domains are dropped");
         assert_eq!(
-            reg.supports_response("light", "toggle"),
+            reg.supports_response("Light", "turn_on"),
             Some(SupportsResponse::None)
         );
         assert_eq!(reg.supports_response("light", "nope"), None);
@@ -396,13 +423,12 @@ mod tests {
         );
         assert_eq!(call_with(json!("ALL")).entity_ids(), Ok(EntityTarget::All));
         assert_eq!(call_with(json!("none")).entity_ids(), Ok(ids(&[])));
-        assert_eq!(call_with(Value::Null).entity_ids(), Ok(ids(&[])));
         let missing = ServiceCall {
             data: Arc::new(ServiceData::new()),
-            ..call_with(Value::Null)
+            ..call_with(json!("none"))
         };
         assert_eq!(missing.entity_ids(), Ok(ids(&[])));
-        for bad in [json!("light"), json!(["light.a", 3]), json!(5)] {
+        for bad in [json!("light"), json!(["light.a", 3]), json!(5), Value::Null] {
             assert!(
                 matches!(
                     call_with(bad.clone()).entity_ids(),

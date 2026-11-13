@@ -22,7 +22,7 @@ pub use service::{
 };
 pub use state::{Attributes, State, StateMachine};
 
-use smol_str::SmolStr;
+use service::lower;
 
 use std::sync::Arc;
 
@@ -126,14 +126,5 @@ impl Hass {
                 .fire(Event::state_changed(entity_id, old, Some(new.clone())));
         }
         new
-    }
-}
-
-/// Lower-case `s`, without allocating when it already is (the common case).
-fn lower(s: &str) -> SmolStr {
-    if s.bytes().any(|b| b.is_ascii_uppercase()) {
-        SmolStr::new(s.to_ascii_lowercase())
-    } else {
-        SmolStr::new(s)
     }
 }

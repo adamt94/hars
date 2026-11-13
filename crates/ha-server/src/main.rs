@@ -2,13 +2,14 @@
 
 use axum::{
     Json, Router,
-    extract::{Path, RawQuery, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     response::{IntoResponse, Response},
     routing::{get, post},
 };
-use ha_core::{Attributes, EntityId, EventKind, Hass, ServiceData, ServiceError};
+use ha_core::{Attributes, EntityId, EventKind, Hass, ServiceData, ServiceError, SupportsResponse};
 use serde_json::{Value, json};
+use tokio::sync::broadcast::error::{RecvError, TryRecvError};
 use tracing_subscriber::EnvFilter;
 
 #[global_allocator]
@@ -82,8 +83,8 @@ async fn post_state(
 }
 
 /// Same shape as Home Assistant's `GET /api/services`. Service descriptions
-/// (`services.yaml`) are not loaded yet, so each one is `{"fields": {}}`, the
-/// same as HA reports for a service without a description.
+/// (`services.yaml`) are not loaded yet, so each one is `{"fields": {}}` plus
+/// `response` metadata, as HA reports for a service without a description.
 async fn list_services(State(hass): State<Hass>) -> Json<Value> {
     let domains: Vec<Value> = hass
         .services()
@@ -92,7 +93,18 @@ async fn list_services(State(hass): State<Hass>) -> Json<Value> {
         .map(|(domain, services)| {
             let services: serde_json::Map<String, Value> = services
                 .into_iter()
-                .map(|s| (s.to_string(), json!({ "fields": {} })))
+                .map(|(name, supports)| {
+                    let description = match supports {
+                        SupportsResponse::None => json!({ "fields": {} }),
+                        SupportsResponse::Optional => {
+                            json!({ "fields": {}, "response": { "optional": true } })
+                        }
+                        SupportsResponse::Only => {
+                            json!({ "fields": {}, "response": { "optional": false } })
+                        }
+                    };
+                    (name.to_string(), description)
+                })
                 .collect();
             json!({ "domain": domain, "services": services })
         })
@@ -113,7 +125,7 @@ fn message(status: StatusCode, message: impl std::fmt::Display) -> Response {
 async fn call_service(
     State(hass): State<Hass>,
     Path((domain, service)): Path<(String, String)>,
-    RawQuery(query): RawQuery,
+    Query(query): Query<Vec<(String, String)>>,
     body: String,
 ) -> Response {
     let data: ServiceData = if body.is_empty() {
@@ -126,43 +138,53 @@ async fn call_service(
             Err(_) => return message(StatusCode::BAD_REQUEST, "Data should be valid JSON."),
         }
     };
-    let return_response = query
-        .as_deref()
-        .unwrap_or_default()
-        .split('&')
-        .any(|pair| pair.split('=').next() == Some("return_response"));
+    let return_response = query.iter().any(|(key, _)| key == "return_response");
 
     // Subscribe before the call so no change it causes is missed.
     let mut rx = hass.bus().subscribe();
     // Like HA, finish the call even if the client disconnects mid-way.
-    let task = tokio::spawn({
+    let mut task = tokio::spawn({
         let hass = hass.clone();
         async move {
             hass.call_service(&domain, &service, data, None, return_response)
                 .await
         }
     });
-    let result = match task.await {
-        Ok(result) => result,
-        Err(e) => return message(StatusCode::INTERNAL_SERVER_ERROR, e),
-    };
 
+    // Collect changes while the call runs, so a long call can't overflow the
+    // bus and evict its own earliest changes before they are read.
     let mut changed_states = Vec::new();
+    let mut collect = |event: &ha_core::Event| {
+        if let EventKind::StateChanged {
+            new_state: Some(state),
+            ..
+        } = &event.kind
+        {
+            changed_states.push(state.clone());
+        }
+    };
+    let joined = loop {
+        tokio::select! {
+            joined = &mut task => break joined,
+            event = rx.recv() => match event {
+                Ok(event) => collect(&event),
+                Err(RecvError::Lagged(_)) => {}
+                Err(RecvError::Closed) => break (&mut task).await,
+            },
+        }
+    };
+    // Changes fired just before the call returned.
     loop {
         match rx.try_recv() {
-            Ok(event) => {
-                if let EventKind::StateChanged {
-                    new_state: Some(state),
-                    ..
-                } = &event.kind
-                {
-                    changed_states.push(state.clone());
-                }
-            }
-            Err(tokio::sync::broadcast::error::TryRecvError::Lagged(_)) => continue,
+            Ok(event) => collect(&event),
+            Err(TryRecvError::Lagged(_)) => {}
             Err(_) => break,
         }
     }
+    let result = match joined {
+        Ok(result) => result,
+        Err(e) => return message(StatusCode::INTERNAL_SERVER_ERROR, e),
+    };
 
     match result {
         Ok(response) if return_response => Json(json!({
@@ -249,7 +271,12 @@ mod tests {
             body,
             json!([
                 { "domain": "light", "services": { "turn_on": { "fields": {} } } },
-                { "domain": "weather", "services": { "get_forecasts": { "fields": {} } } },
+                {
+                    "domain": "weather",
+                    "services": {
+                        "get_forecasts": { "fields": {}, "response": { "optional": false } }
+                    }
+                },
             ])
         );
     }
@@ -346,20 +373,47 @@ mod tests {
 
     #[tokio::test]
     async fn return_response_wraps_the_result() {
-        let (status, body) = send(
-            &hass_with_services(),
-            "POST",
+        // `%72` is `r`: the query key is matched after URL decoding, like HA.
+        for uri in [
             "/api/services/weather/get_forecasts?return_response",
-            r#"{"type": "daily"}"#,
-        )
-        .await;
+            "/api/services/weather/get_forecasts?return_response=1",
+            "/api/services/weather/get_forecasts?%72eturn_response",
+        ] {
+            let (status, body) =
+                send(&hass_with_services(), "POST", uri, r#"{"type": "daily"}"#).await;
+            assert_eq!(status, StatusCode::OK, "{uri}");
+            assert_eq!(
+                body,
+                json!({
+                    "changed_states": [],
+                    "service_response": { "weather.home": { "forecast": [] } },
+                }),
+                "{uri}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn changed_states_survive_more_changes_than_the_bus_holds() {
+        const N: usize = 5_000; // > the 4,096-event bus capacity
+        let hass = Hass::new();
+        let h = hass.clone();
+        hass.services()
+            .register("demo", "flood", SupportsResponse::None, move |_| {
+                let h = h.clone();
+                async move {
+                    for i in 0..N {
+                        let id = EntityId::parse(&format!("sensor.s{i}")).unwrap();
+                        h.set_state(id, "on", Attributes::new());
+                        tokio::task::yield_now().await; // as a real I/O-bound handler would
+                    }
+                    Ok(None)
+                }
+            });
+        let (status, body) = send(&hass, "POST", "/api/services/demo/flood", "").await;
         assert_eq!(status, StatusCode::OK);
-        assert_eq!(
-            body,
-            json!({
-                "changed_states": [],
-                "service_response": { "weather.home": { "forecast": [] } },
-            })
-        );
+        let changed = body.as_array().unwrap();
+        assert_eq!(changed.len(), N);
+        assert_eq!(changed[0]["entity_id"], "sensor.s0", "earliest change kept");
     }
 }
