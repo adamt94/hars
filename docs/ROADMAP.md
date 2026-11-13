@@ -120,8 +120,10 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
 - [x] REST: `/api/`, `/api/states`, `/api/states/{entity_id}`
 - [ ] Injectable clock (wall + monotonic) used by states, timers and sun maths,
       so tests run on simulated time
-- [ ] Service registry: `call(domain, service, data, target)` with target
-      resolution; per-service schemas returning HA-shaped errors
+- [x] Service registry: `call(domain, service, data, target)`, `call_service`
+      event, `supports_response`, `entity_id` target resolution; REST
+      `GET /api/services` + `POST /api/services/{domain}/{service}`
+- [ ] Per-service data schemas (handlers validate for now and return `Invalid` → 400)
 - [ ] `Context` (id, parent_id, user_id) on states, events and service calls
 - [ ] Lossless, ordered state-change delivery for internal consumers
       (automations, recorder). The lossy broadcast bus is only for API

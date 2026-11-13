@@ -2,11 +2,12 @@
 
 use axum::{
     Json, Router,
-    extract::{Path, State},
+    extract::{Path, RawQuery, State},
     http::StatusCode,
-    routing::get,
+    response::{IntoResponse, Response},
+    routing::{get, post},
 };
-use ha_core::{Attributes, EntityId, Hass};
+use ha_core::{Attributes, EntityId, EventKind, Hass, ServiceData, ServiceError};
 use serde_json::{Value, json};
 use tracing_subscriber::EnvFilter;
 
@@ -22,15 +23,7 @@ async fn main() -> anyhow::Result<()> {
     let hass = Hass::new();
     let addr = std::env::var("HARS_BIND").unwrap_or_else(|_| "0.0.0.0:8123".into());
 
-    let app = Router::new()
-        .route(
-            "/api/",
-            get(|| async { Json(json!({ "message": "API running." })) }),
-        )
-        .route("/api/states", get(list_states))
-        .route("/api/states/{entity_id}", get(get_state).post(post_state))
-        .with_state(hass);
-
+    let app = router(hass);
     let listener = tokio::net::TcpListener::bind(&addr).await?;
     tracing::info!("hars listening on http://{addr}");
     axum::serve(listener, app)
@@ -39,6 +32,19 @@ async fn main() -> anyhow::Result<()> {
         })
         .await?;
     Ok(())
+}
+
+fn router(hass: Hass) -> Router {
+    Router::new()
+        .route(
+            "/api/",
+            get(|| async { Json(json!({ "message": "API running." })) }),
+        )
+        .route("/api/states", get(list_states))
+        .route("/api/states/{entity_id}", get(get_state).post(post_state))
+        .route("/api/services", get(list_services))
+        .route("/api/services/{domain}/{service}", post(call_service))
+        .with_state(hass)
 }
 
 async fn list_states(State(hass): State<Hass>) -> Json<Value> {
@@ -73,4 +79,287 @@ async fn post_state(
         .cloned()
         .unwrap_or_default();
     Ok(Json(json!(hass.set_state(id, state, attributes))))
+}
+
+/// Same shape as Home Assistant's `GET /api/services`. Service descriptions
+/// (`services.yaml`) are not loaded yet, so each one is `{"fields": {}}`, the
+/// same as HA reports for a service without a description.
+async fn list_services(State(hass): State<Hass>) -> Json<Value> {
+    let domains: Vec<Value> = hass
+        .services()
+        .services()
+        .into_iter()
+        .map(|(domain, services)| {
+            let services: serde_json::Map<String, Value> = services
+                .into_iter()
+                .map(|s| (s.to_string(), json!({ "fields": {} })))
+                .collect();
+            json!({ "domain": domain, "services": services })
+        })
+        .collect();
+    Json(Value::Array(domains))
+}
+
+fn message(status: StatusCode, message: impl std::fmt::Display) -> Response {
+    (status, Json(json!({ "message": message.to_string() }))).into_response()
+}
+
+/// Same shape as Home Assistant's `POST /api/services/<domain>/<service>`:
+/// returns the states that changed during the call, or with
+/// `?return_response` `{"changed_states": [...], "service_response": {...}}`.
+///
+/// Until states carry a `Context`, "changed during the call" includes changes
+/// from other sources that land while the call runs.
+async fn call_service(
+    State(hass): State<Hass>,
+    Path((domain, service)): Path<(String, String)>,
+    RawQuery(query): RawQuery,
+    body: String,
+) -> Response {
+    let data: ServiceData = if body.is_empty() {
+        ServiceData::new()
+    } else {
+        match serde_json::from_str(&body) {
+            Ok(Value::Object(data)) => data,
+            Ok(Value::Null) => ServiceData::new(),
+            Ok(_) => return message(StatusCode::BAD_REQUEST, "Data should be a JSON object."),
+            Err(_) => return message(StatusCode::BAD_REQUEST, "Data should be valid JSON."),
+        }
+    };
+    let return_response = query
+        .as_deref()
+        .unwrap_or_default()
+        .split('&')
+        .any(|pair| pair.split('=').next() == Some("return_response"));
+
+    // Subscribe before the call so no change it causes is missed.
+    let mut rx = hass.bus().subscribe();
+    // Like HA, finish the call even if the client disconnects mid-way.
+    let task = tokio::spawn({
+        let hass = hass.clone();
+        async move {
+            hass.call_service(&domain, &service, data, None, return_response)
+                .await
+        }
+    });
+    let result = match task.await {
+        Ok(result) => result,
+        Err(e) => return message(StatusCode::INTERNAL_SERVER_ERROR, e),
+    };
+
+    let mut changed_states = Vec::new();
+    loop {
+        match rx.try_recv() {
+            Ok(event) => {
+                if let EventKind::StateChanged {
+                    new_state: Some(state),
+                    ..
+                } = &event.kind
+                {
+                    changed_states.push(state.clone());
+                }
+            }
+            Err(tokio::sync::broadcast::error::TryRecvError::Lagged(_)) => continue,
+            Err(_) => break,
+        }
+    }
+
+    match result {
+        Ok(response) if return_response => Json(json!({
+            "changed_states": changed_states,
+            "service_response": response,
+        }))
+        .into_response(),
+        Ok(_) => Json(json!(changed_states)).into_response(),
+        Err(ServiceError::ResponseNotSupported) => message(
+            StatusCode::BAD_REQUEST,
+            "Service does not support responses. Remove return_response from request.",
+        ),
+        Err(ServiceError::ResponseRequired) => message(
+            StatusCode::BAD_REQUEST,
+            "Service call requires responses but caller did not ask for responses. Add ?return_response to query parameters.",
+        ),
+        Err(e @ (ServiceError::NotFound { .. } | ServiceError::Invalid(_))) => {
+            message(StatusCode::BAD_REQUEST, e)
+        }
+        Err(e @ ServiceError::Failed(_)) => message(StatusCode::INTERNAL_SERVER_ERROR, e),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::{body::Body, http::Request};
+    use ha_core::{EntityTarget, ServiceResponse, SupportsResponse};
+    use tower::ServiceExt;
+
+    /// A `light.turn_on` that turns on every targeted entity, like a real light platform.
+    fn hass_with_services() -> Hass {
+        let hass = Hass::new();
+        let h = hass.clone();
+        hass.services()
+            .register("light", "turn_on", SupportsResponse::None, move |call| {
+                let h = h.clone();
+                async move {
+                    let EntityTarget::Ids(ids) = call.entity_ids()? else {
+                        return Ok(None);
+                    };
+                    let mut attrs = Attributes::new();
+                    if let Some(b) = call.data.get("brightness") {
+                        attrs.insert("brightness".into(), b.clone());
+                    }
+                    for id in ids {
+                        h.set_state(id, "on", attrs.clone());
+                    }
+                    Ok(None)
+                }
+            });
+        hass.services().register(
+            "weather",
+            "get_forecasts",
+            SupportsResponse::Only,
+            |_| async {
+                let mut r = ServiceResponse::new();
+                r.insert("weather.home".into(), json!({ "forecast": [] }));
+                Ok(Some(r))
+            },
+        );
+        hass
+    }
+
+    async fn send(hass: &Hass, method: &str, uri: &str, body: &str) -> (StatusCode, Value) {
+        let req = Request::builder()
+            .method(method)
+            .uri(uri)
+            .body(Body::from(body.to_owned()))
+            .unwrap();
+        let res = router(hass.clone()).oneshot(req).await.unwrap();
+        let status = res.status();
+        let bytes = axum::body::to_bytes(res.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        (status, serde_json::from_slice(&bytes).unwrap())
+    }
+
+    #[tokio::test]
+    async fn lists_services_in_ha_shape() {
+        let (status, body) = send(&hass_with_services(), "GET", "/api/services", "").await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(
+            body,
+            json!([
+                { "domain": "light", "services": { "turn_on": { "fields": {} } } },
+                { "domain": "weather", "services": { "get_forecasts": { "fields": {} } } },
+            ])
+        );
+    }
+
+    #[tokio::test]
+    async fn call_returns_changed_states() {
+        let hass = hass_with_services();
+        let (status, body) = send(
+            &hass,
+            "POST",
+            "/api/services/light/turn_on",
+            r#"{"entity_id": "light.kitchen, light.hallway", "brightness": 200}"#,
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        let changed: Vec<_> = body
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|s| {
+                (
+                    s["entity_id"].clone(),
+                    s["state"].clone(),
+                    s["attributes"].clone(),
+                )
+            })
+            .collect();
+        assert_eq!(
+            changed,
+            vec![
+                (
+                    json!("light.kitchen"),
+                    json!("on"),
+                    json!({ "brightness": 200 })
+                ),
+                (
+                    json!("light.hallway"),
+                    json!("on"),
+                    json!({ "brightness": 200 })
+                ),
+            ]
+        );
+        let id = EntityId::parse("light.hallway").unwrap();
+        assert_eq!(hass.states().get(&id).unwrap().state, "on");
+    }
+
+    #[tokio::test]
+    async fn empty_body_is_empty_data() {
+        let (status, body) = send(
+            &hass_with_services(),
+            "POST",
+            "/api/services/light/turn_on",
+            "",
+        )
+        .await;
+        assert_eq!((status, body), (StatusCode::OK, json!([])));
+    }
+
+    #[tokio::test]
+    async fn bad_requests_are_400() {
+        let hass = hass_with_services();
+        for (uri, body, msg) in [
+            ("/api/services/light/fly", "", None),
+            (
+                "/api/services/light/turn_on",
+                "{not json",
+                Some("Data should be valid JSON."),
+            ),
+            (
+                "/api/services/light/turn_on",
+                r#"{"entity_id": "kitchen"}"#,
+                None,
+            ),
+            (
+                "/api/services/light/turn_on?return_response",
+                "",
+                Some("Service does not support responses. Remove return_response from request."),
+            ),
+            (
+                "/api/services/weather/get_forecasts",
+                "",
+                Some(
+                    "Service call requires responses but caller did not ask for responses. Add ?return_response to query parameters.",
+                ),
+            ),
+        ] {
+            let (status, res) = send(&hass, "POST", uri, body).await;
+            assert_eq!(status, StatusCode::BAD_REQUEST, "{uri} {body}");
+            if let Some(msg) = msg {
+                assert_eq!(res["message"], msg);
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn return_response_wraps_the_result() {
+        let (status, body) = send(
+            &hass_with_services(),
+            "POST",
+            "/api/services/weather/get_forecasts?return_response",
+            r#"{"type": "daily"}"#,
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(
+            body,
+            json!({
+                "changed_states": [],
+                "service_response": { "weather.home": { "forecast": [] } },
+            })
+        );
+    }
 }
