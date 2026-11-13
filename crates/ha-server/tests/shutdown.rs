@@ -24,7 +24,7 @@ fn spawn_hars(port: u16) -> Child {
     let deadline = Instant::now() + Duration::from_secs(10);
     while TcpStream::connect(("127.0.0.1", port)).is_err() {
         assert!(Instant::now() < deadline, "hars did not start listening");
-        std::thread::sleep(Duration::from_millis(20));
+        std::thread::sleep(Duration::from_millis(1));
     }
     child
 }
@@ -97,4 +97,17 @@ fn sigint_stops_cleanly() {
     let (status, out) = wait_with_limit(child, Duration::from_secs(5));
     assert!(status.success(), "exit {status}: {out}");
     assert!(out.contains("SIGINT received, stopping"), "{out}");
+}
+
+/// A supervisor may signal the moment the port answers: the handlers must
+/// already be installed by then.
+#[cfg(unix)]
+#[test]
+fn signal_right_after_the_port_opens_still_stops_cleanly() {
+    for sig in ["-TERM", "-INT"].repeat(10) {
+        let child = spawn_hars(free_port());
+        signal(&child, sig);
+        let (status, out) = wait_with_limit(child, Duration::from_secs(5));
+        assert!(status.success(), "{sig}: exit {status}: {out}");
+    }
 }

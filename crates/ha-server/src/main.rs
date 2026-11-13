@@ -31,6 +31,7 @@ async fn main() -> anyhow::Result<()> {
     let hass = Hass::new();
     let addr = std::env::var("HARS_BIND").unwrap_or_else(|_| "0.0.0.0:8123".into());
 
+    let mut signals = StopSignals::install()?;
     let listener = tokio::net::TcpListener::bind(&addr).await?;
     let (stop_http, http_stopped) = tokio::sync::oneshot::channel::<()>();
     let mut server = tokio::spawn(
@@ -44,7 +45,7 @@ async fn main() -> anyhow::Result<()> {
     tracing::info!("hars listening on http://{addr}");
 
     tokio::select! {
-        signal = stop_signal() => tracing::info!("{signal} received, stopping"),
+        signal = signals.recv() => tracing::info!("{signal} received, stopping"),
         res = &mut server => {
             res??;
             anyhow::bail!("HTTP server exited unexpectedly");
@@ -67,21 +68,43 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Resolve on SIGTERM (container stop) or SIGINT (Ctrl-C).
-async fn stop_signal() -> &'static str {
+/// SIGTERM (container stop) and SIGINT (Ctrl-C) handlers. They are installed
+/// before the port is bound, so a signal that arrives as soon as the server
+/// is reachable still stops it cleanly instead of killing it.
+struct StopSignals {
     #[cfg(unix)]
-    {
-        use tokio::signal::unix::{SignalKind, signal};
-        let mut term = signal(SignalKind::terminate()).expect("install SIGTERM handler");
-        tokio::select! {
-            _ = term.recv() => "SIGTERM",
-            _ = tokio::signal::ctrl_c() => "SIGINT",
+    term: tokio::signal::unix::Signal,
+    #[cfg(unix)]
+    int: tokio::signal::unix::Signal,
+}
+
+impl StopSignals {
+    fn install() -> std::io::Result<Self> {
+        #[cfg(unix)]
+        {
+            use tokio::signal::unix::{SignalKind, signal};
+            Ok(Self {
+                term: signal(SignalKind::terminate())?,
+                int: signal(SignalKind::interrupt())?,
+            })
         }
+        #[cfg(not(unix))]
+        Ok(Self {})
     }
-    #[cfg(not(unix))]
-    {
-        let _ = tokio::signal::ctrl_c().await;
-        "Ctrl-C"
+
+    async fn recv(&mut self) -> &'static str {
+        #[cfg(unix)]
+        {
+            tokio::select! {
+                _ = self.term.recv() => "SIGTERM",
+                _ = self.int.recv() => "SIGINT",
+            }
+        }
+        #[cfg(not(unix))]
+        {
+            let _ = tokio::signal::ctrl_c().await;
+            "Ctrl-C"
+        }
     }
 }
 
