@@ -14,6 +14,7 @@ mod context;
 mod entity_id;
 mod event;
 mod lifecycle;
+mod schema;
 mod service;
 mod state;
 
@@ -22,6 +23,7 @@ pub use context::{Context, ContextId};
 pub use entity_id::{EntityId, EntityIdError};
 pub use event::{Event, EventBus, EventKind};
 pub use lifecycle::CoreState;
+pub use schema::{Kind, Range, Schema};
 pub use service::{
     EntityTarget, ServiceCall, ServiceData, ServiceError, ServiceRegistry, ServiceResponse,
     SupportsResponse,
@@ -120,11 +122,18 @@ impl Hass {
             data.extend(target);
         }
 
+        // HA validates before firing `call_service`; the event keeps the data
+        // as sent and the handler gets the coerced copy, if one was needed.
+        let coerced = match &handler.schema {
+            Some(schema) => schema.validate(&data)?,
+            None => None,
+        };
+        let data = Arc::new(data);
         let now = self.inner.clock.now();
         let call = ServiceCall {
             domain: lower(domain),
             service: lower(service),
-            data: Arc::new(data),
+            data: coerced.map_or_else(|| data.clone(), Arc::new),
             return_response,
             context: context.unwrap_or_else(|| Context::at(now)),
         };
@@ -132,7 +141,7 @@ impl Hass {
             EventKind::CallService {
                 domain: call.domain.clone(),
                 service: call.service.clone(),
-                service_data: call.data.clone(),
+                service_data: data,
             },
             now,
             call.context.clone(),

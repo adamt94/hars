@@ -293,15 +293,21 @@ async fn call_service(
 mod tests {
     use super::*;
     use axum::{body::Body, http::Request};
-    use ha_core::{EntityTarget, ServiceResponse, SupportsResponse};
+    use ha_core::{EntityTarget, Kind, Range, Schema, ServiceResponse, SupportsResponse};
     use tower::ServiceExt;
 
     /// A `light.turn_on` that turns on every targeted entity, like a real light platform.
     fn hass_with_services() -> Hass {
         let hass = Hass::new();
         let h = hass.clone();
-        hass.services()
-            .register("light", "turn_on", SupportsResponse::None, move |call| {
+        let schema =
+            Schema::entity_service().optional("brightness", Kind::Int(Range::new(0.0, 255.0)));
+        hass.services().register_with_schema(
+            "light",
+            "turn_on",
+            Some(schema),
+            SupportsResponse::None,
+            move |call| {
                 let h = h.clone();
                 async move {
                     let EntityTarget::Ids(ids) = call.entity_ids()? else {
@@ -321,7 +327,8 @@ mod tests {
                     }
                     Ok(None)
                 }
-            });
+            },
+        );
         hass.services().register(
             "weather",
             "get_forecasts",
@@ -414,11 +421,12 @@ mod tests {
         let (status, body) = send(
             &hass_with_services(),
             "POST",
-            "/api/services/light/turn_on",
+            "/api/services/weather/get_forecasts?return_response",
             "",
         )
         .await;
-        assert_eq!((status, body), (StatusCode::OK, json!([])));
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(body["changed_states"], json!([]));
     }
 
     #[tokio::test]
@@ -435,6 +443,20 @@ mod tests {
                 "/api/services/light/turn_on",
                 r#"{"entity_id": "kitchen"}"#,
                 None,
+            ),
+            (
+                "/api/services/light/turn_on",
+                r#"{"entity_id": "light.a", "brightness": 300}"#,
+                Some(
+                    "invalid service data: value must be at most 255 for dictionary value @ data['brightness']",
+                ),
+            ),
+            (
+                "/api/services/light/turn_on",
+                "",
+                Some(
+                    "invalid service data: must contain at least one of entity_id, device_id, area_id, floor_id, label_id.",
+                ),
             ),
             (
                 "/api/services/light/turn_on?return_response",

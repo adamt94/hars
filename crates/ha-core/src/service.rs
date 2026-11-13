@@ -4,7 +4,7 @@
 //! services are keyed by `domain` then `service`, `target` is merged into the
 //! service data, and a `call_service` event is fired before the handler runs.
 
-use crate::{Context, EntityId};
+use crate::{Context, EntityId, Schema};
 use parking_lot::RwLock;
 use serde_json::Value;
 use smol_str::SmolStr;
@@ -78,47 +78,53 @@ impl ServiceCall {
     /// id, a comma-separated string, a list of ids, or `all` / `none`.
     /// Ids are lower-cased before validation. An explicit `null` is invalid.
     pub fn entity_ids(&self) -> Result<EntityTarget, ServiceError> {
-        let parse = |s: &str| {
-            let s = s.trim();
-            let id = if s.bytes().any(|b| b.is_ascii_uppercase()) {
-                EntityId::parse(&s.to_ascii_lowercase())
-            } else {
-                EntityId::parse(s)
-            };
-            id.map_err(|e| ServiceError::Invalid(e.to_string()))
+        resolve_entity_ids(self.data.get("entity_id"))
+    }
+}
+
+/// [`ServiceCall::entity_ids`] for a raw `entity_id` value.
+pub(crate) fn resolve_entity_ids(value: Option<&Value>) -> Result<EntityTarget, ServiceError> {
+    let parse = |s: &str| {
+        let s = s.trim();
+        let id = if s.bytes().any(|b| b.is_ascii_uppercase()) {
+            EntityId::parse(&s.to_ascii_lowercase())
+        } else {
+            EntityId::parse(s)
         };
-        match self.data.get("entity_id") {
-            None => Ok(EntityTarget::Ids(Vec::new())),
-            Some(Value::Null) => Err(ServiceError::Invalid("Entity IDs cannot be None".into())),
-            Some(Value::String(s)) if s.eq_ignore_ascii_case("all") => Ok(EntityTarget::All),
-            Some(Value::String(s)) if s.eq_ignore_ascii_case("none") => {
-                Ok(EntityTarget::Ids(Vec::new()))
-            }
-            Some(Value::String(s)) => s
-                .split(',')
-                .map(parse)
-                .collect::<Result<_, _>>()
-                .map(EntityTarget::Ids),
-            Some(Value::Array(items)) => items
-                .iter()
-                .map(|v| match v {
-                    Value::String(s) => parse(s),
-                    other => Err(ServiceError::Invalid(format!(
-                        "entity_id must be a string, got {other}"
-                    ))),
-                })
-                .collect::<Result<_, _>>()
-                .map(EntityTarget::Ids),
-            Some(other) => Err(ServiceError::Invalid(format!(
-                "entity_id must be a string or list, got {other}"
-            ))),
+        id.map_err(|e| ServiceError::Invalid(e.to_string()))
+    };
+    match value {
+        None => Ok(EntityTarget::Ids(Vec::new())),
+        Some(Value::Null) => Err(ServiceError::Invalid("Entity IDs cannot be None".into())),
+        Some(Value::String(s)) if s.eq_ignore_ascii_case("all") => Ok(EntityTarget::All),
+        Some(Value::String(s)) if s.eq_ignore_ascii_case("none") => {
+            Ok(EntityTarget::Ids(Vec::new()))
         }
+        Some(Value::String(s)) => s
+            .split(',')
+            .map(parse)
+            .collect::<Result<_, _>>()
+            .map(EntityTarget::Ids),
+        Some(Value::Array(items)) => items
+            .iter()
+            .map(|v| match v {
+                Value::String(s) => parse(s),
+                other => Err(ServiceError::Invalid(format!(
+                    "entity_id must be a string, got {other}"
+                ))),
+            })
+            .collect::<Result<_, _>>()
+            .map(EntityTarget::Ids),
+        Some(other) => Err(ServiceError::Invalid(format!(
+            "entity_id must be a string or list, got {other}"
+        ))),
     }
 }
 
 pub(crate) struct Service {
     handler: Box<Handler>,
     pub(crate) supports_response: SupportsResponse,
+    pub(crate) schema: Option<Schema>,
 }
 
 impl Service {
@@ -133,7 +139,8 @@ pub struct ServiceRegistry {
 }
 
 impl ServiceRegistry {
-    /// Register (or replace) `domain.service`. Names are lower-cased, as in HA.
+    /// Register (or replace) `domain.service` with no data schema. Names are
+    /// lower-cased, as in HA.
     pub fn register<F, Fut>(
         &self,
         domain: impl Into<SmolStr>,
@@ -144,9 +151,27 @@ impl ServiceRegistry {
         F: Fn(ServiceCall) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<Option<ServiceResponse>, ServiceError>> + Send + 'static,
     {
+        self.register_with_schema(domain, service, None, supports_response, handler);
+    }
+
+    /// Register (or replace) `domain.service`. Calls are validated against
+    /// `schema`, if any, before the `call_service` event fires; the handler
+    /// receives the coerced data.
+    pub fn register_with_schema<F, Fut>(
+        &self,
+        domain: impl Into<SmolStr>,
+        service: impl Into<SmolStr>,
+        schema: Option<Schema>,
+        supports_response: SupportsResponse,
+        handler: F,
+    ) where
+        F: Fn(ServiceCall) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<Option<ServiceResponse>, ServiceError>> + Send + 'static,
+    {
         let entry = Arc::new(Service {
             handler: Box::new(move |call| Box::pin(handler(call))),
             supports_response,
+            schema,
         });
         self.services
             .write()
@@ -449,5 +474,63 @@ mod tests {
                 "{bad} should be invalid"
             );
         }
+    }
+
+    #[tokio::test]
+    async fn schema_rejects_before_the_event_and_coerces_for_the_handler() {
+        use crate::{Kind, Range, Schema};
+        let hass = Hass::new();
+        let mut rx = hass.bus().subscribe();
+        let seen = Arc::new(parking_lot::Mutex::new(Vec::new()));
+        let seen2 = seen.clone();
+        hass.services().register_with_schema(
+            "light",
+            "turn_on",
+            Some(
+                Schema::entity_service()
+                    .optional("brightness_pct", Kind::Float(Range::new(0.0, 100.0))),
+            ),
+            SupportsResponse::None,
+            move |call| {
+                let seen = seen2.clone();
+                async move {
+                    seen.lock().push(call.data);
+                    Ok(None)
+                }
+            },
+        );
+        let call = |v: Value| {
+            let hass = hass.clone();
+            async move {
+                hass.call_service("light", "turn_on", data(v), None, false, None)
+                    .await
+            }
+        };
+
+        let bad = call(json!({ "entity_id": "light.a", "brightness_pct": 150 })).await;
+        assert!(matches!(bad, Err(ServiceError::Invalid(_))), "{bad:?}");
+        assert!(rx.try_recv().is_err(), "no call_service for invalid data");
+        assert!(seen.lock().is_empty(), "handler not run");
+
+        // Coerced: the handler sees 50.0, the event keeps "50" as sent.
+        call(json!({ "entity_id": "light.a", "brightness_pct": "50" }))
+            .await
+            .unwrap();
+        let event = rx.try_recv().unwrap();
+        let EventKind::CallService { service_data, .. } = &event.kind else {
+            panic!("expected call_service");
+        };
+        assert_eq!(service_data["brightness_pct"], json!("50"));
+        assert_eq!(seen.lock()[0]["brightness_pct"], json!(50.0));
+
+        // Already valid: handler and event share one allocation.
+        call(json!({ "entity_id": "light.a", "brightness_pct": 50 }))
+            .await
+            .unwrap();
+        let event = rx.try_recv().unwrap();
+        let EventKind::CallService { service_data, .. } = &event.kind else {
+            panic!("expected call_service");
+        };
+        assert!(Arc::ptr_eq(service_data, &seen.lock()[1]));
     }
 }

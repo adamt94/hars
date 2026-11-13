@@ -123,7 +123,7 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
 - [x] Service registry: `call(domain, service, data, target)`, `call_service`
       event, `supports_response`, `entity_id` target resolution; REST
       `GET /api/services` + `POST /api/services/{domain}/{service}`
-- [ ] Per-service data schemas (handlers validate for now and return `Invalid` → 400)
+- [x] Per-service data schemas, checked before `call_service` fires (`Invalid` → 400)
 - [x] `Context` (id, parent_id, user_id) on states, events and service calls
 - [x] Lossless, ordered state-change delivery for internal consumers
       (automations, recorder). The lossy broadcast bus is only for API
