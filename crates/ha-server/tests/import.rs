@@ -108,9 +108,19 @@ fn ha_config(dir: &Path) -> String {
         1,
         json!({"config": {"strategy": {"type": "map"}}}),
     );
-    for f in ["configuration.yaml", "automations.yaml", "secrets.yaml"] {
-        std::fs::write(dir.join(f), "# yaml\n").unwrap();
-    }
+    std::fs::write(
+        dir.join("configuration.yaml"),
+        "default_config:\nautomation: !include automations.yaml\n",
+    )
+    .unwrap();
+    std::fs::write(
+        dir.join("automations.yaml"),
+        "- id: ok\n  alias: Fine\n  triggers: [{trigger: time, at: '23:30:00'}]\n  actions: [{action: light.turn_off}]\n\
+         - id: tpl\n  alias: Templated\n  triggers: [{trigger: time, at: '23:30:00'}]\n  actions: [{action: light.turn_on, data: {brightness: '{{ 1 }}'}}]\n",
+    )
+    .unwrap();
+    // Not used by any file: never copied.
+    std::fs::write(dir.join("secrets.yaml"), "pw: secret-value\n").unwrap();
     owner
 }
 
@@ -195,7 +205,7 @@ fn imports_an_ha_install_and_keeps_its_sessions() {
         assert_eq!(mode(&user_data), 0o644);
     }
     let report = read_json(&dest.join("import-report.json"));
-    assert_eq!(report["importer_version"], 1);
+    assert_eq!(report["importer_version"], 2);
     assert_eq!(report["ha_version"], "2026.6.1");
     let mut imported = vec![
         "auth",
@@ -221,11 +231,30 @@ fn imports_an_ha_install_and_keeps_its_sessions() {
         json!({"entry_id": "e1", "domain": "hue", "title": "Hue Bridge", "disabled": false, "supported": true})
     );
     assert_eq!(report["config_entries"][1]["disabled"], true);
-    // secrets.yaml is never listed (nor read).
+    // The YAML, byte for byte; secrets.yaml only when something uses it.
     assert_eq!(
         report["yaml"],
-        json!(["configuration.yaml", "automations.yaml"])
+        json!(["automations.yaml", "configuration.yaml"])
     );
+    for f in ["automations.yaml", "configuration.yaml"] {
+        assert_eq!(
+            std::fs::read(src.join(f)).unwrap(),
+            std::fs::read(dest.join(f)).unwrap(),
+            "{f}"
+        );
+    }
+    assert!(!dest.join("secrets.yaml").exists());
+    assert_eq!(
+        report["automations"][0],
+        json!({"id": "ok", "alias": "Fine", "status": "ok"})
+    );
+    assert_eq!(report["automations"][1]["status"], "unavailable");
+    assert!(
+        stdout.contains("automation Templated will be unavailable: templates are not supported"),
+        "{stdout}"
+    );
+    assert!(stdout.contains("automations: 1 of 2 supported"), "{stdout}");
+    assert!(!report.to_string().contains("secret-value"));
     assert!(
         !report.to_string().contains("secret-key"),
         "integration secrets stay out of the report"
@@ -494,4 +523,161 @@ fn a_leftover_backup_blocks_the_next_import() {
     for d in [src, dest] {
         let _ = std::fs::remove_dir_all(d);
     }
+}
+
+/// `!secret` brings `secrets.yaml` (owner-only); an include leaving the
+/// config directory is refused.
+#[test]
+fn yaml_secrets_and_includes() {
+    let src = temp("yaml-src");
+    let dest = temp("yaml-dest");
+    ha_config(&src);
+    std::fs::write(
+        src.join("configuration.yaml"),
+        "http:\n  key: !secret pw\nautomation: !include_dir_merge_list automations\n",
+    )
+    .unwrap();
+    std::fs::create_dir_all(src.join("automations/sub")).unwrap();
+    std::fs::write(src.join("automations/sub/a.yaml"), "- id: a\n").unwrap();
+    let out = hars(&dest, &["import", src.to_str().unwrap()]);
+    assert!(out.status.success(), "{out:?}");
+    let report = read_json(&dest.join("import-report.json"));
+    assert_eq!(
+        report["yaml"],
+        json!([
+            "automations/sub/a.yaml",
+            "configuration.yaml",
+            "secrets.yaml"
+        ])
+    );
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mode = std::fs::metadata(dest.join("secrets.yaml"))
+            .unwrap()
+            .permissions()
+            .mode();
+        assert_eq!(mode & 0o777, 0o600);
+    }
+    assert!(!String::from_utf8_lossy(&out.stdout).contains("secret-value"));
+    // Loosened in the destination: a re-import makes it owner-only again.
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let p = dest.join("secrets.yaml");
+        std::fs::set_permissions(&p, std::fs::Permissions::from_mode(0o644)).unwrap();
+        let out = hars(&dest, &["import", src.to_str().unwrap()]);
+        assert!(out.status.success(), "{out:?}");
+        let mode = std::fs::metadata(&p).unwrap().permissions().mode();
+        assert_eq!(mode & 0o777, 0o600);
+    }
+
+    std::fs::write(src.parent().unwrap().join("outside.yaml"), "1\n").unwrap();
+    std::fs::write(
+        src.join("configuration.yaml"),
+        "x: !include ../outside.yaml\n",
+    )
+    .unwrap();
+    let dest2 = temp("yaml-dest2");
+    let out = hars(&dest2, &["import", src.to_str().unwrap()]);
+    assert!(!out.status.success());
+    assert!(String::from_utf8_lossy(&out.stderr).contains("outside the config directory"));
+}
+
+/// The files the loader really follows (multi-line and flow includes;
+/// not comments or quoted text), secrets beside included files, and
+/// secrets never printed.
+#[test]
+fn yaml_found_as_the_loader_finds_it() {
+    let src = temp("yaml-loader-src");
+    let dest = temp("yaml-loader-dest");
+    ha_config(&src);
+    std::fs::create_dir_all(src.join("parts")).unwrap();
+    std::fs::create_dir_all(src.join("sub")).unwrap();
+    std::fs::write(
+        src.join("configuration.yaml"),
+        "# !include /etc/passwd and !secret nothing\nnote: \"!include ../nope.yaml\"\nautomation: !include_dir_merge_list\n  parts\nother: [!include sub/a.yaml]\n",
+    )
+    .unwrap();
+    std::fs::write(
+        src.join("parts/a.yaml"),
+        "- id: a\n  alias: !secret name\n  triggers: [{trigger: time, at: '10:00'}]\n  actions: [{action: light.turn_on}]\n",
+    )
+    .unwrap();
+    std::fs::write(src.join("sub/a.yaml"), "pw: !secret pw\n").unwrap();
+    std::fs::write(src.join("sub/secrets.yaml"), "pw: SUBSECRET\n").unwrap();
+    std::fs::write(src.join("secrets.yaml"), "name: TOPNAME\npw: ROOTPW\n").unwrap();
+    let out = hars(&dest, &["import", src.to_str().unwrap()]);
+    assert!(out.status.success(), "{out:?}");
+    let report = read_json(&dest.join("import-report.json"));
+    assert_eq!(
+        report["yaml"],
+        json!([
+            "configuration.yaml",
+            "parts/a.yaml",
+            "secrets.yaml",
+            "sub/a.yaml",
+            "sub/secrets.yaml"
+        ])
+    );
+    let text = format!(
+        "{report}{}{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    for secret in ["TOPNAME", "SUBSECRET", "ROOTPW"] {
+        assert!(!text.contains(secret), "{secret} leaked");
+    }
+    assert_eq!(report["automations"][0]["alias"], "<secret>");
+}
+
+/// Symlinks, in the source or the destination, and the importer's own
+/// paths are refused.
+#[cfg(unix)]
+#[test]
+fn yaml_paths_are_checked() {
+    let src = temp("yaml-paths-src");
+    let outside = temp("yaml-paths-outside");
+    ha_config(&src);
+    std::fs::create_dir_all(&outside).unwrap();
+    std::fs::write(outside.join("a.yaml"), "1\n").unwrap();
+    std::os::unix::fs::symlink(&outside, src.join("linked")).unwrap();
+    std::fs::write(
+        src.join("configuration.yaml"),
+        "x: !include linked/a.yaml\n",
+    )
+    .unwrap();
+    let out = hars(&temp("yaml-paths-d1"), &["import", src.to_str().unwrap()]);
+    assert!(!out.status.success());
+    assert!(
+        String::from_utf8_lossy(&out.stderr).contains("symlink"),
+        "{out:?}"
+    );
+
+    std::fs::remove_file(src.join("linked")).unwrap();
+    std::fs::create_dir_all(src.join("linked")).unwrap();
+    std::fs::write(src.join("linked/a.yaml"), "1\n").unwrap();
+    let dest = temp("yaml-paths-d2");
+    std::fs::create_dir_all(&dest).unwrap();
+    std::os::unix::fs::symlink(&outside, dest.join("linked")).unwrap();
+    let out = hars(&dest, &["import", src.to_str().unwrap()]);
+    assert!(!out.status.success());
+    assert!(
+        String::from_utf8_lossy(&out.stderr).contains("symlink"),
+        "{out:?}"
+    );
+
+    std::fs::create_dir_all(src.join(".import-backup")).unwrap();
+    std::fs::write(src.join(".import-backup/a.yaml"), "42\n").unwrap();
+    std::fs::write(
+        src.join("configuration.yaml"),
+        "x: !include .import-backup/a.yaml\n",
+    )
+    .unwrap();
+    let out = hars(&temp("yaml-paths-d3"), &["import", src.to_str().unwrap()]);
+    assert!(!out.status.success());
+    assert!(
+        String::from_utf8_lossy(&out.stderr).contains("keeps for itself"),
+        "{out:?}"
+    );
 }

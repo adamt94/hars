@@ -16,7 +16,7 @@ use serde_json::{Map, Value};
 use std::path::{Path, PathBuf};
 
 /// Bumped whenever what the importer does changes.
-pub const IMPORTER_VERSION: u32 = 1;
+pub const IMPORTER_VERSION: u32 = 2;
 /// The HA release whose formats `hars` reads.
 const SUPPORTED_HA: &str = "2026.6.";
 const REPORT_FILE: &str = "import-report.json";
@@ -71,8 +71,10 @@ pub struct Report {
     pub skipped: Vec<Skipped>,
     /// Every config entry, with whether `hars` can run it yet.
     pub config_entries: Vec<EntryReport>,
-    /// YAML configuration found, which isn't imported yet.
+    /// YAML files copied (or that would be).
     pub yaml: Vec<String>,
+    /// Each automation in the YAML, and whether hars can run it.
+    pub automations: Vec<AutomationReport>,
 }
 
 #[derive(Debug, Serialize)]
@@ -119,16 +121,8 @@ pub fn run(opts: &Options) -> anyhow::Result<Report> {
         removed: Vec::new(),
         skipped: Vec::new(),
         config_entries: config_entries(&source)?,
-        yaml: [
-            "configuration.yaml",
-            "automations.yaml",
-            "scripts.yaml",
-            "scenes.yaml",
-        ]
-        .into_iter()
-        .filter(|f| source.join(f).is_file())
-        .map(str::to_owned)
-        .collect(),
+        yaml: Vec::new(),
+        automations: Vec::new(),
     };
 
     if !source.join(".storage").is_dir() {
@@ -164,6 +158,28 @@ pub fn run(opts: &Options) -> anyhow::Result<Report> {
         Store::new(&staging.root, key.clone(), 1, 1, private).save_raw(&bytes)?;
     }
 
+    // 1b. The YAML configuration, staged byte for byte with its mode bits
+    //     (`secrets.yaml` owner-only).
+    let mut secret_values = Vec::new();
+    if source.join("configuration.yaml").is_file() {
+        (report.yaml, secret_values) = yaml_files(&source)?;
+        for rel in &report.yaml {
+            check_path(&dest, Path::new(rel), false)?;
+        }
+    }
+    for rel in &report.yaml {
+        let to = staging.root.join(rel);
+        if let Some(d) = to.parent() {
+            std::fs::create_dir_all(d)?;
+        }
+        std::fs::copy(source.join(rel), &to)?;
+        #[cfg(unix)]
+        if rel.ends_with("secrets.yaml") {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&to, std::fs::Permissions::from_mode(0o600))?;
+        }
+    }
+
     // 2. Validate the staged copy with the loaders the server uses. Auth and
     //    core.config must load; frontend settings that don't are left out.
     ha_auth::Auth::load(&staging.root, ha_core::Clock::system()).map_err(|e| {
@@ -180,6 +196,35 @@ pub fn run(opts: &Options) -> anyhow::Result<Report> {
         .map_err(|e| anyhow::anyhow!("the zones or people don't load ({})", sanitized(&e)))?;
     ha_api::Lovelace::load_strict(&staging.root)
         .map_err(|e| anyhow::anyhow!("the dashboards don't load ({})", sanitized(&e)))?;
+    if !report.yaml.is_empty() {
+        let secrets = ha_core::yaml::Secrets {
+            config_dir: staging.root.clone(),
+        };
+        // The loader's errors name the problem, not secret values.
+        let config =
+            ha_core::yaml::load_file(&staging.root.join("configuration.yaml"), Some(&secrets))
+                .map_err(|e| {
+                    anyhow::anyhow!(
+                        "configuration.yaml doesn't load ({})",
+                        redact(&e.to_string(), &secret_values)
+                    )
+                })?;
+        for item in ha_automation::from_config(&config) {
+            // Secret values never reach the report or the terminal.
+            let text = |k: &str| {
+                item.get(k)
+                    .and_then(Value::as_str)
+                    .map(|v| redact(v, &secret_values))
+            };
+            let parsed = ha_automation::config::parse(&item);
+            report.automations.push(AutomationReport {
+                id: text("id"),
+                alias: text("alias"),
+                status: if parsed.is_ok() { "ok" } else { "unavailable" },
+                reason: parsed.err().map(|e| redact(&e, &secret_values)),
+            });
+        }
+    }
     for key in staging.keys()? {
         if key == "frontend.system_data" || key.starts_with(USER_DATA_PREFIX) {
             let store = Store::new(&staging.root, key.clone(), 1, 1, false);
@@ -216,6 +261,13 @@ pub fn run(opts: &Options) -> anyhow::Result<Report> {
             true => {}
         }
     }
+    for rel in &report.yaml {
+        if dest.join(rel).exists()
+            && std::fs::read(dest.join(rel)).ok() != std::fs::read(staging.root.join(rel)).ok()
+        {
+            report.replaced.push(rel.clone());
+        }
+    }
     report.imported = staged.clone();
     if !opts.force && !opts.dry_run && !(report.replaced.is_empty() && report.removed.is_empty()) {
         let mut changed = report.replaced.clone();
@@ -234,14 +286,30 @@ pub fn run(opts: &Options) -> anyhow::Result<Report> {
     let mut changes: Vec<Change> = Vec::new();
     for key in &staged {
         if read(&dest, key) != read(&staging.root, key) {
-            changes.push(Change::Put(key.clone()));
+            changes.push(Change::Put(format!(".storage/{key}")));
         }
     }
-    changes.extend(report.removed.iter().cloned().map(Change::Remove));
+    changes.extend(
+        report
+            .removed
+            .iter()
+            .map(|k| Change::Remove(format!(".storage/{k}"))),
+    );
+    for rel in &report.yaml {
+        if std::fs::read(dest.join(rel)).ok() != std::fs::read(staging.root.join(rel)).ok() {
+            changes.push(Change::Put(rel.clone()));
+        }
+    }
     commit(&staging, &dest, &changes, |from, to| {
         std::fs::rename(from, to)
     })?;
 
+    // A secrets file is owner-only even when its bytes didn't change.
+    #[cfg(unix)]
+    for rel in report.yaml.iter().filter(|r| r.ends_with("secrets.yaml")) {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(dest.join(rel), std::fs::Permissions::from_mode(0o600))?;
+    }
     let json = serde_json::to_vec_pretty(&report)?;
     std::fs::write(dest.join(REPORT_FILE), json)?;
     Ok(report)
@@ -323,49 +391,75 @@ enum Change {
     Remove(String),
 }
 
-/// Apply the changes with renames. The destination's current files are moved
-/// to `.import-backup` first; if any step fails, everything done so far is
-/// undone. `rename` is injectable so the rollback can be tested.
+/// Apply the changes with renames. Each change is a path relative to the
+/// config directory (`.storage/<key>`, or a YAML file). The destination's
+/// current files are moved to `.import-backup` first; if any step fails,
+/// everything done so far is undone. `rename` is injectable so the
+/// rollback can be tested.
 fn commit(
     staging: &Staging,
     dest: &Path,
     changes: &[Change],
     mut rename: impl FnMut(&Path, &Path) -> std::io::Result<()>,
 ) -> anyhow::Result<()> {
-    let storage = dest.join(".storage");
     let backup = dest.join(BACKUP_DIR);
     // `run` refuses to start while a backup is left over; never delete one.
     std::fs::create_dir(&backup).with_context(|| format!("{} already exists", backup.display()))?;
-    std::fs::create_dir_all(&storage)?;
+    std::fs::create_dir_all(dest.join(".storage"))?;
 
     // What was done, to undo in reverse on failure.
     let mut moved_out: Vec<String> = Vec::new();
     let mut put: Vec<String> = Vec::new();
+    // Directories this commit made, to remove on rollback (deepest last).
+    let mut made: Vec<PathBuf> = Vec::new();
+    let mut parent = |p: &Path| -> std::io::Result<()> {
+        let Some(d) = p.parent() else { return Ok(()) };
+        let mut missing = Vec::new();
+        let mut at = Some(d);
+        while let Some(x) = at.filter(|x| !x.exists()) {
+            missing.push(x.to_path_buf());
+            at = x.parent();
+        }
+        for x in missing.into_iter().rev() {
+            std::fs::create_dir(&x)?;
+            made.push(x);
+        }
+        Ok(())
+    };
     let result = (|| -> std::io::Result<()> {
         for change in changes {
-            let (Change::Put(key) | Change::Remove(key)) = change;
-            let current = storage.join(key);
+            let (Change::Put(rel) | Change::Remove(rel)) = change;
+            let current = dest.join(rel);
             if current.exists() {
-                rename(&current, &backup.join(key))?;
-                moved_out.push(key.clone());
+                let saved = backup.join(rel);
+                parent(&saved)?;
+                rename(&current, &saved)?;
+                moved_out.push(rel.clone());
             }
-            if let Change::Put(key) = change {
-                rename(&staging.root.join(".storage").join(key), &current)?;
-                put.push(key.clone());
+            if let Change::Put(rel) = change {
+                parent(&current)?;
+                rename(&staging.root.join(rel), &current)?;
+                put.push(rel.clone());
             }
         }
         #[cfg(unix)]
-        std::fs::File::open(&storage)?.sync_all()?;
+        {
+            std::fs::File::open(dest.join(".storage"))?.sync_all()?;
+            std::fs::File::open(dest)?.sync_all()?;
+        }
         Ok(())
     })();
 
     if let Err(e) = result {
-        for key in put.iter().rev() {
-            let _ = std::fs::remove_file(storage.join(key));
+        for rel in put.iter().rev() {
+            let _ = std::fs::remove_file(dest.join(rel));
         }
         let mut restored = true;
-        for key in moved_out.iter().rev() {
-            restored &= std::fs::rename(backup.join(key), storage.join(key)).is_ok();
+        for rel in moved_out.iter().rev() {
+            restored &= std::fs::rename(backup.join(rel), dest.join(rel)).is_ok();
+        }
+        for d in made.iter().rev().filter(|d| !d.starts_with(&backup)) {
+            let _ = std::fs::remove_dir(d);
         }
         if restored {
             let _ = std::fs::remove_dir_all(&backup);
@@ -378,6 +472,112 @@ fn commit(
     }
     let _ = std::fs::remove_dir_all(&backup);
     Ok(())
+}
+
+/// The YAML configuration HA reads, found by loading it with hars's own
+/// loader (so exactly the files it follows): `configuration.yaml`, every
+/// file its `!include*` tags reach, and each `secrets.yaml` a secret came
+/// from. Relative paths, sorted, and the secret values used. Anything
+/// outside the config directory, through a symlink, or in a path the
+/// importer reserves is refused.
+fn yaml_files(source: &Path) -> anyhow::Result<(Vec<String>, Vec<String>)> {
+    let secrets = ha_core::yaml::Secrets {
+        config_dir: source.to_path_buf(),
+    };
+    let (_, trace) =
+        ha_core::yaml::load_file_traced(&source.join("configuration.yaml"), Some(&secrets))
+            .map_err(|e| anyhow::anyhow!("configuration.yaml doesn't load ({e})"))?;
+    let mut files = Vec::new();
+    for f in &trace.files {
+        let rel = f
+            .strip_prefix(source)
+            .ok()
+            .and_then(normalize)
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "an include reaches {}, outside the config directory",
+                    f.display()
+                )
+            })?;
+        check_path(source, &rel, true)?;
+        files.push(rel.to_string_lossy().into_owned());
+    }
+    files.sort();
+    files.dedup();
+    Ok((files, trace.secret_values))
+}
+
+/// `a/./b/../c` as `a/c`, or `None` if it leaves the root (or is absolute).
+fn normalize(p: &Path) -> Option<PathBuf> {
+    let mut out = PathBuf::new();
+    for c in p.components() {
+        match c {
+            std::path::Component::Normal(x) => out.push(x),
+            std::path::Component::CurDir => {}
+            std::path::Component::ParentDir => {
+                if !out.pop() {
+                    return None;
+                }
+            }
+            _ => return None,
+        }
+    }
+    Some(out)
+}
+
+/// A relative YAML path is usable in `root`: not a path the importer or
+/// HA's storage owns, and no component a symlink. In the source the file
+/// must be a regular file.
+fn check_path(root: &Path, rel: &Path, source: bool) -> anyhow::Result<()> {
+    let first = rel
+        .components()
+        .next()
+        .map(|c| c.as_os_str().to_string_lossy().into_owned())
+        .unwrap_or_default();
+    if first == ".storage" || first.starts_with(".import") || first == REPORT_FILE {
+        bail!("{} is a path hars keeps for itself", rel.display());
+    }
+    let mut at = root.to_path_buf();
+    let n = rel.components().count();
+    for (i, c) in rel.components().enumerate() {
+        at.push(c);
+        match std::fs::symlink_metadata(&at) {
+            Ok(m) if m.file_type().is_symlink() => {
+                bail!(
+                    "{} goes through a symlink; copy the real files",
+                    rel.display()
+                )
+            }
+            Ok(m) if source && i + 1 == n && !m.is_file() => {
+                bail!("{} is not a regular file", rel.display())
+            }
+            Ok(_) => {}
+            // Not in the destination yet: nothing further to check.
+            Err(_) if !source => return Ok(()),
+            Err(e) => bail!("{}: {:?}", rel.display(), e.kind()),
+        }
+    }
+    Ok(())
+}
+
+/// `text` with each secret value replaced.
+fn redact(text: &str, secrets: &[String]) -> String {
+    let mut out = text.to_owned();
+    for s in secrets.iter().filter(|s| !s.is_empty()) {
+        out = out.replace(s.as_str(), "<secret>");
+    }
+    out
+}
+
+/// What the import did with an automation.
+#[derive(Debug, Serialize)]
+pub struct AutomationReport {
+    pub id: Option<String>,
+    pub alias: Option<String>,
+    /// `ok`, or `unavailable` (invalid or not supported by hars yet).
+    pub status: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -487,9 +687,24 @@ pub fn summary(report: &Report, dest: &Path) -> String {
         ));
     }
     if !report.yaml.is_empty() {
+        out.push_str(&format!("  YAML: {}\n", report.yaml.join(", ")));
+    }
+    for a in report.automations.iter().filter(|a| a.status != "ok") {
         out.push_str(&format!(
-            "  YAML not imported yet: {}\n",
-            report.yaml.join(", ")
+            "  automation {} will be unavailable: {}\n",
+            a.alias.as_deref().or(a.id.as_deref()).unwrap_or("?"),
+            a.reason.as_deref().unwrap_or_default()
+        ));
+    }
+    let ok = report
+        .automations
+        .iter()
+        .filter(|a| a.status == "ok")
+        .count();
+    if !report.automations.is_empty() {
+        out.push_str(&format!(
+            "  automations: {ok} of {} supported\n",
+            report.automations.len()
         ));
     }
     if !report.dry_run {
@@ -522,9 +737,9 @@ mod tests {
         )
         .unwrap();
         let changes = [
-            Change::Put("auth".into()),
-            Change::Put("auth_provider.homeassistant".into()),
-            Change::Remove("onboarding".into()),
+            Change::Put(".storage/auth".into()),
+            Change::Put(".storage/auth_provider.homeassistant".into()),
+            Change::Remove(".storage/onboarding".into()),
         ];
         // The fourth rename (moving the new provider in) fails.
         let mut calls = 0;
@@ -595,5 +810,29 @@ mod tests {
             sanitized(&err)
         );
         std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// A rollback removes the directories the commit made.
+    #[test]
+    fn rollback_removes_new_directories() {
+        let dest = std::env::temp_dir().join(format!("hars-import-dirs-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dest);
+        std::fs::create_dir_all(&dest).unwrap();
+        std::fs::write(dest.join("z"), "a file").unwrap();
+        let staging = Staging::new(&dest).unwrap();
+        for rel in ["a/one.yaml", "z/two.yaml"] {
+            let p = staging.root.join(rel);
+            std::fs::create_dir_all(p.parent().unwrap()).unwrap();
+            std::fs::write(p, "x").unwrap();
+        }
+        let changes = [
+            Change::Put("a/one.yaml".into()),
+            Change::Put("z/two.yaml".into()),
+        ];
+        let err = commit(&staging, &dest, &changes, |f, t| std::fs::rename(f, t)).unwrap_err();
+        assert!(err.to_string().contains("rolled back"), "{err}");
+        assert!(!dest.join("a").exists());
+        drop(staging);
+        std::fs::remove_dir_all(dest).unwrap();
     }
 }

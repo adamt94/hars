@@ -252,6 +252,10 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
 - [x] `automation.*` entities (registry ids, HA's attributes, restore with
       `initial_state`, invalid configs `unavailable`), `trigger`/`turn_on`/
       `turn_off`/`toggle`; loaded from `configuration.yaml` (`ha-automation`)
+- [x] `hars import` copies the YAML (`configuration.yaml`, every file its
+      `!include*` tags reach, `secrets.yaml` only if `!secret` is used,
+      owner-only), validates it with hars's loader and reports each
+      automation as supported or `unavailable` with the reason
 - [ ] `automation.reload`, the editor's config API and traces
 - [x] Inventory triggers/conditions/actions/modes with HA 2026.6.1 semantics,
       matched against HA's own engine on 36 scenario vectors:

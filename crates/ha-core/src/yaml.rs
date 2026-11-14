@@ -154,22 +154,39 @@ pub struct Secrets {
 }
 
 impl Secrets {
-    fn get(&self, from: &Path, name: &str) -> Result<Yaml, YamlError> {
+    fn get(
+        &self,
+        from: &Path,
+        name: &str,
+        trace: &std::cell::RefCell<Trace>,
+    ) -> Result<Yaml, YamlError> {
         // From the including file's directory up to the config directory,
         // and never outside it. `logger` is the secrets file's own setting.
         let mut dir = from.parent().map(Path::to_path_buf);
         while let Some(d) = dir.filter(|d| d.starts_with(&self.config_dir)) {
             let file = d.join("secrets.yaml");
             if let Ok(text) = std::fs::read_to_string(&file) {
+                // Its errors would quote the secrets: name the file only.
                 let secrets = Loader {
                     file: Some(file.clone()),
                     secrets: None,
                     nodes: Default::default(),
+                    trace: Default::default(),
                 }
-                .load_str(&text)?;
+                .load_str(&text)
+                .map_err(|_| YamlError(format!("{} doesn't load", file.display())))?;
                 if name != "logger"
                     && let Some(v) = secrets.get(name)
                 {
+                    let mut t = trace.borrow_mut();
+                    if !t.files.contains(&file) {
+                        t.files.push(file.clone());
+                    }
+                    let text = match v {
+                        Yaml::Str(s) => s.clone(),
+                        v => v.to_json().to_string(),
+                    };
+                    t.secret_values.push(text);
                     return Ok(v.clone());
                 }
             }
@@ -189,6 +206,7 @@ pub fn parse(text: &str) -> Result<Yaml, YamlError> {
         file: None,
         secrets: None,
         nodes: Default::default(),
+        trace: Default::default(),
     }
     .load_str(text)
 }
@@ -202,6 +220,7 @@ pub fn load_file(path: &Path, secrets: Option<&Secrets>) -> Result<Yaml, YamlErr
         file: Some(path.to_path_buf()),
         secrets: secrets.cloned(),
         nodes: Default::default(),
+        trace: Default::default(),
     }
     .load_str(&text)
 }
@@ -353,6 +372,36 @@ struct Loader {
     secrets: Option<Secrets>,
     /// Nodes made so far, against [`MAX_NODES`].
     nodes: std::rc::Rc<std::cell::Cell<usize>>,
+    /// What the load read, for [`load_file_traced`].
+    trace: std::rc::Rc<std::cell::RefCell<Trace>>,
+}
+
+/// The files a load read (the entry file, every include, and each
+/// `secrets.yaml` a secret came from) and the secret values it used.
+#[derive(Debug, Default, Clone)]
+pub struct Trace {
+    pub files: Vec<PathBuf>,
+    pub secret_values: Vec<String>,
+}
+
+/// [`load_file`], with what it read: the importer copies exactly the
+/// files the loader follows, and keeps the secrets out of what it prints.
+pub fn load_file_traced(
+    path: &Path,
+    secrets: Option<&Secrets>,
+) -> Result<(Yaml, Trace), YamlError> {
+    let text = std::fs::read_to_string(path)
+        .map_err(|e| YamlError(format!("Unable to read file {}: {e}", path.display())))?;
+    let loader = Loader {
+        file: Some(path.to_path_buf()),
+        secrets: secrets.cloned(),
+        nodes: Default::default(),
+        trace: Default::default(),
+    };
+    loader.trace.borrow_mut().files.push(path.to_path_buf());
+    let v = loader.load_str(&text)?;
+    let trace = loader.trace.borrow().clone();
+    Ok((v, trace))
 }
 
 /// Aliases make shared values in Python; here they're copied, so a few
@@ -585,7 +634,7 @@ impl Loader {
                 let (Some(secrets), Some(file)) = (&self.secrets, &self.file) else {
                     return err("Secrets not supported in this YAML file");
                 };
-                secrets.get(file, value)
+                secrets.get(file, value, &self.trace)
             }
             "!env_var" => {
                 let mut parts = value.split_whitespace();
@@ -615,12 +664,14 @@ impl Loader {
     }
 
     fn child_raw(&self, path: &Path) -> Result<Yaml, YamlError> {
+        self.trace.borrow_mut().files.push(path.to_path_buf());
         let text = std::fs::read_to_string(path)
             .map_err(|_| YamlError(format!("Unable to read file {}", path.display())))?;
         Loader {
             file: Some(path.to_path_buf()),
             secrets: self.secrets.clone(),
             nodes: self.nodes.clone(),
+            trace: self.trace.clone(),
         }
         .load_str(&text)
     }
