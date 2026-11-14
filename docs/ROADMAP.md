@@ -146,6 +146,8 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
   - [x] `core.config` (location, elevation, units, time zone)
   - [x] `person`, zones (`.storage/person`, `.storage/zone`, `zone.home` from
         `core.config`; states before any tracker reports; tracking comes in M5)
+  - [ ] Full Unicode transliteration in `slugify` (CJK, Cyrillic) for new
+        entity ids; imported ones come from the registry
   - [x] Lovelace dashboards and the dashboards list (`url_path` identity),
         resources; storage mode (YAML dashboards come with `configuration.yaml`)
   - [x] Auth: users, bcrypt hashes, **refresh tokens with ids, client ids and

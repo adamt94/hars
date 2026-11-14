@@ -9,6 +9,7 @@ fn slugs_like_ha() {
         ("  Straße  ", "strasse"),
         ("Zone #2!", "zone_2"),
         ("???", "unknown"),
+        ("Đorđe", "dorde"),
     ] {
         assert_eq!(slugify(text), slug, "{text}");
     }
@@ -128,5 +129,70 @@ fn duplicate_names_get_suffixes_and_bad_stores_dont_stop_the_server() {
             .get(&EntityId::parse("zone.shop_2").unwrap())
             .is_some()
     );
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
+/// A person registered as `person.alex` keeps that id even when an
+/// unregistered "Alex" comes first.
+#[test]
+fn registered_ids_are_reserved() {
+    let dir = std::env::temp_dir().join(format!("hars-components-reserved-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    write(
+        &dir,
+        PERSON_KEY,
+        2,
+        json!({"items": [
+            {"id": "new", "name": "Alex", "device_trackers": []},
+            {"id": "old", "name": "Alexander", "device_trackers": []}
+        ]}),
+    );
+    let registries = Registries {
+        entities: vec![ha_registry::Entity {
+            entity_id: "person.alex".into(),
+            platform: "person".into(),
+            unique_id: Some(json!("old")),
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+    let hass = Hass::new();
+    Components::load_strict(&dir)
+        .unwrap()
+        .setup(&hass, &registries);
+    let id = |s: &str| hass.states().get(&EntityId::parse(s).unwrap());
+    assert_eq!(id("person.alex").unwrap().attributes["id"], "old");
+    assert_eq!(id("person.alex_2").unwrap().attributes["id"], "new");
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
+/// HA's person store migration (version 1 `persons`) and its fix for
+/// `device_trackers: null`.
+#[test]
+fn old_person_stores_load_like_ha() {
+    let dir = std::env::temp_dir().join(format!("hars-components-v1-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    write(
+        &dir,
+        PERSON_KEY,
+        1,
+        json!({"persons": [
+            {"id": "p1", "name": "Adam", "user_id": "u1", "device_trackers": null}
+        ]}),
+    );
+    for c in [
+        Components::load_strict(&dir).unwrap(),
+        Components::load(&dir),
+    ] {
+        assert_eq!(c.persons.len(), 1);
+        assert_eq!(c.persons[0]["device_trackers"], json!([]));
+    }
+    let hass = Hass::new();
+    Components::load(&dir).setup(&hass, &Registries::default());
+    let adam = hass
+        .states()
+        .get(&EntityId::parse("person.adam").unwrap())
+        .unwrap();
+    assert_eq!(adam.attributes["device_trackers"], json!([]));
     std::fs::remove_dir_all(dir).unwrap();
 }

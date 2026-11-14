@@ -34,16 +34,19 @@ impl Components {
     /// Read the stores for the server (blocking): one that can't be read is
     /// logged and skipped, so it can't stop the server.
     pub fn load(config_dir: &Path) -> Self {
-        let read = |store: Store| match store.load::<Collection>() {
-            Ok(c) => c.unwrap_or_default().items,
-            Err(e) => {
-                tracing::error!("{e}; starting without it");
-                Vec::new()
-            }
-        };
+        let zones = zone_store(config_dir)
+            .load::<Collection>()
+            .unwrap_or_else(|e| {
+                tracing::error!("{e}; starting without zones");
+                None
+            });
+        let persons = load_persons(config_dir).unwrap_or_else(|e| {
+            tracing::error!("{e}; starting without people");
+            Vec::new()
+        });
         Self {
-            zones: read(zone_store(config_dir)),
-            persons: read(person_store(config_dir)),
+            zones: zones.unwrap_or_default().items,
+            persons,
         }
     }
 
@@ -54,10 +57,7 @@ impl Components {
                 .load::<Collection>()?
                 .unwrap_or_default()
                 .items,
-            persons: person_store(config_dir)
-                .load::<Collection>()?
-                .unwrap_or_default()
-                .items,
+            persons: load_persons(config_dir)?,
         })
     }
 
@@ -74,6 +74,9 @@ impl Components {
             .iter()
             .map(|s| s.entity_id.to_string())
             .collect();
+        // New ids avoid existing states and every id the registry has given
+        // out, as HA's `async_generate_entity_id` does.
+        taken.extend(registries.entities.iter().map(|e| e.entity_id.clone()));
         let config = hass.config();
         let zone_attrs =
             |lat: &Value, lon: &Value, radius: &Value, passive: &Value, editable: bool| {
@@ -275,6 +278,8 @@ pub fn slugify(text: &str) -> String {
             'ž' | 'ź' | 'ż' => "z",
             'š' | 'ś' => "s",
             'ł' => "l",
+            'đ' | 'ð' => "d",
+            'þ' => "th",
             'ř' => "r",
             _ => {
                 sep = true;
@@ -300,6 +305,31 @@ fn zone_store(dir: &Path) -> Store {
 
 fn person_store(dir: &Path) -> Store {
     Store::new(dir, PERSON_KEY, 2, 1, false)
+}
+
+/// `.storage/person`: version 2 (`items`), or version 1 (`persons`), which
+/// HA migrates to `items`. Then HA's fix for an old onboarding bug: a person
+/// with `device_trackers: null` gets `[]`.
+fn load_persons(dir: &Path) -> Result<Vec<Map<String, Value>>, StoreError> {
+    #[derive(Deserialize)]
+    struct V1 {
+        #[serde(default)]
+        persons: Vec<Map<String, Value>>,
+    }
+    let mut persons = match person_store(dir).load::<Collection>() {
+        Ok(c) => c.unwrap_or_default().items,
+        Err(StoreError::TooOld { found: 1, .. }) => Store::new(dir, PERSON_KEY, 1, 1, false)
+            .load::<V1>()?
+            .map(|v| v.persons)
+            .unwrap_or_default(),
+        Err(e) => return Err(e),
+    };
+    for p in &mut persons {
+        if p.get("device_trackers").is_none_or(Value::is_null) {
+            p.insert("device_trackers".into(), json!([]));
+        }
+    }
+    Ok(persons)
 }
 
 #[cfg(test)]
