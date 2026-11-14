@@ -14,6 +14,7 @@ ha-api = { path = "crates/ha-api" }
 ha-auth = { path = "crates/ha-auth" }
 ha-components = { path = "crates/ha-components" }
 ha-core = { path = "crates/ha-core" }
+ha-integrations = { path = "crates/ha-integrations" }
 ha-registry = { path = "crates/ha-registry" }
 
 [workspace.lints.rust]

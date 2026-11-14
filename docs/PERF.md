@@ -110,3 +110,13 @@ costs one timer: the 55 s heartbeat ping.
 | binary | start→/api/ | idle RSS | idle PSS | idle CPU | wakeups/s | threads | run |
 |---|---|---|---|---|---|---|---|
 | 3.08 MiB | 9 ms | 5.5 MiB | 4.6 MiB | 0.000 % | 0.00 | 3 | 15s warm-up, 30s quiet |
+
+### Registries, dashboards, zones/people and `sun`, 2026-11-14
+
+Fresh install (no imported data), so `sun` runs at the default location.
+Its position refreshes every 2 to 20 minutes depending on the sun's phase,
+as in HA, each a single timer; none fell in this 60 s window.
+
+| binary | start→/api/ | idle RSS | idle PSS | idle CPU | wakeups/s | threads | run |
+|---|---|---|---|---|---|---|---|
+| 3.70 MiB | 10 ms | 6.7 MiB | 5.8 MiB | 0.000 % | 0.00 | 3 | 15s warm-up, 60s quiet |

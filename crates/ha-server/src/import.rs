@@ -31,6 +31,8 @@ const STORES: &[(&str, bool)] = &[
     ("onboarding", true),
     ("core.config", true),
     ("frontend.system_data", false),
+    // Integrations' settings (hosts, keys, tokens): owner-only, as in HA.
+    ("core.config_entries", true),
     (ha_registry::ENTITY_KEY, false),
     (ha_registry::DEVICE_KEY, false),
     (ha_registry::AREA_KEY, false),
@@ -40,7 +42,7 @@ const STORES: &[(&str, bool)] = &[
 
 /// Integrations `hars` implements, by domain; their config entries are
 /// imported once their integration exists.
-const SUPPORTED_DOMAINS: &[&str] = &[];
+const SUPPORTED_DOMAINS: &[&str] = ha_integrations::SUPPORTED;
 
 pub struct Options {
     pub source: PathBuf,
@@ -255,7 +257,6 @@ fn supported(key: &str) -> Option<bool> {
 
 fn unsupported_reason(key: &str) -> &'static str {
     match key {
-        "core.config_entries" => "integrations: see config_entries",
         k if k.starts_with("core.") && k.ends_with("_registry") => {
             "this registry is not used by hars yet"
         }
@@ -422,7 +423,7 @@ fn config_entries(config_dir: &Path) -> anyhow::Result<Vec<EntryReport>> {
     let store = Store::new(config_dir, "core.config_entries", 1, 5, true);
     let Some(data) = store
         .load::<Entries>()
-        .context("core.config_entries doesn't load")?
+        .map_err(|e| anyhow::anyhow!("core.config_entries doesn't load ({})", sanitized(&e)))?
     else {
         return Ok(Vec::new());
     };

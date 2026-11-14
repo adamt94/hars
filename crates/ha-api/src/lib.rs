@@ -40,6 +40,8 @@ pub struct ApiConfig {
     pub lovelace: Arc<Lovelace>,
     /// Stored zones and people.
     pub components: Arc<ha_components::Components>,
+    /// Integrations running (`sun`, `sensor`, ...), for `components`.
+    pub integrations: Vec<&'static str>,
 }
 
 /// What the WebSocket and `/api/config` need.
@@ -69,6 +71,9 @@ fn components(config: &ApiConfig) -> Vec<&'static str> {
     if config.frontend.is_some() {
         c.push("frontend");
     }
+    c.extend(&config.integrations);
+    c.sort_unstable();
+    c.dedup();
     c
 }
 

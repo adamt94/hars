@@ -154,8 +154,10 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
         `jwt_key`s**, so the iPhone and browser sessions survive (tested: an
         imported HA refresh token refreshes against `hars`); frontend user
         and system settings
-  - [ ] Config entries: Hue host/key, LIFX host, SwitchBot token/secret,
-        mobile_app registration (webhook id, secret, push data)
+  - [x] Config entries: `core.config_entries` imported as is (0600); the
+        report marks each entry's integration as supported or not. Hue host/key,
+        LIFX host, SwitchBot token/secret and mobile_app registration are used
+        as those integrations land
 - [ ] `configuration.yaml`: `!include`, `!secret`, `!include_dir_merge_named`;
       unknown keys log a warning, while unsupported **automation** syntax fails validation
 - [ ] Restore state on restart: automation on/off + `last_triggered`, IR climate
@@ -234,8 +236,10 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
       over 10 days of recorded data
 
 ### M4: Integrations (each behind a Cargo feature, numbers recorded when added)
-- [ ] `sun` (solar elevation/azimuth + `sensor.sun_next_*`, HA-matched maths),
-      `person`, `zone.home`
+- [x] `sun` (solar elevation/azimuth + `sensor.sun_next_*`, HA-matched maths:
+      a port of astral 2.2 that matches HA to the microsecond on 231 event
+      times), `person`, `zone.home`; started from `core.config_entries`
+      (imported) or by default on a fresh install
 - [ ] `met`: identifying User-Agent, ≤ 4-decimal coordinates, honour
       `Expires`/`If-Modified-Since`, jitter, backoff, serve the stale cache on
       failure; `weather/subscribe_forecast`; attribution

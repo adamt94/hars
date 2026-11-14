@@ -477,6 +477,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "ha-integrations"
+version = "0.1.0"
+dependencies = [
+ "ha-core",
+ "ha-registry",
+ "jiff",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "ha-registry"
 version = "0.1.0"
 dependencies = [
@@ -497,6 +510,7 @@ dependencies = [
  "ha-auth",
  "ha-components",
  "ha-core",
+ "ha-integrations",
  "ha-registry",
  "mimalloc",
  "rustix",
