@@ -13,6 +13,7 @@ workspace = true
 [dependencies]
 axum = { version = "0.8.9", features = ["ws"] }
 ha-auth.workspace = true
+ha-automation.workspace = true
 ha-components.workspace = true
 ha-integrations.workspace = true
 ha-core.workspace = true

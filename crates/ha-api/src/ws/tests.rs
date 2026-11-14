@@ -1448,3 +1448,76 @@ async fn system_log_list_is_admin_only() {
         "extra keys not allowed @ data['x']. Got 1"
     );
 }
+
+#[tokio::test]
+async fn automation_config_is_the_raw_entry() {
+    let hass = Hass::new();
+    let items = ha_core::yaml::parse(
+        "- id: b_first\n  alias: Z\n  triggers: [{trigger: time, at: '10:00'}]\n  actions: [{action: light.turn_on}]\n",
+    )
+    .unwrap();
+    let ha_core::yaml::Yaml::Seq(items) = items else {
+        panic!()
+    };
+    let autos = ha_automation::Automations::setup_yaml(&hass, &Default::default(), &items);
+    let s = server_with(crate::ApiConfig {
+        automations: Some(autos),
+        ..Default::default()
+    })
+    .await;
+    let mut c = Client::authed(&s, &token(&s.auth).0).await;
+    let r = c
+        .call(json!({"id": 2, "type": "automation/config", "entity_id": "automation.z"}))
+        .await;
+    assert_eq!(
+        r["result"],
+        json!({"config": {"id": "b_first", "alias": "Z", "triggers": [{"trigger": "time", "at": "10:00"}], "actions": [{"action": "light.turn_on"}]}})
+    );
+    let r = c
+        .call(json!({"id": 3, "type": "automation/config", "entity_id": "automation.nope"}))
+        .await;
+    assert_eq!(
+        r["error"],
+        json!({"code": "not_found", "message": "Entity not found"})
+    );
+    let r = c.call(json!({"id": 4, "type": "automation/config"})).await;
+    assert_eq!(
+        r["error"],
+        json!({"code": "unknown_error", "message": "Unknown error"})
+    );
+}
+
+/// HA's raw config shows its validators' nested changes (`service` →
+/// `action`, last), and what its encoder can't write is an error.
+#[tokio::test]
+async fn automation_config_quirks() {
+    let hass = Hass::new();
+    let items = ha_core::yaml::parse(
+        "- alias: Legacy no id\n  trigger: {platform: time, at: '10:00'}\n  action: {service: light.turn_on, target: {entity_id: light.hallway}}\n- {id: bin, alias: Bin, value: !!binary aGk=, triggers: [], actions: []}\n",
+    )
+    .unwrap();
+    let ha_core::yaml::Yaml::Seq(items) = items else {
+        panic!()
+    };
+    let autos = ha_automation::Automations::setup_yaml(&hass, &Default::default(), &items);
+    let s = server_with(crate::ApiConfig {
+        automations: Some(autos),
+        ..Default::default()
+    })
+    .await;
+    let mut c = Client::authed(&s, &token(&s.auth).0).await;
+    let r = c
+        .call(json!({"id": 2, "type": "automation/config", "entity_id": "automation.legacy_no_id"}))
+        .await;
+    assert_eq!(
+        r["result"]["config"]["action"],
+        json!({"target": {"entity_id": "light.hallway"}, "action": "light.turn_on"})
+    );
+    let r = c
+        .call(json!({"id": 3, "type": "automation/config", "entity_id": "automation.bin"}))
+        .await;
+    assert_eq!(
+        r["error"],
+        json!({"code": "unknown_error", "message": "Invalid JSON in response"})
+    );
+}

@@ -325,6 +325,9 @@ pub struct Automation {
     pub entity_id: EntityId,
     pub name: String,
     pub unique_id: Option<String>,
+    /// The config as loaded, as JSON text in its YAML key order (`None`
+    /// if HA couldn't encode it either).
+    pub raw: Option<String>,
     /// The validated config, or why it isn't valid (`unavailable`).
     config: Result<Config, String>,
     live: Mutex<Live>,
@@ -860,7 +863,79 @@ fn entity_id_for(
 /// or `automation <anything>` key (`config_per_platform`), a list of them or
 /// one; a falsy value is none.
 pub fn from_config(config: &ha_core::yaml::Yaml) -> Vec<Value> {
-    let ha_core::yaml::Yaml::Map(pairs) = config else {
+    from_config_yaml(config)
+        .iter()
+        .map(|y| y.to_json())
+        .collect()
+}
+
+/// HA's `raw_config` shows its validators' changes to nested mappings:
+/// an action's legacy `service` becomes `action`, moved last. Top-level
+/// keys, triggers and conditions are as written.
+pub fn migrate_actions(item: &ha_core::yaml::Yaml) -> ha_core::yaml::Yaml {
+    use ha_core::yaml::Yaml;
+    fn action(a: &Yaml) -> Yaml {
+        let Yaml::Map(pairs) = a else {
+            return a.clone();
+        };
+        let mut out: Vec<(Yaml, Yaml)> = Vec::new();
+        let mut service = None;
+        let has_action = pairs.iter().any(|(k, _)| k.as_str() == Some("action"));
+        for (k, v) in pairs {
+            match k.as_str() {
+                Some("service") if !has_action => service = Some(v.clone()),
+                Some("sequence" | "default" | "then" | "else") => out.push((k.clone(), actions(v))),
+                Some("choose") => out.push((k.clone(), choose(v))),
+                _ => out.push((k.clone(), v.clone())),
+            }
+        }
+        if let Some(s) = service {
+            out.push((Yaml::Str("action".into()), s));
+        }
+        Yaml::Map(out)
+    }
+    fn actions(v: &Yaml) -> Yaml {
+        match v {
+            Yaml::Seq(items) => Yaml::Seq(items.iter().map(action).collect()),
+            single => action(single),
+        }
+    }
+    fn choose(v: &Yaml) -> Yaml {
+        let option = |o: &Yaml| match o {
+            Yaml::Map(pairs) => Yaml::Map(
+                pairs
+                    .iter()
+                    .map(|(k, v)| match k.as_str() {
+                        Some("sequence") => (k.clone(), actions(v)),
+                        _ => (k.clone(), v.clone()),
+                    })
+                    .collect(),
+            ),
+            o => o.clone(),
+        };
+        match v {
+            Yaml::Seq(items) => Yaml::Seq(items.iter().map(option).collect()),
+            single => option(single),
+        }
+    }
+    let Yaml::Map(pairs) = item else {
+        return item.clone();
+    };
+    Yaml::Map(
+        pairs
+            .iter()
+            .map(|(k, v)| match k.as_str() {
+                Some("actions" | "action") => (k.clone(), actions(v)),
+                _ => (k.clone(), v.clone()),
+            })
+            .collect(),
+    )
+}
+
+/// [`from_config`], as loaded (for the raw configs the editor shows).
+pub fn from_config_yaml(config: &ha_core::yaml::Yaml) -> Vec<ha_core::yaml::Yaml> {
+    use ha_core::yaml::Yaml;
+    let Yaml::Map(pairs) = config else {
         return Vec::new();
     };
     let mut out = Vec::new();
@@ -872,9 +947,9 @@ pub fn from_config(config: &ha_core::yaml::Yaml) -> Vec<Value> {
         if !v.is_truthy() {
             continue;
         }
-        match v.to_json() {
-            Value::Array(items) => out.extend(items),
-            item => out.push(item),
+        match v {
+            Yaml::Seq(items) => out.extend(items.iter().cloned()),
+            item => out.push(item.clone()),
         }
     }
     out
@@ -885,6 +960,27 @@ impl Automations {
     /// write their states, restored as HA restores them. Triggers attach at
     /// [`Automations::started`].
     pub fn setup(hass: &Hass, registries: &Registries, items: &[Value]) -> Self {
+        let raw: Vec<Option<String>> = items.iter().map(|v| Some(v.to_string())).collect();
+        Self::setup_raw(hass, registries, items, &raw)
+    }
+
+    /// [`Automations::setup`] from YAML as loaded, keeping each item's raw
+    /// config in its YAML key order for `automation/config`.
+    pub fn setup_yaml(hass: &Hass, registries: &Registries, items: &[ha_core::yaml::Yaml]) -> Self {
+        let json: Vec<Value> = items.iter().map(|y| y.to_json()).collect();
+        let raw: Vec<Option<String>> = items
+            .iter()
+            .map(|y| migrate_actions(y).to_json_text())
+            .collect();
+        Self::setup_raw(hass, registries, &json, &raw)
+    }
+
+    fn setup_raw(
+        hass: &Hass,
+        registries: &Registries,
+        items: &[Value],
+        raw: &[Option<String>],
+    ) -> Self {
         let shared = Arc::new(Shared {
             hass: hass.clone(),
             listeners: Arc::default(),
@@ -970,6 +1066,7 @@ impl Automations {
                 entity_id,
                 name,
                 unique_id,
+                raw: raw[n].clone(),
                 config,
                 live: Mutex::new(live),
             });
@@ -982,6 +1079,13 @@ impl Automations {
         let me = Self { shared };
         me.register_services();
         me
+    }
+
+    /// The automation with this entity id.
+    pub fn by_entity(&self, entity_id: &str) -> Option<Arc<Automation>> {
+        self.list()
+            .into_iter()
+            .find(|a| a.entity_id.as_str() == entity_id)
     }
 
     pub fn list(&self) -> Vec<Arc<Automation>> {

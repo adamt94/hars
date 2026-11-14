@@ -7,6 +7,7 @@
 //! `supported_features` with `coalesce_messages`, queued messages go out
 //! together as one JSON array per frame.
 
+mod automation;
 mod commands;
 mod entities;
 mod frontend;

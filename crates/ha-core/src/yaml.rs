@@ -97,6 +97,37 @@ impl Yaml {
         }
     }
 
+    /// As JSON text with mappings in their YAML order (what HA's JSON of
+    /// the loaded dict looks like), unlike [`Yaml::to_json`].
+    /// `None` where HA's JSON encoder (orjson) fails: bytes, ints past
+    /// 64 bits, sets, blueprint inputs.
+    pub fn to_json_text(&self) -> Option<String> {
+        Some(match self {
+            Yaml::Bytes(_) | Yaml::BigInt(_) | Yaml::Set(_) | Yaml::Input(_) => return None,
+            Yaml::Int(i) if i64::try_from(*i).is_err() && u64::try_from(*i).is_err() => {
+                return None;
+            }
+            Yaml::Seq(v) | Yaml::Tuple(v) => {
+                let items: Option<Vec<String>> = v.iter().map(Yaml::to_json_text).collect();
+                format!("[{}]", items?.join(","))
+            }
+            Yaml::Map(pairs) => {
+                let items: Option<Vec<String>> = pairs
+                    .iter()
+                    .map(|(k, v)| {
+                        Some(format!(
+                            "{}:{}",
+                            serde_json::Value::String(k.key_string()),
+                            v.to_json_text()?
+                        ))
+                    })
+                    .collect();
+                format!("{{{}}}", items?.join(","))
+            }
+            other => other.to_json().to_string(),
+        })
+    }
+
     /// A key as JSON names it (`str(k)` for non-strings, as orjson's
     /// `OPT_NON_STR_KEYS`).
     fn key_string(&self) -> String {

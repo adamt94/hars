@@ -143,8 +143,8 @@ async fn run(thp_disabled: std::io::Result<bool>) -> anyhow::Result<()> {
         .await?;
         match loaded {
             Ok(Some(config)) => {
-                let items = ha_automation::from_config(&config);
-                Some(ha_automation::Automations::setup(
+                let items = ha_automation::from_config_yaml(&config);
+                Some(ha_automation::Automations::setup_yaml(
                     &hass,
                     &api_config.registries,
                     &items,
@@ -160,6 +160,7 @@ async fn run(thp_disabled: std::io::Result<bool>) -> anyhow::Result<()> {
     if automations.is_some() {
         api_config.integrations.push("automation");
     }
+    api_config.automations = automations.clone();
     api_config.brands = match ha_api::brands::Brands::new(&config_dir, ha_api::brands::CDN) {
         Ok(b) => Some(b),
         Err(e) => {

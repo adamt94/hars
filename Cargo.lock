@@ -436,6 +436,7 @@ dependencies = [
  "axum",
  "futures-util",
  "ha-auth",
+ "ha-automation",
  "ha-components",
  "ha-core",
  "ha-http",

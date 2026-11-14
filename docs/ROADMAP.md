@@ -256,7 +256,11 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
       `!include*` tags reach, `secrets.yaml` only if `!secret` is used,
       owner-only), validates it with hars's loader and reports each
       automation as supported or `unavailable` with the reason
-- [ ] `automation.reload`, the editor's config API and traces
+- [x] The editor's read side: `GET /api/config/automation/config/<id>`
+      (admin; `automations.yaml` read with HA's loader, the entry in file key
+      order, `Resource not found`) and WS `automation/config` (the raw entry);
+      saving and deleting answer that hars doesn't support it yet
+- [ ] `automation.reload`, editor saves, traces
 - [x] Inventory triggers/conditions/actions/modes with HA 2026.6.1 semantics,
       matched against HA's own engine on 36 scenario vectors:
   - [x] `numeric_state` fires on crossing only; covers threshold equality,

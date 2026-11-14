@@ -2,6 +2,7 @@
 //! frontend, served unchanged from disk.
 
 mod auth;
+mod automation;
 pub mod brands;
 mod frontend;
 mod frontend_data;
@@ -57,6 +58,8 @@ pub struct ApiConfig {
     pub weather: Arc<ha_integrations::weather::Weather>,
     /// Brand images and their access tokens.
     pub brands: Option<Arc<brands::Brands>>,
+    /// The automations, from `configuration.yaml`.
+    pub automations: Option<ha_automation::Automations>,
 }
 
 /// What the WebSocket and `/api/config` need.
@@ -156,13 +159,13 @@ pub fn router(hass: Hass, auth: Auth, config: &ApiConfig) -> Router {
     let config_route = Router::new()
         .route("/api/config", axum::routing::get(api_config))
         .with_state(shared.clone());
-    let api =
-        rest::router(hass)
-            .merge(config_route)
-            .route_layer(axum::middleware::from_fn_with_state(
-                auth.clone(),
-                auth::require_auth,
-            ));
+    let api = rest::router(hass)
+        .merge(config_route)
+        .merge(automation::routes(config.config_dir.clone().into()))
+        .route_layer(axum::middleware::from_fn_with_state(
+            auth.clone(),
+            auth::require_auth,
+        ));
     // The WebSocket authenticates inside the protocol, not over HTTP.
     let mut router = api
         .merge(auth::routes(auth.clone()))

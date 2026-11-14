@@ -141,6 +141,8 @@ fn required_permission(method: &Method, path: Option<&str>) -> Permission {
     match (method, path) {
         (&Method::POST, Some("/api/states/{entity_id}")) => Permission::Admin,
         (&Method::POST, Some("/api/services/{domain}/{service}")) => Permission::Control,
+        // `require_admin` on every method of the config views.
+        (_, Some("/api/config/automation/config/{id}")) => Permission::Admin,
         _ => Permission::Read,
     }
 }
