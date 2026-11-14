@@ -163,7 +163,7 @@ async fn the_registry_enables_renames_and_disables_sensors() {
             ..Default::default()
         };
     let registries = Registries {
-        entities: vec![
+        entities: ha_registry::rows![
             entry("solar_elevation", "sensor.sun_solar_elevation", false, None),
             entry("next_dusk", "sensor.evening", false, Some("Evening")),
             entry("next_dawn", "sensor.sun_next_dawn", true, None),

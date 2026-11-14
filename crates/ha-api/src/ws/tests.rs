@@ -907,7 +907,7 @@ async fn registry_lists_come_from_the_registries() {
             name: "Kitchen".into(),
             ..Default::default()
         }],
-        entities: vec![ha_registry::Entity {
+        entities: ha_registry::rows![ha_registry::Entity {
             entity_id: "light.kitchen".into(),
             platform: "hue".into(),
             area_id: Some("kitchen".into()),
@@ -1078,7 +1078,7 @@ async fn weather_forecasts_are_served_and_pushed() {
     let auth = crate::test_util::auth(true);
     let weather = std::sync::Arc::new(Weather::default());
     let registries = ha_registry::Registries {
-        entities: vec![ha_registry::Entity {
+        entities: ha_registry::rows![ha_registry::Entity {
             entity_id: "weather.forecast_home".into(),
             platform: "met".into(),
             device_id: Some("dev1".into()),

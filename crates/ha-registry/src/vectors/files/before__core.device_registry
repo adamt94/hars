@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "minor_version": 12,
+  "key": "core.device_registry",
+  "data": {
+    "devices": [
+      {"area_id":null,"config_entries":["01JFAKEMOBILEAPPENTRY00000"],"config_entries_subentries":{"01JFAKEMOBILEAPPENTRY00000":[null]},"configuration_url":null,"connections":[],"created_at":"2026-07-08T13:35:56.373320+00:00","disabled_by":null,"entry_type":null,"hw_version":null,"id":"d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0","identifiers":[["mobile_app","11111111-2222-4333-8444-555555555555"]],"labels":[],"manufacturer":"Apple","model":"iPhone17,1","model_id":null,"modified_at":"2026-09-15T21:13:48.636995+00:00","name_by_user":null,"name":" Phone","primary_config_entry":"01JFAKEMOBILEAPPENTRY00000","serial_number":null,"sw_version":"27.0","via_device_id":null}
+    ],
+    "deleted_devices": []
+  }
+}

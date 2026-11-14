@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "minor_version": 12,
+  "key": "core.device_registry",
+  "data": {
+    "devices": [],
+    "deleted_devices": [
+      {"area_id":null,"config_entries":[],"config_entries_subentries":{},"connections":[],"created_at":"2026-07-08T13:35:56.373320+00:00","disabled_by":null,"disabled_by_undefined":false,"identifiers":[["mobile_app","11111111-2222-4333-8444-555555555555"]],"id":"d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0","labels":[],"modified_at":"<t:config_entries_async_remove#3>","name_by_user":null,"orphaned_timestamp":"<ts:config_entries_async_remove#2>"}
+    ]
+  }
+}

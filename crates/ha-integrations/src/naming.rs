@@ -27,11 +27,15 @@ impl<'a> Names<'a> {
 
     /// The registry device with identifier `(platform, id)`.
     pub fn registry_device(&self, id: &str) -> Option<&ha_registry::Device> {
-        self.registries.devices.iter().find(|d| {
-            d.identifiers
-                .iter()
-                .any(|i| i[0] == self.platform && i[1] == id)
-        })
+        self.registries
+            .devices
+            .iter()
+            .find(|d| {
+                d.identifiers
+                    .iter()
+                    .any(|i| i[0] == self.platform && i[1] == id)
+            })
+            .map(|v| &**v)
     }
 
     /// A device's name: the user's, else the integration's.

@@ -13,6 +13,13 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 use std::collections::HashMap;
 use std::path::Path;
+use std::sync::Arc;
+
+/// `vec![...]` of rows, each in an `Arc`.
+#[macro_export]
+macro_rules! rows {
+    ($($row:expr),* $(,)?) => { vec![$(::std::sync::Arc::new($row)),*] };
+}
 
 pub const ENTITY_KEY: &str = "core.entity_registry";
 pub const DEVICE_KEY: &str = "core.device_registry";
@@ -39,6 +46,10 @@ where
     T: Deserialize<'de> + Default,
 {
     Ok(Option::<T>::deserialize(d)?.unwrap_or_default())
+}
+
+fn zero() -> Value {
+    json!(0)
 }
 
 /// `datetime.isoformat()` → `datetime.timestamp()`.
@@ -159,17 +170,17 @@ impl Label {
     }
 }
 
+/// A device row, its fields in HA's storage order (`DeviceEntry.as_storage_fragment`).
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Device {
-    pub id: String,
     #[serde(default)]
     pub area_id: Option<String>,
-    #[serde(default)]
-    pub configuration_url: Option<String>,
     #[serde(default, deserialize_with = "null_as_default")]
     pub config_entries: Vec<String>,
     #[serde(default, deserialize_with = "null_as_default")]
     pub config_entries_subentries: Map<String, Value>,
+    #[serde(default)]
+    pub configuration_url: Option<String>,
     #[serde(default, deserialize_with = "null_as_default")]
     pub connections: Vec<Value>,
     #[serde(default)]
@@ -180,6 +191,7 @@ pub struct Device {
     pub entry_type: Option<String>,
     #[serde(default)]
     pub hw_version: Option<String>,
+    pub id: String,
     #[serde(default, deserialize_with = "null_as_default")]
     pub identifiers: Vec<Value>,
     #[serde(default, deserialize_with = "null_as_default")]
@@ -246,38 +258,75 @@ impl Device {
     }
 }
 
+/// An entity row, its fields in HA's storage order
+/// (`RegistryEntry.as_storage_fragment`); keys `hars` doesn't know are kept
+/// in `extra`, written last.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Entity {
-    pub entity_id: String,
-    pub platform: String,
-    #[serde(default)]
-    pub id: Option<String>,
-    #[serde(default)]
-    pub unique_id: Option<Value>,
+    #[serde(default, deserialize_with = "null_as_default")]
+    pub aliases: Vec<Value>,
+    #[serde(default, deserialize_with = "null_as_default")]
+    pub aliases_v2: Vec<Value>,
     #[serde(default)]
     pub area_id: Option<String>,
     #[serde(default, deserialize_with = "null_as_default")]
-    pub labels: Vec<String>,
+    pub categories: RawJson,
+    /// `{"state_class": …}` and the like, or `null`.
+    #[serde(default)]
+    pub capabilities: Option<RawJson>,
+    #[serde(default)]
+    pub config_entry_id: Option<String>,
+    #[serde(default)]
+    pub config_subentry_id: Option<String>,
+    #[serde(default)]
+    pub created_at: Option<String>,
+    /// The user's override of the integration's `original_device_class`.
+    #[serde(default)]
+    pub device_class: Option<String>,
     #[serde(default)]
     pub device_id: Option<String>,
     #[serde(default)]
-    pub icon: Option<String>,
-    #[serde(default)]
-    pub translation_key: Option<String>,
+    pub disabled_by: Option<String>,
     #[serde(default)]
     pub entity_category: Option<String>,
+    pub entity_id: String,
     #[serde(default)]
     pub hidden_by: Option<String>,
     #[serde(default)]
-    pub disabled_by: Option<String>,
+    pub icon: Option<String>,
+    #[serde(default)]
+    pub id: Option<String>,
     #[serde(default)]
     pub has_entity_name: bool,
+    #[serde(default, deserialize_with = "null_as_default")]
+    pub labels: Vec<String>,
+    #[serde(default)]
+    pub modified_at: Option<String>,
     #[serde(default)]
     pub name: Option<String>,
     #[serde(default)]
-    pub original_name: Option<String>,
+    pub object_id_base: Option<String>,
     #[serde(default, deserialize_with = "null_as_default")]
-    pub options: Map<String, Value>,
+    pub options: RawJson,
+    #[serde(default)]
+    pub original_device_class: Option<String>,
+    #[serde(default)]
+    pub original_icon: Option<String>,
+    #[serde(default)]
+    pub original_name: Option<String>,
+    pub platform: String,
+    #[serde(default)]
+    pub suggested_object_id: Option<String>,
+    #[serde(default = "zero")]
+    pub supported_features: Value,
+    #[serde(default)]
+    pub translation_key: Option<String>,
+    #[serde(default)]
+    pub unique_id: Option<Value>,
+    #[serde(default)]
+    pub previous_unique_id: Option<Value>,
+    #[serde(default)]
+    pub unit_of_measurement: Option<String>,
     #[serde(flatten)]
     pub extra: Map<String, Value>,
 }
@@ -331,8 +380,13 @@ impl Entity {
         {
             m.insert("en".into(), json!(name));
         }
-        let sensor = self.options.get("sensor").and_then(Value::as_object);
-        if let Some(sensor) = sensor.filter(|_| self.domain() == "sensor") {
+        let options = (self.domain() == "sensor" && self.options.get().contains("sensor"))
+            .then(|| self.options.object());
+        let sensor = options
+            .as_ref()
+            .and_then(|o| o.get("sensor"))
+            .and_then(Value::as_object);
+        if let Some(sensor) = sensor {
             let precision = [
                 sensor.get("display_precision"),
                 sensor.get("suggested_display_precision"),
@@ -408,20 +462,79 @@ fn is_lower(s: &str) -> bool {
     cased
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+/// A JSON value kept as the file wrote it, so key order inside survives a
+/// write (HA's insertion order; `serde_json::Map` would sort it). Parsed
+/// when read.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct RawJson(Box<serde_json::value::RawValue>);
+
+impl RawJson {
+    pub fn new(v: &Value) -> Self {
+        Self(serde_json::value::to_raw_value(v).expect("a Value serialises"))
+    }
+
+    pub fn value(&self) -> Value {
+        serde_json::from_str(self.0.get()).unwrap_or(Value::Null)
+    }
+
+    /// The value as an object (`{}` if it isn't one).
+    pub fn object(&self) -> Map<String, Value> {
+        match self.value() {
+            Value::Object(m) => m,
+            _ => Map::new(),
+        }
+    }
+
+    pub fn get(&self) -> &str {
+        self.0.get()
+    }
+}
+
+impl Default for RawJson {
+    /// `{}`.
+    fn default() -> Self {
+        Self(serde_json::value::RawValue::from_string("{}".into()).expect("valid JSON"))
+    }
+}
+
+impl PartialEq for RawJson {
+    fn eq(&self, other: &Self) -> bool {
+        self.value() == other.value()
+    }
+}
+
+/// A row kept as the file had it (deleted entities and devices: `hars`
+/// doesn't change them yet).
+pub type RawRow = Box<serde_json::value::RawValue>;
+
+#[derive(Debug, Default, Deserialize)]
 struct EntityData {
     #[serde(default)]
-    entities: Vec<Entity>,
+    entities: Vec<Arc<Entity>>,
+    #[serde(default)]
+    deleted_entities: Vec<RawRow>,
     #[serde(flatten)]
     extra: Map<String, Value>,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Default, Deserialize)]
 struct DeviceData {
     #[serde(default)]
-    devices: Vec<Device>,
+    devices: Vec<Arc<Device>>,
+    #[serde(default)]
+    deleted_devices: Vec<RawRow>,
     #[serde(flatten)]
     extra: Map<String, Value>,
+}
+
+/// What a registry file holds besides its rows, for writing it back.
+#[derive(Debug, Clone, Default)]
+pub struct FileRest {
+    /// The file's `minor_version` (0 when there was no file).
+    pub minor: u32,
+    pub deleted: Arc<Vec<RawRow>>,
+    pub extra: Map<String, Value>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -448,11 +561,15 @@ struct LabelData {
     extra: Map<String, Value>,
 }
 
-/// All five registries, as loaded.
+/// All five registries. Rows are shared, so a copy with one row changed
+/// costs a pointer per row.
 #[derive(Debug, Clone, Default)]
 pub struct Registries {
-    pub entities: Vec<Entity>,
-    pub devices: Vec<Device>,
+    pub entities: Vec<Arc<Entity>>,
+    pub devices: Vec<Arc<Device>>,
+    /// The entity and device files' deleted rows and other keys.
+    pub entity_file: FileRest,
+    pub device_file: FileRest,
     pub areas: Vec<Area>,
     pub floors: Vec<Floor>,
     pub labels: Vec<Label>,
@@ -468,6 +585,25 @@ fn store_minor(store: &Store) -> u32 {
         .iter()
         .find(|(k, _, _)| *k == key)
         .map_or(1, |&(_, _, minor)| minor)
+}
+
+/// Each row as compact JSON (HA's `json_fragment`s).
+fn raw_rows<T: Serialize>(rows: &[Arc<T>]) -> std::io::Result<Vec<RawRow>> {
+    rows.iter()
+        .map(|r| serde_json::value::to_raw_value(&**r).map_err(std::io::Error::other))
+        .collect()
+}
+
+/// `hars` writes only the current minor version (or a new file).
+fn check_minor(store: &Store, loaded: u32) -> std::io::Result<()> {
+    let current = store_minor(store);
+    if store.path().exists() && loaded != current {
+        return Err(std::io::Error::other(format!(
+            "{} is at minor version {loaded}, not {current}; not overwriting it",
+            store.path().display()
+        )));
+    }
+    Ok(())
 }
 
 fn store(dir: &Path, key: &'static str) -> Store {
@@ -527,12 +663,61 @@ impl Registries {
         let mut r = Self {
             entities: entities.entities,
             devices: devices.devices,
+            entity_file: FileRest {
+                minor: entity_minor,
+                deleted: Arc::new(entities.deleted_entities),
+                extra: entities.extra,
+            },
+            device_file: FileRest {
+                minor: device_minor,
+                deleted: Arc::new(devices.deleted_devices),
+                extra: devices.extra,
+            },
             areas: areas.areas,
             floors: floors.floors,
             labels: labels.labels,
         };
         r.migrate(entity_minor, device_minor, area_minor, floor_minor);
         Ok(r)
+    }
+
+    /// Write `core.entity_registry` as HA does: each row compact, on its
+    /// own line, in HA's field order, inside a 2-space indented envelope.
+    /// A file at an older minor version is never overwritten: HA would
+    /// skip the migrations that were never run on it.
+    pub fn save_entities(&self, config_dir: &Path) -> std::io::Result<()> {
+        #[derive(Serialize)]
+        struct Out<'a> {
+            entities: Vec<RawRow>,
+            deleted_entities: &'a [RawRow],
+            #[serde(flatten)]
+            extra: &'a Map<String, Value>,
+        }
+        let store = store(config_dir, ENTITY_KEY);
+        check_minor(&store, self.entity_file.minor)?;
+        store.save(&Out {
+            entities: raw_rows(&self.entities)?,
+            deleted_entities: &self.entity_file.deleted,
+            extra: &self.entity_file.extra,
+        })
+    }
+
+    /// Write `core.device_registry`, as [`Registries::save_entities`].
+    pub fn save_devices(&self, config_dir: &Path) -> std::io::Result<()> {
+        #[derive(Serialize)]
+        struct Out<'a> {
+            devices: Vec<RawRow>,
+            deleted_devices: &'a [RawRow],
+            #[serde(flatten)]
+            extra: &'a Map<String, Value>,
+        }
+        let store = store(config_dir, DEVICE_KEY);
+        check_minor(&store, self.device_file.minor)?;
+        store.save(&Out {
+            devices: raw_rows(&self.devices)?,
+            deleted_devices: &self.device_file.deleted,
+            extra: &self.device_file.extra,
+        })
     }
 
     /// The parts of HA's minor-version migrations that change what `hars`
@@ -543,6 +728,7 @@ impl Registries {
         // Device 1.9 (2025.2) adds subentries: each config entry maps to [null].
         if device_minor < 9 {
             for d in &mut self.devices {
+                let d = Arc::make_mut(d);
                 d.config_entries_subentries = d
                     .config_entries
                     .iter()
@@ -572,6 +758,7 @@ impl Registries {
                 .filter_map(|d| Some((d.id.as_str(), d.display_name()?.to_owned())))
                 .collect();
             for e in &mut self.entities {
+                let e = Arc::make_mut(e);
                 let old = e.name.take();
                 let v2 = match e.extra.remove("name_v2") {
                     Some(Value::String(s)) => Some(s),
@@ -605,7 +792,7 @@ impl Registries {
         let mut areas = ids("area_id");
         let mut devices = ids("device_id");
         let mut out = BTreeSet::new();
-        let enabled = |e: &&Entity| e.disabled_by.is_none();
+        let enabled = |e: &&Arc<Entity>| e.disabled_by.is_none();
         let primary = |e: &Entity| e.hidden_by.is_none() && e.entity_category.is_none();
         for label in &labels {
             let has = |l: &Vec<String>| l.iter().any(|x| x == label);
@@ -678,31 +865,26 @@ impl Registries {
                 continue;
             }
             // Written only if still absent (an integration may write first).
-            let extra = |k: &str| e.extra.get(k).filter(|v| !v.is_null());
             let mut a = Map::new();
             a.insert("restored".into(), Value::Bool(true));
-            if let Some(Value::Object(caps)) = extra("capabilities") {
-                a.extend(caps.clone());
+            if let Some(caps) = &e.capabilities {
+                a.extend(caps.object());
             }
-            if let Some(dc) = extra("device_class").or_else(|| extra("original_device_class")) {
-                a.insert("device_class".into(), dc.clone());
+            if let Some(dc) = e.device_class.as_ref().or(e.original_device_class.as_ref()) {
+                a.insert("device_class".into(), json!(dc));
             }
-            if let Some(icon) = e
-                .icon
-                .clone()
-                .map(Value::String)
-                .or_else(|| extra("original_icon").cloned())
-            {
-                a.insert("icon".into(), icon);
+            if let Some(icon) = e.icon.as_ref().or(e.original_icon.as_ref()) {
+                a.insert("icon".into(), json!(icon));
             }
             if let Some(name) = e.name.clone().or_else(|| e.original_name.clone()) {
                 a.insert("friendly_name".into(), Value::String(name));
             }
-            if let Some(f) = extra("supported_features") {
-                a.insert("supported_features".into(), f.clone());
+            // `is not None`: 0 is written too.
+            if !e.supported_features.is_null() {
+                a.insert("supported_features".into(), e.supported_features.clone());
             }
-            if let Some(u) = extra("unit_of_measurement") {
-                a.insert("unit_of_measurement".into(), u.clone());
+            if let Some(u) = &e.unit_of_measurement {
+                a.insert("unit_of_measurement".into(), json!(u));
             }
             hass.set_state_if_absent(id, "unavailable", a);
         }
@@ -712,7 +894,7 @@ impl Registries {
     pub fn entities_for_display(&self) -> Value {
         // Indexed once per call: linear in entities + devices.
         let devices: HashMap<&str, &Device> =
-            self.devices.iter().map(|d| (d.id.as_str(), d)).collect();
+            self.devices.iter().map(|d| (d.id.as_str(), &**d)).collect();
         let device_name = |id: &str| devices.get(id).and_then(|d| d.display_name());
         let entities: Vec<Value> = self
             .entities
@@ -727,7 +909,7 @@ impl Registries {
     }
 
     pub fn devices_json(&self) -> Value {
-        Value::Array(self.devices.iter().map(Device::json).collect())
+        Value::Array(self.devices.iter().map(|d| d.json()).collect())
     }
 
     pub fn areas_json(&self) -> Value {

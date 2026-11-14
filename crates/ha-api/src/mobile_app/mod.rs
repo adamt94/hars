@@ -515,7 +515,7 @@ fn get_config(shared: &Shared, reg: &Registration) -> Value {
     let webhook_id = &*reg.webhook_id;
     let mut entities = Map::new();
     for e in &shared.config.registries.entities {
-        if e.extra.get("config_entry_id").and_then(Value::as_str) != Some(reg.entry_id.as_str()) {
+        if e.config_entry_id.as_deref() != Some(reg.entry_id.as_str()) {
             continue;
         }
         let unique_id = match &e.unique_id {

@@ -389,7 +389,7 @@ async fn services_reach_the_targeted_available_lights() {
         }));
     }
     let registries = Registries {
-        entities: vec![ha_registry::Entity {
+        entities: ha_registry::rows![ha_registry::Entity {
             entity_id: "light.b".into(),
             platform: "hue".into(),
             device_id: Some("dev".into()),

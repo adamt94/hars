@@ -1,5 +1,6 @@
 use super::*;
 use serde_json::json;
+use std::sync::Arc;
 
 /// From HA's own `_async_strip_prefix_from_entity_name`, run in Python.
 #[test]
@@ -299,14 +300,15 @@ fn nulls_and_empty_names_read_like_ha() {
 /// under the ~95 ms the nested scan took (release); generous for debug.
 #[test]
 fn display_list_scales_linearly() {
-    let devices: Vec<Device> = (0..5000)
+    let devices: Vec<Arc<Device>> = (0..5000)
         .map(|i| Device {
             id: format!("d{i}"),
             name: Some(format!("Device {i}")),
             ..Default::default()
         })
+        .map(Arc::new)
         .collect();
-    let entities: Vec<Entity> = (0..10000)
+    let entities: Vec<Arc<Entity>> = (0..10000)
         .map(|i| Entity {
             entity_id: format!("sensor.e{i}"),
             platform: "p".into(),
@@ -314,6 +316,7 @@ fn display_list_scales_linearly() {
             original_name: Some(format!("Device {} Power", i % 5000)),
             ..Default::default()
         })
+        .map(Arc::new)
         .collect();
     let r = Registries {
         devices,
@@ -338,7 +341,7 @@ fn targets_expand_like_ha() {
         ..Default::default()
     };
     let r = Registries {
-        entities: vec![
+        entities: crate::rows![
             entity("weather.a", Some("d1"), None),
             // Its own area wins over its device's.
             entity("weather.b", Some("d1"), Some("garden")),
@@ -355,7 +358,7 @@ fn targets_expand_like_ha() {
                 ..entity("weather.c", None, None)
             },
         ],
-        devices: vec![Device {
+        devices: crate::rows![Device {
             id: "d1".into(),
             area_id: Some("roof".into()),
             ..Default::default()
@@ -393,12 +396,14 @@ fn registered_entities_without_a_state_are_unavailable() {
         ..Default::default()
     };
     let r = Registries {
-        entities: vec![
-            entity(
-                "light.kitchen_light",
-                json!({"capabilities": {"supported_color_modes": ["color_temp", "hs"]}, "supported_features": 44,
-                    "original_device_class": null, "unit_of_measurement": null}),
-            ),
+        entities: crate::rows![
+            Entity {
+                capabilities: Some(RawJson::new(
+                    &json!({"supported_color_modes": ["color_temp", "hs"]})
+                )),
+                supported_features: json!(44),
+                ..entity("light.kitchen_light", json!({}))
+            },
             Entity {
                 disabled_by: Some("user".into()),
                 ..entity("light.off", json!({}))
@@ -425,4 +430,86 @@ fn registered_entities_without_a_state_are_unavailable() {
             .is_none()
     );
     assert_eq!(hass.states().get(&has).unwrap().state, "1");
+}
+
+/// Every entity and device file HA 2026.6.1 wrote in the registry-write
+/// runs (`spec-registry-writes.md` §1.1, sanitised fakes) reads and writes
+/// back byte for byte.
+#[test]
+fn files_round_trip_byte_for_byte() {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/vectors/files");
+    let mut n = 0;
+    for f in std::fs::read_dir(&dir).unwrap() {
+        let path = f.unwrap().path();
+        let name = path.file_name().unwrap().to_str().unwrap().to_owned();
+        let key = name.rsplit("__").next().unwrap();
+        let tmp = std::env::temp_dir().join(format!("hars-reg-rt-{}-{n}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&tmp);
+        std::fs::create_dir_all(tmp.join(".storage")).unwrap();
+        let original = std::fs::read(&path).unwrap();
+        std::fs::write(tmp.join(".storage").join(key), &original).unwrap();
+        let r = Registries::load_strict(&tmp).unwrap();
+        match key {
+            ENTITY_KEY => r.save_entities(&tmp).unwrap(),
+            DEVICE_KEY => r.save_devices(&tmp).unwrap(),
+            _ => unreachable!("{name}"),
+        }
+        let written = std::fs::read(tmp.join(".storage").join(key)).unwrap();
+        assert!(
+            written == original,
+            "{name}:\n{}",
+            String::from_utf8_lossy(&written)
+        );
+        let _ = std::fs::remove_dir_all(&tmp);
+        n += 1;
+    }
+    assert_eq!(n, 28);
+}
+
+/// A file at an older minor version is left alone.
+#[test]
+fn older_files_are_not_overwritten() {
+    let tmp = std::env::temp_dir().join(format!("hars-reg-minor-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&tmp);
+    std::fs::create_dir_all(tmp.join(".storage")).unwrap();
+    let old =
+        r#"{"version":1,"minor_version":20,"key":"core.entity_registry","data":{"entities":[]}}"#;
+    std::fs::write(tmp.join(".storage").join(ENTITY_KEY), old).unwrap();
+    let r = Registries::load_strict(&tmp).unwrap();
+    assert!(r.save_entities(&tmp).is_err());
+    assert_eq!(
+        std::fs::read_to_string(tmp.join(".storage").join(ENTITY_KEY)).unwrap(),
+        old
+    );
+    // No file yet: written at the current version.
+    std::fs::remove_file(tmp.join(".storage").join(ENTITY_KEY)).unwrap();
+    let r = Registries::load_strict(&tmp).unwrap();
+    r.save_entities(&tmp).unwrap();
+    let _ = std::fs::remove_dir_all(&tmp);
+}
+
+/// `HARS_REAL_CONFIG=<config dir>`: the same round trip on a real install,
+/// in a temporary copy (the original is only read).
+#[test]
+#[ignore = "needs HARS_REAL_CONFIG"]
+fn real_files_round_trip() {
+    let Ok(real) = std::env::var("HARS_REAL_CONFIG") else {
+        return;
+    };
+    let tmp = std::env::temp_dir().join(format!("hars-reg-real-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&tmp);
+    std::fs::create_dir_all(tmp.join(".storage")).unwrap();
+    for key in [ENTITY_KEY, DEVICE_KEY] {
+        let original =
+            std::fs::read(std::path::Path::new(&real).join(".storage").join(key)).unwrap();
+        std::fs::write(tmp.join(".storage").join(key), &original).unwrap();
+        let r = Registries::load_strict(&tmp).unwrap();
+        match key {
+            ENTITY_KEY => r.save_entities(&tmp).unwrap(),
+            _ => r.save_devices(&tmp).unwrap(),
+        }
+        let written = std::fs::read(tmp.join(".storage").join(key)).unwrap();
+        assert!(written == original, "{key} differs; see {}", tmp.display());
+    }
+    let _ = std::fs::remove_dir_all(&tmp);
 }

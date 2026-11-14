@@ -120,7 +120,7 @@ fn entity(r: &Registries, loc: &Location) -> Option<Entity> {
     Some(Entity {
         id: EntityId::parse(&entity_id).ok()?,
         name,
-        options: entry.map(|e| e.options.clone()),
+        options: entry.map(|e| e.options.object()),
     })
 }
 

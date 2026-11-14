@@ -83,7 +83,7 @@ fn app_with(entries: &[Map<String, Value>]) -> App {
     );
     let registries = ha_registry::Registries {
         entities: serde_json::from_value(vector("entities")).unwrap(),
-        devices: vec![serde_json::from_value(vector("device")).unwrap()],
+        devices: ha_registry::rows![serde_json::from_value(vector("device")).unwrap()],
         ..Default::default()
     };
     let config = crate::ApiConfig {

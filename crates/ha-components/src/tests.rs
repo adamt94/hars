@@ -45,7 +45,7 @@ fn creates_has_zone_and_person_entities() {
     );
     let components = Components::load_strict(&dir).unwrap();
     let registries = Registries {
-        entities: vec![
+        entities: ha_registry::rows![
             // Renamed in HA's UI: the registry's entity id and name win.
             ha_registry::Entity {
                 entity_id: "person.me".into(),
@@ -148,7 +148,7 @@ fn registered_ids_are_reserved() {
         ]}),
     );
     let registries = Registries {
-        entities: vec![ha_registry::Entity {
+        entities: ha_registry::rows![ha_registry::Entity {
             entity_id: "person.alex".into(),
             platform: "person".into(),
             unique_id: Some(json!("old")),

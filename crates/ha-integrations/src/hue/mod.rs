@@ -76,11 +76,15 @@ impl Bridge {
     }
 
     fn registry_entity(&self, domain: &str, unique_id: &str) -> Option<&ha_registry::Entity> {
-        self.registries.entities.iter().find(|e| {
-            e.platform == DOMAIN
-                && e.entity_id.split('.').next() == Some(domain)
-                && e.unique_id.as_ref().and_then(Value::as_str) == Some(unique_id)
-        })
+        self.registries
+            .entities
+            .iter()
+            .find(|e| {
+                e.platform == DOMAIN
+                    && e.entity_id.split('.').next() == Some(domain)
+                    && e.unique_id.as_ref().and_then(Value::as_str) == Some(unique_id)
+            })
+            .map(|v| &**v)
     }
 
     /// The registered entity id for a resource (any state or none).
@@ -91,11 +95,15 @@ impl Bridge {
 
     /// The registry device for a Hue resource id (`("hue", id)`).
     fn registry_device(&self, hue_id: &str) -> Option<&ha_registry::Device> {
-        self.registries.devices.iter().find(|d| {
-            d.identifiers
-                .iter()
-                .any(|i| i[0] == DOMAIN && i[1] == hue_id)
-        })
+        self.registries
+            .devices
+            .iter()
+            .find(|d| {
+                d.identifiers
+                    .iter()
+                    .any(|i| i[0] == DOMAIN && i[1] == hue_id)
+            })
+            .map(|v| &**v)
     }
 
     /// A Hue device's (or room's) display name: the user's name for it,

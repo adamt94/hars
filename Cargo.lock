@@ -594,6 +594,7 @@ version = "0.1.0"
 dependencies = [
  "ha-core",
  "jiff",
+ "parking_lot",
  "serde",
  "serde_json",
  "tracing",

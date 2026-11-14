@@ -487,9 +487,13 @@ fn registry_entry<'a>(
     platform: &str,
     unique_id: &str,
 ) -> Option<&'a ha_registry::Entity> {
-    r.entities.iter().find(|e| {
-        e.platform == platform && e.unique_id.as_ref().and_then(Value::as_str) == Some(unique_id)
-    })
+    r.entities
+        .iter()
+        .find(|e| {
+            e.platform == platform
+                && e.unique_id.as_ref().and_then(Value::as_str) == Some(unique_id)
+        })
+        .map(|e| &**e)
 }
 
 /// The registry's entity id if there is an entry, else `<domain>.<slug>`
