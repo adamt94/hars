@@ -1,6 +1,7 @@
 //! Integrations: what turns devices and services into entities. Each one is
 //! started for its config entries (HA's `core.config_entries`).
 
+pub mod hue;
 pub mod light;
 pub mod met;
 pub mod num;
@@ -33,7 +34,7 @@ pub fn load_entries(config_dir: &std::path::Path) -> Option<Vec<Map<String, Valu
 }
 
 /// The integrations `hars` can run, by HA domain.
-pub const SUPPORTED: &[&str] = &[sun::DOMAIN, met::DOMAIN];
+pub const SUPPORTED: &[&str] = &[sun::DOMAIN, met::DOMAIN, hue::DOMAIN];
 
 /// Who `hars` says it is to the services it calls.
 pub const USER_AGENT: &str = concat!(
@@ -57,6 +58,7 @@ pub fn start(
     hass: &Hass,
     registries: Arc<Registries>,
     entries: Option<&[Map<String, Value>]>,
+    profiles: light::Profiles,
 ) -> Started {
     let field =
         |e: &Map<String, Value>, k: &str| e.get(k).and_then(Value::as_str).map(str::to_owned);
@@ -94,6 +96,20 @@ pub fn start(
         }
         weather.register_services(hass, registries.clone());
         running.extend(["met", "weather"]);
+    }
+    let hue: Vec<Map<String, Value>> = enabled(hue::DOMAIN).cloned().collect();
+    if !hue.is_empty() {
+        let lights = Arc::new(light::Lights::new(profiles));
+        lights.register_services(hass, registries.clone());
+        for entry in hue {
+            tokio::spawn(hue::run(
+                hass.clone(),
+                registries.clone(),
+                lights.clone(),
+                entry,
+            ));
+        }
+        running.extend(["hue", "light"]);
     }
     Started { running, weather }
 }

@@ -172,6 +172,31 @@ impl StateMachine {
         }
     }
 
+    /// Remove a state, firing `state_changed` with no new state (HA's
+    /// `async_remove`); `false` if there was none.
+    pub(crate) fn remove(&self, entity_id: &EntityId, clock: &Clock, bus: &EventBus) -> bool {
+        let mut states = self.states.write();
+        let Some(old) = states.remove(entity_id) else {
+            return false;
+        };
+        let now = clock.now();
+        let context = Context::at(now);
+        let event = Arc::new(Event::new(
+            EventKind::StateChanged {
+                entity_id: entity_id.clone(),
+                old_state: Some(old),
+                new_state: None,
+            },
+            now,
+            context,
+        ));
+        self.listeners
+            .lock()
+            .retain(|tx| tx.send(event.clone()).is_ok());
+        bus.fire_shared(event);
+        true
+    }
+
     /// Write a state and, if it changed, fire `state_changed` to the
     /// lossless listeners and the bus before the lock is released, so every
     /// consumer sees one order. The timestamp is read under the lock for the
@@ -556,5 +581,31 @@ mod tests {
         let json = serde_json::to_value(&*reported).unwrap();
         assert_eq!(json["last_reported"], "2026-11-14T13:29:34.778252+00:00");
         assert_eq!(json["last_updated"], "2026-11-14T13:29:31.778252+00:00");
+    }
+
+    #[tokio::test]
+    async fn removing_fires_state_changed_without_a_new_state() {
+        let hass = Hass::new();
+        let id = EntityId::parse("light.gone").unwrap();
+        hass.set_state(id.clone(), "on", Attributes::new());
+        let mut rx = hass.bus().subscribe();
+        assert!(hass.remove_state(&id));
+        assert!(hass.states().get(&id).is_none());
+        let EventKind::StateChanged {
+            old_state,
+            new_state,
+            ..
+        } = &rx.recv().await.unwrap().kind
+        else {
+            panic!()
+        };
+        assert_eq!(
+            (
+                old_state.as_ref().unwrap().state.as_str(),
+                new_state.is_none()
+            ),
+            ("on", true)
+        );
+        assert!(!hass.remove_state(&id));
     }
 }

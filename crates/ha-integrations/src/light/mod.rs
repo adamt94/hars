@@ -632,12 +632,13 @@ pub fn turn_off_params(
     }
 }
 
-type BoxFuture<'a> = Pin<Box<dyn Future<Output = Result<(), ServiceError>> + Send + 'a>>;
+pub type BoxFuture<'a> = Pin<Box<dyn Future<Output = Result<(), ServiceError>> + Send + 'a>>;
 
 /// A light a platform runs.
 pub trait Light: Send + Sync {
     fn entity_id(&self) -> &EntityId;
-    fn capabilities(&self) -> &Capabilities;
+    /// What it can do now (a group's colour modes follow its members).
+    fn capabilities(&self) -> Capabilities;
     /// The state now (what HA's entity properties would return).
     fn state(&self) -> LightState;
     fn available(&self) -> bool;
@@ -698,7 +699,7 @@ impl Lights {
         params: &Params,
     ) -> Result<(), ServiceError> {
         let id = light.entity_id().as_str();
-        let caps = light.capabilities();
+        let caps = &light.capabilities();
         let off = |p: &Params| turn_off_params(p, id, caps, &self.profiles);
         let state = light.state();
         let invalid = |e: ConversionError| ServiceError::Failed(e.to_string());
@@ -761,7 +762,7 @@ impl Lights {
                         let calls = targets
                             .iter()
                             .map(|l| lights.handle(l.as_ref(), service, &params));
-                        let results = futures_join_all(calls).await;
+                        let results = join_all(calls).await;
                         results.into_iter().collect::<Result<Vec<()>, _>>()?;
                         Ok(None)
                     }
@@ -772,7 +773,7 @@ impl Lights {
 }
 
 /// Run futures concurrently on this task and collect their results.
-async fn futures_join_all<F: Future>(futures: impl IntoIterator<Item = F>) -> Vec<F::Output> {
+pub(crate) async fn join_all<F: Future>(futures: impl IntoIterator<Item = F>) -> Vec<F::Output> {
     let mut pending: Vec<Pin<Box<F>>> = futures.into_iter().map(Box::pin).collect();
     let mut out: Vec<Option<F::Output>> = (0..pending.len()).map(|_| None).collect();
     std::future::poll_fn(|cx| {

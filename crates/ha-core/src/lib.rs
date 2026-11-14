@@ -202,6 +202,13 @@ impl Hass {
         )
     }
 
+    /// Remove an entity's state (HA's `async_remove`): `state_changed`
+    /// fires with no new state. `false` if it had none.
+    pub fn remove_state(&self, entity_id: &EntityId) -> bool {
+        let inner = &*self.inner;
+        inner.states.remove(entity_id, &inner.clock, &inner.bus)
+    }
+
     /// Lossless, ordered `state_changed` delivery for internal consumers
     /// (automations, the recorder), plus a snapshot of every state taken
     /// atomically with the subscription. API clients use the lossy

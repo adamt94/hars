@@ -270,12 +270,21 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
       colour-space conversion, filtering by capability), capability and state
       attributes; matched against HA's own code on 348 mireks, 4536 kelvins,
       600 xy points and 48 service calls
-- [ ] `hue` v2: full snapshot on connect, then SSE partial-resource merge;
-      reconcile after reconnect; bounded 429/503 retry; mDNS rediscovery if the
-      imported host moves; link-button re-pair only if the key is rejected.
-      Lights (on/off, brightness, mirek/kelvin, xy, transition), grouped lights,
-      scenes, motion/illuminance/temperature/battery, enable switches, the
-      `behavior_instance` switch
+- [x] `hue` v2, lights: full snapshot, then the event stream merged as
+      aiohue merges it (absent and `null` keep, objects merge, lists
+      replace); HA's writes per item in HA's order (no coalescing); lights
+      and room/zone groups with HA's state, attributes and group
+      carry-overs; `light.*` services as the exact aiohue request bodies,
+      429/503 retried 25 times, HA's error messages; HA's availability
+      (zigbee connectivity, `ignore_availability`); reconnect at `2n` s and,
+      unlike HA, a full reconcile after every reconnect, removals included;
+      TCP keepalive instead of aiohue's geofence-renaming keepalive. Matched
+      against HA's own code on the real bridge: every light entity, 14
+      event-stream scenarios, 50 service calls
+- [ ] `hue`: sensors, binary sensors, switches, scenes (`scene.turn_on`,
+      `hue.activate_scene`), events and `hue_event`; mDNS rediscovery if the
+      imported host moves; link-button re-pair (user-initiated) if the key
+      is rejected
 - [ ] `lifx`: imported host + broadcast rediscovery, source/sequence matching,
       bounded retries, offline → `unavailable`, re-read state after a
       transition (the ack is not the final state); on/off/brightness/kelvin/HSBK;

@@ -349,8 +349,8 @@ impl Light for Fake {
     fn entity_id(&self) -> &EntityId {
         &self.id
     }
-    fn capabilities(&self) -> &Capabilities {
-        &self.caps
+    fn capabilities(&self) -> Capabilities {
+        self.caps.clone()
     }
     fn state(&self) -> LightState {
         self.state.lock().clone()

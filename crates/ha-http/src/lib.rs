@@ -105,7 +105,9 @@ impl Builder {
         .enable_http1()
         .wrap_connector(http);
         let inner = Hyper::builder(TokioExecutor::new())
-            // Don't keep connections open between the (rare) requests.
+            // Don't keep connections open between the (rare) requests. The
+            // pool needs a timer to close idle ones at all.
+            .pool_timer(hyper_util::rt::TokioTimer::new())
             .pool_idle_timeout(Duration::from_secs(5))
             .pool_max_idle_per_host(1)
             .build(https);
@@ -934,5 +936,33 @@ mod tests {
             s.write_all(&reply).await.unwrap();
         });
         (base, task)
+    }
+
+    /// An idle pooled connection is closed after 5 s, not kept until the
+    /// server drops it.
+    #[tokio::test]
+    async fn idle_connections_are_closed() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("http://{}/", listener.local_addr().unwrap());
+        let (closed_tx, closed_rx) = tokio::sync::oneshot::channel();
+        tokio::spawn(async move {
+            let (mut s, _) = listener.accept().await.unwrap();
+            let mut buf = vec![0u8; 4096];
+            let _ = s.read(&mut buf).await.unwrap();
+            // Keep-alive: the client may reuse this connection.
+            s.write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok")
+                .await
+                .unwrap();
+            // A read returns 0 when the client closes it.
+            let n = s.read(&mut buf).await.unwrap_or(0);
+            let _ = closed_tx.send(n);
+        });
+        let client = Client::new("t").unwrap();
+        client.get(&url, &[]).await.unwrap();
+        let n = tokio::time::timeout(Duration::from_secs(10), closed_rx)
+            .await
+            .expect("closed within 10 s")
+            .unwrap();
+        assert_eq!(n, 0);
     }
 }

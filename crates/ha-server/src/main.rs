@@ -100,7 +100,16 @@ async fn run(thp_disabled: std::io::Result<bool>) -> anyhow::Result<()> {
         tokio::task::spawn_blocking(move || ha_integrations::load_entries(&dir)).await?
     };
     ha_api::system_log::register(&hass);
-    let started = ha_integrations::start(&hass, api_config.registries.clone(), entries.as_deref());
+    let profiles = {
+        let dir = config_dir.clone();
+        tokio::task::spawn_blocking(move || ha_integrations::light::Profiles::load(&dir)).await?
+    };
+    let started = ha_integrations::start(
+        &hass,
+        api_config.registries.clone(),
+        entries.as_deref(),
+        profiles,
+    );
     api_config.integrations = started.running;
     api_config.weather = started.weather;
     api_config.lovelace = {
