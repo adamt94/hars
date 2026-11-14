@@ -882,7 +882,9 @@ fn entry_settings(entry: &Map<String, Value>) -> Option<(String, String, Vec<Str
 /// Run a `hue` config entry until the task is dropped: set up (retrying as
 /// HA's `ConfigEntryNotReady` does), make the entities, then follow the
 /// event stream.
-pub async fn run(platforms: Arc<Platforms>, entry: Map<String, Value>) {
+/// `ready` is done after the first connection attempt.
+pub async fn run(platforms: Arc<Platforms>, entry: Map<String, Value>, ready: ha_core::SetupGuard) {
+    let mut ready = Some(ready);
     let (hass, registries) = (platforms.hass.clone(), platforms.registries.clone());
     let Some((host, key, ignore)) = entry_settings(&entry) else {
         return;
@@ -909,12 +911,15 @@ pub async fn run(platforms: Arc<Platforms>, entry: Map<String, Value>) {
                 return;
             }
             ApiError::Connection(_) | ApiError::Busy => {
+                if let Some(r) = ready.take() {
+                    r.done();
+                }
                 let wait = (5u64 << tries.min(7)).min(600);
                 tracing::warn!(
                     "Error connecting to the Hue bridge at {host}; retrying in {wait} s"
                 );
                 tries += 1;
-                tokio::time::sleep(Duration::from_secs(wait)).await;
+                hass.setup_retry_wait(Duration::from_secs(wait)).await;
             }
             other => {
                 tracing::error!("Unknown error connecting to Hue bridge: {other}");
@@ -936,6 +941,7 @@ pub async fn run(platforms: Arc<Platforms>, entry: Map<String, Value>) {
     platforms.bridges.write().push(Arc::downgrade(&bridge));
     bridge.add_entities();
     bridge.write_all();
+    drop(ready);
     bridge.listen().await;
 }
 

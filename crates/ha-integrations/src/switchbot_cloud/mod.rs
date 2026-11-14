@@ -283,7 +283,14 @@ fn polls(d: &Device) -> bool {
 }
 
 /// Set up an entry (on HA's retry ladder), feed the components and poll.
-pub async fn run(components: Arc<Components>, entry: Map<String, Value>, host: String) {
+/// `ready` is done after the first setup attempt.
+pub async fn run(
+    components: Arc<Components>,
+    entry: Map<String, Value>,
+    host: String,
+    ready: ha_core::SetupGuard,
+) {
+    let mut ready = Some(ready);
     let data = entry.get("data").and_then(Value::as_object);
     let field = |k: &str| {
         data.and_then(|d| d.get(k))
@@ -315,12 +322,16 @@ pub async fn run(components: Arc<Components>, entry: Map<String, Value>, host: S
                 return;
             }
             Err(SetupError::Retry(why)) => {
+                if let Some(r) = ready.take() {
+                    r.done();
+                }
                 let wait = (5u64 << tries.min(7)).min(600);
                 tracing::info!(
                     "Config entry 'SwitchBot Cloud' for switchbot_cloud integration not ready yet: {why}; Retrying in {wait} seconds"
                 );
                 tries += 1;
-                tokio::time::sleep(Duration::from_secs(wait) + jitter()).await;
+                hass.setup_retry_wait(Duration::from_secs(wait) + jitter())
+                    .await;
             }
         }
     };
@@ -334,6 +345,7 @@ pub async fn run(components: Arc<Components>, entry: Map<String, Value>, host: S
         components.buttons().add(b.clone());
     }
     entry.write_all();
+    drop(ready);
     if !polling {
         return;
     }

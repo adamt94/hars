@@ -177,31 +177,48 @@ async fn run(thp_disabled: std::io::Result<bool>) -> anyhow::Result<()> {
         })
         .into_future(),
     );
-    hass.start();
-    // HA at `homeassistant_start`: registered entities nobody provides are
-    // `unavailable`, then the last states are dumped, and every 15 minutes.
-    {
-        let (hass, registries) = (hass.clone(), api_config.registries.clone());
-        tokio::spawn(async move {
-            // Let the integrations make their first writes.
-            for _ in 0..8 {
-                tokio::task::yield_now().await;
+    // HA's bootstrap: every integration's first setup attempt (its first
+    // writes, or a failure it retries in the background), at most
+    // `STAGE_2_TIMEOUT`; then `homeassistant_start`, where registered
+    // entities nobody provides become `unavailable`; then
+    // `homeassistant_started`, where automations attach.
+    // A stop signal during the wait stops at once.
+    let signalled = tokio::select! {
+        done = tokio::time::timeout(SETUP_TIMEOUT, hass.setups_done()) => {
+            if done.is_err() {
+                tracing::warn!(
+                    "integrations still setting up after {SETUP_TIMEOUT:?}; starting anyway"
+                );
             }
-            registries.write_unavailable_states(&hass);
-            let restore = hass.restore();
-            loop {
-                restore.dump(&hass).await;
-                tokio::time::sleep(ha_core::restore::DUMP_INTERVAL).await;
+            None
+        }
+        signal = signals.recv() => Some(signal),
+    };
+    match signalled {
+        Some(signal) => tracing::info!("{signal} received during startup, stopping"),
+        None => {
+            hass.begin_start();
+            api_config.registries.write_unavailable_states(&hass);
+            hass.finish_start();
+            {
+                // The last states are dumped now, then every 15 minutes.
+                let hass = hass.clone();
+                tokio::spawn(async move {
+                    let restore = hass.restore();
+                    loop {
+                        restore.dump(&hass).await;
+                        tokio::time::sleep(ha_core::restore::DUMP_INTERVAL).await;
+                    }
+                });
             }
-        });
-    }
-    tracing::info!("hars listening on http://{addr}");
-
-    tokio::select! {
-        signal = signals.recv() => tracing::info!("{signal} received, stopping"),
-        res = &mut server => {
-            res??;
-            anyhow::bail!("HTTP server exited unexpectedly");
+            tracing::info!("hars listening on http://{addr}");
+            tokio::select! {
+                signal = signals.recv() => tracing::info!("{signal} received, stopping"),
+                res = &mut server => {
+                    res??;
+                    anyhow::bail!("HTTP server exited unexpectedly");
+                }
+            }
         }
     }
 
@@ -294,6 +311,9 @@ fn config_dir() -> anyhow::Result<std::path::PathBuf> {
         .map_err(|e| anyhow::anyhow!("creating the config directory {}: {e}", dir.display()))?;
     Ok(dir)
 }
+
+/// HA's bootstrap `STAGE_2_TIMEOUT`.
+const SETUP_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(300);
 
 const USAGE: &str = "usage: hars                              run the server
        hars auth add USERNAME PASSWORD  add a login (the first one becomes the owner)

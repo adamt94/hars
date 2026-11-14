@@ -108,7 +108,12 @@ async fn runs_on_has_schedule() {
     // 03:30:17 UTC on 21 June in Amsterdam: phase small_day (2-minute
     // position updates) until 04:42:40.926698.
     let (hass, _sim) = hass_at("2026-06-21T03:30:17Z");
-    let task = tokio::spawn(run(hass.clone(), Default::default(), "entry1".into()));
+    let task = tokio::spawn(run(
+        hass.clone(),
+        Default::default(),
+        "entry1".into(),
+        hass.setup_guard(),
+    ));
     tokio::task::yield_now().await;
 
     let sun = state(&hass, "sun.sun").unwrap();
@@ -169,6 +174,7 @@ async fn the_registry_enables_renames_and_disables_sensors() {
         hass.clone(),
         std::sync::Arc::new(registries),
         "e1".into(),
+        hass.setup_guard(),
     ));
     tokio::task::yield_now().await;
     let elevation = state(&hass, "sensor.sun_solar_elevation").unwrap();
@@ -229,7 +235,12 @@ async fn a_clock_stepped_back_does_not_fire_early() {
     // Phase small_day until 04:42:40.926698; position refreshes stop 2.5
     // minutes before it, then one sleep until the phase change.
     let (hass, sim) = hass_at("2026-06-21T03:30:17Z");
-    let task = tokio::spawn(run(hass.clone(), Default::default(), "entry1".into()));
+    let task = tokio::spawn(run(
+        hass.clone(),
+        Default::default(),
+        "entry1".into(),
+        hass.setup_guard(),
+    ));
     tokio::task::yield_now().await;
     // Into the final sleep.
     tokio::time::sleep(std::time::Duration::from_secs(70 * 60)).await;

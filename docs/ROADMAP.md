@@ -244,6 +244,11 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
       fixture entities (protocol smoke test; real data comes in M4/M5)
 
 ### M3: Automations
+- [x] Startup as HA's bootstrap: `homeassistant_start` waits for every
+      integration's first setup attempt (its first writes, or a failure it
+      retries in the background; at most 300 s), registered entities nobody
+      provides are written `unavailable` at `start`, then `started`, so
+      automations attach to real states
 - [ ] `automation.*` entities, `trigger`/`turn_on`/`turn_off`/`toggle`/`reload`
 - [ ] Inventory triggers/conditions/actions/modes with HA 2026.6.1 semantics:
   - [ ] `numeric_state` fires on crossing only; covers threshold equality,

@@ -26,7 +26,7 @@ pub use clock::{Clock, SimulatedClock, isoformat, serialize_iso};
 pub use context::{Context, ContextId};
 pub use entity_id::{EntityId, EntityIdError};
 pub use event::{Event, EventBus, EventKind};
-pub use lifecycle::CoreState;
+pub use lifecycle::{CoreState, SetupGuard};
 pub use schema::{Kind, Range, Schema};
 pub use service::{
     EntityTarget, Raised, ServiceCall, ServiceData, ServiceError, ServiceRegistry, ServiceResponse,
@@ -54,6 +54,7 @@ struct HassInner {
     core_state: AtomicU8,
     config: parking_lot::RwLock<Arc<config::CoreConfig>>,
     restore: parking_lot::RwLock<Arc<restore::RestoreState>>,
+    setups: lifecycle::Setups,
 }
 
 impl Hass {

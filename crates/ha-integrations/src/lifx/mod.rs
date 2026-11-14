@@ -506,7 +506,14 @@ pub fn bulb(
 }
 
 /// The entry: set up on HA's ladder, then run; rediscovery moves it.
-pub async fn run(components: Arc<Components>, entry: Map<String, Value>, port: u16) {
+/// `ready` is done after the first connection attempt.
+pub async fn run(
+    components: Arc<Components>,
+    entry: Map<String, Value>,
+    port: u16,
+    ready: ha_core::SetupGuard,
+) {
+    let mut ready = Some(ready);
     let s = |k: &str| entry.get(k).and_then(Value::as_str).map(str::to_owned);
     let (Some(mut host), Some(unique_id)) = (
         entry
@@ -529,6 +536,9 @@ pub async fn run(components: Arc<Components>, entry: Map<String, Value>, port: u
             match connect(&host, port, &unique_id, Timing::HA).await {
                 Ok(f) => break f,
                 Err(SetupError::Retry(why)) => {
+                    if let Some(r) = ready.take() {
+                        r.done();
+                    }
                     let wait = (5u64 << tries.min(7)).min(600);
                     tracing::info!(
                         "Config entry '{title}' for lifx integration not ready yet: {why}; Retrying in {wait} seconds"
@@ -537,13 +547,16 @@ pub async fn run(components: Arc<Components>, entry: Map<String, Value>, port: u
                     let jitter = Duration::from_micros(rand::random_range(50_000..500_001));
                     // Discovery of the bulb retries at once.
                     tokio::select! {
-                        () = tokio::time::sleep(Duration::from_secs(wait) + jitter) => {}
+                        () = components.hass().setup_retry_wait(Duration::from_secs(wait) + jitter) => {}
                         Some(at) = found_rx.recv() => host = at,
                     }
                 }
             }
         };
         let (b, coordinator) = bulb(&components, &title, &host, found, polling, Timing::HA);
+        if let Some(r) = ready.take() {
+            r.done();
+        }
         // Running until the bulb turns up elsewhere.
         loop {
             match found_rx.recv().await {

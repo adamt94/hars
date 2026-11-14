@@ -298,6 +298,7 @@ pub async fn run(
     user_agent: &'static str,
     base_url: String,
     entry: Map<String, Value>,
+    ready: ha_core::SetupGuard,
 ) {
     let empty = Map::new();
     let data = entry
@@ -317,7 +318,7 @@ pub async fn run(
         "{base_url}?{}",
         forecast::query(loc.latitude, loc.longitude, loc.elevation)
     );
-    schedule(&hass, &weather, &entity, polling, |prev| {
+    schedule(&hass, &weather, &entity, polling, ready, |prev| {
         fetch_once(user_agent, &url, prev)
     })
     .await;
@@ -330,6 +331,7 @@ async fn schedule<F, Fut>(
     weather: &Weather,
     entity: &Entity,
     polling: bool,
+    ready: ha_core::SetupGuard,
     mut fetch: F,
 ) where
     F: FnMut(Option<Fetched>) -> Fut,
@@ -339,16 +341,22 @@ async fn schedule<F, Fut>(
     let clock = hass.clock().clone();
     let features = weather::FORECAST_DAILY | weather::FORECAST_HOURLY;
 
-    // The first refresh: `ConfigEntryNotReady` until it works.
+    // The first refresh: `ConfigEntryNotReady` until it works. Setup is
+    // done after the first try either way (HA retries in the background).
     let mut tries = 0u32;
+    let mut ready = Some(ready);
     let mut last = loop {
         match fetch(None).await {
             Ok(f) => break f,
             Err((e, _)) => {
+                if let Some(r) = ready.take() {
+                    r.done();
+                }
                 let wait = (5u64 << tries.min(7)).min(600);
                 tracing::warn!("met.no: {e}; retrying setup in {wait} s");
                 tries += 1;
-                tokio::time::sleep(Duration::from_secs(wait) + jitter()).await;
+                hass.setup_retry_wait(Duration::from_secs(wait) + jitter())
+                    .await;
             }
         }
     };
@@ -365,6 +373,9 @@ async fn schedule<F, Fut>(
             true,
             entity.forecasts(hass, &computed),
         );
+        if let Some(r) = ready.take() {
+            r.done();
+        }
         if !polling {
             return std::future::pending().await;
         }

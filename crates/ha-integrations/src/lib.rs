@@ -91,7 +91,12 @@ pub fn start(
     };
     let mut running = Vec::new();
     if let Some(entry_id) = sun_entry {
-        tokio::spawn(sun::run(hass.clone(), registries.clone(), entry_id));
+        tokio::spawn(sun::run(
+            hass.clone(),
+            registries.clone(),
+            entry_id,
+            hass.setup_guard(),
+        ));
         running.extend(["sun", "sensor", "binary_sensor"]);
     }
 
@@ -106,6 +111,7 @@ pub fn start(
                 USER_AGENT,
                 met::URL.to_owned(),
                 entry,
+                hass.setup_guard(),
             ));
         }
         weather.register_services(hass, registries.clone());
@@ -116,7 +122,7 @@ pub fn start(
     if !hue.is_empty() {
         let platforms = hue::Platforms::new(&components);
         for entry in hue {
-            tokio::spawn(hue::run(platforms.clone(), entry));
+            tokio::spawn(hue::run(platforms.clone(), entry, hass.setup_guard()));
         }
         running.extend(["hue", "light", "sensor", "binary_sensor", "switch", "scene"]);
     }
@@ -134,6 +140,7 @@ pub fn start(
                 components.clone(),
                 entry,
                 switchbot_cloud::api::HOST.to_owned(),
+                hass.setup_guard(),
             ));
         }
         running.extend(["switchbot_cloud", "button", "climate", "sensor", "switch"]);
@@ -142,7 +149,12 @@ pub fn start(
     if !lifx.is_empty() {
         let _ = (components.lights(), components.buttons());
         for entry in lifx {
-            tokio::spawn(lifx::run(components.clone(), entry, lifx::conn::PORT));
+            tokio::spawn(lifx::run(
+                components.clone(),
+                entry,
+                lifx::conn::PORT,
+                hass.setup_guard(),
+            ));
         }
         running.extend(["lifx", "light", "button"]);
     }

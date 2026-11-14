@@ -422,7 +422,14 @@ fn object(v: Value) -> Map<String, Value> {
 /// dropped: work out the events, refresh the position on the phase's
 /// schedule, and start again when the phase changes. Each step sleeps until
 /// its time on the hass clock; nothing polls.
-pub async fn run(hass: Hass, registries: std::sync::Arc<Registries>, entry_id: String) {
+/// `ready` is done after the first write.
+pub async fn run(
+    hass: Hass,
+    registries: std::sync::Arc<Registries>,
+    entry_id: String,
+    ready: ha_core::SetupGuard,
+) {
+    let mut ready = Some(ready);
     let config = hass.config();
     let observer = Observer {
         latitude: config.latitude,
@@ -458,6 +465,9 @@ pub async fn run(hass: Hass, registries: std::sync::Arc<Registries>, entry_id: S
         let now = clock.now();
         let ev = events(&observer, &tz, now);
         entities.write(&hass, &ev, position(&observer, now), true);
+        if let Some(r) = ready.take() {
+            r.done();
+        }
         // `update_sun_position`'s schedule until the phase changes.
         let mut at = now;
         loop {

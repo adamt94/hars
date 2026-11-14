@@ -389,6 +389,9 @@ fn fixture_a() -> Fetched {
 #[tokio::test(start_paused = true)]
 async fn refreshes_on_has_schedule_and_goes_unavailable_on_failure() {
     let hass = Hass::new();
+    // Running: a failed setup retries on the backoff (while starting it
+    // would wait for `homeassistant_started`).
+    hass.start();
     let weather = Arc::new(Weather::default());
     let entity = Entity {
         id: EntityId::parse("weather.forecast_home").unwrap(),
@@ -415,7 +418,8 @@ async fn refreshes_on_has_schedule_and_goes_unavailable_on_failure() {
         std::future::ready(res)
     };
     let (h, w) = (hass.clone(), weather.clone());
-    let task = tokio::spawn(async move { schedule(&h, &w, &entity, true, fetch).await });
+    let task =
+        tokio::spawn(async move { schedule(&h, &w, &entity, true, h.setup_guard(), fetch).await });
     let id = EntityId::parse("weather.forecast_home").unwrap();
 
     tokio::time::sleep(Duration::from_secs(20)).await;
@@ -606,7 +610,8 @@ async fn polling_disabled_fetches_only_at_setup() {
         std::future::ready(Ok(fixture_a()))
     };
     let (h, w) = (hass.clone(), weather.clone());
-    let task = tokio::spawn(async move { schedule(&h, &w, &entity, false, fetch).await });
+    let task =
+        tokio::spawn(async move { schedule(&h, &w, &entity, false, h.setup_guard(), fetch).await });
     tokio::time::sleep(Duration::from_secs(5 * 3600)).await;
     assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 1);
     let id = EntityId::parse("weather.forecast_home").unwrap();
