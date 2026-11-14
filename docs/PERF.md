@@ -165,3 +165,16 @@ of English strings and icons compiled in. Idle RSS barely moved (7.4 → 7.5
 MiB): the strings are file-backed pages, read only while a request is
 answered. Nothing is parsed or cached; an answer is the stored JSON
 pieces joined.
+
+### Entity filter, 2026-11-14
+
+`subscribe_entities` filters (`ha_core::entityfilter`) run once per state
+change per filtered subscription. The glob walk keeps byte offsets into the
+entity id, so a match allocates nothing. `cargo bench -p ha-core -- entity_filter`
+on an Apple M4:
+
+| case | time |
+|---|---|
+| glob `sensor.phone_*_level` vs `sensor.phone_battery_level` | 76.6 ns |
+| the iOS app's `include.domains [zone, person]`, rejecting a sensor | 18.2 ns |
+| case 4, globs on both sides | 143 ns |

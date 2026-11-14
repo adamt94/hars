@@ -585,7 +585,7 @@ fn cv_entity_ids(v: &Value, path: &str) -> Result<Vec<String>, Bad> {
     for item in &items {
         let s = cv_string(item).map_err(|why| fail(why.into()))?;
         let lower = s.to_lowercase();
-        if ha_core::EntityId::parse(&lower).is_err() {
+        if !ha_core::valid_entity_id(&lower) {
             return Err(fail(format!("Entity ID {s} is an invalid entity ID")));
         }
         ids.push(lower);

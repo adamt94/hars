@@ -65,8 +65,8 @@ impl Glob {
         Self(toks)
     }
 
+    /// No allocation: the walk keeps byte offsets into `s`.
     pub fn matches(&self, s: &str) -> bool {
-        let s: Vec<char> = s.chars().collect();
         let one = |t: &Tok, c: char| match t {
             Tok::Any => true,
             Tok::Lit(l) => *l == c,
@@ -75,25 +75,26 @@ impl Glob {
             }
             Tok::Never | Tok::Star => false,
         };
+        let next = |i: usize| s[i..].chars().next().map(|c| (c, i + c.len_utf8()));
         // The classic wildcard walk: each token but `*` takes one character;
         // on a mismatch, the last `*` takes one more.
         let (mut t, mut i) = (0, 0);
         let mut star: Option<(usize, usize)> = None;
-        while i < s.len() {
+        while let Some((c, after)) = next(i) {
             match self.0.get(t) {
                 Some(Tok::Star) => {
                     star = Some((t, i));
                     t += 1;
                 }
-                Some(tok) if one(tok, s[i]) => {
+                Some(tok) if one(tok, c) => {
                     t += 1;
-                    i += 1;
+                    i = after;
                 }
-                _ => match star {
+                _ => match star.and_then(|(st, si)| Some((st, next(si)?.1))) {
                     Some((st, si)) => {
-                        star = Some((st, si + 1));
+                        star = Some((st, si));
                         t = st + 1;
-                        i = si + 1;
+                        i = si;
                     }
                     None => return false,
                 },

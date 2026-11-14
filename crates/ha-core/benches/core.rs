@@ -96,5 +96,34 @@ fn fan_out(c: &mut Criterion) {
     g.finish();
 }
 
-criterion_group!(benches, state_write, fan_out);
+/// `subscribe_entities` filters run once per state change per subscription.
+fn entity_filter(c: &mut Criterion) {
+    use ha_core::entityfilter::{EntityFilter, FilterLists, Glob};
+    let mut g = c.benchmark_group("entity_filter");
+    let glob = Glob::new("sensor.phone_*_level");
+    g.bench_function("glob/match", |b| {
+        b.iter(|| black_box(glob.matches(black_box("sensor.phone_battery_level"))))
+    });
+    let lists = |domains: &[&str], globs: &[&str], entities: &[&str]| FilterLists {
+        domains: domains.iter().map(|s| s.to_string()).collect(),
+        entities: entities.iter().map(|s| s.to_string()).collect(),
+        entity_globs: globs.iter().map(|s| s.to_string()).collect(),
+    };
+    // The iOS app's filter.
+    let app = EntityFilter::new(lists(&["zone", "person"], &[], &[]), lists(&[], &[], &[]));
+    g.bench_function("app/reject", |b| {
+        b.iter(|| black_box(app.matches(black_box("sensor.phone_battery_level"))))
+    });
+    // Case 4 with globs on both sides.
+    let mixed = EntityFilter::new(
+        lists(&["light"], &["sensor.phone_*"], &["switch.a"]),
+        lists(&[], &["*_battery_*"], &["light.b"]),
+    );
+    g.bench_function("mixed/glob_path", |b| {
+        b.iter(|| black_box(mixed.matches(black_box("sensor.phone_battery_level"))))
+    });
+    g.finish();
+}
+
+criterion_group!(benches, state_write, fan_out, entity_filter);
 criterion_main!(benches);

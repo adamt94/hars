@@ -1589,6 +1589,14 @@ async fn subscribe_entities_include_exclude_filters() {
     assert_eq!(r["success"], true);
     assert_eq!(keys(&c.recv().await), ["sensor.x"]);
 
+    // HA's validator, not `EntityId`'s: Unicode digits and a trailing newline pass.
+    let r = c
+        .call(json!({"id": 10, "type": "subscribe_entities",
+                     "entity_ids": ["sensor.\u{661}", "sensor.a\n"]}))
+        .await;
+    assert_eq!(r["success"], true);
+    assert_eq!(c.recv().await["event"]["a"], json!({}));
+
     // Changes are filtered the same way: only 8 sees the sensor, 7 and 6 the zone.
     s.hass.set_state(
         EntityId::parse("sensor.phone_battery_level").unwrap(),
