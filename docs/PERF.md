@@ -178,3 +178,12 @@ on an Apple M4:
 | glob `sensor.phone_*_level` vs `sensor.phone_battery_level` | 76.6 ns |
 | the iOS app's `include.domains [zone, person]`, rejecting a sensor | 18.2 ns |
 | case 4, globs on both sides | 143 ns |
+
+### `mobile_app` webhook, 2026-11-14
+
+Release `hars` (aarch64-darwin), main vs the webhook branch: 6,337,120 →
+6,419,920 bytes, **+80.9 KiB**. That is over the spec's 64 KiB budget for
+the whole feature: `crypto_secretbox` is about 16.5 KB, and the rest is the
+pipeline and commands. It is a candidate for trimming once sensors and
+location land. Seal + open of a 2 KiB payload costs 12.1 µs on an Apple M4
+(the spec's standalone bench).
