@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "minor_version": 5,
+  "key": "core.config_entries",
+  "data": {
+    "entries": [
+      {"created_at":"2026-07-08T13:35:56.373075+00:00","data":{"app_data":{"push_token":"fake-push-token","push_url":"https://mobile-apps.home-assistant.io/api/sendPushNotification","start_live_activity_token":"abababababababab"},"app_id":"io.robbie.HomeAssistant","app_name":"Home Assistant","app_version":"2026.9.1 (2026.2900)","device_id":"11111111-2222-4333-8444-555555555555","device_name":" Phone","manufacturer":"Apple","model":"iPhone17,1","no_legacy_encryption":true,"os_name":"iOS","os_version":"27.0.1","secret":"000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f","supports_encryption":true,"user_id":"00112233445566778899aabbccddeeff","webhook_id":"0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f"},"disabled_by":null,"discovery_keys":{},"domain":"mobile_app","entry_id":"01JFAKEMOBILEAPPENTRY00000","minor_version":1,"modified_at":"<t:os_and_app_version#3>","options":{},"pref_disable_new_entities":false,"pref_disable_polling":false,"source":"registration","subentries":[],"title":" Phone","unique_id":"io.robbie.HomeAssistant-11111111-2222-4333-8444-555555555555","version":1}
+    ]
+  }
+}

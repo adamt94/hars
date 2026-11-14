@@ -63,6 +63,7 @@ struct App {
     hass: Hass,
     router: Router,
     registry: Arc<ha_registry::Registry>,
+    entries: Arc<ha_integrations::config_entries::ConfigEntries>,
 }
 
 fn app_with(entries: &[Map<String, Value>]) -> App {
@@ -109,7 +110,9 @@ fn app_with(entries: &[Map<String, Value>]) -> App {
     let _ = std::fs::remove_dir_all(&dir);
     let registry = ha_registry::Registry::in_memory(&hass, registries);
     let mobile_app = Arc::new(MobileApp::new(entries, vec![DELETED.into()]));
-    mobile_app.setup(&hass, registry.clone());
+    let config_entries =
+        ha_integrations::config_entries::ConfigEntries::in_memory(&hass, entries.to_vec());
+    mobile_app.setup(&hass, registry.clone(), config_entries.clone());
     let config = crate::ApiConfig {
         registry: Some(registry.clone()),
         mobile_app: Some(mobile_app),
@@ -124,6 +127,7 @@ fn app_with(entries: &[Map<String, Value>]) -> App {
         hass,
         router: routes(shared),
         registry,
+        entries: config_entries,
     }
 }
 
@@ -308,17 +312,13 @@ async fn commands_as_ha() {
         }
         assert_eq!(ours, theirs, "{i} {ty}");
 
-        // Events and service calls, but HA's registry and `tag` entity ones.
+        // Events and service calls, but the `tag` entity's registry ones
+        // (`hars` keeps no tag entities).
         let want_events: Vec<Value> = x["effects"]["events"]
             .as_array()
             .unwrap()
             .iter()
-            .filter(|e| {
-                !matches!(
-                    e["event_type"].as_str(),
-                    Some("device_registry_updated" | "entity_registry_updated")
-                )
-            })
+            .filter(|e| e["event_type"] != "entity_registry_updated")
             .cloned()
             .collect();
         let mut got_events = Vec::new();
@@ -333,6 +333,27 @@ async fn commands_as_ha() {
             }
         }
         assert_eq!(got_events, want_events, "{i} {ty}");
+        // The entry and the device, saved as HA left them.
+        if let Some(data) = x.get("entry_data_after") {
+            let entry = app.entries.list().unwrap()[0].clone();
+            let mut ours = entry["data"].as_object().unwrap().clone();
+            // The vector leaves the secret out.
+            ours.remove("secret");
+            assert_eq!(&Value::Object(ours), data, "{i} {ty} entry");
+        }
+        if let Some(devices) = x.get("devices_after") {
+            let want = devices
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|d| d["id"] == "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0")
+                .unwrap();
+            let snap = app.registry.snapshot();
+            let got = serde_json::to_value(&*snap.devices[0]).unwrap();
+            for (k, v) in want.as_object().unwrap() {
+                assert_eq!(&got[k], v, "{i} {ty} device {k}");
+            }
+        }
         let want_calls: Vec<Value> = x["effects"]["service_calls"]
             .as_array()
             .unwrap()
@@ -447,6 +468,24 @@ async fn plaintext_registrations_and_enable_encryption() {
             .open(env["encrypted_data"].as_str().unwrap())
             .is_some()
     );
+    // The new secret is saved to the entry; the flag isn't, yet.
+    let saved = || app.entries.list().unwrap()[0]["data"].clone();
+    assert_eq!(saved()["secret"], secret.as_str());
+    assert_eq!(saved()["supports_encryption"], true);
+    assert!(saved().get("no_legacy_encryption").is_none());
+    // The first hex-key request records `no_legacy_encryption`.
+    let sealed = Key::hex(&secret).unwrap().seal(b"{}");
+    send(
+        &app,
+        WEBHOOK,
+        "POST",
+        Some(
+            &json!({"type": "get_zones", "encrypted": true, "encrypted_data": sealed}).to_string(),
+        ),
+        None,
+    )
+    .await;
+    assert_eq!(saved()["no_legacy_encryption"], true);
 }
 
 #[test]

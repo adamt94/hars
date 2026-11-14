@@ -4,6 +4,7 @@
 pub mod button;
 pub mod climate;
 pub mod components;
+pub mod config_entries;
 pub mod hue;
 pub mod lifx;
 pub mod light;
@@ -21,26 +22,6 @@ use ha_core::Hass;
 use ha_registry::Registries;
 use serde_json::{Map, Value};
 use std::sync::Arc;
-
-/// `.storage/core.config_entries` (1.5): every integration's entries, or
-/// `None` if the store doesn't exist (a fresh install). One that can't be
-/// read is logged and treated as no entries (nothing starts), so a bad file
-/// can't stop the server.
-pub fn load_entries(config_dir: &std::path::Path) -> Option<Vec<Map<String, Value>>> {
-    #[derive(serde::Deserialize)]
-    struct Entries {
-        #[serde(default)]
-        entries: Vec<Map<String, Value>>,
-    }
-    let store = ha_core::storage::Store::new(config_dir, "core.config_entries", 1, 5, true);
-    match store.load::<Entries>() {
-        Ok(data) => data.map(|d| d.entries),
-        Err(e) => {
-            tracing::error!("{e}; starting no integrations");
-            Some(Vec::new())
-        }
-    }
-}
 
 /// The integrations `hars` can run, by HA domain.
 pub const SUPPORTED: &[&str] = &[

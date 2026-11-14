@@ -207,6 +207,7 @@ pub struct MobileApp {
     deleted_ids: HashSet<String>,
     sensors: std::sync::OnceLock<sensor::Sensors>,
     trackers: std::sync::OnceLock<tracker::Trackers>,
+    entries: std::sync::OnceLock<Arc<crate::config_entries::ConfigEntries>>,
 }
 
 /// The webhook's view of an id.
@@ -250,12 +251,19 @@ impl MobileApp {
             deleted_ids: deleted_ids.into_iter().collect(),
             sensors: std::sync::OnceLock::new(),
             trackers: std::sync::OnceLock::new(),
+            entries: std::sync::OnceLock::new(),
         }
     }
 
     /// The registrations' entities, restored and written (before start, as
     /// HA's platforms set up).
-    pub fn setup(&self, hass: &ha_core::Hass, registry: Arc<ha_registry::Registry>) {
+    pub fn setup(
+        &self,
+        hass: &ha_core::Hass,
+        registry: Arc<ha_registry::Registry>,
+        entries: Arc<crate::config_entries::ConfigEntries>,
+    ) {
+        let _ = self.entries.set(entries);
         let regs: Vec<Arc<Registration>> = self.registrations.read().values().cloned().collect();
         let _ = self
             .sensors
@@ -265,6 +273,14 @@ impl MobileApp {
             .set(tracker::Trackers::setup(hass, registry.clone(), &regs));
         tracker::setup_notify(hass, &registry, &regs);
         register_notify_services(hass, &regs);
+    }
+
+    /// Save a registration's data to its config entry (HA's
+    /// `async_update_entry`), if it changed.
+    pub fn persist(&self, reg: &Registration) {
+        if let Some(entries) = self.entries.get() {
+            entries.update_data(&reg.entry_id, reg.data());
+        }
     }
 
     /// The trackers, once [`MobileApp::setup`] ran.

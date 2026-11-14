@@ -232,7 +232,13 @@ pub(crate) async fn handle(shared: &Shared, reg: &Arc<Registration>, body: &[u8]
             (Opened::Json(Value::Null), _) | (Opened::Failed, _) => {
                 return empty_okay(StatusCode::OK);
             }
-            (Opened::Json(v), _) => v,
+            (Opened::Json(v), newly_flagged) => {
+                // The first hex-key success records `no_legacy_encryption`.
+                if newly_flagged && let Some(app) = &shared.config.mobile_app {
+                    app.persist(reg);
+                }
+                v
+            }
         },
     };
     command(shared, reg, &envelope.ty, payload).await
@@ -437,7 +443,7 @@ async fn command(shared: &Shared, reg: &Arc<Registration>, ty: &str, payload: Va
                 ok()
             }
         }
-        "update_registration" => update_registration(reg, &payload),
+        "update_registration" => update_registration(shared, reg, &payload),
         "enable_encryption" => {
             let secret: String = rand::random::<[u8; 32]>()
                 .iter()
@@ -445,6 +451,9 @@ async fn command(shared: &Shared, reg: &Arc<Registration>, ty: &str, payload: Va
                 .collect();
             if !reg.enable_encryption(secret.clone()) {
                 return error_response("encryption_already_enabled", "Encryption already enabled");
+            }
+            if let Some(app) = &shared.config.mobile_app {
+                app.persist(reg);
             }
             Reply::Json {
                 status: StatusCode::OK,
@@ -573,7 +582,7 @@ fn get_config(shared: &Shared, reg: &Registration) -> Value {
 }
 
 /// `webhook_update_registration`. The merged data is kept for this run.
-fn update_registration(reg: &Registration, payload: &Value) -> Reply {
+fn update_registration(shared: &Shared, reg: &Registration, payload: &Value) -> Reply {
     let ok = || empty_okay(StatusCode::OK);
     let Some(m) = object(
         payload,
@@ -608,7 +617,32 @@ fn update_registration(reg: &Registration, payload: &Value) -> Reply {
         };
         update.insert("app_data".into(), Value::Object(app_data));
     }
+    // `{**entry.data, **data}`; the device is updated from it first. A
+    // missing key raises, before anything changes.
+    let mut new = reg.data();
+    let device_id = new
+        .get("device_id")
+        .and_then(Value::as_str)
+        .map(str::to_owned);
+    new.extend(update.clone());
+    let field = |k: &str| new.get(k).and_then(Value::as_str).map(str::to_owned);
+    let (Some(device_id), Some(_)) = (device_id, new.get("os_version")) else {
+        return Reply::Bare(StatusCode::OK);
+    };
+    if let Some(registry) = &shared.config.registry {
+        registry.get_or_create_device(ha_registry::DeviceInfo {
+            config_entry_id: reg.entry_id.clone(),
+            identifiers: vec![json!(["mobile_app", device_id])],
+            manufacturer: field("manufacturer"),
+            model: field("model"),
+            name: field("device_name"),
+            sw_version: field("os_version"),
+        });
+    }
     let new = reg.merge(update);
+    if let Some(app) = &shared.config.mobile_app {
+        app.persist(reg);
+    }
     // `safe_registration`: a missing key raises.
     let mut safe = Map::new();
     for key in [

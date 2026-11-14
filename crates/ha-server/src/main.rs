@@ -115,10 +115,14 @@ async fn run(thp_disabled: std::io::Result<bool>) -> anyhow::Result<()> {
     let components = std::sync::Arc::new(components);
     components.track(&hass);
     api_config.components = components;
-    let entries = {
-        let dir = config_dir.clone();
-        tokio::task::spawn_blocking(move || ha_integrations::load_entries(&dir)).await?
+    let config_entries = {
+        let (dir, hass) = (config_dir.clone(), hass.clone());
+        tokio::task::spawn_blocking(move || {
+            ha_integrations::config_entries::ConfigEntries::load(&hass, &dir)
+        })
+        .await?
     };
+    let entries = config_entries.list();
     {
         // A device's primary config entry yields to a new one when its
         // entry is gone or a low-priority integration's (HA).
@@ -157,7 +161,7 @@ async fn run(thp_disabled: std::io::Result<bool>) -> anyhow::Result<()> {
         api_config.integrations.push("mobile_app");
     }
     // The apps' sensors, restored, before start.
-    mobile_app.setup(&hass, registry.clone());
+    mobile_app.setup(&hass, registry.clone(), config_entries.clone());
     api_config.mobile_app = Some(std::sync::Arc::new(mobile_app));
     // `configuration.yaml`'s automations (written now; triggers attach at
     // `homeassistant_started`).
@@ -316,6 +320,7 @@ async fn run(thp_disabled: std::io::Result<bool>) -> anyhow::Result<()> {
     }
     hass.restore().dump(&hass).await;
     registry.flush().await;
+    config_entries.flush().await;
     hass.finish_stop();
     tracing::info!("hars stopped");
     Ok(())

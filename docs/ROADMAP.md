@@ -374,8 +374,9 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
       sensors restore as HA's `RestoreSensor` (17 of `startup.json`); HA's
       `sensors.json` (updates, registrations, re-registrations,
       disable/enable) and all 20 `location.json` tracker steps match
-  - [ ] persist entry changes (`update_registration`, `no_legacy_encryption`,
-        `enable_encryption`) to `core.config_entries`, and the device update
+  - [x] persist entry changes (`update_registration`, `no_legacy_encryption`,
+        `enable_encryption`) to `core.config_entries` (1 s after, HA's layout,
+        mode 0600), and `update_registration`'s device update
 - [ ] `/api/mobile_app/registrations` for fresh registrations (re-pair fallback)
 - [x] WS `subscribe_entities` `include`/`exclude` filters (HA's `entityfilter`
       cases 1-6, `fnmatch` globs, `cv.entity_ids`): the app subscribes to
