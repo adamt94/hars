@@ -475,6 +475,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "ha-automation"
+version = "0.1.0"
+dependencies = [
+ "ha-components",
+ "ha-core",
+ "ha-registry",
+ "jiff",
+ "parking_lot",
+ "rand",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "ha-components"
 version = "0.1.0"
 dependencies = [
@@ -560,6 +576,7 @@ dependencies = [
  "axum",
  "ha-api",
  "ha-auth",
+ "ha-automation",
  "ha-components",
  "ha-core",
  "ha-integrations",

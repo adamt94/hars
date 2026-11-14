@@ -1,0 +1,146 @@
+[
+ {
+  "name": "ns_crossing",
+  "doc": "numeric_state below:30 fires only when the value crosses from >=30 to <30."
+ },
+ {
+  "name": "ns_threshold_equality",
+  "doc": "30 is not below 30; 30 re-arms; 29.99 fires."
+ },
+ {
+  "name": "ns_already_below_at_startup",
+  "doc": "Value already below at homeassistant_started: not armed, so no fire until it rises >=30 and drops again."
+ },
+ {
+  "name": "ns_unavailable_recovery",
+  "doc": "below -> unavailable -> below fires (unavailable arms); same for unknown."
+ },
+ {
+  "name": "ns_unknown_at_startup",
+  "doc": "unknown at homeassistant_started arms the trigger; the first numeric value below fires."
+ },
+ {
+  "name": "ns_missing_at_startup",
+  "doc": "Entity has no state at attach: warning, not armed; first value below does NOT fire."
+ },
+ {
+  "name": "ns_non_numeric",
+  "doc": "A non-numeric state logs a warning and leaves the armed flag unchanged: 40 (armed) -> abc -> 25 fires; 25 -> abc -> 24 does not; 40 -> abc -> 20 fires."
+ },
+ {
+  "name": "ns_attribute_only",
+  "doc": "Attribute-only writes neither fire nor arm/disarm."
+ },
+ {
+  "name": "ns_condition_motion_off",
+  "doc": "became_dark fires while motion is off: the automation's state condition fails; no run."
+ },
+ {
+  "name": "st_to_on",
+  "doc": "state to:on fires on any change whose new state is on (from anything, incl. unavailable)."
+ },
+ {
+  "name": "st_on_at_startup",
+  "doc": "Motion already on at homeassistant_started: no trigger."
+ },
+ {
+  "name": "st_created_on",
+  "doc": "Entity created directly as on (old_state None) fires."
+ },
+ {
+  "name": "st_change_during_startup",
+  "doc": "States written after setup but before homeassistant_started are missed."
+ },
+ {
+  "name": "same_tick_batch",
+  "doc": "Real 2026-11-04 21:54:57: hue writes motion=on and lux=22 in one batch. Trigger dispatch is deferred (call_soon), so the motion trigger's conditions already see lux=22: both triggers run (the second restarts). Written 1 ms apart instead, the motion trigger's conditions see lux=45 and fail."
+ },
+ {
+  "name": "wait_basic",
+  "doc": "on -> lights on; off for 5 min -> lights off. wait.remaining is None (no timeout)."
+ },
+ {
+  "name": "wait_reenter_restart",
+  "doc": "off, then on again after 4 min with conditions passing: restart; new 5 min from the next off."
+ },
+ {
+  "name": "wait_reenter_conditions_fail",
+  "doc": "on re-enters while lux >= 30: conditions fail so no restart; the old wait's for-timer resets on the next off."
+ },
+ {
+  "name": "wait_attribute_only",
+  "doc": "Attribute-only motion write during the 5 min does not reset it."
+ },
+ {
+  "name": "wait_unavailable_blip",
+  "doc": "off -> unavailable -> off restarts the 5 min."
+ },
+ {
+  "name": "wait_already_off",
+  "doc": "Motion goes off while light.turn_on is still running (3 s latency): wait_for_trigger subscribes afterwards, so the off is missed."
+ },
+ {
+  "name": "wait_wall_jump",
+  "doc": "A wall-clock jump of +1 h during the 5 min does not shorten it (loop time)."
+ },
+ {
+  "name": "mode_restart_order",
+  "doc": "Restart: conditions are checked first; then 'Restarting', the old run is stopped, then automation_triggered."
+ },
+ {
+  "name": "mode_single_drop",
+  "doc": "single: a second trigger while running is dropped with a WARNING 'Already running'; no event, last_triggered unchanged."
+ },
+ {
+  "name": "time_day",
+  "doc": "A full GMT day: 23:00/06:30/09:30 brightness bands (light on), 23:30 kitchen off, 10:00 kitchen check."
+ },
+ {
+  "name": "time_light_off",
+  "doc": "Hallway light off: the 23:00 trigger runs but its state condition fails."
+ },
+ {
+  "name": "time_condition_edges",
+  "doc": "choose time windows at their edges (after inclusive, before exclusive, across midnight)."
+ },
+ {
+  "name": "kitchen_condition_edges",
+  "doc": "Kitchen: sun below at 09:59:59 (time condition false), 10:00 time trigger fires, below at 23:29:59 true, 23:30:00 false."
+ },
+ {
+  "name": "dst_autumn",
+  "doc": "Europe/London 2026-10-25 02:00 BST -> 01:00 GMT: time triggers at local wall times both days; motion at both 01:30s."
+ },
+ {
+  "name": "dst_spring",
+  "doc": "Europe/London 2027-03-28 01:00 GMT -> 02:00 BST: time triggers at local wall times; motion either side of the gap."
+ },
+ {
+  "name": "jump_forward_over_trigger",
+  "doc": "Wall clock jumps +2 h at 22:59: 23:00 and 23:30 timers (loop time) fire late, at 01:00 and 01:30 wall."
+ },
+ {
+  "name": "jump_back_after_trigger",
+  "doc": "Wall clock jumps -1 h at 23:10 after 23:00 fired: no second 23:00 tonight; 23:30 timer fires early by loop time, re-arms, fires at 23:30 wall."
+ },
+ {
+  "name": "jump_back_over_trigger",
+  "doc": "Wall clock jumps -1 h at 23:00:30 (just after the 23:00 fire): 23:00 is not repeated when the wall clock passes it again."
+ },
+ {
+  "name": "startup_restore",
+  "doc": "Restore: last_triggered comes back; a restored 'off' stays off (no triggers attach); 'current' is not restored (0)."
+ },
+ {
+  "name": "startup_integration_late",
+  "doc": "Hue not ready at start: the registry placeholders (unavailable, restored) are written at homeassistant_start, so triggers attach to 'unavailable'; when hue delivers motion=on and lux=20 later, both triggers fire (from unavailable)."
+ },
+ {
+  "name": "startup_missed_time",
+  "doc": "HA boots at 23:05: the 23:00 trigger is not run retroactively."
+ },
+ {
+  "name": "service_turn_off_on",
+  "doc": "automation.turn_off stops the running wait (stop_actions default) and detaches triggers; turn_on re-attaches (no fire for current on)."
+ }
+]

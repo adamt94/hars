@@ -154,6 +154,13 @@ impl ServiceCall {
     }
 }
 
+impl ServiceCall {
+    /// [`ServiceCall::entity_ids`] for a raw `entity_id` value.
+    pub fn entity_ids_of(value: Option<&Value>) -> Result<EntityTarget, ServiceError> {
+        resolve_entity_ids(value)
+    }
+}
+
 /// [`ServiceCall::entity_ids`] for a raw `entity_id` value.
 pub(crate) fn resolve_entity_ids(value: Option<&Value>) -> Result<EntityTarget, ServiceError> {
     let mut ids = Vec::new();

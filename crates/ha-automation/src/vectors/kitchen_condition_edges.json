@@ -1,0 +1,769 @@
+{
+ "name": "kitchen_condition_edges",
+ "doc": "Kitchen: sun below at 09:59:59 (time condition false), 10:00 time trigger fires, below at 23:29:59 true, 23:30:00 false.",
+ "start": "2026-11-11T09:59:00",
+ "automations": [
+  "living_room_lifx_on_when_dark_after_10",
+  "living_room_lifx_off_at_2330"
+ ],
+ "steps": [
+  {
+   "op": "set",
+   "entity_id": "sun.sun",
+   "state": "above_horizon",
+   "attributes": {}
+  },
+  {
+   "op": "set",
+   "entity_id": "light.kitchen_kitchen_light",
+   "state": "off",
+   "attributes": {}
+  },
+  {
+   "op": "set",
+   "entity_id": "light.bedroom_lamp",
+   "state": "off",
+   "attributes": {}
+  },
+  {
+   "op": "setup"
+  },
+  {
+   "op": "start"
+  },
+  {
+   "op": "at",
+   "t": "2026-11-11T09:59:59"
+  },
+  {
+   "op": "set",
+   "entity_id": "sun.sun",
+   "state": "below_horizon",
+   "attributes": {}
+  },
+  {
+   "op": "at",
+   "t": "2026-11-11T10:00:30"
+  },
+  {
+   "op": "set",
+   "entity_id": "sun.sun",
+   "state": "above_horizon",
+   "attributes": {}
+  },
+  {
+   "op": "at",
+   "t": "2026-11-11T23:29:59"
+  },
+  {
+   "op": "set",
+   "entity_id": "sun.sun",
+   "state": "below_horizon",
+   "attributes": {}
+  },
+  {
+   "op": "wait",
+   "s": 1
+  },
+  {
+   "op": "set",
+   "entity_id": "sun.sun",
+   "state": "above_horizon",
+   "attributes": {}
+  },
+  {
+   "op": "at",
+   "t": "2026-11-11T23:30:00"
+  },
+  {
+   "op": "set",
+   "entity_id": "sun.sun",
+   "state": "below_horizon",
+   "attributes": {}
+  },
+  {
+   "op": "wait",
+   "s": 2
+  }
+ ],
+ "expected": [
+  {
+   "t": "2026-11-11T09:59:00+00:00",
+   "kind": "input",
+   "entity_id": "sun.sun",
+   "state": "above_horizon",
+   "attributes": {},
+   "ctx": "c3"
+  },
+  {
+   "t": "2026-11-11T09:59:00+00:00",
+   "kind": "input",
+   "entity_id": "light.kitchen_kitchen_light",
+   "state": "off",
+   "attributes": {},
+   "ctx": "c4"
+  },
+  {
+   "t": "2026-11-11T09:59:00+00:00",
+   "kind": "input",
+   "entity_id": "light.bedroom_lamp",
+   "state": "off",
+   "attributes": {},
+   "ctx": "c5"
+  },
+  {
+   "t": "2026-11-11T09:59:00+00:00",
+   "kind": "log",
+   "level": "DEBUG",
+   "logger": "homeassistant.components.automation.living_room_lifx_on_when_dark_after_10am",
+   "msg": "Automation automation.living_room_lifx_on_when_dark_after_10am not in state storage, state True from default is used"
+  },
+  {
+   "t": "2026-11-11T09:59:00+00:00",
+   "kind": "state",
+   "entity_id": "automation.living_room_lifx_on_when_dark_after_10am",
+   "old": null,
+   "new": "on",
+   "ctx": "c8",
+   "parent": null,
+   "last_changed": "2026-11-11T09:59:00+00:00",
+   "last_updated": "2026-11-11T09:59:00+00:00",
+   "attributes": {
+    "last_triggered": null,
+    "current": 0,
+    "mode": "single",
+    "id": "living_room_lifx_on_when_dark_after_10",
+    "friendly_name": "Kitchen lights - on when dark after 10am"
+   }
+  },
+  {
+   "t": "2026-11-11T09:59:00+00:00",
+   "kind": "log",
+   "level": "DEBUG",
+   "logger": "homeassistant.components.automation.living_room_lifx_off_at_11_30pm",
+   "msg": "Automation automation.living_room_lifx_off_at_11_30pm not in state storage, state True from default is used"
+  },
+  {
+   "t": "2026-11-11T09:59:00+00:00",
+   "kind": "state",
+   "entity_id": "automation.living_room_lifx_off_at_11_30pm",
+   "old": null,
+   "new": "on",
+   "ctx": "c9",
+   "parent": null,
+   "last_changed": "2026-11-11T09:59:00+00:00",
+   "last_updated": "2026-11-11T09:59:00+00:00",
+   "attributes": {
+    "last_triggered": null,
+    "current": 0,
+    "mode": "single",
+    "id": "living_room_lifx_off_at_2330",
+    "friendly_name": "Kitchen lights - off at 11:30pm"
+   }
+  },
+  {
+   "t": "2026-11-11T09:59:00+00:00",
+   "kind": "event",
+   "event_type": "homeassistant_start",
+   "ctx": "c17",
+   "parent": null
+  },
+  {
+   "t": "2026-11-11T09:59:00+00:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.living_room_lifx_on_when_dark_after_10am",
+   "msg": "Initialized trigger Kitchen lights - on when dark after 10am"
+  },
+  {
+   "t": "2026-11-11T09:59:00+00:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.living_room_lifx_off_at_11_30pm",
+   "msg": "Initialized trigger Kitchen lights - off at 11:30pm"
+  },
+  {
+   "t": "2026-11-11T09:59:00+00:00",
+   "kind": "event",
+   "event_type": "homeassistant_started",
+   "ctx": "c19",
+   "parent": null
+  },
+  {
+   "t": "2026-11-11T09:59:59+00:00",
+   "kind": "input",
+   "entity_id": "sun.sun",
+   "state": "below_horizon",
+   "attributes": {},
+   "ctx": "c20"
+  },
+  {
+   "t": "2026-11-11T09:59:59+00:00",
+   "kind": "trigger",
+   "automation": "automation.living_room_lifx_on_when_dark_after_10am",
+   "enabled": true,
+   "trigger": {
+    "id": "0",
+    "idx": "0",
+    "alias": null,
+    "platform": "state",
+    "entity_id": "sun.sun",
+    "from_state": {
+     "entity_id": "sun.sun",
+     "state": "above_horizon",
+     "attributes": {},
+     "ctx": "c3"
+    },
+    "to_state": {
+     "entity_id": "sun.sun",
+     "state": "below_horizon",
+     "attributes": {},
+     "ctx": "c20"
+    },
+    "for": null,
+    "attribute": null,
+    "description": "state of sun.sun"
+   },
+   "trigger_ctx": "c20"
+  },
+  {
+   "t": "2026-11-11T09:59:59+00:00",
+   "kind": "log",
+   "level": "DEBUG",
+   "logger": "homeassistant.components.automation.living_room_lifx_on_when_dark_after_10am",
+   "msg": "Automation trigger 'None' triggered by state of sun.sun"
+  },
+  {
+   "t": "2026-11-11T09:59:59+00:00",
+   "kind": "log",
+   "level": "DEBUG",
+   "logger": "homeassistant.components.automation.living_room_lifx_on_when_dark_after_10am",
+   "msg": "Conditions not met, aborting automation. Condition summary: <trace elided>"
+  },
+  {
+   "t": "2026-11-11T10:00:00.360911+00:00",
+   "kind": "trigger",
+   "automation": "automation.living_room_lifx_on_when_dark_after_10am",
+   "enabled": true,
+   "trigger": {
+    "id": "1",
+    "idx": "1",
+    "alias": null,
+    "platform": "time",
+    "now": "2026-11-11T10:00:00.360911+00:00",
+    "description": "time",
+    "entity_id": null
+   },
+   "trigger_ctx": null
+  },
+  {
+   "t": "2026-11-11T10:00:00.360911+00:00",
+   "kind": "log",
+   "level": "DEBUG",
+   "logger": "homeassistant.components.automation.living_room_lifx_on_when_dark_after_10am",
+   "msg": "Automation trigger 'None' triggered by time"
+  },
+  {
+   "t": "2026-11-11T10:00:00.360911+00:00",
+   "kind": "event",
+   "event_type": "automation_triggered",
+   "data": {
+    "name": "Kitchen lights - on when dark after 10am",
+    "entity_id": "automation.living_room_lifx_on_when_dark_after_10am",
+    "source": "time"
+   },
+   "ctx": "c21",
+   "parent": null
+  },
+  {
+   "t": "2026-11-11T10:00:00.360911+00:00",
+   "kind": "state",
+   "entity_id": "automation.living_room_lifx_on_when_dark_after_10am",
+   "old": "on",
+   "new": "on",
+   "ctx": "c21",
+   "parent": null,
+   "last_changed": "2026-11-11T09:59:00+00:00",
+   "last_updated": "2026-11-11T10:00:00.360911+00:00",
+   "attributes": {
+    "last_triggered": "2026-11-11T10:00:00.360911+00:00",
+    "current": 1,
+    "mode": "single",
+    "id": "living_room_lifx_on_when_dark_after_10",
+    "friendly_name": "Kitchen lights - on when dark after 10am"
+   }
+  },
+  {
+   "t": "2026-11-11T10:00:00.360911+00:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.living_room_lifx_on_when_dark_after_10am",
+   "msg": "Kitchen lights - on when dark after 10am: Running automation actions"
+  },
+  {
+   "t": "2026-11-11T10:00:00.360911+00:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.living_room_lifx_on_when_dark_after_10am",
+   "msg": "Kitchen lights - on when dark after 10am: Executing step call service"
+  },
+  {
+   "t": "2026-11-11T10:00:00.360911+00:00",
+   "kind": "event",
+   "event_type": "call_service",
+   "data": {
+    "domain": "light",
+    "service": "turn_on",
+    "service_data": {
+     "brightness_pct": 60,
+     "color_temp_kelvin": 2700,
+     "transition": 5,
+     "entity_id": [
+      "light.kitchen_kitchen_light"
+     ]
+    }
+   },
+   "ctx": "c21",
+   "parent": null
+  },
+  {
+   "t": "2026-11-11T10:00:00.360911+00:00",
+   "kind": "service_handler",
+   "service": "light.turn_on",
+   "data": {
+    "brightness_pct": 60,
+    "color_temp_kelvin": 2700,
+    "transition": 5,
+    "entity_id": [
+     "light.kitchen_kitchen_light"
+    ]
+   },
+   "ctx": "c21",
+   "parent": null
+  },
+  {
+   "t": "2026-11-11T10:00:00.360911+00:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.living_room_lifx_on_when_dark_after_10am",
+   "msg": "Kitchen lights - on when dark after 10am: Executing step call service"
+  },
+  {
+   "t": "2026-11-11T10:00:00.360911+00:00",
+   "kind": "event",
+   "event_type": "call_service",
+   "data": {
+    "domain": "light",
+    "service": "turn_on",
+    "service_data": {
+     "brightness_pct": 30,
+     "color_temp_kelvin": 2400,
+     "transition": 5,
+     "entity_id": [
+      "light.bedroom_lamp"
+     ]
+    }
+   },
+   "ctx": "c21",
+   "parent": null
+  },
+  {
+   "t": "2026-11-11T10:00:00.360911+00:00",
+   "kind": "service_handler",
+   "service": "light.turn_on",
+   "data": {
+    "brightness_pct": 30,
+    "color_temp_kelvin": 2400,
+    "transition": 5,
+    "entity_id": [
+     "light.bedroom_lamp"
+    ]
+   },
+   "ctx": "c21",
+   "parent": null
+  },
+  {
+   "t": "2026-11-11T10:00:00.360911+00:00",
+   "kind": "state",
+   "entity_id": "automation.living_room_lifx_on_when_dark_after_10am",
+   "old": "on",
+   "new": "on",
+   "ctx": "c21",
+   "parent": null,
+   "last_changed": "2026-11-11T09:59:00+00:00",
+   "last_updated": "2026-11-11T10:00:00.360911+00:00",
+   "attributes": {
+    "last_triggered": "2026-11-11T10:00:00.360911+00:00",
+    "current": 0,
+    "mode": "single",
+    "id": "living_room_lifx_on_when_dark_after_10",
+    "friendly_name": "Kitchen lights - on when dark after 10am"
+   }
+  },
+  {
+   "t": "2026-11-11T10:00:30+00:00",
+   "kind": "input",
+   "entity_id": "sun.sun",
+   "state": "above_horizon",
+   "attributes": {},
+   "ctx": "c22"
+  },
+  {
+   "t": "2026-11-11T23:29:59+00:00",
+   "kind": "input",
+   "entity_id": "sun.sun",
+   "state": "below_horizon",
+   "attributes": {},
+   "ctx": "c23"
+  },
+  {
+   "t": "2026-11-11T23:29:59+00:00",
+   "kind": "trigger",
+   "automation": "automation.living_room_lifx_on_when_dark_after_10am",
+   "enabled": true,
+   "trigger": {
+    "id": "0",
+    "idx": "0",
+    "alias": null,
+    "platform": "state",
+    "entity_id": "sun.sun",
+    "from_state": {
+     "entity_id": "sun.sun",
+     "state": "above_horizon",
+     "attributes": {},
+     "ctx": "c22"
+    },
+    "to_state": {
+     "entity_id": "sun.sun",
+     "state": "below_horizon",
+     "attributes": {},
+     "ctx": "c23"
+    },
+    "for": null,
+    "attribute": null,
+    "description": "state of sun.sun"
+   },
+   "trigger_ctx": "c23"
+  },
+  {
+   "t": "2026-11-11T23:29:59+00:00",
+   "kind": "log",
+   "level": "DEBUG",
+   "logger": "homeassistant.components.automation.living_room_lifx_on_when_dark_after_10am",
+   "msg": "Automation trigger 'None' triggered by state of sun.sun"
+  },
+  {
+   "t": "2026-11-11T23:29:59+00:00",
+   "kind": "event",
+   "event_type": "automation_triggered",
+   "data": {
+    "name": "Kitchen lights - on when dark after 10am",
+    "entity_id": "automation.living_room_lifx_on_when_dark_after_10am",
+    "source": "state of sun.sun"
+   },
+   "ctx": "c24",
+   "parent": "c23"
+  },
+  {
+   "t": "2026-11-11T23:29:59+00:00",
+   "kind": "state",
+   "entity_id": "automation.living_room_lifx_on_when_dark_after_10am",
+   "old": "on",
+   "new": "on",
+   "ctx": "c24",
+   "parent": "c23",
+   "last_changed": "2026-11-11T09:59:00+00:00",
+   "last_updated": "2026-11-11T23:29:59+00:00",
+   "attributes": {
+    "last_triggered": "2026-11-11T23:29:59+00:00",
+    "current": 1,
+    "mode": "single",
+    "id": "living_room_lifx_on_when_dark_after_10",
+    "friendly_name": "Kitchen lights - on when dark after 10am"
+   }
+  },
+  {
+   "t": "2026-11-11T23:29:59+00:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.living_room_lifx_on_when_dark_after_10am",
+   "msg": "Kitchen lights - on when dark after 10am: Running automation actions"
+  },
+  {
+   "t": "2026-11-11T23:29:59+00:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.living_room_lifx_on_when_dark_after_10am",
+   "msg": "Kitchen lights - on when dark after 10am: Executing step call service"
+  },
+  {
+   "t": "2026-11-11T23:29:59+00:00",
+   "kind": "event",
+   "event_type": "call_service",
+   "data": {
+    "domain": "light",
+    "service": "turn_on",
+    "service_data": {
+     "brightness_pct": 60,
+     "color_temp_kelvin": 2700,
+     "transition": 5,
+     "entity_id": [
+      "light.kitchen_kitchen_light"
+     ]
+    }
+   },
+   "ctx": "c24",
+   "parent": "c23"
+  },
+  {
+   "t": "2026-11-11T23:29:59+00:00",
+   "kind": "service_handler",
+   "service": "light.turn_on",
+   "data": {
+    "brightness_pct": 60,
+    "color_temp_kelvin": 2700,
+    "transition": 5,
+    "entity_id": [
+     "light.kitchen_kitchen_light"
+    ]
+   },
+   "ctx": "c24",
+   "parent": "c23"
+  },
+  {
+   "t": "2026-11-11T23:29:59+00:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.living_room_lifx_on_when_dark_after_10am",
+   "msg": "Kitchen lights - on when dark after 10am: Executing step call service"
+  },
+  {
+   "t": "2026-11-11T23:29:59+00:00",
+   "kind": "event",
+   "event_type": "call_service",
+   "data": {
+    "domain": "light",
+    "service": "turn_on",
+    "service_data": {
+     "brightness_pct": 30,
+     "color_temp_kelvin": 2400,
+     "transition": 5,
+     "entity_id": [
+      "light.bedroom_lamp"
+     ]
+    }
+   },
+   "ctx": "c24",
+   "parent": "c23"
+  },
+  {
+   "t": "2026-11-11T23:29:59+00:00",
+   "kind": "service_handler",
+   "service": "light.turn_on",
+   "data": {
+    "brightness_pct": 30,
+    "color_temp_kelvin": 2400,
+    "transition": 5,
+    "entity_id": [
+     "light.bedroom_lamp"
+    ]
+   },
+   "ctx": "c24",
+   "parent": "c23"
+  },
+  {
+   "t": "2026-11-11T23:29:59+00:00",
+   "kind": "state",
+   "entity_id": "automation.living_room_lifx_on_when_dark_after_10am",
+   "old": "on",
+   "new": "on",
+   "ctx": "c24",
+   "parent": "c23",
+   "last_changed": "2026-11-11T09:59:00+00:00",
+   "last_updated": "2026-11-11T23:29:59+00:00",
+   "attributes": {
+    "last_triggered": "2026-11-11T23:29:59+00:00",
+    "current": 0,
+    "mode": "single",
+    "id": "living_room_lifx_on_when_dark_after_10",
+    "friendly_name": "Kitchen lights - on when dark after 10am"
+   }
+  },
+  {
+   "t": "2026-11-11T23:30:00+00:00",
+   "kind": "input",
+   "entity_id": "sun.sun",
+   "state": "above_horizon",
+   "attributes": {},
+   "ctx": "c25"
+  },
+  {
+   "t": "2026-11-11T23:30:00+00:00",
+   "kind": "input",
+   "entity_id": "sun.sun",
+   "state": "below_horizon",
+   "attributes": {},
+   "ctx": "c26"
+  },
+  {
+   "t": "2026-11-11T23:30:00+00:00",
+   "kind": "trigger",
+   "automation": "automation.living_room_lifx_on_when_dark_after_10am",
+   "enabled": true,
+   "trigger": {
+    "id": "0",
+    "idx": "0",
+    "alias": null,
+    "platform": "state",
+    "entity_id": "sun.sun",
+    "from_state": {
+     "entity_id": "sun.sun",
+     "state": "above_horizon",
+     "attributes": {},
+     "ctx": "c25"
+    },
+    "to_state": {
+     "entity_id": "sun.sun",
+     "state": "below_horizon",
+     "attributes": {},
+     "ctx": "c26"
+    },
+    "for": null,
+    "attribute": null,
+    "description": "state of sun.sun"
+   },
+   "trigger_ctx": "c26"
+  },
+  {
+   "t": "2026-11-11T23:30:00+00:00",
+   "kind": "log",
+   "level": "DEBUG",
+   "logger": "homeassistant.components.automation.living_room_lifx_on_when_dark_after_10am",
+   "msg": "Automation trigger 'None' triggered by state of sun.sun"
+  },
+  {
+   "t": "2026-11-11T23:30:00+00:00",
+   "kind": "log",
+   "level": "DEBUG",
+   "logger": "homeassistant.components.automation.living_room_lifx_on_when_dark_after_10am",
+   "msg": "Conditions not met, aborting automation. Condition summary: <trace elided>"
+  },
+  {
+   "t": "2026-11-11T23:30:00.229636+00:00",
+   "kind": "trigger",
+   "automation": "automation.living_room_lifx_off_at_11_30pm",
+   "enabled": true,
+   "trigger": {
+    "id": "0",
+    "idx": "0",
+    "alias": null,
+    "platform": "time",
+    "now": "2026-11-11T23:30:00.229636+00:00",
+    "description": "time",
+    "entity_id": null
+   },
+   "trigger_ctx": null
+  },
+  {
+   "t": "2026-11-11T23:30:00.229636+00:00",
+   "kind": "log",
+   "level": "DEBUG",
+   "logger": "homeassistant.components.automation.living_room_lifx_off_at_11_30pm",
+   "msg": "Automation trigger 'None' triggered by time"
+  },
+  {
+   "t": "2026-11-11T23:30:00.229636+00:00",
+   "kind": "event",
+   "event_type": "automation_triggered",
+   "data": {
+    "name": "Kitchen lights - off at 11:30pm",
+    "entity_id": "automation.living_room_lifx_off_at_11_30pm",
+    "source": "time"
+   },
+   "ctx": "c27",
+   "parent": null
+  },
+  {
+   "t": "2026-11-11T23:30:00.229636+00:00",
+   "kind": "state",
+   "entity_id": "automation.living_room_lifx_off_at_11_30pm",
+   "old": "on",
+   "new": "on",
+   "ctx": "c27",
+   "parent": null,
+   "last_changed": "2026-11-11T09:59:00+00:00",
+   "last_updated": "2026-11-11T23:30:00.229636+00:00",
+   "attributes": {
+    "last_triggered": "2026-11-11T23:30:00.229636+00:00",
+    "current": 1,
+    "mode": "single",
+    "id": "living_room_lifx_off_at_2330",
+    "friendly_name": "Kitchen lights - off at 11:30pm"
+   }
+  },
+  {
+   "t": "2026-11-11T23:30:00.229636+00:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.living_room_lifx_off_at_11_30pm",
+   "msg": "Kitchen lights - off at 11:30pm: Running automation actions"
+  },
+  {
+   "t": "2026-11-11T23:30:00.229636+00:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.living_room_lifx_off_at_11_30pm",
+   "msg": "Kitchen lights - off at 11:30pm: Executing step call service"
+  },
+  {
+   "t": "2026-11-11T23:30:00.229636+00:00",
+   "kind": "event",
+   "event_type": "call_service",
+   "data": {
+    "domain": "light",
+    "service": "turn_off",
+    "service_data": {
+     "transition": 10,
+     "entity_id": [
+      "light.kitchen_kitchen_light",
+      "light.bedroom_lamp"
+     ]
+    }
+   },
+   "ctx": "c27",
+   "parent": null
+  },
+  {
+   "t": "2026-11-11T23:30:00.229636+00:00",
+   "kind": "service_handler",
+   "service": "light.turn_off",
+   "data": {
+    "transition": 10,
+    "entity_id": [
+     "light.kitchen_kitchen_light",
+     "light.bedroom_lamp"
+    ]
+   },
+   "ctx": "c27",
+   "parent": null
+  },
+  {
+   "t": "2026-11-11T23:30:00.229636+00:00",
+   "kind": "state",
+   "entity_id": "automation.living_room_lifx_off_at_11_30pm",
+   "old": "on",
+   "new": "on",
+   "ctx": "c27",
+   "parent": null,
+   "last_changed": "2026-11-11T09:59:00+00:00",
+   "last_updated": "2026-11-11T23:30:00.229636+00:00",
+   "attributes": {
+    "last_triggered": "2026-11-11T23:30:00.229636+00:00",
+    "current": 0,
+    "mode": "single",
+    "id": "living_room_lifx_off_at_2330",
+    "friendly_name": "Kitchen lights - off at 11:30pm"
+   }
+  }
+ ]
+}

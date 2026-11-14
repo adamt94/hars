@@ -1,0 +1,2014 @@
+{
+ "name": "dst_spring",
+ "doc": "Europe/London 2027-03-28 01:00 GMT -> 02:00 BST: time triggers at local wall times; motion either side of the gap.",
+ "start": "2027-03-27T22:00:00",
+ "automations": [
+  "hallway_motion_lights_on_when_dark",
+  "hallway_lights_adjust_brightness_for_time",
+  "living_room_lifx_on_when_dark_after_10",
+  "living_room_lifx_off_at_2330"
+ ],
+ "steps": [
+  {
+   "op": "set",
+   "entity_id": "binary_sensor.hallway_motion",
+   "state": "off",
+   "attributes": {
+    "device_class": "motion",
+    "friendly_name": "Hallway Motion"
+   }
+  },
+  {
+   "op": "set",
+   "entity_id": "sensor.hallway_illuminance",
+   "state": "12",
+   "attributes": {
+    "state_class": "measurement",
+    "unit_of_measurement": "lx",
+    "device_class": "illuminance",
+    "friendly_name": "Hallway Illuminance"
+   }
+  },
+  {
+   "op": "set",
+   "entity_id": "light.hallway_hallway",
+   "state": "on",
+   "attributes": {}
+  },
+  {
+   "op": "set",
+   "entity_id": "sun.sun",
+   "state": "below_horizon",
+   "attributes": {}
+  },
+  {
+   "op": "set",
+   "entity_id": "light.kitchen_kitchen_light",
+   "state": "off",
+   "attributes": {}
+  },
+  {
+   "op": "set",
+   "entity_id": "light.bedroom_lamp",
+   "state": "off",
+   "attributes": {}
+  },
+  {
+   "op": "setup"
+  },
+  {
+   "op": "start"
+  },
+  {
+   "op": "at",
+   "t": "2027-03-28T00:59:59"
+  },
+  {
+   "op": "set",
+   "entity_id": "binary_sensor.hallway_motion",
+   "state": "on",
+   "attributes": {
+    "device_class": "motion",
+    "friendly_name": "Hallway Motion"
+   }
+  },
+  {
+   "op": "wait",
+   "s": 0.5
+  },
+  {
+   "op": "set",
+   "entity_id": "binary_sensor.hallway_motion",
+   "state": "off",
+   "attributes": {
+    "device_class": "motion",
+    "friendly_name": "Hallway Motion"
+   }
+  },
+  {
+   "op": "at",
+   "t": "2027-03-28T02:00:00"
+  },
+  {
+   "op": "set",
+   "entity_id": "binary_sensor.hallway_motion",
+   "state": "on",
+   "attributes": {
+    "device_class": "motion",
+    "friendly_name": "Hallway Motion"
+   }
+  },
+  {
+   "op": "wait",
+   "s": 0.5
+  },
+  {
+   "op": "set",
+   "entity_id": "binary_sensor.hallway_motion",
+   "state": "off",
+   "attributes": {
+    "device_class": "motion",
+    "friendly_name": "Hallway Motion"
+   }
+  },
+  {
+   "op": "at",
+   "t": "2027-03-28T06:29:59"
+  },
+  {
+   "op": "set",
+   "entity_id": "binary_sensor.hallway_motion",
+   "state": "on",
+   "attributes": {
+    "device_class": "motion",
+    "friendly_name": "Hallway Motion"
+   }
+  },
+  {
+   "op": "wait",
+   "s": 0.5
+  },
+  {
+   "op": "set",
+   "entity_id": "binary_sensor.hallway_motion",
+   "state": "off",
+   "attributes": {
+    "device_class": "motion",
+    "friendly_name": "Hallway Motion"
+   }
+  },
+  {
+   "op": "at",
+   "t": "2027-03-28T06:30:00"
+  },
+  {
+   "op": "set",
+   "entity_id": "binary_sensor.hallway_motion",
+   "state": "on",
+   "attributes": {
+    "device_class": "motion",
+    "friendly_name": "Hallway Motion"
+   }
+  },
+  {
+   "op": "wait",
+   "s": 0.5
+  },
+  {
+   "op": "set",
+   "entity_id": "binary_sensor.hallway_motion",
+   "state": "off",
+   "attributes": {
+    "device_class": "motion",
+    "friendly_name": "Hallway Motion"
+   }
+  },
+  {
+   "op": "at",
+   "t": "2027-03-29T10:30:00"
+  }
+ ],
+ "debug": false,
+ "expected": [
+  {
+   "t": "2027-03-27T22:00:00+00:00",
+   "kind": "input",
+   "entity_id": "binary_sensor.hallway_motion",
+   "state": "off",
+   "attributes": {
+    "device_class": "motion",
+    "friendly_name": "Hallway Motion"
+   },
+   "ctx": "c3"
+  },
+  {
+   "t": "2027-03-27T22:00:00+00:00",
+   "kind": "input",
+   "entity_id": "sensor.hallway_illuminance",
+   "state": "12",
+   "attributes": {
+    "state_class": "measurement",
+    "unit_of_measurement": "lx",
+    "device_class": "illuminance",
+    "friendly_name": "Hallway Illuminance"
+   },
+   "ctx": "c4"
+  },
+  {
+   "t": "2027-03-27T22:00:00+00:00",
+   "kind": "input",
+   "entity_id": "light.hallway_hallway",
+   "state": "on",
+   "attributes": {},
+   "ctx": "c5"
+  },
+  {
+   "t": "2027-03-27T22:00:00+00:00",
+   "kind": "input",
+   "entity_id": "sun.sun",
+   "state": "below_horizon",
+   "attributes": {},
+   "ctx": "c6"
+  },
+  {
+   "t": "2027-03-27T22:00:00+00:00",
+   "kind": "input",
+   "entity_id": "light.kitchen_kitchen_light",
+   "state": "off",
+   "attributes": {},
+   "ctx": "c7"
+  },
+  {
+   "t": "2027-03-27T22:00:00+00:00",
+   "kind": "input",
+   "entity_id": "light.bedroom_lamp",
+   "state": "off",
+   "attributes": {},
+   "ctx": "c8"
+  },
+  {
+   "t": "2027-03-27T22:00:00+00:00",
+   "kind": "state",
+   "entity_id": "automation.hallway_lights_motion_on_when_dark",
+   "old": null,
+   "new": "on",
+   "ctx": "c11",
+   "parent": null,
+   "last_changed": "2027-03-27T22:00:00+00:00",
+   "last_updated": "2027-03-27T22:00:00+00:00",
+   "attributes": {
+    "last_triggered": null,
+    "current": 0,
+    "mode": "restart",
+    "id": "hallway_motion_lights_on_when_dark",
+    "friendly_name": "Hallway lights - motion on when dark"
+   }
+  },
+  {
+   "t": "2027-03-27T22:00:00+00:00",
+   "kind": "state",
+   "entity_id": "automation.hallway_lights_adjust_brightness_for_time",
+   "old": null,
+   "new": "on",
+   "ctx": "c12",
+   "parent": null,
+   "last_changed": "2027-03-27T22:00:00+00:00",
+   "last_updated": "2027-03-27T22:00:00+00:00",
+   "attributes": {
+    "last_triggered": null,
+    "current": 0,
+    "mode": "single",
+    "id": "hallway_lights_adjust_brightness_for_time",
+    "friendly_name": "Hallway lights - adjust brightness for time"
+   }
+  },
+  {
+   "t": "2027-03-27T22:00:00+00:00",
+   "kind": "state",
+   "entity_id": "automation.living_room_lifx_on_when_dark_after_10am",
+   "old": null,
+   "new": "on",
+   "ctx": "c13",
+   "parent": null,
+   "last_changed": "2027-03-27T22:00:00+00:00",
+   "last_updated": "2027-03-27T22:00:00+00:00",
+   "attributes": {
+    "last_triggered": null,
+    "current": 0,
+    "mode": "single",
+    "id": "living_room_lifx_on_when_dark_after_10",
+    "friendly_name": "Kitchen lights - on when dark after 10am"
+   }
+  },
+  {
+   "t": "2027-03-27T22:00:00+00:00",
+   "kind": "state",
+   "entity_id": "automation.living_room_lifx_off_at_11_30pm",
+   "old": null,
+   "new": "on",
+   "ctx": "c14",
+   "parent": null,
+   "last_changed": "2027-03-27T22:00:00+00:00",
+   "last_updated": "2027-03-27T22:00:00+00:00",
+   "attributes": {
+    "last_triggered": null,
+    "current": 0,
+    "mode": "single",
+    "id": "living_room_lifx_off_at_2330",
+    "friendly_name": "Kitchen lights - off at 11:30pm"
+   }
+  },
+  {
+   "t": "2027-03-27T22:00:00+00:00",
+   "kind": "event",
+   "event_type": "homeassistant_start",
+   "ctx": "c22",
+   "parent": null
+  },
+  {
+   "t": "2027-03-27T22:00:00+00:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.hallway_lights_motion_on_when_dark",
+   "msg": "Initialized trigger Hallway lights - motion on when dark"
+  },
+  {
+   "t": "2027-03-27T22:00:00+00:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.hallway_lights_adjust_brightness_for_time",
+   "msg": "Initialized trigger Hallway lights - adjust brightness for time"
+  },
+  {
+   "t": "2027-03-27T22:00:00+00:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.living_room_lifx_on_when_dark_after_10am",
+   "msg": "Initialized trigger Kitchen lights - on when dark after 10am"
+  },
+  {
+   "t": "2027-03-27T22:00:00+00:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.living_room_lifx_off_at_11_30pm",
+   "msg": "Initialized trigger Kitchen lights - off at 11:30pm"
+  },
+  {
+   "t": "2027-03-27T22:00:00+00:00",
+   "kind": "event",
+   "event_type": "homeassistant_started",
+   "ctx": "c24",
+   "parent": null
+  },
+  {
+   "t": "2027-03-27T23:00:00.169389+00:00",
+   "kind": "trigger",
+   "automation": "automation.hallway_lights_adjust_brightness_for_time",
+   "enabled": true,
+   "trigger": {
+    "id": "overnight",
+    "idx": "0",
+    "alias": null,
+    "platform": "time",
+    "now": "2027-03-27T23:00:00.169389+00:00",
+    "description": "time",
+    "entity_id": null
+   },
+   "trigger_ctx": null
+  },
+  {
+   "t": "2027-03-27T23:00:00.169389+00:00",
+   "kind": "event",
+   "event_type": "automation_triggered",
+   "data": {
+    "name": "Hallway lights - adjust brightness for time",
+    "entity_id": "automation.hallway_lights_adjust_brightness_for_time",
+    "source": "time"
+   },
+   "ctx": "c25",
+   "parent": null
+  },
+  {
+   "t": "2027-03-27T23:00:00.169389+00:00",
+   "kind": "state",
+   "entity_id": "automation.hallway_lights_adjust_brightness_for_time",
+   "old": "on",
+   "new": "on",
+   "ctx": "c25",
+   "parent": null,
+   "last_changed": "2027-03-27T22:00:00+00:00",
+   "last_updated": "2027-03-27T23:00:00.169389+00:00",
+   "attributes": {
+    "last_triggered": "2027-03-27T23:00:00.169389+00:00",
+    "current": 1,
+    "mode": "single",
+    "id": "hallway_lights_adjust_brightness_for_time",
+    "friendly_name": "Hallway lights - adjust brightness for time"
+   }
+  },
+  {
+   "t": "2027-03-27T23:00:00.169389+00:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.hallway_lights_adjust_brightness_for_time",
+   "msg": "Hallway lights - adjust brightness for time: Running automation actions"
+  },
+  {
+   "t": "2027-03-27T23:00:00.169389+00:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.hallway_lights_adjust_brightness_for_time",
+   "msg": "Hallway lights - adjust brightness for time: Choose at step 1: choice 1: Running automation actions"
+  },
+  {
+   "t": "2027-03-27T23:00:00.169389+00:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.hallway_lights_adjust_brightness_for_time",
+   "msg": "Hallway lights - adjust brightness for time: Choose at step 1: choice 1: Executing step call service"
+  },
+  {
+   "t": "2027-03-27T23:00:00.169389+00:00",
+   "kind": "event",
+   "event_type": "call_service",
+   "data": {
+    "domain": "light",
+    "service": "turn_on",
+    "service_data": {
+     "brightness_pct": 12,
+     "color_temp_kelvin": 2202,
+     "transition": 10,
+     "entity_id": [
+      "light.hallway_hallway"
+     ]
+    }
+   },
+   "ctx": "c25",
+   "parent": null
+  },
+  {
+   "t": "2027-03-27T23:00:00.169389+00:00",
+   "kind": "service_handler",
+   "service": "light.turn_on",
+   "data": {
+    "brightness_pct": 12,
+    "color_temp_kelvin": 2202,
+    "transition": 10,
+    "entity_id": [
+     "light.hallway_hallway"
+    ]
+   },
+   "ctx": "c25",
+   "parent": null
+  },
+  {
+   "t": "2027-03-27T23:00:00.169389+00:00",
+   "kind": "state",
+   "entity_id": "automation.hallway_lights_adjust_brightness_for_time",
+   "old": "on",
+   "new": "on",
+   "ctx": "c25",
+   "parent": null,
+   "last_changed": "2027-03-27T22:00:00+00:00",
+   "last_updated": "2027-03-27T23:00:00.169389+00:00",
+   "attributes": {
+    "last_triggered": "2027-03-27T23:00:00.169389+00:00",
+    "current": 0,
+    "mode": "single",
+    "id": "hallway_lights_adjust_brightness_for_time",
+    "friendly_name": "Hallway lights - adjust brightness for time"
+   }
+  },
+  {
+   "t": "2027-03-27T23:30:00.267032+00:00",
+   "kind": "trigger",
+   "automation": "automation.living_room_lifx_off_at_11_30pm",
+   "enabled": true,
+   "trigger": {
+    "id": "0",
+    "idx": "0",
+    "alias": null,
+    "platform": "time",
+    "now": "2027-03-27T23:30:00.267032+00:00",
+    "description": "time",
+    "entity_id": null
+   },
+   "trigger_ctx": null
+  },
+  {
+   "t": "2027-03-27T23:30:00.267032+00:00",
+   "kind": "event",
+   "event_type": "automation_triggered",
+   "data": {
+    "name": "Kitchen lights - off at 11:30pm",
+    "entity_id": "automation.living_room_lifx_off_at_11_30pm",
+    "source": "time"
+   },
+   "ctx": "c26",
+   "parent": null
+  },
+  {
+   "t": "2027-03-27T23:30:00.267032+00:00",
+   "kind": "state",
+   "entity_id": "automation.living_room_lifx_off_at_11_30pm",
+   "old": "on",
+   "new": "on",
+   "ctx": "c26",
+   "parent": null,
+   "last_changed": "2027-03-27T22:00:00+00:00",
+   "last_updated": "2027-03-27T23:30:00.267032+00:00",
+   "attributes": {
+    "last_triggered": "2027-03-27T23:30:00.267032+00:00",
+    "current": 1,
+    "mode": "single",
+    "id": "living_room_lifx_off_at_2330",
+    "friendly_name": "Kitchen lights - off at 11:30pm"
+   }
+  },
+  {
+   "t": "2027-03-27T23:30:00.267032+00:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.living_room_lifx_off_at_11_30pm",
+   "msg": "Kitchen lights - off at 11:30pm: Running automation actions"
+  },
+  {
+   "t": "2027-03-27T23:30:00.267032+00:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.living_room_lifx_off_at_11_30pm",
+   "msg": "Kitchen lights - off at 11:30pm: Executing step call service"
+  },
+  {
+   "t": "2027-03-27T23:30:00.267032+00:00",
+   "kind": "event",
+   "event_type": "call_service",
+   "data": {
+    "domain": "light",
+    "service": "turn_off",
+    "service_data": {
+     "transition": 10,
+     "entity_id": [
+      "light.kitchen_kitchen_light",
+      "light.bedroom_lamp"
+     ]
+    }
+   },
+   "ctx": "c26",
+   "parent": null
+  },
+  {
+   "t": "2027-03-27T23:30:00.267032+00:00",
+   "kind": "service_handler",
+   "service": "light.turn_off",
+   "data": {
+    "transition": 10,
+    "entity_id": [
+     "light.kitchen_kitchen_light",
+     "light.bedroom_lamp"
+    ]
+   },
+   "ctx": "c26",
+   "parent": null
+  },
+  {
+   "t": "2027-03-27T23:30:00.267032+00:00",
+   "kind": "state",
+   "entity_id": "automation.living_room_lifx_off_at_11_30pm",
+   "old": "on",
+   "new": "on",
+   "ctx": "c26",
+   "parent": null,
+   "last_changed": "2027-03-27T22:00:00+00:00",
+   "last_updated": "2027-03-27T23:30:00.267032+00:00",
+   "attributes": {
+    "last_triggered": "2027-03-27T23:30:00.267032+00:00",
+    "current": 0,
+    "mode": "single",
+    "id": "living_room_lifx_off_at_2330",
+    "friendly_name": "Kitchen lights - off at 11:30pm"
+   }
+  },
+  {
+   "t": "2027-03-28T00:59:59+00:00",
+   "kind": "input",
+   "entity_id": "binary_sensor.hallway_motion",
+   "state": "on",
+   "attributes": {
+    "device_class": "motion",
+    "friendly_name": "Hallway Motion"
+   },
+   "ctx": "c27"
+  },
+  {
+   "t": "2027-03-28T00:59:59+00:00",
+   "kind": "trigger",
+   "automation": "automation.hallway_lights_motion_on_when_dark",
+   "enabled": true,
+   "trigger": {
+    "id": "motion",
+    "idx": "0",
+    "alias": null,
+    "platform": "state",
+    "entity_id": "binary_sensor.hallway_motion",
+    "from_state": {
+     "entity_id": "binary_sensor.hallway_motion",
+     "state": "off",
+     "attributes": {
+      "device_class": "motion",
+      "friendly_name": "Hallway Motion"
+     },
+     "ctx": "c3"
+    },
+    "to_state": {
+     "entity_id": "binary_sensor.hallway_motion",
+     "state": "on",
+     "attributes": {
+      "device_class": "motion",
+      "friendly_name": "Hallway Motion"
+     },
+     "ctx": "c27"
+    },
+    "for": null,
+    "attribute": null,
+    "description": "state of binary_sensor.hallway_motion"
+   },
+   "trigger_ctx": "c27"
+  },
+  {
+   "t": "2027-03-28T00:59:59+00:00",
+   "kind": "event",
+   "event_type": "automation_triggered",
+   "data": {
+    "name": "Hallway lights - motion on when dark",
+    "entity_id": "automation.hallway_lights_motion_on_when_dark",
+    "source": "state of binary_sensor.hallway_motion"
+   },
+   "ctx": "c28",
+   "parent": "c27"
+  },
+  {
+   "t": "2027-03-28T00:59:59+00:00",
+   "kind": "state",
+   "entity_id": "automation.hallway_lights_motion_on_when_dark",
+   "old": "on",
+   "new": "on",
+   "ctx": "c28",
+   "parent": "c27",
+   "last_changed": "2027-03-27T22:00:00+00:00",
+   "last_updated": "2027-03-28T00:59:59+00:00",
+   "attributes": {
+    "last_triggered": "2027-03-28T00:59:59+00:00",
+    "current": 1,
+    "mode": "restart",
+    "id": "hallway_motion_lights_on_when_dark",
+    "friendly_name": "Hallway lights - motion on when dark"
+   }
+  },
+  {
+   "t": "2027-03-28T00:59:59+00:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.hallway_lights_motion_on_when_dark",
+   "msg": "Hallway lights - motion on when dark: Running automation actions"
+  },
+  {
+   "t": "2027-03-28T00:59:59+00:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.hallway_lights_motion_on_when_dark",
+   "msg": "Hallway lights - motion on when dark: Choose at step 1: choice 1: Running automation actions"
+  },
+  {
+   "t": "2027-03-28T00:59:59+00:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.hallway_lights_motion_on_when_dark",
+   "msg": "Hallway lights - motion on when dark: Choose at step 1: choice 1: Executing step call service"
+  },
+  {
+   "t": "2027-03-28T00:59:59+00:00",
+   "kind": "event",
+   "event_type": "call_service",
+   "data": {
+    "domain": "light",
+    "service": "turn_on",
+    "service_data": {
+     "brightness_pct": 12,
+     "color_temp_kelvin": 2202,
+     "transition": 1,
+     "entity_id": [
+      "light.hallway_hallway"
+     ]
+    }
+   },
+   "ctx": "c28",
+   "parent": "c27"
+  },
+  {
+   "t": "2027-03-28T00:59:59+00:00",
+   "kind": "service_handler",
+   "service": "light.turn_on",
+   "data": {
+    "brightness_pct": 12,
+    "color_temp_kelvin": 2202,
+    "transition": 1,
+    "entity_id": [
+     "light.hallway_hallway"
+    ]
+   },
+   "ctx": "c28",
+   "parent": "c27"
+  },
+  {
+   "t": "2027-03-28T00:59:59+00:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.hallway_lights_motion_on_when_dark",
+   "msg": "Hallway lights - motion on when dark: Executing step wait for trigger"
+  },
+  {
+   "t": "2027-03-28T00:59:59+00:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.hallway_lights_motion_on_when_dark",
+   "msg": "Hallway lights - motion on when dark: Initialized trigger"
+  },
+  {
+   "t": "2027-03-28T00:59:59.500000+00:00",
+   "kind": "input",
+   "entity_id": "binary_sensor.hallway_motion",
+   "state": "off",
+   "attributes": {
+    "device_class": "motion",
+    "friendly_name": "Hallway Motion"
+   },
+   "ctx": "c29"
+  },
+  {
+   "t": "2027-03-28T02:00:00+01:00",
+   "kind": "input",
+   "entity_id": "binary_sensor.hallway_motion",
+   "state": "on",
+   "attributes": {
+    "device_class": "motion",
+    "friendly_name": "Hallway Motion"
+   },
+   "ctx": "c30"
+  },
+  {
+   "t": "2027-03-28T02:00:00+01:00",
+   "kind": "trigger",
+   "automation": "automation.hallway_lights_motion_on_when_dark",
+   "enabled": true,
+   "trigger": {
+    "id": "motion",
+    "idx": "0",
+    "alias": null,
+    "platform": "state",
+    "entity_id": "binary_sensor.hallway_motion",
+    "from_state": {
+     "entity_id": "binary_sensor.hallway_motion",
+     "state": "off",
+     "attributes": {
+      "device_class": "motion",
+      "friendly_name": "Hallway Motion"
+     },
+     "ctx": "c29"
+    },
+    "to_state": {
+     "entity_id": "binary_sensor.hallway_motion",
+     "state": "on",
+     "attributes": {
+      "device_class": "motion",
+      "friendly_name": "Hallway Motion"
+     },
+     "ctx": "c30"
+    },
+    "for": null,
+    "attribute": null,
+    "description": "state of binary_sensor.hallway_motion"
+   },
+   "trigger_ctx": "c30"
+  },
+  {
+   "t": "2027-03-28T02:00:00+01:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.hallway_lights_motion_on_when_dark",
+   "msg": "Hallway lights - motion on when dark: Restarting"
+  },
+  {
+   "t": "2027-03-28T02:00:00+01:00",
+   "kind": "wait_done",
+   "script": "Hallway lights - motion on when dark",
+   "wait": {
+    "remaining": null,
+    "completed": false,
+    "trigger": null
+   }
+  },
+  {
+   "t": "2027-03-28T02:00:00+01:00",
+   "kind": "event",
+   "event_type": "automation_triggered",
+   "data": {
+    "name": "Hallway lights - motion on when dark",
+    "entity_id": "automation.hallway_lights_motion_on_when_dark",
+    "source": "state of binary_sensor.hallway_motion"
+   },
+   "ctx": "c31",
+   "parent": "c30"
+  },
+  {
+   "t": "2027-03-28T02:00:00+01:00",
+   "kind": "state",
+   "entity_id": "automation.hallway_lights_motion_on_when_dark",
+   "old": "on",
+   "new": "on",
+   "ctx": "c31",
+   "parent": "c30",
+   "last_changed": "2027-03-27T22:00:00+00:00",
+   "last_updated": "2027-03-28T01:00:00+00:00",
+   "attributes": {
+    "last_triggered": "2027-03-28T01:00:00+00:00",
+    "current": 1,
+    "mode": "restart",
+    "id": "hallway_motion_lights_on_when_dark",
+    "friendly_name": "Hallway lights - motion on when dark"
+   }
+  },
+  {
+   "t": "2027-03-28T02:00:00+01:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.hallway_lights_motion_on_when_dark",
+   "msg": "Hallway lights - motion on when dark: Running automation actions"
+  },
+  {
+   "t": "2027-03-28T02:00:00+01:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.hallway_lights_motion_on_when_dark",
+   "msg": "Hallway lights - motion on when dark: Choose at step 1: choice 1: Running automation actions"
+  },
+  {
+   "t": "2027-03-28T02:00:00+01:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.hallway_lights_motion_on_when_dark",
+   "msg": "Hallway lights - motion on when dark: Choose at step 1: choice 1: Executing step call service"
+  },
+  {
+   "t": "2027-03-28T02:00:00+01:00",
+   "kind": "event",
+   "event_type": "call_service",
+   "data": {
+    "domain": "light",
+    "service": "turn_on",
+    "service_data": {
+     "brightness_pct": 12,
+     "color_temp_kelvin": 2202,
+     "transition": 1,
+     "entity_id": [
+      "light.hallway_hallway"
+     ]
+    }
+   },
+   "ctx": "c31",
+   "parent": "c30"
+  },
+  {
+   "t": "2027-03-28T02:00:00+01:00",
+   "kind": "service_handler",
+   "service": "light.turn_on",
+   "data": {
+    "brightness_pct": 12,
+    "color_temp_kelvin": 2202,
+    "transition": 1,
+    "entity_id": [
+     "light.hallway_hallway"
+    ]
+   },
+   "ctx": "c31",
+   "parent": "c30"
+  },
+  {
+   "t": "2027-03-28T02:00:00+01:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.hallway_lights_motion_on_when_dark",
+   "msg": "Hallway lights - motion on when dark: Executing step wait for trigger"
+  },
+  {
+   "t": "2027-03-28T02:00:00+01:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.hallway_lights_motion_on_when_dark",
+   "msg": "Hallway lights - motion on when dark: Initialized trigger"
+  },
+  {
+   "t": "2027-03-28T02:00:00.500000+01:00",
+   "kind": "input",
+   "entity_id": "binary_sensor.hallway_motion",
+   "state": "off",
+   "attributes": {
+    "device_class": "motion",
+    "friendly_name": "Hallway Motion"
+   },
+   "ctx": "c32"
+  },
+  {
+   "t": "2027-03-28T02:05:00.500000+01:00",
+   "kind": "wait_done",
+   "script": "Hallway lights - motion on when dark",
+   "wait": {
+    "remaining": null,
+    "completed": true,
+    "trigger": {
+     "id": "0",
+     "idx": "0",
+     "alias": null,
+     "platform": "state",
+     "entity_id": "binary_sensor.hallway_motion",
+     "from_state": {
+      "entity_id": "binary_sensor.hallway_motion",
+      "state": "on",
+      "attributes": {
+       "device_class": "motion",
+       "friendly_name": "Hallway Motion"
+      },
+      "ctx": "c30"
+     },
+     "to_state": {
+      "entity_id": "binary_sensor.hallway_motion",
+      "state": "off",
+      "attributes": {
+       "device_class": "motion",
+       "friendly_name": "Hallway Motion"
+      },
+      "ctx": "c32"
+     },
+     "for": 300.0,
+     "attribute": null,
+     "description": "state of binary_sensor.hallway_motion"
+    }
+   }
+  },
+  {
+   "t": "2027-03-28T02:05:00.500000+01:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.hallway_lights_motion_on_when_dark",
+   "msg": "Hallway lights - motion on when dark: Executing step call service"
+  },
+  {
+   "t": "2027-03-28T02:05:00.500000+01:00",
+   "kind": "event",
+   "event_type": "call_service",
+   "data": {
+    "domain": "light",
+    "service": "turn_off",
+    "service_data": {
+     "transition": 10,
+     "entity_id": [
+      "light.hallway_hallway"
+     ]
+    }
+   },
+   "ctx": "c31",
+   "parent": "c30"
+  },
+  {
+   "t": "2027-03-28T02:05:00.500000+01:00",
+   "kind": "service_handler",
+   "service": "light.turn_off",
+   "data": {
+    "transition": 10,
+    "entity_id": [
+     "light.hallway_hallway"
+    ]
+   },
+   "ctx": "c31",
+   "parent": "c30"
+  },
+  {
+   "t": "2027-03-28T02:05:00.500000+01:00",
+   "kind": "state",
+   "entity_id": "automation.hallway_lights_motion_on_when_dark",
+   "old": "on",
+   "new": "on",
+   "ctx": "c33",
+   "parent": null,
+   "last_changed": "2027-03-27T22:00:00+00:00",
+   "last_updated": "2027-03-28T01:05:00.500000+00:00",
+   "attributes": {
+    "last_triggered": "2027-03-28T01:00:00+00:00",
+    "current": 0,
+    "mode": "restart",
+    "id": "hallway_motion_lights_on_when_dark",
+    "friendly_name": "Hallway lights - motion on when dark"
+   }
+  },
+  {
+   "t": "2027-03-28T06:29:59+01:00",
+   "kind": "input",
+   "entity_id": "binary_sensor.hallway_motion",
+   "state": "on",
+   "attributes": {
+    "device_class": "motion",
+    "friendly_name": "Hallway Motion"
+   },
+   "ctx": "c34"
+  },
+  {
+   "t": "2027-03-28T06:29:59+01:00",
+   "kind": "trigger",
+   "automation": "automation.hallway_lights_motion_on_when_dark",
+   "enabled": true,
+   "trigger": {
+    "id": "motion",
+    "idx": "0",
+    "alias": null,
+    "platform": "state",
+    "entity_id": "binary_sensor.hallway_motion",
+    "from_state": {
+     "entity_id": "binary_sensor.hallway_motion",
+     "state": "off",
+     "attributes": {
+      "device_class": "motion",
+      "friendly_name": "Hallway Motion"
+     },
+     "ctx": "c32"
+    },
+    "to_state": {
+     "entity_id": "binary_sensor.hallway_motion",
+     "state": "on",
+     "attributes": {
+      "device_class": "motion",
+      "friendly_name": "Hallway Motion"
+     },
+     "ctx": "c34"
+    },
+    "for": null,
+    "attribute": null,
+    "description": "state of binary_sensor.hallway_motion"
+   },
+   "trigger_ctx": "c34"
+  },
+  {
+   "t": "2027-03-28T06:29:59+01:00",
+   "kind": "event",
+   "event_type": "automation_triggered",
+   "data": {
+    "name": "Hallway lights - motion on when dark",
+    "entity_id": "automation.hallway_lights_motion_on_when_dark",
+    "source": "state of binary_sensor.hallway_motion"
+   },
+   "ctx": "c35",
+   "parent": "c34"
+  },
+  {
+   "t": "2027-03-28T06:29:59+01:00",
+   "kind": "state",
+   "entity_id": "automation.hallway_lights_motion_on_when_dark",
+   "old": "on",
+   "new": "on",
+   "ctx": "c35",
+   "parent": "c34",
+   "last_changed": "2027-03-27T22:00:00+00:00",
+   "last_updated": "2027-03-28T05:29:59+00:00",
+   "attributes": {
+    "last_triggered": "2027-03-28T05:29:59+00:00",
+    "current": 1,
+    "mode": "restart",
+    "id": "hallway_motion_lights_on_when_dark",
+    "friendly_name": "Hallway lights - motion on when dark"
+   }
+  },
+  {
+   "t": "2027-03-28T06:29:59+01:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.hallway_lights_motion_on_when_dark",
+   "msg": "Hallway lights - motion on when dark: Running automation actions"
+  },
+  {
+   "t": "2027-03-28T06:29:59+01:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.hallway_lights_motion_on_when_dark",
+   "msg": "Hallway lights - motion on when dark: Choose at step 1: choice 1: Running automation actions"
+  },
+  {
+   "t": "2027-03-28T06:29:59+01:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.hallway_lights_motion_on_when_dark",
+   "msg": "Hallway lights - motion on when dark: Choose at step 1: choice 1: Executing step call service"
+  },
+  {
+   "t": "2027-03-28T06:29:59+01:00",
+   "kind": "event",
+   "event_type": "call_service",
+   "data": {
+    "domain": "light",
+    "service": "turn_on",
+    "service_data": {
+     "brightness_pct": 12,
+     "color_temp_kelvin": 2202,
+     "transition": 1,
+     "entity_id": [
+      "light.hallway_hallway"
+     ]
+    }
+   },
+   "ctx": "c35",
+   "parent": "c34"
+  },
+  {
+   "t": "2027-03-28T06:29:59+01:00",
+   "kind": "service_handler",
+   "service": "light.turn_on",
+   "data": {
+    "brightness_pct": 12,
+    "color_temp_kelvin": 2202,
+    "transition": 1,
+    "entity_id": [
+     "light.hallway_hallway"
+    ]
+   },
+   "ctx": "c35",
+   "parent": "c34"
+  },
+  {
+   "t": "2027-03-28T06:29:59+01:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.hallway_lights_motion_on_when_dark",
+   "msg": "Hallway lights - motion on when dark: Executing step wait for trigger"
+  },
+  {
+   "t": "2027-03-28T06:29:59+01:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.hallway_lights_motion_on_when_dark",
+   "msg": "Hallway lights - motion on when dark: Initialized trigger"
+  },
+  {
+   "t": "2027-03-28T06:29:59.500000+01:00",
+   "kind": "input",
+   "entity_id": "binary_sensor.hallway_motion",
+   "state": "off",
+   "attributes": {
+    "device_class": "motion",
+    "friendly_name": "Hallway Motion"
+   },
+   "ctx": "c36"
+  },
+  {
+   "t": "2027-03-28T06:30:00+01:00",
+   "kind": "input",
+   "entity_id": "binary_sensor.hallway_motion",
+   "state": "on",
+   "attributes": {
+    "device_class": "motion",
+    "friendly_name": "Hallway Motion"
+   },
+   "ctx": "c37"
+  },
+  {
+   "t": "2027-03-28T06:30:00+01:00",
+   "kind": "trigger",
+   "automation": "automation.hallway_lights_motion_on_when_dark",
+   "enabled": true,
+   "trigger": {
+    "id": "motion",
+    "idx": "0",
+    "alias": null,
+    "platform": "state",
+    "entity_id": "binary_sensor.hallway_motion",
+    "from_state": {
+     "entity_id": "binary_sensor.hallway_motion",
+     "state": "off",
+     "attributes": {
+      "device_class": "motion",
+      "friendly_name": "Hallway Motion"
+     },
+     "ctx": "c36"
+    },
+    "to_state": {
+     "entity_id": "binary_sensor.hallway_motion",
+     "state": "on",
+     "attributes": {
+      "device_class": "motion",
+      "friendly_name": "Hallway Motion"
+     },
+     "ctx": "c37"
+    },
+    "for": null,
+    "attribute": null,
+    "description": "state of binary_sensor.hallway_motion"
+   },
+   "trigger_ctx": "c37"
+  },
+  {
+   "t": "2027-03-28T06:30:00+01:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.hallway_lights_motion_on_when_dark",
+   "msg": "Hallway lights - motion on when dark: Restarting"
+  },
+  {
+   "t": "2027-03-28T06:30:00+01:00",
+   "kind": "wait_done",
+   "script": "Hallway lights - motion on when dark",
+   "wait": {
+    "remaining": null,
+    "completed": false,
+    "trigger": null
+   }
+  },
+  {
+   "t": "2027-03-28T06:30:00+01:00",
+   "kind": "event",
+   "event_type": "automation_triggered",
+   "data": {
+    "name": "Hallway lights - motion on when dark",
+    "entity_id": "automation.hallway_lights_motion_on_when_dark",
+    "source": "state of binary_sensor.hallway_motion"
+   },
+   "ctx": "c38",
+   "parent": "c37"
+  },
+  {
+   "t": "2027-03-28T06:30:00+01:00",
+   "kind": "state",
+   "entity_id": "automation.hallway_lights_motion_on_when_dark",
+   "old": "on",
+   "new": "on",
+   "ctx": "c38",
+   "parent": "c37",
+   "last_changed": "2027-03-27T22:00:00+00:00",
+   "last_updated": "2027-03-28T05:30:00+00:00",
+   "attributes": {
+    "last_triggered": "2027-03-28T05:30:00+00:00",
+    "current": 1,
+    "mode": "restart",
+    "id": "hallway_motion_lights_on_when_dark",
+    "friendly_name": "Hallway lights - motion on when dark"
+   }
+  },
+  {
+   "t": "2027-03-28T06:30:00+01:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.hallway_lights_motion_on_when_dark",
+   "msg": "Hallway lights - motion on when dark: Running automation actions"
+  },
+  {
+   "t": "2027-03-28T06:30:00+01:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.hallway_lights_motion_on_when_dark",
+   "msg": "Hallway lights - motion on when dark: Choose at step 1: choice 2: Running automation actions"
+  },
+  {
+   "t": "2027-03-28T06:30:00+01:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.hallway_lights_motion_on_when_dark",
+   "msg": "Hallway lights - motion on when dark: Choose at step 1: choice 2: Executing step call service"
+  },
+  {
+   "t": "2027-03-28T06:30:00+01:00",
+   "kind": "event",
+   "event_type": "call_service",
+   "data": {
+    "domain": "light",
+    "service": "turn_on",
+    "service_data": {
+     "brightness_pct": 30,
+     "color_temp_kelvin": 2400,
+     "transition": 2,
+     "entity_id": [
+      "light.hallway_hallway"
+     ]
+    }
+   },
+   "ctx": "c38",
+   "parent": "c37"
+  },
+  {
+   "t": "2027-03-28T06:30:00+01:00",
+   "kind": "service_handler",
+   "service": "light.turn_on",
+   "data": {
+    "brightness_pct": 30,
+    "color_temp_kelvin": 2400,
+    "transition": 2,
+    "entity_id": [
+     "light.hallway_hallway"
+    ]
+   },
+   "ctx": "c38",
+   "parent": "c37"
+  },
+  {
+   "t": "2027-03-28T06:30:00+01:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.hallway_lights_motion_on_when_dark",
+   "msg": "Hallway lights - motion on when dark: Executing step wait for trigger"
+  },
+  {
+   "t": "2027-03-28T06:30:00+01:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.hallway_lights_motion_on_when_dark",
+   "msg": "Hallway lights - motion on when dark: Initialized trigger"
+  },
+  {
+   "t": "2027-03-28T06:30:00.283085+01:00",
+   "kind": "trigger",
+   "automation": "automation.hallway_lights_adjust_brightness_for_time",
+   "enabled": true,
+   "trigger": {
+    "id": "morning",
+    "idx": "1",
+    "alias": null,
+    "platform": "time",
+    "now": "2027-03-28T06:30:00.283085+01:00",
+    "description": "time",
+    "entity_id": null
+   },
+   "trigger_ctx": null
+  },
+  {
+   "t": "2027-03-28T06:30:00.283085+01:00",
+   "kind": "event",
+   "event_type": "automation_triggered",
+   "data": {
+    "name": "Hallway lights - adjust brightness for time",
+    "entity_id": "automation.hallway_lights_adjust_brightness_for_time",
+    "source": "time"
+   },
+   "ctx": "c39",
+   "parent": null
+  },
+  {
+   "t": "2027-03-28T06:30:00.283085+01:00",
+   "kind": "state",
+   "entity_id": "automation.hallway_lights_adjust_brightness_for_time",
+   "old": "on",
+   "new": "on",
+   "ctx": "c39",
+   "parent": null,
+   "last_changed": "2027-03-27T22:00:00+00:00",
+   "last_updated": "2027-03-28T05:30:00.283085+00:00",
+   "attributes": {
+    "last_triggered": "2027-03-28T05:30:00.283085+00:00",
+    "current": 1,
+    "mode": "single",
+    "id": "hallway_lights_adjust_brightness_for_time",
+    "friendly_name": "Hallway lights - adjust brightness for time"
+   }
+  },
+  {
+   "t": "2027-03-28T06:30:00.283085+01:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.hallway_lights_adjust_brightness_for_time",
+   "msg": "Hallway lights - adjust brightness for time: Running automation actions"
+  },
+  {
+   "t": "2027-03-28T06:30:00.283085+01:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.hallway_lights_adjust_brightness_for_time",
+   "msg": "Hallway lights - adjust brightness for time: Choose at step 1: choice 2: Running automation actions"
+  },
+  {
+   "t": "2027-03-28T06:30:00.283085+01:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.hallway_lights_adjust_brightness_for_time",
+   "msg": "Hallway lights - adjust brightness for time: Choose at step 1: choice 2: Executing step call service"
+  },
+  {
+   "t": "2027-03-28T06:30:00.283085+01:00",
+   "kind": "event",
+   "event_type": "call_service",
+   "data": {
+    "domain": "light",
+    "service": "turn_on",
+    "service_data": {
+     "brightness_pct": 30,
+     "color_temp_kelvin": 2400,
+     "transition": 10,
+     "entity_id": [
+      "light.hallway_hallway"
+     ]
+    }
+   },
+   "ctx": "c39",
+   "parent": null
+  },
+  {
+   "t": "2027-03-28T06:30:00.283085+01:00",
+   "kind": "service_handler",
+   "service": "light.turn_on",
+   "data": {
+    "brightness_pct": 30,
+    "color_temp_kelvin": 2400,
+    "transition": 10,
+    "entity_id": [
+     "light.hallway_hallway"
+    ]
+   },
+   "ctx": "c39",
+   "parent": null
+  },
+  {
+   "t": "2027-03-28T06:30:00.283085+01:00",
+   "kind": "state",
+   "entity_id": "automation.hallway_lights_adjust_brightness_for_time",
+   "old": "on",
+   "new": "on",
+   "ctx": "c39",
+   "parent": null,
+   "last_changed": "2027-03-27T22:00:00+00:00",
+   "last_updated": "2027-03-28T05:30:00.283085+00:00",
+   "attributes": {
+    "last_triggered": "2027-03-28T05:30:00.283085+00:00",
+    "current": 0,
+    "mode": "single",
+    "id": "hallway_lights_adjust_brightness_for_time",
+    "friendly_name": "Hallway lights - adjust brightness for time"
+   }
+  },
+  {
+   "t": "2027-03-28T06:30:00.500000+01:00",
+   "kind": "input",
+   "entity_id": "binary_sensor.hallway_motion",
+   "state": "off",
+   "attributes": {
+    "device_class": "motion",
+    "friendly_name": "Hallway Motion"
+   },
+   "ctx": "c40"
+  },
+  {
+   "t": "2027-03-28T06:35:00.500000+01:00",
+   "kind": "wait_done",
+   "script": "Hallway lights - motion on when dark",
+   "wait": {
+    "remaining": null,
+    "completed": true,
+    "trigger": {
+     "id": "0",
+     "idx": "0",
+     "alias": null,
+     "platform": "state",
+     "entity_id": "binary_sensor.hallway_motion",
+     "from_state": {
+      "entity_id": "binary_sensor.hallway_motion",
+      "state": "on",
+      "attributes": {
+       "device_class": "motion",
+       "friendly_name": "Hallway Motion"
+      },
+      "ctx": "c37"
+     },
+     "to_state": {
+      "entity_id": "binary_sensor.hallway_motion",
+      "state": "off",
+      "attributes": {
+       "device_class": "motion",
+       "friendly_name": "Hallway Motion"
+      },
+      "ctx": "c40"
+     },
+     "for": 300.0,
+     "attribute": null,
+     "description": "state of binary_sensor.hallway_motion"
+    }
+   }
+  },
+  {
+   "t": "2027-03-28T06:35:00.500000+01:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.hallway_lights_motion_on_when_dark",
+   "msg": "Hallway lights - motion on when dark: Executing step call service"
+  },
+  {
+   "t": "2027-03-28T06:35:00.500000+01:00",
+   "kind": "event",
+   "event_type": "call_service",
+   "data": {
+    "domain": "light",
+    "service": "turn_off",
+    "service_data": {
+     "transition": 10,
+     "entity_id": [
+      "light.hallway_hallway"
+     ]
+    }
+   },
+   "ctx": "c38",
+   "parent": "c37"
+  },
+  {
+   "t": "2027-03-28T06:35:00.500000+01:00",
+   "kind": "service_handler",
+   "service": "light.turn_off",
+   "data": {
+    "transition": 10,
+    "entity_id": [
+     "light.hallway_hallway"
+    ]
+   },
+   "ctx": "c38",
+   "parent": "c37"
+  },
+  {
+   "t": "2027-03-28T06:35:00.500000+01:00",
+   "kind": "state",
+   "entity_id": "automation.hallway_lights_motion_on_when_dark",
+   "old": "on",
+   "new": "on",
+   "ctx": "c41",
+   "parent": null,
+   "last_changed": "2027-03-27T22:00:00+00:00",
+   "last_updated": "2027-03-28T05:35:00.500000+00:00",
+   "attributes": {
+    "last_triggered": "2027-03-28T05:30:00+00:00",
+    "current": 0,
+    "mode": "restart",
+    "id": "hallway_motion_lights_on_when_dark",
+    "friendly_name": "Hallway lights - motion on when dark"
+   }
+  },
+  {
+   "t": "2027-03-28T09:30:00.370873+01:00",
+   "kind": "trigger",
+   "automation": "automation.hallway_lights_adjust_brightness_for_time",
+   "enabled": true,
+   "trigger": {
+    "id": "normal",
+    "idx": "2",
+    "alias": null,
+    "platform": "time",
+    "now": "2027-03-28T09:30:00.370873+01:00",
+    "description": "time",
+    "entity_id": null
+   },
+   "trigger_ctx": null
+  },
+  {
+   "t": "2027-03-28T10:00:00.197015+01:00",
+   "kind": "trigger",
+   "automation": "automation.living_room_lifx_on_when_dark_after_10am",
+   "enabled": true,
+   "trigger": {
+    "id": "1",
+    "idx": "1",
+    "alias": null,
+    "platform": "time",
+    "now": "2027-03-28T10:00:00.197015+01:00",
+    "description": "time",
+    "entity_id": null
+   },
+   "trigger_ctx": null
+  },
+  {
+   "t": "2027-03-28T10:00:00.197015+01:00",
+   "kind": "event",
+   "event_type": "automation_triggered",
+   "data": {
+    "name": "Kitchen lights - on when dark after 10am",
+    "entity_id": "automation.living_room_lifx_on_when_dark_after_10am",
+    "source": "time"
+   },
+   "ctx": "c42",
+   "parent": null
+  },
+  {
+   "t": "2027-03-28T10:00:00.197015+01:00",
+   "kind": "state",
+   "entity_id": "automation.living_room_lifx_on_when_dark_after_10am",
+   "old": "on",
+   "new": "on",
+   "ctx": "c42",
+   "parent": null,
+   "last_changed": "2027-03-27T22:00:00+00:00",
+   "last_updated": "2027-03-28T09:00:00.197015+00:00",
+   "attributes": {
+    "last_triggered": "2027-03-28T09:00:00.197015+00:00",
+    "current": 1,
+    "mode": "single",
+    "id": "living_room_lifx_on_when_dark_after_10",
+    "friendly_name": "Kitchen lights - on when dark after 10am"
+   }
+  },
+  {
+   "t": "2027-03-28T10:00:00.197015+01:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.living_room_lifx_on_when_dark_after_10am",
+   "msg": "Kitchen lights - on when dark after 10am: Running automation actions"
+  },
+  {
+   "t": "2027-03-28T10:00:00.197015+01:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.living_room_lifx_on_when_dark_after_10am",
+   "msg": "Kitchen lights - on when dark after 10am: Executing step call service"
+  },
+  {
+   "t": "2027-03-28T10:00:00.197015+01:00",
+   "kind": "event",
+   "event_type": "call_service",
+   "data": {
+    "domain": "light",
+    "service": "turn_on",
+    "service_data": {
+     "brightness_pct": 60,
+     "color_temp_kelvin": 2700,
+     "transition": 5,
+     "entity_id": [
+      "light.kitchen_kitchen_light"
+     ]
+    }
+   },
+   "ctx": "c42",
+   "parent": null
+  },
+  {
+   "t": "2027-03-28T10:00:00.197015+01:00",
+   "kind": "service_handler",
+   "service": "light.turn_on",
+   "data": {
+    "brightness_pct": 60,
+    "color_temp_kelvin": 2700,
+    "transition": 5,
+    "entity_id": [
+     "light.kitchen_kitchen_light"
+    ]
+   },
+   "ctx": "c42",
+   "parent": null
+  },
+  {
+   "t": "2027-03-28T10:00:00.197015+01:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.living_room_lifx_on_when_dark_after_10am",
+   "msg": "Kitchen lights - on when dark after 10am: Executing step call service"
+  },
+  {
+   "t": "2027-03-28T10:00:00.197015+01:00",
+   "kind": "event",
+   "event_type": "call_service",
+   "data": {
+    "domain": "light",
+    "service": "turn_on",
+    "service_data": {
+     "brightness_pct": 30,
+     "color_temp_kelvin": 2400,
+     "transition": 5,
+     "entity_id": [
+      "light.bedroom_lamp"
+     ]
+    }
+   },
+   "ctx": "c42",
+   "parent": null
+  },
+  {
+   "t": "2027-03-28T10:00:00.197015+01:00",
+   "kind": "service_handler",
+   "service": "light.turn_on",
+   "data": {
+    "brightness_pct": 30,
+    "color_temp_kelvin": 2400,
+    "transition": 5,
+    "entity_id": [
+     "light.bedroom_lamp"
+    ]
+   },
+   "ctx": "c42",
+   "parent": null
+  },
+  {
+   "t": "2027-03-28T10:00:00.197015+01:00",
+   "kind": "state",
+   "entity_id": "automation.living_room_lifx_on_when_dark_after_10am",
+   "old": "on",
+   "new": "on",
+   "ctx": "c42",
+   "parent": null,
+   "last_changed": "2027-03-27T22:00:00+00:00",
+   "last_updated": "2027-03-28T09:00:00.197015+00:00",
+   "attributes": {
+    "last_triggered": "2027-03-28T09:00:00.197015+00:00",
+    "current": 0,
+    "mode": "single",
+    "id": "living_room_lifx_on_when_dark_after_10",
+    "friendly_name": "Kitchen lights - on when dark after 10am"
+   }
+  },
+  {
+   "t": "2027-03-28T23:00:00.169389+01:00",
+   "kind": "trigger",
+   "automation": "automation.hallway_lights_adjust_brightness_for_time",
+   "enabled": true,
+   "trigger": {
+    "id": "overnight",
+    "idx": "0",
+    "alias": null,
+    "platform": "time",
+    "now": "2027-03-28T23:00:00.169389+01:00",
+    "description": "time",
+    "entity_id": null
+   },
+   "trigger_ctx": null
+  },
+  {
+   "t": "2027-03-28T23:30:00.267032+01:00",
+   "kind": "trigger",
+   "automation": "automation.living_room_lifx_off_at_11_30pm",
+   "enabled": true,
+   "trigger": {
+    "id": "0",
+    "idx": "0",
+    "alias": null,
+    "platform": "time",
+    "now": "2027-03-28T23:30:00.267032+01:00",
+    "description": "time",
+    "entity_id": null
+   },
+   "trigger_ctx": null
+  },
+  {
+   "t": "2027-03-28T23:30:00.267032+01:00",
+   "kind": "event",
+   "event_type": "automation_triggered",
+   "data": {
+    "name": "Kitchen lights - off at 11:30pm",
+    "entity_id": "automation.living_room_lifx_off_at_11_30pm",
+    "source": "time"
+   },
+   "ctx": "c43",
+   "parent": null
+  },
+  {
+   "t": "2027-03-28T23:30:00.267032+01:00",
+   "kind": "state",
+   "entity_id": "automation.living_room_lifx_off_at_11_30pm",
+   "old": "on",
+   "new": "on",
+   "ctx": "c43",
+   "parent": null,
+   "last_changed": "2027-03-27T22:00:00+00:00",
+   "last_updated": "2027-03-28T22:30:00.267032+00:00",
+   "attributes": {
+    "last_triggered": "2027-03-28T22:30:00.267032+00:00",
+    "current": 1,
+    "mode": "single",
+    "id": "living_room_lifx_off_at_2330",
+    "friendly_name": "Kitchen lights - off at 11:30pm"
+   }
+  },
+  {
+   "t": "2027-03-28T23:30:00.267032+01:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.living_room_lifx_off_at_11_30pm",
+   "msg": "Kitchen lights - off at 11:30pm: Running automation actions"
+  },
+  {
+   "t": "2027-03-28T23:30:00.267032+01:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.living_room_lifx_off_at_11_30pm",
+   "msg": "Kitchen lights - off at 11:30pm: Executing step call service"
+  },
+  {
+   "t": "2027-03-28T23:30:00.267032+01:00",
+   "kind": "event",
+   "event_type": "call_service",
+   "data": {
+    "domain": "light",
+    "service": "turn_off",
+    "service_data": {
+     "transition": 10,
+     "entity_id": [
+      "light.kitchen_kitchen_light",
+      "light.bedroom_lamp"
+     ]
+    }
+   },
+   "ctx": "c43",
+   "parent": null
+  },
+  {
+   "t": "2027-03-28T23:30:00.267032+01:00",
+   "kind": "service_handler",
+   "service": "light.turn_off",
+   "data": {
+    "transition": 10,
+    "entity_id": [
+     "light.kitchen_kitchen_light",
+     "light.bedroom_lamp"
+    ]
+   },
+   "ctx": "c43",
+   "parent": null
+  },
+  {
+   "t": "2027-03-28T23:30:00.267032+01:00",
+   "kind": "state",
+   "entity_id": "automation.living_room_lifx_off_at_11_30pm",
+   "old": "on",
+   "new": "on",
+   "ctx": "c43",
+   "parent": null,
+   "last_changed": "2027-03-27T22:00:00+00:00",
+   "last_updated": "2027-03-28T22:30:00.267032+00:00",
+   "attributes": {
+    "last_triggered": "2027-03-28T22:30:00.267032+00:00",
+    "current": 0,
+    "mode": "single",
+    "id": "living_room_lifx_off_at_2330",
+    "friendly_name": "Kitchen lights - off at 11:30pm"
+   }
+  },
+  {
+   "t": "2027-03-29T06:30:00.283085+01:00",
+   "kind": "trigger",
+   "automation": "automation.hallway_lights_adjust_brightness_for_time",
+   "enabled": true,
+   "trigger": {
+    "id": "morning",
+    "idx": "1",
+    "alias": null,
+    "platform": "time",
+    "now": "2027-03-29T06:30:00.283085+01:00",
+    "description": "time",
+    "entity_id": null
+   },
+   "trigger_ctx": null
+  },
+  {
+   "t": "2027-03-29T09:30:00.370873+01:00",
+   "kind": "trigger",
+   "automation": "automation.hallway_lights_adjust_brightness_for_time",
+   "enabled": true,
+   "trigger": {
+    "id": "normal",
+    "idx": "2",
+    "alias": null,
+    "platform": "time",
+    "now": "2027-03-29T09:30:00.370873+01:00",
+    "description": "time",
+    "entity_id": null
+   },
+   "trigger_ctx": null
+  },
+  {
+   "t": "2027-03-29T10:00:00.197015+01:00",
+   "kind": "trigger",
+   "automation": "automation.living_room_lifx_on_when_dark_after_10am",
+   "enabled": true,
+   "trigger": {
+    "id": "1",
+    "idx": "1",
+    "alias": null,
+    "platform": "time",
+    "now": "2027-03-29T10:00:00.197015+01:00",
+    "description": "time",
+    "entity_id": null
+   },
+   "trigger_ctx": null
+  },
+  {
+   "t": "2027-03-29T10:00:00.197015+01:00",
+   "kind": "event",
+   "event_type": "automation_triggered",
+   "data": {
+    "name": "Kitchen lights - on when dark after 10am",
+    "entity_id": "automation.living_room_lifx_on_when_dark_after_10am",
+    "source": "time"
+   },
+   "ctx": "c44",
+   "parent": null
+  },
+  {
+   "t": "2027-03-29T10:00:00.197015+01:00",
+   "kind": "state",
+   "entity_id": "automation.living_room_lifx_on_when_dark_after_10am",
+   "old": "on",
+   "new": "on",
+   "ctx": "c44",
+   "parent": null,
+   "last_changed": "2027-03-27T22:00:00+00:00",
+   "last_updated": "2027-03-29T09:00:00.197015+00:00",
+   "attributes": {
+    "last_triggered": "2027-03-29T09:00:00.197015+00:00",
+    "current": 1,
+    "mode": "single",
+    "id": "living_room_lifx_on_when_dark_after_10",
+    "friendly_name": "Kitchen lights - on when dark after 10am"
+   }
+  },
+  {
+   "t": "2027-03-29T10:00:00.197015+01:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.living_room_lifx_on_when_dark_after_10am",
+   "msg": "Kitchen lights - on when dark after 10am: Running automation actions"
+  },
+  {
+   "t": "2027-03-29T10:00:00.197015+01:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.living_room_lifx_on_when_dark_after_10am",
+   "msg": "Kitchen lights - on when dark after 10am: Executing step call service"
+  },
+  {
+   "t": "2027-03-29T10:00:00.197015+01:00",
+   "kind": "event",
+   "event_type": "call_service",
+   "data": {
+    "domain": "light",
+    "service": "turn_on",
+    "service_data": {
+     "brightness_pct": 60,
+     "color_temp_kelvin": 2700,
+     "transition": 5,
+     "entity_id": [
+      "light.kitchen_kitchen_light"
+     ]
+    }
+   },
+   "ctx": "c44",
+   "parent": null
+  },
+  {
+   "t": "2027-03-29T10:00:00.197015+01:00",
+   "kind": "service_handler",
+   "service": "light.turn_on",
+   "data": {
+    "brightness_pct": 60,
+    "color_temp_kelvin": 2700,
+    "transition": 5,
+    "entity_id": [
+     "light.kitchen_kitchen_light"
+    ]
+   },
+   "ctx": "c44",
+   "parent": null
+  },
+  {
+   "t": "2027-03-29T10:00:00.197015+01:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.living_room_lifx_on_when_dark_after_10am",
+   "msg": "Kitchen lights - on when dark after 10am: Executing step call service"
+  },
+  {
+   "t": "2027-03-29T10:00:00.197015+01:00",
+   "kind": "event",
+   "event_type": "call_service",
+   "data": {
+    "domain": "light",
+    "service": "turn_on",
+    "service_data": {
+     "brightness_pct": 30,
+     "color_temp_kelvin": 2400,
+     "transition": 5,
+     "entity_id": [
+      "light.bedroom_lamp"
+     ]
+    }
+   },
+   "ctx": "c44",
+   "parent": null
+  },
+  {
+   "t": "2027-03-29T10:00:00.197015+01:00",
+   "kind": "service_handler",
+   "service": "light.turn_on",
+   "data": {
+    "brightness_pct": 30,
+    "color_temp_kelvin": 2400,
+    "transition": 5,
+    "entity_id": [
+     "light.bedroom_lamp"
+    ]
+   },
+   "ctx": "c44",
+   "parent": null
+  },
+  {
+   "t": "2027-03-29T10:00:00.197015+01:00",
+   "kind": "state",
+   "entity_id": "automation.living_room_lifx_on_when_dark_after_10am",
+   "old": "on",
+   "new": "on",
+   "ctx": "c44",
+   "parent": null,
+   "last_changed": "2027-03-27T22:00:00+00:00",
+   "last_updated": "2027-03-29T09:00:00.197015+00:00",
+   "attributes": {
+    "last_triggered": "2027-03-29T09:00:00.197015+00:00",
+    "current": 0,
+    "mode": "single",
+    "id": "living_room_lifx_on_when_dark_after_10",
+    "friendly_name": "Kitchen lights - on when dark after 10am"
+   }
+  }
+ ]
+}

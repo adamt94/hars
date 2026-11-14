@@ -249,21 +249,27 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
       retries in the background; at most 300 s), registered entities nobody
       provides are written `unavailable` at `start`, then `started`, so
       automations attach to real states
-- [ ] `automation.*` entities, `trigger`/`turn_on`/`turn_off`/`toggle`/`reload`
-- [ ] Inventory triggers/conditions/actions/modes with HA 2026.6.1 semantics:
-  - [ ] `numeric_state` fires on crossing only; covers threshold equality,
+- [x] `automation.*` entities (registry ids, HA's attributes, restore with
+      `initial_state`, invalid configs `unavailable`), `trigger`/`turn_on`/
+      `turn_off`/`toggle`; loaded from `configuration.yaml` (`ha-automation`)
+- [ ] `automation.reload`, the editor's config API and traces
+- [x] Inventory triggers/conditions/actions/modes with HA 2026.6.1 semantics,
+      matched against HA's own engine on 36 scenario vectors:
+  - [x] `numeric_state` fires on crossing only; covers threshold equality,
         already-below at startup, and recovery from `unknown`/`unavailable`
-  - [ ] `state` `to`/`for`: attribute-only updates do not retrigger or reset
+  - [x] `state` `to`/`for`: attribute-only updates do not retrigger or reset
         `for`; leaving and re-entering restarts the duration
-  - [ ] `wait_for_trigger` subscribes at the moment it starts, so an
+  - [x] `wait_for_trigger` subscribes at the moment it starts, so an
         already-matching state does not complete it
-  - [ ] `restart` cancels the running instance only after the new run passes
+  - [x] `restart` cancels the running instance only after the new run passes
         its conditions; `single` drops overlapping runs with a warning
-  - [ ] `time` windows across midnight, both London DST transitions, clock jumps
-- [ ] Timers via `tokio::time::sleep_until` (no custom wheel until benchmarks
+  - [x] `time` windows across midnight, both London DST transitions, clock jumps
+- [x] Timers via `tokio::time::sleep_until` (no custom wheel until benchmarks
       demand one); nothing polls
-- [ ] Acceptance: the automation replay oracle matches HA on all 4 automations
-      over 10 days of recorded data
+- [x] Acceptance: the automation replay oracle matches HA on all 4 automations
+      over 10 days of recorded data (1,345 triggers, 1,627 light calls; the
+      vector is the household's motion timeline, so it's kept out of the
+      repo: `HARS_AUTOMATION_REPLAY` runs it)
 
 ### M4: Integrations (each behind a Cargo feature, numbers recorded when added)
 - [x] `sun` (solar elevation/azimuth + `sensor.sun_next_*`, HA-matched maths:

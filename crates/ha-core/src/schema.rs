@@ -43,6 +43,10 @@ pub enum Kind {
     /// `vol.Coerce(SomeStrEnum)`: one of the enum's values (case-sensitive),
     /// named in the error by the enum's class name, in definition order.
     Enum(&'static str, &'static [&'static str]),
+    /// `bool` (strict: a JSON boolean only).
+    StrictBool,
+    /// `dict`: a mapping.
+    Dict,
 }
 
 /// Inclusive bounds, as `vol.Range`.
@@ -319,6 +323,14 @@ fn check(kind: &Kind, value: &Value) -> Checked {
             }
         },
         Kind::EntityIds => check_target("entity_id", value),
+        Kind::StrictBool => match value {
+            Value::Bool(_) => Ok(None),
+            _ => err("expected bool".into()),
+        },
+        Kind::Dict => match value {
+            Value::Object(_) => Ok(None),
+            _ => err("expected dict".into()),
+        },
         Kind::Enum(name, values) => match value {
             Value::String(v) if values.contains(&v.as_str()) => Ok(None),
             _ => {

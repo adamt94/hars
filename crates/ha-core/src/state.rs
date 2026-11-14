@@ -105,6 +105,8 @@ pub struct StateMachine {
     /// Lossless `state_changed` consumers. Only touched while `states` is
     /// locked, so every consumer sees changes in the order they were applied.
     listeners: Mutex<Vec<mpsc::UnboundedSender<Arc<Event>>>>,
+    /// `state_changed` events fired so far: the next one's sequence number.
+    seq: std::sync::atomic::AtomicU64,
 }
 
 /// A lossless, ordered feed of `state_changed` events, from
@@ -118,17 +120,29 @@ pub struct StateChanges {
     /// feed, and none before it is.
     pub snapshot: Vec<Arc<State>>,
     rx: mpsc::UnboundedReceiver<Arc<Event>>,
+    /// The next event's sequence number.
+    next: u64,
 }
 
 impl StateChanges {
     /// The next `state_changed` event. `None` once the `Hass` is gone.
     pub async fn recv(&mut self) -> Option<Arc<Event>> {
-        self.rx.recv().await
+        self.recv_seq().await.map(|(_, e)| e)
+    }
+
+    /// The next event with its sequence number (see
+    /// [`crate::Hass::state_seq`]).
+    pub async fn recv_seq(&mut self) -> Option<(u64, Arc<Event>)> {
+        let e = self.rx.recv().await?;
+        self.next += 1;
+        Some((self.next - 1, e))
     }
 
     /// The next event if one is queued.
     pub fn try_recv(&mut self) -> Option<Arc<Event>> {
-        self.rx.try_recv().ok()
+        let e = self.rx.try_recv().ok()?;
+        self.next += 1;
+        Some(e)
     }
 
     /// Events queued and not yet received.
@@ -144,6 +158,12 @@ impl StateMachine {
 
     pub fn all(&self) -> Vec<Arc<State>> {
         self.states.read().values().cloned().collect()
+    }
+
+    /// `state_changed` events fired so far: a change made from now on has
+    /// a sequence number at least this.
+    pub fn seq(&self) -> u64 {
+        self.seq.load(std::sync::atomic::Ordering::Acquire)
     }
 
     pub fn len(&self) -> usize {
@@ -169,6 +189,7 @@ impl StateMachine {
         StateChanges {
             snapshot: states.values().cloned().collect(),
             rx,
+            next: self.seq.load(std::sync::atomic::Ordering::Acquire),
         }
     }
 
@@ -190,6 +211,7 @@ impl StateMachine {
             now,
             context,
         ));
+        self.seq.fetch_add(1, std::sync::atomic::Ordering::AcqRel);
         self.listeners
             .lock()
             .retain(|tx| tx.send(event.clone()).is_ok());
@@ -256,6 +278,7 @@ impl StateMachine {
             now,
             context,
         ));
+        self.seq.fetch_add(1, std::sync::atomic::Ordering::AcqRel);
         self.listeners
             .lock()
             .retain(|tx| tx.send(event.clone()).is_ok());

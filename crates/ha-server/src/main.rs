@@ -126,6 +126,40 @@ async fn run(thp_disabled: std::io::Result<bool>) -> anyhow::Result<()> {
         profiles,
     );
     api_config.integrations = started.running;
+    // `configuration.yaml`'s automations (written now; triggers attach at
+    // `homeassistant_started`).
+    let automations = {
+        let dir = config_dir.clone();
+        let loaded = tokio::task::spawn_blocking(move || {
+            let file = dir.join("configuration.yaml");
+            if !file.is_file() {
+                return Ok(None);
+            }
+            let secrets = ha_core::yaml::Secrets {
+                config_dir: dir.clone(),
+            };
+            ha_core::yaml::load_file(&file, Some(&secrets)).map(Some)
+        })
+        .await?;
+        match loaded {
+            Ok(Some(config)) => {
+                let items = ha_automation::from_config(&config);
+                Some(ha_automation::Automations::setup(
+                    &hass,
+                    &api_config.registries,
+                    &items,
+                ))
+            }
+            Ok(None) => None,
+            Err(e) => {
+                tracing::error!("configuration.yaml: {e}");
+                None
+            }
+        }
+    };
+    if automations.is_some() {
+        api_config.integrations.push("automation");
+    }
     api_config.brands = match ha_api::brands::Brands::new(&config_dir, ha_api::brands::CDN) {
         Ok(b) => Some(b),
         Err(e) => {
@@ -200,6 +234,9 @@ async fn run(thp_disabled: std::io::Result<bool>) -> anyhow::Result<()> {
             hass.begin_start();
             api_config.registries.write_unavailable_states(&hass);
             hass.finish_start();
+            if let Some(a) = &automations {
+                a.started();
+            }
             {
                 // The last states are dumped now, then every 15 minutes.
                 let hass = hass.clone();
@@ -222,6 +259,9 @@ async fn run(thp_disabled: std::io::Result<bool>) -> anyhow::Result<()> {
         }
     }
 
+    if let Some(a) = &automations {
+        a.stop();
+    }
     hass.begin_stop();
     let _ = stop_http.send(());
     match tokio::time::timeout(HTTP_DRAIN_TIMEOUT, &mut server).await {

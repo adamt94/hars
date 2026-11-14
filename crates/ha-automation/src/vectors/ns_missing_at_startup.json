@@ -1,0 +1,339 @@
+{
+ "name": "ns_missing_at_startup",
+ "doc": "Entity has no state at attach: warning, not armed; first value below does NOT fire.",
+ "start": "2026-11-10T16:00:00",
+ "automations": [
+  "hallway_motion_lights_on_when_dark"
+ ],
+ "steps": [
+  {
+   "op": "set",
+   "entity_id": "binary_sensor.hallway_motion",
+   "state": "on",
+   "attributes": {
+    "device_class": "motion",
+    "friendly_name": "Hallway Motion"
+   }
+  },
+  {
+   "op": "set",
+   "entity_id": "light.hallway_hallway",
+   "state": "off",
+   "attributes": {}
+  },
+  {
+   "op": "setup"
+  },
+  {
+   "op": "start"
+  },
+  {
+   "op": "wait",
+   "s": 10
+  },
+  {
+   "op": "set",
+   "entity_id": "sensor.hallway_illuminance",
+   "state": "25",
+   "attributes": {
+    "state_class": "measurement",
+    "unit_of_measurement": "lx",
+    "device_class": "illuminance",
+    "friendly_name": "Hallway Illuminance"
+   }
+  },
+  {
+   "op": "wait",
+   "s": 10
+  },
+  {
+   "op": "set",
+   "entity_id": "sensor.hallway_illuminance",
+   "state": "35",
+   "attributes": {
+    "state_class": "measurement",
+    "unit_of_measurement": "lx",
+    "device_class": "illuminance",
+    "friendly_name": "Hallway Illuminance"
+   }
+  },
+  {
+   "op": "wait",
+   "s": 10
+  },
+  {
+   "op": "set",
+   "entity_id": "sensor.hallway_illuminance",
+   "state": "25",
+   "attributes": {
+    "state_class": "measurement",
+    "unit_of_measurement": "lx",
+    "device_class": "illuminance",
+    "friendly_name": "Hallway Illuminance"
+   }
+  },
+  {
+   "op": "wait",
+   "s": 10
+  }
+ ],
+ "expected": [
+  {
+   "t": "2026-11-10T16:00:00+00:00",
+   "kind": "input",
+   "entity_id": "binary_sensor.hallway_motion",
+   "state": "on",
+   "attributes": {
+    "device_class": "motion",
+    "friendly_name": "Hallway Motion"
+   },
+   "ctx": "c3"
+  },
+  {
+   "t": "2026-11-10T16:00:00+00:00",
+   "kind": "input",
+   "entity_id": "light.hallway_hallway",
+   "state": "off",
+   "attributes": {},
+   "ctx": "c4"
+  },
+  {
+   "t": "2026-11-10T16:00:00+00:00",
+   "kind": "log",
+   "level": "DEBUG",
+   "logger": "homeassistant.components.automation.hallway_lights_motion_on_when_dark",
+   "msg": "Automation automation.hallway_lights_motion_on_when_dark not in state storage, state True from default is used"
+  },
+  {
+   "t": "2026-11-10T16:00:00+00:00",
+   "kind": "state",
+   "entity_id": "automation.hallway_lights_motion_on_when_dark",
+   "old": null,
+   "new": "on",
+   "ctx": "c7",
+   "parent": null,
+   "last_changed": "2026-11-10T16:00:00+00:00",
+   "last_updated": "2026-11-10T16:00:00+00:00",
+   "attributes": {
+    "last_triggered": null,
+    "current": 0,
+    "mode": "restart",
+    "id": "hallway_motion_lights_on_when_dark",
+    "friendly_name": "Hallway lights - motion on when dark"
+   }
+  },
+  {
+   "t": "2026-11-10T16:00:00+00:00",
+   "kind": "event",
+   "event_type": "homeassistant_start",
+   "ctx": "c15",
+   "parent": null
+  },
+  {
+   "t": "2026-11-10T16:00:00+00:00",
+   "kind": "log",
+   "level": "WARNING",
+   "logger": "homeassistant.components.homeassistant.triggers.numeric_state",
+   "msg": "Error initializing 'Hallway lights - motion on when dark' trigger: In 'numeric_state' condition: unknown entity sensor.hallway_illuminance"
+  },
+  {
+   "t": "2026-11-10T16:00:00+00:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.hallway_lights_motion_on_when_dark",
+   "msg": "Initialized trigger Hallway lights - motion on when dark"
+  },
+  {
+   "t": "2026-11-10T16:00:00+00:00",
+   "kind": "event",
+   "event_type": "homeassistant_started",
+   "ctx": "c17",
+   "parent": null
+  },
+  {
+   "t": "2026-11-10T16:00:10+00:00",
+   "kind": "input",
+   "entity_id": "sensor.hallway_illuminance",
+   "state": "25",
+   "attributes": {
+    "state_class": "measurement",
+    "unit_of_measurement": "lx",
+    "device_class": "illuminance",
+    "friendly_name": "Hallway Illuminance"
+   },
+   "ctx": "c18"
+  },
+  {
+   "t": "2026-11-10T16:00:20+00:00",
+   "kind": "input",
+   "entity_id": "sensor.hallway_illuminance",
+   "state": "35",
+   "attributes": {
+    "state_class": "measurement",
+    "unit_of_measurement": "lx",
+    "device_class": "illuminance",
+    "friendly_name": "Hallway Illuminance"
+   },
+   "ctx": "c19"
+  },
+  {
+   "t": "2026-11-10T16:00:30+00:00",
+   "kind": "input",
+   "entity_id": "sensor.hallway_illuminance",
+   "state": "25",
+   "attributes": {
+    "state_class": "measurement",
+    "unit_of_measurement": "lx",
+    "device_class": "illuminance",
+    "friendly_name": "Hallway Illuminance"
+   },
+   "ctx": "c20"
+  },
+  {
+   "t": "2026-11-10T16:00:30+00:00",
+   "kind": "trigger",
+   "automation": "automation.hallway_lights_motion_on_when_dark",
+   "enabled": true,
+   "trigger": {
+    "id": "became_dark",
+    "idx": "1",
+    "alias": null,
+    "platform": "numeric_state",
+    "entity_id": "sensor.hallway_illuminance",
+    "below": 30.0,
+    "above": null,
+    "from_state": {
+     "entity_id": "sensor.hallway_illuminance",
+     "state": "35",
+     "attributes": {
+      "state_class": "measurement",
+      "unit_of_measurement": "lx",
+      "device_class": "illuminance",
+      "friendly_name": "Hallway Illuminance"
+     },
+     "ctx": "c19"
+    },
+    "to_state": {
+     "entity_id": "sensor.hallway_illuminance",
+     "state": "25",
+     "attributes": {
+      "state_class": "measurement",
+      "unit_of_measurement": "lx",
+      "device_class": "illuminance",
+      "friendly_name": "Hallway Illuminance"
+     },
+     "ctx": "c20"
+    },
+    "for": null,
+    "description": "numeric state of sensor.hallway_illuminance"
+   },
+   "trigger_ctx": "c20"
+  },
+  {
+   "t": "2026-11-10T16:00:30+00:00",
+   "kind": "log",
+   "level": "DEBUG",
+   "logger": "homeassistant.components.automation.hallway_lights_motion_on_when_dark",
+   "msg": "Automation trigger 'None' triggered by numeric state of sensor.hallway_illuminance"
+  },
+  {
+   "t": "2026-11-10T16:00:30+00:00",
+   "kind": "event",
+   "event_type": "automation_triggered",
+   "data": {
+    "name": "Hallway lights - motion on when dark",
+    "entity_id": "automation.hallway_lights_motion_on_when_dark",
+    "source": "numeric state of sensor.hallway_illuminance"
+   },
+   "ctx": "c21",
+   "parent": "c20"
+  },
+  {
+   "t": "2026-11-10T16:00:30+00:00",
+   "kind": "state",
+   "entity_id": "automation.hallway_lights_motion_on_when_dark",
+   "old": "on",
+   "new": "on",
+   "ctx": "c21",
+   "parent": "c20",
+   "last_changed": "2026-11-10T16:00:00+00:00",
+   "last_updated": "2026-11-10T16:00:30+00:00",
+   "attributes": {
+    "last_triggered": "2026-11-10T16:00:30+00:00",
+    "current": 1,
+    "mode": "restart",
+    "id": "hallway_motion_lights_on_when_dark",
+    "friendly_name": "Hallway lights - motion on when dark"
+   }
+  },
+  {
+   "t": "2026-11-10T16:00:30+00:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.hallway_lights_motion_on_when_dark",
+   "msg": "Hallway lights - motion on when dark: Running automation actions"
+  },
+  {
+   "t": "2026-11-10T16:00:30+00:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.hallway_lights_motion_on_when_dark",
+   "msg": "Hallway lights - motion on when dark: Choose at step 1: default: Running automation actions"
+  },
+  {
+   "t": "2026-11-10T16:00:30+00:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.hallway_lights_motion_on_when_dark",
+   "msg": "Hallway lights - motion on when dark: Choose at step 1: default: Executing step call service"
+  },
+  {
+   "t": "2026-11-10T16:00:30+00:00",
+   "kind": "event",
+   "event_type": "call_service",
+   "data": {
+    "domain": "light",
+    "service": "turn_on",
+    "service_data": {
+     "brightness_pct": 35,
+     "color_temp_kelvin": 2700,
+     "transition": 2,
+     "entity_id": [
+      "light.hallway_hallway"
+     ]
+    }
+   },
+   "ctx": "c21",
+   "parent": "c20"
+  },
+  {
+   "t": "2026-11-10T16:00:30+00:00",
+   "kind": "service_handler",
+   "service": "light.turn_on",
+   "data": {
+    "brightness_pct": 35,
+    "color_temp_kelvin": 2700,
+    "transition": 2,
+    "entity_id": [
+     "light.hallway_hallway"
+    ]
+   },
+   "ctx": "c21",
+   "parent": "c20"
+  },
+  {
+   "t": "2026-11-10T16:00:30+00:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.hallway_lights_motion_on_when_dark",
+   "msg": "Hallway lights - motion on when dark: Executing step wait for trigger"
+  },
+  {
+   "t": "2026-11-10T16:00:30+00:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.hallway_lights_motion_on_when_dark",
+   "msg": "Hallway lights - motion on when dark: Initialized trigger"
+  }
+ ]
+}

@@ -1,0 +1,130 @@
+[
+ {
+  "aliases": [],
+  "aliases_v2": [
+   null
+  ],
+  "area_id": null,
+  "categories": {},
+  "capabilities": {
+   "min_color_temp_kelvin": 2202,
+   "max_color_temp_kelvin": 4504,
+   "supported_color_modes": [
+    "color_temp"
+   ]
+  },
+  "config_entry_id": null,
+  "config_subentry_id": null,
+  "created_at": "2026-07-03T11:17:44.897699+00:00",
+  "device_class": null,
+  "device_id": null,
+  "disabled_by": null,
+  "entity_category": null,
+  "entity_id": "light.hallway_hallway",
+  "hidden_by": null,
+  "icon": null,
+  "id": "8b1599146705c30344c5c34c64a80286",
+  "has_entity_name": true,
+  "labels": [],
+  "modified_at": "2026-07-03T11:17:59.545927+00:00",
+  "name": null,
+  "object_id_base": null,
+  "options": {
+   "conversation": {
+    "should_expose": true
+   }
+  },
+  "original_device_class": null,
+  "original_icon": null,
+  "original_name": null,
+  "platform": "hue",
+  "suggested_object_id": null,
+  "supported_features": 40,
+  "translation_key": null,
+  "unique_id": "df1e030d-f506-4bfb-bf5e-548706002545",
+  "previous_unique_id": null,
+  "unit_of_measurement": null
+ },
+ {
+  "aliases": [],
+  "aliases_v2": [
+   null
+  ],
+  "area_id": null,
+  "categories": {},
+  "capabilities": null,
+  "config_entry_id": null,
+  "config_subentry_id": null,
+  "created_at": "2026-06-06T18:30:48.693855+00:00",
+  "device_class": null,
+  "device_id": null,
+  "disabled_by": null,
+  "entity_category": null,
+  "entity_id": "binary_sensor.hallway_motion",
+  "hidden_by": null,
+  "icon": null,
+  "id": "59c1af753f0bbd0c954b467f9dd48d17",
+  "has_entity_name": true,
+  "labels": [],
+  "modified_at": "2026-07-04T15:34:33.844373+00:00",
+  "name": null,
+  "object_id_base": "Motion",
+  "options": {
+   "conversation": {
+    "should_expose": true
+   }
+  },
+  "original_device_class": "motion",
+  "original_icon": null,
+  "original_name": "Motion",
+  "platform": "hue",
+  "suggested_object_id": null,
+  "supported_features": 0,
+  "translation_key": null,
+  "unique_id": "c866df7d-21b5-4d5e-9e16-04f6005677b5",
+  "previous_unique_id": null,
+  "unit_of_measurement": null
+ },
+ {
+  "aliases": [],
+  "aliases_v2": [
+   null
+  ],
+  "area_id": null,
+  "categories": {},
+  "capabilities": {
+   "state_class": "measurement"
+  },
+  "config_entry_id": null,
+  "config_subentry_id": null,
+  "created_at": "2026-06-06T18:30:48.697884+00:00",
+  "device_class": null,
+  "device_id": null,
+  "disabled_by": null,
+  "entity_category": null,
+  "entity_id": "sensor.hallway_illuminance",
+  "hidden_by": null,
+  "icon": null,
+  "id": "2937b6395d7721091ade243cbc1118ea",
+  "has_entity_name": true,
+  "labels": [],
+  "modified_at": "2026-07-04T15:34:33.848939+00:00",
+  "name": null,
+  "object_id_base": "Illuminance",
+  "options": {
+   "conversation": {
+    "should_expose": false
+   }
+  },
+  "original_device_class": "illuminance",
+  "original_icon": null,
+  "original_name": "Illuminance",
+  "platform": "hue",
+  "suggested_object_id": null,
+  "supported_features": 0,
+  "translation_key": null,
+  "unique_id": "6c54c53d-e571-4c40-a27f-dad2e763ae40",
+  "previous_unique_id": null,
+  "unit_of_measurement": "lx"
+ }
+]

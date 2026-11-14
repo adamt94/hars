@@ -1,0 +1,169 @@
+- id: hallway_motion_lights_on_when_dark
+  alias: Hallway lights - motion on when dark
+  description: Turn on hallway lights when motion is detected below 30 lux, using dim
+    overnight and gentle morning levels, then turn them off after 5 minutes with no
+    motion.
+  mode: restart
+  triggers:
+  - trigger: state
+    entity_id: binary_sensor.hallway_motion
+    to: "on"
+    id: motion
+  - trigger: numeric_state
+    entity_id: sensor.hallway_illuminance
+    below: 30
+    id: became_dark
+  conditions:
+  - condition: numeric_state
+    entity_id: sensor.hallway_illuminance
+    below: 30
+  - condition: state
+    entity_id: binary_sensor.hallway_motion
+    state: "on"
+  actions:
+  - choose:
+    - conditions:
+      - condition: time
+        after: "23:00:00"
+        before: "06:30:00"
+      sequence:
+      - action: light.turn_on
+        target:
+          entity_id: light.hallway_hallway
+        data:
+          brightness_pct: 12
+          color_temp_kelvin: 2202
+          transition: 1
+    - conditions:
+      - condition: time
+        after: "06:30:00"
+        before: "09:30:00"
+      sequence:
+      - action: light.turn_on
+        target:
+          entity_id: light.hallway_hallway
+        data:
+          brightness_pct: 30
+          color_temp_kelvin: 2400
+          transition: 2
+    default:
+    - action: light.turn_on
+      target:
+        entity_id: light.hallway_hallway
+      data:
+        brightness_pct: 35
+        color_temp_kelvin: 2700
+        transition: 2
+  - wait_for_trigger:
+    - trigger: state
+      entity_id: binary_sensor.hallway_motion
+      to: "off"
+      for:
+        minutes: 5
+  - action: light.turn_off
+    target:
+      entity_id: light.hallway_hallway
+    data:
+      transition: 10
+- id: hallway_lights_adjust_brightness_for_time
+  alias: Hallway lights - adjust brightness for time
+  description: Adjust hallway light brightness at time-band boundaries if the lights
+    are already on.
+  mode: single
+  triggers:
+  - trigger: time
+    at: "23:00:00"
+    id: overnight
+  - trigger: time
+    at: "06:30:00"
+    id: morning
+  - trigger: time
+    at: "09:30:00"
+    id: normal
+  conditions:
+  - condition: state
+    entity_id: light.hallway_hallway
+    state: "on"
+  actions:
+  - choose:
+    - conditions:
+      - condition: trigger
+        id: overnight
+      sequence:
+      - action: light.turn_on
+        target:
+          entity_id: light.hallway_hallway
+        data:
+          brightness_pct: 12
+          color_temp_kelvin: 2202
+          transition: 10
+    - conditions:
+      - condition: trigger
+        id: morning
+      sequence:
+      - action: light.turn_on
+        target:
+          entity_id: light.hallway_hallway
+        data:
+          brightness_pct: 30
+          color_temp_kelvin: 2400
+          transition: 10
+    - conditions:
+      - condition: trigger
+        id: normal
+      sequence:
+      - action: light.turn_on
+        target:
+          entity_id: light.hallway_hallway
+        data:
+          brightness_pct: 35
+          color_temp_kelvin: 2700
+          transition: 10
+- id: living_room_lifx_on_when_dark_after_10
+  alias: Kitchen lights - on when dark after 10am
+  description: Turn on the kitchen light and softer lamp when it becomes dark after
+    10am and before the 11:30pm shutoff.
+  mode: single
+  triggers:
+  - trigger: state
+    entity_id: sun.sun
+    to: below_horizon
+  - trigger: time
+    at: "10:00:00"
+  conditions:
+  - condition: time
+    after: "10:00:00"
+    before: "23:30:00"
+  - condition: state
+    entity_id: sun.sun
+    state: below_horizon
+  actions:
+  - action: light.turn_on
+    target:
+      entity_id: light.kitchen_kitchen_light
+    data:
+      brightness_pct: 60
+      color_temp_kelvin: 2700
+      transition: 5
+  - action: light.turn_on
+    target:
+      entity_id: light.bedroom_lamp
+    data:
+      brightness_pct: 30
+      color_temp_kelvin: 2400
+      transition: 5
+- id: living_room_lifx_off_at_2330
+  alias: Kitchen lights - off at 11:30pm
+  description: Turn off the kitchen light and lamp every night at 11:30pm.
+  mode: single
+  triggers:
+  - trigger: time
+    at: "23:30:00"
+  actions:
+  - action: light.turn_off
+    target:
+      entity_id:
+      - light.kitchen_kitchen_light
+      - light.bedroom_lamp
+    data:
+      transition: 10

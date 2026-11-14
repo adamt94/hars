@@ -1,0 +1,112 @@
+{
+ "name": "time_light_off",
+ "doc": "Hallway light off: the 23:00 trigger runs but its state condition fails.",
+ "start": "2026-11-10T22:59:00",
+ "automations": [
+  "hallway_lights_adjust_brightness_for_time"
+ ],
+ "steps": [
+  {
+   "op": "set",
+   "entity_id": "light.hallway_hallway",
+   "state": "off",
+   "attributes": {}
+  },
+  {
+   "op": "setup"
+  },
+  {
+   "op": "start"
+  },
+  {
+   "op": "at",
+   "t": "2026-11-10T23:01:00"
+  }
+ ],
+ "expected": [
+  {
+   "t": "2026-11-10T22:59:00+00:00",
+   "kind": "input",
+   "entity_id": "light.hallway_hallway",
+   "state": "off",
+   "attributes": {},
+   "ctx": "c3"
+  },
+  {
+   "t": "2026-11-10T22:59:00+00:00",
+   "kind": "log",
+   "level": "DEBUG",
+   "logger": "homeassistant.components.automation.hallway_lights_adjust_brightness_for_time",
+   "msg": "Automation automation.hallway_lights_adjust_brightness_for_time not in state storage, state True from default is used"
+  },
+  {
+   "t": "2026-11-10T22:59:00+00:00",
+   "kind": "state",
+   "entity_id": "automation.hallway_lights_adjust_brightness_for_time",
+   "old": null,
+   "new": "on",
+   "ctx": "c6",
+   "parent": null,
+   "last_changed": "2026-11-10T22:59:00+00:00",
+   "last_updated": "2026-11-10T22:59:00+00:00",
+   "attributes": {
+    "last_triggered": null,
+    "current": 0,
+    "mode": "single",
+    "id": "hallway_lights_adjust_brightness_for_time",
+    "friendly_name": "Hallway lights - adjust brightness for time"
+   }
+  },
+  {
+   "t": "2026-11-10T22:59:00+00:00",
+   "kind": "event",
+   "event_type": "homeassistant_start",
+   "ctx": "c14",
+   "parent": null
+  },
+  {
+   "t": "2026-11-10T22:59:00+00:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.hallway_lights_adjust_brightness_for_time",
+   "msg": "Initialized trigger Hallway lights - adjust brightness for time"
+  },
+  {
+   "t": "2026-11-10T22:59:00+00:00",
+   "kind": "event",
+   "event_type": "homeassistant_started",
+   "ctx": "c16",
+   "parent": null
+  },
+  {
+   "t": "2026-11-10T23:00:00.177060+00:00",
+   "kind": "trigger",
+   "automation": "automation.hallway_lights_adjust_brightness_for_time",
+   "enabled": true,
+   "trigger": {
+    "id": "overnight",
+    "idx": "0",
+    "alias": null,
+    "platform": "time",
+    "now": "2026-11-10T23:00:00.177060+00:00",
+    "description": "time",
+    "entity_id": null
+   },
+   "trigger_ctx": null
+  },
+  {
+   "t": "2026-11-10T23:00:00.177060+00:00",
+   "kind": "log",
+   "level": "DEBUG",
+   "logger": "homeassistant.components.automation.hallway_lights_adjust_brightness_for_time",
+   "msg": "Automation trigger 'None' triggered by time"
+  },
+  {
+   "t": "2026-11-10T23:00:00.177060+00:00",
+   "kind": "log",
+   "level": "DEBUG",
+   "logger": "homeassistant.components.automation.hallway_lights_adjust_brightness_for_time",
+   "msg": "Conditions not met, aborting automation. Condition summary: <trace elided>"
+  }
+ ]
+}

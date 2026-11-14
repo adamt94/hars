@@ -1,0 +1,898 @@
+{
+ "name": "jump_forward_over_trigger",
+ "doc": "Wall clock jumps +2 h at 22:59: 23:00 and 23:30 timers (loop time) fire late, at 01:00 and 01:30 wall.",
+ "start": "2026-11-10T22:58:00",
+ "automations": [
+  "hallway_lights_adjust_brightness_for_time",
+  "living_room_lifx_off_at_2330"
+ ],
+ "steps": [
+  {
+   "op": "set",
+   "entity_id": "light.hallway_hallway",
+   "state": "on",
+   "attributes": {}
+  },
+  {
+   "op": "set",
+   "entity_id": "light.kitchen_kitchen_light",
+   "state": "on",
+   "attributes": {}
+  },
+  {
+   "op": "set",
+   "entity_id": "light.bedroom_lamp",
+   "state": "on",
+   "attributes": {}
+  },
+  {
+   "op": "setup"
+  },
+  {
+   "op": "start"
+  },
+  {
+   "op": "at",
+   "t": "2026-11-10T22:59:00"
+  },
+  {
+   "op": "jump_wall",
+   "s": 7200
+  },
+  {
+   "op": "wait",
+   "s": 5400
+  },
+  {
+   "op": "at",
+   "t": "2026-11-11T23:31:00"
+  }
+ ],
+ "expected": [
+  {
+   "t": "2026-11-10T22:58:00+00:00",
+   "kind": "input",
+   "entity_id": "light.hallway_hallway",
+   "state": "on",
+   "attributes": {},
+   "ctx": "c3"
+  },
+  {
+   "t": "2026-11-10T22:58:00+00:00",
+   "kind": "input",
+   "entity_id": "light.kitchen_kitchen_light",
+   "state": "on",
+   "attributes": {},
+   "ctx": "c4"
+  },
+  {
+   "t": "2026-11-10T22:58:00+00:00",
+   "kind": "input",
+   "entity_id": "light.bedroom_lamp",
+   "state": "on",
+   "attributes": {},
+   "ctx": "c5"
+  },
+  {
+   "t": "2026-11-10T22:58:00+00:00",
+   "kind": "log",
+   "level": "DEBUG",
+   "logger": "homeassistant.components.automation.hallway_lights_adjust_brightness_for_time",
+   "msg": "Automation automation.hallway_lights_adjust_brightness_for_time not in state storage, state True from default is used"
+  },
+  {
+   "t": "2026-11-10T22:58:00+00:00",
+   "kind": "state",
+   "entity_id": "automation.hallway_lights_adjust_brightness_for_time",
+   "old": null,
+   "new": "on",
+   "ctx": "c8",
+   "parent": null,
+   "last_changed": "2026-11-10T22:58:00+00:00",
+   "last_updated": "2026-11-10T22:58:00+00:00",
+   "attributes": {
+    "last_triggered": null,
+    "current": 0,
+    "mode": "single",
+    "id": "hallway_lights_adjust_brightness_for_time",
+    "friendly_name": "Hallway lights - adjust brightness for time"
+   }
+  },
+  {
+   "t": "2026-11-10T22:58:00+00:00",
+   "kind": "log",
+   "level": "DEBUG",
+   "logger": "homeassistant.components.automation.living_room_lifx_off_at_11_30pm",
+   "msg": "Automation automation.living_room_lifx_off_at_11_30pm not in state storage, state True from default is used"
+  },
+  {
+   "t": "2026-11-10T22:58:00+00:00",
+   "kind": "state",
+   "entity_id": "automation.living_room_lifx_off_at_11_30pm",
+   "old": null,
+   "new": "on",
+   "ctx": "c9",
+   "parent": null,
+   "last_changed": "2026-11-10T22:58:00+00:00",
+   "last_updated": "2026-11-10T22:58:00+00:00",
+   "attributes": {
+    "last_triggered": null,
+    "current": 0,
+    "mode": "single",
+    "id": "living_room_lifx_off_at_2330",
+    "friendly_name": "Kitchen lights - off at 11:30pm"
+   }
+  },
+  {
+   "t": "2026-11-10T22:58:00+00:00",
+   "kind": "event",
+   "event_type": "homeassistant_start",
+   "ctx": "c17",
+   "parent": null
+  },
+  {
+   "t": "2026-11-10T22:58:00+00:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.hallway_lights_adjust_brightness_for_time",
+   "msg": "Initialized trigger Hallway lights - adjust brightness for time"
+  },
+  {
+   "t": "2026-11-10T22:58:00+00:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.living_room_lifx_off_at_11_30pm",
+   "msg": "Initialized trigger Kitchen lights - off at 11:30pm"
+  },
+  {
+   "t": "2026-11-10T22:58:00+00:00",
+   "kind": "event",
+   "event_type": "homeassistant_started",
+   "ctx": "c19",
+   "parent": null
+  },
+  {
+   "t": "2026-11-10T22:59:00+00:00",
+   "kind": "wall_jump",
+   "seconds": 7200
+  },
+  {
+   "t": "2026-11-11T01:00:00.189042+00:00",
+   "kind": "trigger",
+   "automation": "automation.hallway_lights_adjust_brightness_for_time",
+   "enabled": true,
+   "trigger": {
+    "id": "overnight",
+    "idx": "0",
+    "alias": null,
+    "platform": "time",
+    "now": "2026-11-11T01:00:00.189042+00:00",
+    "description": "time",
+    "entity_id": null
+   },
+   "trigger_ctx": null
+  },
+  {
+   "t": "2026-11-11T01:00:00.189042+00:00",
+   "kind": "log",
+   "level": "DEBUG",
+   "logger": "homeassistant.components.automation.hallway_lights_adjust_brightness_for_time",
+   "msg": "Automation trigger 'None' triggered by time"
+  },
+  {
+   "t": "2026-11-11T01:00:00.189042+00:00",
+   "kind": "event",
+   "event_type": "automation_triggered",
+   "data": {
+    "name": "Hallway lights - adjust brightness for time",
+    "entity_id": "automation.hallway_lights_adjust_brightness_for_time",
+    "source": "time"
+   },
+   "ctx": "c20",
+   "parent": null
+  },
+  {
+   "t": "2026-11-11T01:00:00.189042+00:00",
+   "kind": "state",
+   "entity_id": "automation.hallway_lights_adjust_brightness_for_time",
+   "old": "on",
+   "new": "on",
+   "ctx": "c20",
+   "parent": null,
+   "last_changed": "2026-11-10T22:58:00+00:00",
+   "last_updated": "2026-11-11T01:00:00.189042+00:00",
+   "attributes": {
+    "last_triggered": "2026-11-11T01:00:00.189042+00:00",
+    "current": 1,
+    "mode": "single",
+    "id": "hallway_lights_adjust_brightness_for_time",
+    "friendly_name": "Hallway lights - adjust brightness for time"
+   }
+  },
+  {
+   "t": "2026-11-11T01:00:00.189042+00:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.hallway_lights_adjust_brightness_for_time",
+   "msg": "Hallway lights - adjust brightness for time: Running automation actions"
+  },
+  {
+   "t": "2026-11-11T01:00:00.189042+00:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.hallway_lights_adjust_brightness_for_time",
+   "msg": "Hallway lights - adjust brightness for time: Choose at step 1: choice 1: Running automation actions"
+  },
+  {
+   "t": "2026-11-11T01:00:00.189042+00:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.hallway_lights_adjust_brightness_for_time",
+   "msg": "Hallway lights - adjust brightness for time: Choose at step 1: choice 1: Executing step call service"
+  },
+  {
+   "t": "2026-11-11T01:00:00.189042+00:00",
+   "kind": "event",
+   "event_type": "call_service",
+   "data": {
+    "domain": "light",
+    "service": "turn_on",
+    "service_data": {
+     "brightness_pct": 12,
+     "color_temp_kelvin": 2202,
+     "transition": 10,
+     "entity_id": [
+      "light.hallway_hallway"
+     ]
+    }
+   },
+   "ctx": "c20",
+   "parent": null
+  },
+  {
+   "t": "2026-11-11T01:00:00.189042+00:00",
+   "kind": "service_handler",
+   "service": "light.turn_on",
+   "data": {
+    "brightness_pct": 12,
+    "color_temp_kelvin": 2202,
+    "transition": 10,
+    "entity_id": [
+     "light.hallway_hallway"
+    ]
+   },
+   "ctx": "c20",
+   "parent": null
+  },
+  {
+   "t": "2026-11-11T01:00:00.189042+00:00",
+   "kind": "state",
+   "entity_id": "automation.hallway_lights_adjust_brightness_for_time",
+   "old": "on",
+   "new": "on",
+   "ctx": "c20",
+   "parent": null,
+   "last_changed": "2026-11-10T22:58:00+00:00",
+   "last_updated": "2026-11-11T01:00:00.189042+00:00",
+   "attributes": {
+    "last_triggered": "2026-11-11T01:00:00.189042+00:00",
+    "current": 0,
+    "mode": "single",
+    "id": "hallway_lights_adjust_brightness_for_time",
+    "friendly_name": "Hallway lights - adjust brightness for time"
+   }
+  },
+  {
+   "t": "2026-11-11T01:30:00.329983+00:00",
+   "kind": "trigger",
+   "automation": "automation.living_room_lifx_off_at_11_30pm",
+   "enabled": true,
+   "trigger": {
+    "id": "0",
+    "idx": "0",
+    "alias": null,
+    "platform": "time",
+    "now": "2026-11-11T01:30:00.329983+00:00",
+    "description": "time",
+    "entity_id": null
+   },
+   "trigger_ctx": null
+  },
+  {
+   "t": "2026-11-11T01:30:00.329983+00:00",
+   "kind": "log",
+   "level": "DEBUG",
+   "logger": "homeassistant.components.automation.living_room_lifx_off_at_11_30pm",
+   "msg": "Automation trigger 'None' triggered by time"
+  },
+  {
+   "t": "2026-11-11T01:30:00.329983+00:00",
+   "kind": "event",
+   "event_type": "automation_triggered",
+   "data": {
+    "name": "Kitchen lights - off at 11:30pm",
+    "entity_id": "automation.living_room_lifx_off_at_11_30pm",
+    "source": "time"
+   },
+   "ctx": "c21",
+   "parent": null
+  },
+  {
+   "t": "2026-11-11T01:30:00.329983+00:00",
+   "kind": "state",
+   "entity_id": "automation.living_room_lifx_off_at_11_30pm",
+   "old": "on",
+   "new": "on",
+   "ctx": "c21",
+   "parent": null,
+   "last_changed": "2026-11-10T22:58:00+00:00",
+   "last_updated": "2026-11-11T01:30:00.329983+00:00",
+   "attributes": {
+    "last_triggered": "2026-11-11T01:30:00.329983+00:00",
+    "current": 1,
+    "mode": "single",
+    "id": "living_room_lifx_off_at_2330",
+    "friendly_name": "Kitchen lights - off at 11:30pm"
+   }
+  },
+  {
+   "t": "2026-11-11T01:30:00.329983+00:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.living_room_lifx_off_at_11_30pm",
+   "msg": "Kitchen lights - off at 11:30pm: Running automation actions"
+  },
+  {
+   "t": "2026-11-11T01:30:00.329983+00:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.living_room_lifx_off_at_11_30pm",
+   "msg": "Kitchen lights - off at 11:30pm: Executing step call service"
+  },
+  {
+   "t": "2026-11-11T01:30:00.329983+00:00",
+   "kind": "event",
+   "event_type": "call_service",
+   "data": {
+    "domain": "light",
+    "service": "turn_off",
+    "service_data": {
+     "transition": 10,
+     "entity_id": [
+      "light.kitchen_kitchen_light",
+      "light.bedroom_lamp"
+     ]
+    }
+   },
+   "ctx": "c21",
+   "parent": null
+  },
+  {
+   "t": "2026-11-11T01:30:00.329983+00:00",
+   "kind": "service_handler",
+   "service": "light.turn_off",
+   "data": {
+    "transition": 10,
+    "entity_id": [
+     "light.kitchen_kitchen_light",
+     "light.bedroom_lamp"
+    ]
+   },
+   "ctx": "c21",
+   "parent": null
+  },
+  {
+   "t": "2026-11-11T01:30:00.329983+00:00",
+   "kind": "state",
+   "entity_id": "automation.living_room_lifx_off_at_11_30pm",
+   "old": "on",
+   "new": "on",
+   "ctx": "c21",
+   "parent": null,
+   "last_changed": "2026-11-10T22:58:00+00:00",
+   "last_updated": "2026-11-11T01:30:00.329983+00:00",
+   "attributes": {
+    "last_triggered": "2026-11-11T01:30:00.329983+00:00",
+    "current": 0,
+    "mode": "single",
+    "id": "living_room_lifx_off_at_2330",
+    "friendly_name": "Kitchen lights - off at 11:30pm"
+   }
+  },
+  {
+   "t": "2026-11-11T08:30:00.361756+00:00",
+   "kind": "trigger",
+   "automation": "automation.hallway_lights_adjust_brightness_for_time",
+   "enabled": true,
+   "trigger": {
+    "id": "morning",
+    "idx": "1",
+    "alias": null,
+    "platform": "time",
+    "now": "2026-11-11T08:30:00.361756+00:00",
+    "description": "time",
+    "entity_id": null
+   },
+   "trigger_ctx": null
+  },
+  {
+   "t": "2026-11-11T08:30:00.361756+00:00",
+   "kind": "log",
+   "level": "DEBUG",
+   "logger": "homeassistant.components.automation.hallway_lights_adjust_brightness_for_time",
+   "msg": "Automation trigger 'None' triggered by time"
+  },
+  {
+   "t": "2026-11-11T08:30:00.361756+00:00",
+   "kind": "event",
+   "event_type": "automation_triggered",
+   "data": {
+    "name": "Hallway lights - adjust brightness for time",
+    "entity_id": "automation.hallway_lights_adjust_brightness_for_time",
+    "source": "time"
+   },
+   "ctx": "c22",
+   "parent": null
+  },
+  {
+   "t": "2026-11-11T08:30:00.361756+00:00",
+   "kind": "state",
+   "entity_id": "automation.hallway_lights_adjust_brightness_for_time",
+   "old": "on",
+   "new": "on",
+   "ctx": "c22",
+   "parent": null,
+   "last_changed": "2026-11-10T22:58:00+00:00",
+   "last_updated": "2026-11-11T08:30:00.361756+00:00",
+   "attributes": {
+    "last_triggered": "2026-11-11T08:30:00.361756+00:00",
+    "current": 1,
+    "mode": "single",
+    "id": "hallway_lights_adjust_brightness_for_time",
+    "friendly_name": "Hallway lights - adjust brightness for time"
+   }
+  },
+  {
+   "t": "2026-11-11T08:30:00.361756+00:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.hallway_lights_adjust_brightness_for_time",
+   "msg": "Hallway lights - adjust brightness for time: Running automation actions"
+  },
+  {
+   "t": "2026-11-11T08:30:00.361756+00:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.hallway_lights_adjust_brightness_for_time",
+   "msg": "Hallway lights - adjust brightness for time: Choose at step 1: choice 2: Running automation actions"
+  },
+  {
+   "t": "2026-11-11T08:30:00.361756+00:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.hallway_lights_adjust_brightness_for_time",
+   "msg": "Hallway lights - adjust brightness for time: Choose at step 1: choice 2: Executing step call service"
+  },
+  {
+   "t": "2026-11-11T08:30:00.361756+00:00",
+   "kind": "event",
+   "event_type": "call_service",
+   "data": {
+    "domain": "light",
+    "service": "turn_on",
+    "service_data": {
+     "brightness_pct": 30,
+     "color_temp_kelvin": 2400,
+     "transition": 10,
+     "entity_id": [
+      "light.hallway_hallway"
+     ]
+    }
+   },
+   "ctx": "c22",
+   "parent": null
+  },
+  {
+   "t": "2026-11-11T08:30:00.361756+00:00",
+   "kind": "service_handler",
+   "service": "light.turn_on",
+   "data": {
+    "brightness_pct": 30,
+    "color_temp_kelvin": 2400,
+    "transition": 10,
+    "entity_id": [
+     "light.hallway_hallway"
+    ]
+   },
+   "ctx": "c22",
+   "parent": null
+  },
+  {
+   "t": "2026-11-11T08:30:00.361756+00:00",
+   "kind": "state",
+   "entity_id": "automation.hallway_lights_adjust_brightness_for_time",
+   "old": "on",
+   "new": "on",
+   "ctx": "c22",
+   "parent": null,
+   "last_changed": "2026-11-10T22:58:00+00:00",
+   "last_updated": "2026-11-11T08:30:00.361756+00:00",
+   "attributes": {
+    "last_triggered": "2026-11-11T08:30:00.361756+00:00",
+    "current": 0,
+    "mode": "single",
+    "id": "hallway_lights_adjust_brightness_for_time",
+    "friendly_name": "Hallway lights - adjust brightness for time"
+   }
+  },
+  {
+   "t": "2026-11-11T11:30:00.075248+00:00",
+   "kind": "trigger",
+   "automation": "automation.hallway_lights_adjust_brightness_for_time",
+   "enabled": true,
+   "trigger": {
+    "id": "normal",
+    "idx": "2",
+    "alias": null,
+    "platform": "time",
+    "now": "2026-11-11T11:30:00.075248+00:00",
+    "description": "time",
+    "entity_id": null
+   },
+   "trigger_ctx": null
+  },
+  {
+   "t": "2026-11-11T11:30:00.075248+00:00",
+   "kind": "log",
+   "level": "DEBUG",
+   "logger": "homeassistant.components.automation.hallway_lights_adjust_brightness_for_time",
+   "msg": "Automation trigger 'None' triggered by time"
+  },
+  {
+   "t": "2026-11-11T11:30:00.075248+00:00",
+   "kind": "event",
+   "event_type": "automation_triggered",
+   "data": {
+    "name": "Hallway lights - adjust brightness for time",
+    "entity_id": "automation.hallway_lights_adjust_brightness_for_time",
+    "source": "time"
+   },
+   "ctx": "c23",
+   "parent": null
+  },
+  {
+   "t": "2026-11-11T11:30:00.075248+00:00",
+   "kind": "state",
+   "entity_id": "automation.hallway_lights_adjust_brightness_for_time",
+   "old": "on",
+   "new": "on",
+   "ctx": "c23",
+   "parent": null,
+   "last_changed": "2026-11-10T22:58:00+00:00",
+   "last_updated": "2026-11-11T11:30:00.075248+00:00",
+   "attributes": {
+    "last_triggered": "2026-11-11T11:30:00.075248+00:00",
+    "current": 1,
+    "mode": "single",
+    "id": "hallway_lights_adjust_brightness_for_time",
+    "friendly_name": "Hallway lights - adjust brightness for time"
+   }
+  },
+  {
+   "t": "2026-11-11T11:30:00.075248+00:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.hallway_lights_adjust_brightness_for_time",
+   "msg": "Hallway lights - adjust brightness for time: Running automation actions"
+  },
+  {
+   "t": "2026-11-11T11:30:00.075248+00:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.hallway_lights_adjust_brightness_for_time",
+   "msg": "Hallway lights - adjust brightness for time: Choose at step 1: choice 3: Running automation actions"
+  },
+  {
+   "t": "2026-11-11T11:30:00.075248+00:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.hallway_lights_adjust_brightness_for_time",
+   "msg": "Hallway lights - adjust brightness for time: Choose at step 1: choice 3: Executing step call service"
+  },
+  {
+   "t": "2026-11-11T11:30:00.075248+00:00",
+   "kind": "event",
+   "event_type": "call_service",
+   "data": {
+    "domain": "light",
+    "service": "turn_on",
+    "service_data": {
+     "brightness_pct": 35,
+     "color_temp_kelvin": 2700,
+     "transition": 10,
+     "entity_id": [
+      "light.hallway_hallway"
+     ]
+    }
+   },
+   "ctx": "c23",
+   "parent": null
+  },
+  {
+   "t": "2026-11-11T11:30:00.075248+00:00",
+   "kind": "service_handler",
+   "service": "light.turn_on",
+   "data": {
+    "brightness_pct": 35,
+    "color_temp_kelvin": 2700,
+    "transition": 10,
+    "entity_id": [
+     "light.hallway_hallway"
+    ]
+   },
+   "ctx": "c23",
+   "parent": null
+  },
+  {
+   "t": "2026-11-11T11:30:00.075248+00:00",
+   "kind": "state",
+   "entity_id": "automation.hallway_lights_adjust_brightness_for_time",
+   "old": "on",
+   "new": "on",
+   "ctx": "c23",
+   "parent": null,
+   "last_changed": "2026-11-10T22:58:00+00:00",
+   "last_updated": "2026-11-11T11:30:00.075248+00:00",
+   "attributes": {
+    "last_triggered": "2026-11-11T11:30:00.075248+00:00",
+    "current": 0,
+    "mode": "single",
+    "id": "hallway_lights_adjust_brightness_for_time",
+    "friendly_name": "Hallway lights - adjust brightness for time"
+   }
+  },
+  {
+   "t": "2026-11-11T23:00:00.189042+00:00",
+   "kind": "trigger",
+   "automation": "automation.hallway_lights_adjust_brightness_for_time",
+   "enabled": true,
+   "trigger": {
+    "id": "overnight",
+    "idx": "0",
+    "alias": null,
+    "platform": "time",
+    "now": "2026-11-11T23:00:00.189042+00:00",
+    "description": "time",
+    "entity_id": null
+   },
+   "trigger_ctx": null
+  },
+  {
+   "t": "2026-11-11T23:00:00.189042+00:00",
+   "kind": "log",
+   "level": "DEBUG",
+   "logger": "homeassistant.components.automation.hallway_lights_adjust_brightness_for_time",
+   "msg": "Automation trigger 'None' triggered by time"
+  },
+  {
+   "t": "2026-11-11T23:00:00.189042+00:00",
+   "kind": "event",
+   "event_type": "automation_triggered",
+   "data": {
+    "name": "Hallway lights - adjust brightness for time",
+    "entity_id": "automation.hallway_lights_adjust_brightness_for_time",
+    "source": "time"
+   },
+   "ctx": "c24",
+   "parent": null
+  },
+  {
+   "t": "2026-11-11T23:00:00.189042+00:00",
+   "kind": "state",
+   "entity_id": "automation.hallway_lights_adjust_brightness_for_time",
+   "old": "on",
+   "new": "on",
+   "ctx": "c24",
+   "parent": null,
+   "last_changed": "2026-11-10T22:58:00+00:00",
+   "last_updated": "2026-11-11T23:00:00.189042+00:00",
+   "attributes": {
+    "last_triggered": "2026-11-11T23:00:00.189042+00:00",
+    "current": 1,
+    "mode": "single",
+    "id": "hallway_lights_adjust_brightness_for_time",
+    "friendly_name": "Hallway lights - adjust brightness for time"
+   }
+  },
+  {
+   "t": "2026-11-11T23:00:00.189042+00:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.hallway_lights_adjust_brightness_for_time",
+   "msg": "Hallway lights - adjust brightness for time: Running automation actions"
+  },
+  {
+   "t": "2026-11-11T23:00:00.189042+00:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.hallway_lights_adjust_brightness_for_time",
+   "msg": "Hallway lights - adjust brightness for time: Choose at step 1: choice 1: Running automation actions"
+  },
+  {
+   "t": "2026-11-11T23:00:00.189042+00:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.hallway_lights_adjust_brightness_for_time",
+   "msg": "Hallway lights - adjust brightness for time: Choose at step 1: choice 1: Executing step call service"
+  },
+  {
+   "t": "2026-11-11T23:00:00.189042+00:00",
+   "kind": "event",
+   "event_type": "call_service",
+   "data": {
+    "domain": "light",
+    "service": "turn_on",
+    "service_data": {
+     "brightness_pct": 12,
+     "color_temp_kelvin": 2202,
+     "transition": 10,
+     "entity_id": [
+      "light.hallway_hallway"
+     ]
+    }
+   },
+   "ctx": "c24",
+   "parent": null
+  },
+  {
+   "t": "2026-11-11T23:00:00.189042+00:00",
+   "kind": "service_handler",
+   "service": "light.turn_on",
+   "data": {
+    "brightness_pct": 12,
+    "color_temp_kelvin": 2202,
+    "transition": 10,
+    "entity_id": [
+     "light.hallway_hallway"
+    ]
+   },
+   "ctx": "c24",
+   "parent": null
+  },
+  {
+   "t": "2026-11-11T23:00:00.189042+00:00",
+   "kind": "state",
+   "entity_id": "automation.hallway_lights_adjust_brightness_for_time",
+   "old": "on",
+   "new": "on",
+   "ctx": "c24",
+   "parent": null,
+   "last_changed": "2026-11-10T22:58:00+00:00",
+   "last_updated": "2026-11-11T23:00:00.189042+00:00",
+   "attributes": {
+    "last_triggered": "2026-11-11T23:00:00.189042+00:00",
+    "current": 0,
+    "mode": "single",
+    "id": "hallway_lights_adjust_brightness_for_time",
+    "friendly_name": "Hallway lights - adjust brightness for time"
+   }
+  },
+  {
+   "t": "2026-11-11T23:30:00.329983+00:00",
+   "kind": "trigger",
+   "automation": "automation.living_room_lifx_off_at_11_30pm",
+   "enabled": true,
+   "trigger": {
+    "id": "0",
+    "idx": "0",
+    "alias": null,
+    "platform": "time",
+    "now": "2026-11-11T23:30:00.329983+00:00",
+    "description": "time",
+    "entity_id": null
+   },
+   "trigger_ctx": null
+  },
+  {
+   "t": "2026-11-11T23:30:00.329983+00:00",
+   "kind": "log",
+   "level": "DEBUG",
+   "logger": "homeassistant.components.automation.living_room_lifx_off_at_11_30pm",
+   "msg": "Automation trigger 'None' triggered by time"
+  },
+  {
+   "t": "2026-11-11T23:30:00.329983+00:00",
+   "kind": "event",
+   "event_type": "automation_triggered",
+   "data": {
+    "name": "Kitchen lights - off at 11:30pm",
+    "entity_id": "automation.living_room_lifx_off_at_11_30pm",
+    "source": "time"
+   },
+   "ctx": "c25",
+   "parent": null
+  },
+  {
+   "t": "2026-11-11T23:30:00.329983+00:00",
+   "kind": "state",
+   "entity_id": "automation.living_room_lifx_off_at_11_30pm",
+   "old": "on",
+   "new": "on",
+   "ctx": "c25",
+   "parent": null,
+   "last_changed": "2026-11-10T22:58:00+00:00",
+   "last_updated": "2026-11-11T23:30:00.329983+00:00",
+   "attributes": {
+    "last_triggered": "2026-11-11T23:30:00.329983+00:00",
+    "current": 1,
+    "mode": "single",
+    "id": "living_room_lifx_off_at_2330",
+    "friendly_name": "Kitchen lights - off at 11:30pm"
+   }
+  },
+  {
+   "t": "2026-11-11T23:30:00.329983+00:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.living_room_lifx_off_at_11_30pm",
+   "msg": "Kitchen lights - off at 11:30pm: Running automation actions"
+  },
+  {
+   "t": "2026-11-11T23:30:00.329983+00:00",
+   "kind": "log",
+   "level": "INFO",
+   "logger": "homeassistant.components.automation.living_room_lifx_off_at_11_30pm",
+   "msg": "Kitchen lights - off at 11:30pm: Executing step call service"
+  },
+  {
+   "t": "2026-11-11T23:30:00.329983+00:00",
+   "kind": "event",
+   "event_type": "call_service",
+   "data": {
+    "domain": "light",
+    "service": "turn_off",
+    "service_data": {
+     "transition": 10,
+     "entity_id": [
+      "light.kitchen_kitchen_light",
+      "light.bedroom_lamp"
+     ]
+    }
+   },
+   "ctx": "c25",
+   "parent": null
+  },
+  {
+   "t": "2026-11-11T23:30:00.329983+00:00",
+   "kind": "service_handler",
+   "service": "light.turn_off",
+   "data": {
+    "transition": 10,
+    "entity_id": [
+     "light.kitchen_kitchen_light",
+     "light.bedroom_lamp"
+    ]
+   },
+   "ctx": "c25",
+   "parent": null
+  },
+  {
+   "t": "2026-11-11T23:30:00.329983+00:00",
+   "kind": "state",
+   "entity_id": "automation.living_room_lifx_off_at_11_30pm",
+   "old": "on",
+   "new": "on",
+   "ctx": "c25",
+   "parent": null,
+   "last_changed": "2026-11-10T22:58:00+00:00",
+   "last_updated": "2026-11-11T23:30:00.329983+00:00",
+   "attributes": {
+    "last_triggered": "2026-11-11T23:30:00.329983+00:00",
+    "current": 0,
+    "mode": "single",
+    "id": "living_room_lifx_off_at_2330",
+    "friendly_name": "Kitchen lights - off at 11:30pm"
+   }
+  }
+ ]
+}
