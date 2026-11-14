@@ -203,7 +203,7 @@ fn labs_subscribe(conn: &mut Conn, id: u64, msg: &Map<String, Value>) -> Result<
         .shared
         .config
         .labs
-        .subscribe(&domain, &feature, listener)
+        .subscribe(&domain, &feature, live.clone(), listener)
     else {
         drop(guard);
         conn.out.error(

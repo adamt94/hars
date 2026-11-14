@@ -39,10 +39,13 @@ const KEY: &str = "core.labs";
 /// `false` once it's gone (and is then dropped).
 pub type Listener = Box<dyn Fn(&Value) -> bool + Send + Sync>;
 
+/// A subscription's `live` flag: false once unsubscribed or closed.
+pub type Live = std::sync::Arc<Mutex<bool>>;
+
 /// The enabled preview features, and where they're saved.
 pub struct Labs {
-    /// `labs/subscribe`rs: (domain, feature, listener).
-    listeners: Mutex<Vec<(String, String, Listener)>>,
+    /// `labs/subscribe`rs: (domain, feature, live, listener).
+    listeners: Mutex<Vec<(String, String, Live, Listener)>>,
     /// The config directory; `None` keeps everything in memory (tests).
     dir: Option<PathBuf>,
     enabled: Mutex<Vec<(String, String)>>,
@@ -155,10 +158,19 @@ impl Labs {
 
     /// Listen to a feature: its description now, taken together with the
     /// registration so no change falls in between. `None` if unknown.
-    pub fn subscribe(&self, domain: &str, name: &str, listener: Listener) -> Option<Value> {
+    /// Subscriptions that have ended are dropped here too, so ones whose
+    /// feature never changes don't pile up.
+    pub fn subscribe(
+        &self,
+        domain: &str,
+        name: &str,
+        live: Live,
+        listener: Listener,
+    ) -> Option<Value> {
         let mut listeners = self.listeners.lock();
+        listeners.retain(|(_, _, live, _)| *live.lock());
         let now = self.describe(domain, name, self.is_enabled(domain, name))?;
-        listeners.push((domain.to_owned(), name.to_owned(), listener));
+        listeners.push((domain.to_owned(), name.to_owned(), live, listener));
         Some(now)
     }
 
@@ -188,7 +200,7 @@ impl Labs {
         }
         self.listeners
             .lock()
-            .retain(|(d, f, listener)| d != domain || f != name || listener(&changed));
+            .retain(|(d, f, _, listener)| d != domain || f != name || listener(&changed));
         true
     }
 
@@ -261,10 +273,12 @@ mod tests {
         let labs = Labs::load(&file);
         let heard = std::sync::Arc::new(Mutex::new(Vec::new()));
         let h = heard.clone();
+        let alive = || std::sync::Arc::new(Mutex::new(true));
         let now = labs
             .subscribe(
                 "frontend",
                 "winter_mode",
+                alive(),
                 Box::new(move |v: &Value| {
                     h.lock().push(v["enabled"].clone());
                     true
@@ -273,15 +287,32 @@ mod tests {
             .unwrap();
         assert_eq!(now["enabled"], false);
         // A listener that's gone is dropped at the next change.
-        labs.subscribe("frontend", "winter_mode", Box::new(|_: &Value| false));
+        labs.subscribe(
+            "frontend",
+            "winter_mode",
+            alive(),
+            Box::new(|_: &Value| false),
+        );
         assert!(labs.update("frontend", "winter_mode", true).await);
         assert!(labs.is_enabled("frontend", "winter_mode"));
         assert_eq!(*heard.lock(), [json!(true)]);
         assert_eq!(labs.listeners.lock().len(), 1);
+        // An ended subscription is dropped when another subscribes, even
+        // if its feature never changes.
+        let ended = alive();
+        labs.subscribe(
+            "analytics",
+            "snapshots",
+            ended.clone(),
+            Box::new(|_: &Value| true),
+        );
+        *ended.lock() = false;
+        assert_eq!(labs.listeners.lock().len(), 2);
         assert!(
-            labs.subscribe("frontend", "nope", Box::new(|_: &Value| true))
+            labs.subscribe("frontend", "nope", alive(), Box::new(|_: &Value| true))
                 .is_none()
         );
+        assert_eq!(labs.listeners.lock().len(), 1);
         let _ = std::fs::remove_file(&file);
     }
 }
