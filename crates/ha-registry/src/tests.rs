@@ -160,3 +160,170 @@ fn a_corrupt_registry_is_set_aside_for_the_server_but_an_error_for_the_importer(
     assert!(!dir.join(".storage").join(AREA_KEY).exists());
     std::fs::remove_dir_all(dir).unwrap();
 }
+
+fn write_minor(dir: &Path, key: &str, minor: u32, data: Value) {
+    std::fs::create_dir_all(dir.join(".storage")).unwrap();
+    write(dir, key, minor, data);
+}
+
+fn temp(name: &str) -> std::path::PathBuf {
+    let dir = std::env::temp_dir().join(format!("hars-registry-{name}-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    dir
+}
+
+/// HA's migrations for files still at an older minor version.
+#[test]
+fn older_minor_versions_are_migrated_like_ha() {
+    let dir = temp("migrate");
+    write_minor(
+        &dir,
+        DEVICE_KEY,
+        8,
+        json!({"devices": [
+            {"id": "dev1", "config_entries": ["entry1", "entry2"], "name": "Kitchen", "name_by_user": null}
+        ]}),
+    );
+    write_minor(
+        &dir,
+        AREA_KEY,
+        8,
+        json!({"areas": [
+            {"id": "z", "name": "Zebra"}, {"id": "a", "name": "attic"}, {"id": "m", "name": "Middle"}
+        ]}),
+    );
+    write_minor(
+        &dir,
+        FLOOR_KEY,
+        2,
+        json!({"floors": [
+            {"floor_id": "none", "name": "Garden", "level": null},
+            {"floor_id": "g", "name": "Ground", "level": 0},
+            {"floor_id": "b", "name": "Basement", "level": -1},
+            {"floor_id": "u2", "name": "Upstairs B", "level": 1},
+            {"floor_id": "u1", "name": "upstairs a", "level": 1}
+        ]}),
+    );
+    write_minor(
+        &dir,
+        ENTITY_KEY,
+        21,
+        json!({"entities": [
+            {"entity_id": "sensor.renamed", "platform": "p", "device_id": "dev1", "name": "Kitchen Power", "name_v2": "Renamed", "labels": []},
+            {"entity_id": "sensor.same", "platform": "p", "device_id": "dev1", "name": "Same", "name_v2": "Same", "labels": []},
+            {"entity_id": "sensor.cleared", "platform": "p", "device_id": "dev1", "name": "Old", "name_v2": null, "labels": []}
+        ]}),
+    );
+    let r = Registries::load_strict(&dir).unwrap();
+    assert_eq!(
+        r.devices_json()[0]["config_entries_subentries"],
+        json!({"entry1": [null], "entry2": [null]})
+    );
+    let areas: Vec<Value> = r
+        .areas_json()
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|a| a["area_id"].clone())
+        .collect();
+    assert_eq!(areas, [json!("a"), json!("m"), json!("z")]);
+    let floors: Vec<Value> = r
+        .floors_json()
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|f| f["floor_id"].clone())
+        .collect();
+    assert_eq!(
+        floors,
+        [
+            json!("u1"),
+            json!("u2"),
+            json!("g"),
+            json!("b"),
+            json!("none")
+        ]
+    );
+    let names: Vec<Option<String>> = r.entities.iter().map(|e| e.name.clone()).collect();
+    assert_eq!(
+        names,
+        [Some("Kitchen Renamed".into()), Some("Same".into()), None]
+    );
+    assert!(r.entities.iter().all(|e| !e.extra.contains_key("name_v2")));
+
+    // Current minor versions are left alone (file order is display order).
+    let dir2 = temp("current");
+    write_minor(
+        &dir2,
+        AREA_KEY,
+        9,
+        json!({"areas": [{"id": "z", "name": "Zebra"}, {"id": "a", "name": "Attic"}]}),
+    );
+    assert_eq!(
+        Registries::load_strict(&dir2).unwrap().areas_json()[0]["area_id"],
+        "z"
+    );
+    for d in [dir, dir2] {
+        std::fs::remove_dir_all(d).unwrap();
+    }
+}
+
+#[test]
+fn nulls_and_empty_names_read_like_ha() {
+    let dir = temp("nulls");
+    write_minor(
+        &dir,
+        DEVICE_KEY,
+        12,
+        json!({"devices": [
+            {"id": "dev1", "name": "Kitchen", "name_by_user": "", "config_entries": null, "labels": null}
+        ]}),
+    );
+    write_minor(
+        &dir,
+        ENTITY_KEY,
+        22,
+        json!({"entities": [
+            {"entity_id": "sensor.kitchen_power", "platform": "p", "device_id": "dev1", "has_entity_name": false,
+             "original_name": "Kitchen Power", "options": null, "labels": null, "name": null}
+        ]}),
+    );
+    let r = Registries::load_strict(&dir).unwrap();
+    // `name_by_user or name`: an empty user name falls back to the name.
+    assert_eq!(r.entities_for_display()["entities"][0]["en"], "Power");
+    assert_eq!(r.devices_json()[0]["labels"], json!([]));
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
+/// Linear, not entities × devices: 10k entities over 5k devices in well
+/// under the ~95 ms the nested scan took (release); generous for debug.
+#[test]
+fn display_list_scales_linearly() {
+    let devices: Vec<Device> = (0..5000)
+        .map(|i| Device {
+            id: format!("d{i}"),
+            name: Some(format!("Device {i}")),
+            ..Default::default()
+        })
+        .collect();
+    let entities: Vec<Entity> = (0..10000)
+        .map(|i| Entity {
+            entity_id: format!("sensor.e{i}"),
+            platform: "p".into(),
+            device_id: Some(format!("d{}", i % 5000)),
+            original_name: Some(format!("Device {} Power", i % 5000)),
+            ..Default::default()
+        })
+        .collect();
+    let r = Registries {
+        devices,
+        entities,
+        ..Default::default()
+    };
+    let start = std::time::Instant::now();
+    let v = r.entities_for_display();
+    let took = start.elapsed();
+    eprintln!("entities_for_display, 10k entities / 5k devices: {took:?}");
+    assert_eq!(v["entities"][0]["en"], "Power");
+    assert!(took < std::time::Duration::from_millis(500), "{took:?}");
+}

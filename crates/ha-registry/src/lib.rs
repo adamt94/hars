@@ -11,6 +11,7 @@
 use ha_core::storage::{Store, StoreError};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
+use std::collections::HashMap;
 use std::path::Path;
 
 pub const ENTITY_KEY: &str = "core.entity_registry";
@@ -30,6 +31,16 @@ pub const STORES: [(&str, u32, u32); 5] = [
 /// `EntityCategory`, by index (`ENTITY_CATEGORY_INDEX_TO_VALUE`).
 const ENTITY_CATEGORIES: [&str; 2] = ["config", "diagnostic"];
 
+/// `null` reads as the empty collection, as HA's loaders treat it (e.g.
+/// `_protect_entity_options(None)`).
+fn null_as_default<'de, D, T>(d: D) -> Result<T, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: Deserialize<'de> + Default,
+{
+    Ok(Option::<T>::deserialize(d)?.unwrap_or_default())
+}
+
 /// `datetime.isoformat()` → `datetime.timestamp()`.
 fn timestamp(iso: &Option<String>) -> Value {
     iso.as_deref()
@@ -41,7 +52,7 @@ fn timestamp(iso: &Option<String>) -> Value {
 pub struct Area {
     pub id: String,
     pub name: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "null_as_default")]
     pub aliases: Vec<String>,
     #[serde(default)]
     pub floor_id: Option<String>,
@@ -49,7 +60,7 @@ pub struct Area {
     pub humidity_entity_id: Option<String>,
     #[serde(default)]
     pub icon: Option<String>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "null_as_default")]
     pub labels: Vec<String>,
     #[serde(default)]
     pub picture: Option<String>,
@@ -86,7 +97,7 @@ impl Area {
 pub struct Floor {
     pub floor_id: String,
     pub name: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "null_as_default")]
     pub aliases: Vec<String>,
     #[serde(default)]
     pub icon: Option<String>,
@@ -155,11 +166,11 @@ pub struct Device {
     pub area_id: Option<String>,
     #[serde(default)]
     pub configuration_url: Option<String>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "null_as_default")]
     pub config_entries: Vec<String>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "null_as_default")]
     pub config_entries_subentries: Map<String, Value>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "null_as_default")]
     pub connections: Vec<Value>,
     #[serde(default)]
     pub created_at: Option<String>,
@@ -169,9 +180,9 @@ pub struct Device {
     pub entry_type: Option<String>,
     #[serde(default)]
     pub hw_version: Option<String>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "null_as_default")]
     pub identifiers: Vec<Value>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "null_as_default")]
     pub labels: Vec<String>,
     #[serde(default)]
     pub manufacturer: Option<String>,
@@ -198,6 +209,14 @@ pub struct Device {
 }
 
 impl Device {
+    /// `name_by_user or name`, with Python's `or`: an empty name doesn't count.
+    pub fn display_name(&self) -> Option<&str> {
+        self.name_by_user
+            .as_deref()
+            .filter(|n| !n.is_empty())
+            .or(self.name.as_deref().filter(|n| !n.is_empty()))
+    }
+
     /// `DeviceEntry.dict_repr`.
     pub fn json(&self) -> Value {
         json!({
@@ -237,7 +256,7 @@ pub struct Entity {
     pub unique_id: Option<Value>,
     #[serde(default)]
     pub area_id: Option<String>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "null_as_default")]
     pub labels: Vec<String>,
     #[serde(default)]
     pub device_id: Option<String>,
@@ -257,7 +276,7 @@ pub struct Entity {
     pub name: Option<String>,
     #[serde(default)]
     pub original_name: Option<String>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "null_as_default")]
     pub options: Map<String, Value>,
     #[serde(flatten)]
     pub extra: Map<String, Value>,
@@ -439,6 +458,18 @@ pub struct Registries {
     pub labels: Vec<Label>,
 }
 
+fn store_minor(store: &Store) -> u32 {
+    let key = store
+        .path()
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or_default();
+    STORES
+        .iter()
+        .find(|(k, _, _)| *k == key)
+        .map_or(1, |&(_, _, minor)| minor)
+}
+
 fn store(dir: &Path, key: &'static str) -> Store {
     let &(_, major, minor) = STORES
         .iter()
@@ -466,9 +497,11 @@ impl Registries {
         fn read<T: serde::de::DeserializeOwned + Default>(
             store: Store,
             quarantine: bool,
-        ) -> Result<T, StoreError> {
-            match store.load::<T>() {
-                Ok(data) => Ok(data.unwrap_or_default()),
+        ) -> Result<(T, u32), StoreError> {
+            let current = store_minor(&store);
+            match store.load_with_minor::<T>() {
+                Ok(Some(loaded)) => Ok(loaded),
+                Ok(None) => Ok((T::default(), current)),
                 Err(StoreError::Json { path, .. }) if quarantine => {
                     let aside = format!(
                         "{}.corrupt.{}",
@@ -479,33 +512,86 @@ impl Registries {
                     if let Err(e) = std::fs::rename(&path, &aside) {
                         tracing::error!("could not move {}: {e}", path.display());
                     }
-                    Ok(T::default())
+                    Ok((T::default(), current))
                 }
                 Err(e) => Err(e),
             }
         }
-        let entities: EntityData = read(store(config_dir, ENTITY_KEY), quarantine)?;
-        let devices: DeviceData = read(store(config_dir, DEVICE_KEY), quarantine)?;
-        let areas: AreaData = read(store(config_dir, AREA_KEY), quarantine)?;
-        let floors: FloorData = read(store(config_dir, FLOOR_KEY), quarantine)?;
-        let labels: LabelData = read(store(config_dir, LABEL_KEY), quarantine)?;
-        Ok(Self {
+        let (entities, entity_minor): (EntityData, _) =
+            read(store(config_dir, ENTITY_KEY), quarantine)?;
+        let (devices, device_minor): (DeviceData, _) =
+            read(store(config_dir, DEVICE_KEY), quarantine)?;
+        let (areas, area_minor): (AreaData, _) = read(store(config_dir, AREA_KEY), quarantine)?;
+        let (floors, floor_minor): (FloorData, _) = read(store(config_dir, FLOOR_KEY), quarantine)?;
+        let (labels, _): (LabelData, _) = read(store(config_dir, LABEL_KEY), quarantine)?;
+        let mut r = Self {
             entities: entities.entities,
             devices: devices.devices,
             areas: areas.areas,
             floors: floors.floors,
             labels: labels.labels,
-        })
+        };
+        r.migrate(entity_minor, device_minor, area_minor, floor_minor);
+        Ok(r)
+    }
+
+    /// The parts of HA's minor-version migrations that change what `hars`
+    /// serves. HA only rewrites a registry file when it changes, so files
+    /// still at an older minor version are normal.
+    fn migrate(&mut self, entity_minor: u32, device_minor: u32, area_minor: u32, floor_minor: u32) {
+        use ha_core::casefold::casefold;
+        // Device 1.9 (2025.2) adds subentries: each config entry maps to [null].
+        if device_minor < 9 {
+            for d in &mut self.devices {
+                d.config_entries_subentries = d
+                    .config_entries
+                    .iter()
+                    .map(|e| (e.clone(), json!([null])))
+                    .collect();
+            }
+        }
+        // Area 1.9 sorts areas by name.
+        if area_minor < 9 {
+            self.areas.sort_by_cached_key(|a| casefold(&a.name));
+        }
+        // Floor 1.3 sorts by level (highest first, none last), then name.
+        if floor_minor < 3 {
+            self.floors.sort_by_cached_key(|f| {
+                (
+                    f.level.map_or(i128::MAX, |l| -(l as i128)),
+                    casefold(&f.name),
+                )
+            });
+        }
+        // Entity 1.21 was reverted: names come back from `name_v2`, with the
+        // device name in front when the user renamed it since.
+        if entity_minor == 21 {
+            let device_names: HashMap<&str, String> = self
+                .devices
+                .iter()
+                .filter_map(|d| Some((d.id.as_str(), d.display_name()?.to_owned())))
+                .collect();
+            for e in &mut self.entities {
+                let old = e.name.take();
+                let v2 = match e.extra.remove("name_v2") {
+                    Some(Value::String(s)) => Some(s),
+                    _ => None,
+                };
+                let device = e.device_id.as_deref().and_then(|id| device_names.get(id));
+                e.name = match (&v2, device) {
+                    (Some(n), Some(device)) if v2 != old => Some(format!("{device} {n}")),
+                    _ => v2,
+                };
+            }
+        }
     }
 
     /// `config/entity_registry/list_for_display`: enabled entities only.
     pub fn entities_for_display(&self) -> Value {
-        let device_name = |id: &str| {
-            self.devices
-                .iter()
-                .find(|d| d.id == id)
-                .and_then(|d| d.name_by_user.as_deref().or(d.name.as_deref()))
-        };
+        // Indexed once per call: linear in entities + devices.
+        let devices: HashMap<&str, &Device> =
+            self.devices.iter().map(|d| (d.id.as_str(), d)).collect();
+        let device_name = |id: &str| devices.get(id).and_then(|d| d.display_name());
         let entities: Vec<Value> = self
             .entities
             .iter()

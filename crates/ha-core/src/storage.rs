@@ -51,12 +51,19 @@ pub enum StoreError {
     },
 }
 
-/// `minor_version` and `key` are not checked: newer minor versions are
-/// backwards compatible, and HA doesn't check the key either.
+/// `minor_version` isn't checked (newer minor versions are backwards
+/// compatible) but is returned for migrations; `key` isn't checked either,
+/// as in HA.
 #[derive(serde::Deserialize)]
 struct Envelope<T> {
     version: u32,
+    #[serde(default = "first_minor")]
+    minor_version: u32,
     data: T,
+}
+
+fn first_minor() -> u32 {
+    1
 }
 
 #[derive(Serialize)]
@@ -94,6 +101,12 @@ impl Store {
     /// The stored data, or `None` if the file doesn't exist. A newer minor
     /// version is read as-is: HA keeps minor versions backwards compatible.
     pub fn load<T: DeserializeOwned>(&self) -> Result<Option<T>, StoreError> {
+        Ok(self.load_with_minor()?.map(|(data, _)| data))
+    }
+
+    /// [`Store::load`], with the file's `minor_version` (1 if missing), for
+    /// stores whose older minor versions HA migrates on load.
+    pub fn load_with_minor<T: DeserializeOwned>(&self) -> Result<Option<(T, u32)>, StoreError> {
         let bytes = match fs::read(&self.path) {
             Ok(bytes) => bytes,
             Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(None),
@@ -121,7 +134,7 @@ impl Store {
                 found: env.version,
                 supported: self.version,
             }),
-            std::cmp::Ordering::Equal => Ok(Some(env.data)),
+            std::cmp::Ordering::Equal => Ok(Some((env.data, env.minor_version))),
         }
     }
 
