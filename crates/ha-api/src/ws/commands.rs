@@ -517,7 +517,7 @@ fn filter_lists(value: &Value, key: &str) -> Result<FilterLists, Bad> {
                 };
                 let mut out = Vec::with_capacity(items.len());
                 for (i, item) in items.into_iter().enumerate() {
-                    match cv_string(item) {
+                    match crate::cv::string(item) {
                         Ok(s) => out.push(s),
                         Err(why) => errors.push(format!("{why} @ data{path}[{i}]")),
                     }
@@ -546,20 +546,6 @@ fn filter_lists(value: &Value, key: &str) -> Result<FilterLists, Bad> {
     }
 }
 
-/// `cv.string`: anything but `None`, a list or a dict, as Python's `str`.
-fn cv_string(v: &Value) -> Result<String, &'static str> {
-    match v {
-        Value::Null => Err("string value is None"),
-        Value::String(s) => Ok(s.clone()),
-        Value::Array(_) | Value::Object(_) => Err("value should be a string"),
-        Value::Bool(b) => Ok(if *b { "True" } else { "False" }.into()),
-        Value::Number(n) => Ok(match n.as_f64().filter(|_| n.is_f64()) {
-            Some(f) => ha_integrations::sun::py_float(f),
-            None => n.to_string(),
-        }),
-    }
-}
-
 /// `cv.entity_ids` at `data<path>`: a comma-separated string or a list
 /// (a dict gives its keys), each lowercased and checked. The first bad id
 /// is the error.
@@ -583,7 +569,7 @@ fn cv_entity_ids(v: &Value, path: &str) -> Result<Vec<String>, Bad> {
     };
     let mut ids = Vec::with_capacity(items.len());
     for item in &items {
-        let s = cv_string(item).map_err(|why| fail(why.into()))?;
+        let s = crate::cv::string(item).map_err(|why| fail(why.into()))?;
         let lower = s.to_lowercase();
         if !ha_core::valid_entity_id(&lower) {
             return Err(fail(format!("Entity ID {s} is an invalid entity ID")));
@@ -626,7 +612,7 @@ pub(super) fn event_json(event: &Event) -> Value {
     json!({
         "event_type": event_type(&event.kind),
         "data": data,
-        "origin": "LOCAL",
+        "origin": event.origin.as_str(),
         "time_fired": ha_core::isoformat(event.time_fired),
         "context": event.context,
     })

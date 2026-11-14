@@ -1,0 +1,528 @@
+{
+ "exchanges": [
+  {
+   "type": "update_registration",
+   "request": {
+    "data_plaintext": "{\"app_data\":{\"push_token\":\"fake-push-token\",\"push_url\":\"https:\\/\\/mobile-apps.home-assistant.io\\/api\\/sendPushNotification\",\"start_live_activity_token\":\"abababababababab\"},\"app_version\":\"2026.9.0 (2026.2874)\",\"device_name\":\" Phone\",\"manufacturer\":\"Apple\",\"model\":\"iPhone17,1\",\"os_version\":\"27.0.1\"}",
+    "nonce_hex": "4150502d4e4f4e43457570646174655f7265676973747261",
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"QVBQLU5PTkNFdXBkYXRlX3JlZ2lzdHJhxhUTnDJy\\/0+VFK8HT34z1wlYQEo4Zq5L3fhqFm9h\\/VV44xn8wouDCyUjeZlfdY6EOJijhqMQvDhob0JmIc6FzktB2ZJpD+KjbQ8u8z20zHaUS6NI\\/iskfzpI+VouhoW\\/JB7zmB9SDxhlOny9ygac9pvCvp44htwcP3PaQzdA\\/NnLMt2pzazjuusdRi8UKrwh6zHELy53SpPLqKF\\/htMxRh6DHI7z8WC44FviUVn1sAfBmM3Tfr+23BrPjkHdm3YDyyCvA1CHwWyKgl8WqrTPTZ1bdMKQjldD1nGD5g4kjtCWjy1VOsPcj0QRZ\\/0XfK7MbsTsbVDSFY0LT+u9r\\/+JDXVBPQoPVTRqnQglo9ZZwi2dQ2fHHbZCAXDsNE83ZiKmJf2TlSvXsB6mL4SKGMY6k2Y8BkeArAxyu9o=\",\"type\":\"update_registration\"}"
+   },
+   "response": {
+    "status": 200,
+    "headers": {
+     "Content-Type": "application/json"
+    },
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"SEEtTk9OQ0UAAAAAAAAAAAAAAAAAAAAFW8eWyaQ0+I9CsaJVz2aKKEFLUBBQMBY5qVktJ7bPC1RgcJzjvtad8ITDxDcBfXNmIhAeXdKVj+szHlwTGnJBvEj7tyB4HEaPnDkbJ+vmWa74n0N6hYv8ig1CDrbwU2PYQohSc4nlF7cApOx5MkP/oPg0UWfI/6f/FbwSUJ/76cktKfWsebCMuKyonp+WhfXE9ZrAwcWHIrIipYkmUBUFReF9N1eNhAdBSLEyeemiDdbgNguq/A/ktKtKPU/JBV1FAnCV1KPCiGao/upWQYxbdVLp4zV0ZAiebVfuhGOxJwJgqUB9NP7P24aUuGz0+bVO9bXcci9KwVVdliI30mQf+DuX75PYQKPw30myX+ZYsuY440oowd8yxz1P1e7mAwxx3SBysiBIgkXB7k942xxmqLpV2g1zVYCOKt2scjkyMK3zUDCq2PcZCmOTf4IpMA91S+hezzu/UZqHdog6R9p3otm+bpromoI1G2lR2k7B6aE+iFFpx3ss0z3gtae0HEwkK51tZ7Sqo/gHFWCoG/x2ow==\"}",
+    "decrypted": "{\"app_data\":{\"push_token\":\"fake-push-token\",\"push_url\":\"https://mobile-apps.home-assistant.io/api/sendPushNotification\",\"start_live_activity_token\":\"abababababababab\"},\"app_id\":\"io.robbie.HomeAssistant\",\"app_name\":\"Home Assistant\",\"app_version\":\"2026.9.0 (2026.2874)\",\"device_name\":\" Phone\",\"manufacturer\":\"Apple\",\"model\":\"iPhone17,1\",\"os_version\":\"27.0.1\",\"supports_encryption\":true}",
+    "nonce_hex": "48412d4e4f4e434500000000000000000000000000000005"
+   },
+   "effects": {
+    "state_writes": [],
+    "events": [
+     {
+      "event_type": "device_registry_updated",
+      "data": {
+       "action": "update",
+       "device_id": "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0",
+       "changes": {
+        "sw_version": "27.0"
+       }
+      },
+      "origin": "LOCAL",
+      "context_user_id": null
+     }
+    ],
+    "service_calls": []
+   },
+   "entry_data_after": {
+    "app_data": {
+     "push_token": "fake-push-token",
+     "push_url": "https://mobile-apps.home-assistant.io/api/sendPushNotification",
+     "start_live_activity_token": "abababababababab"
+    },
+    "app_id": "io.robbie.HomeAssistant",
+    "app_name": "Home Assistant",
+    "app_version": "2026.9.0 (2026.2874)",
+    "device_id": "11111111-2222-4333-8444-555555555555",
+    "device_name": " Phone",
+    "manufacturer": "Apple",
+    "model": "iPhone17,1",
+    "no_legacy_encryption": true,
+    "os_name": "iOS",
+    "os_version": "27.0.1",
+    "supports_encryption": true,
+    "user_id": "00112233445566778899aabbccddeeff",
+    "webhook_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f"
+   },
+   "devices_after": [
+    {
+     "id": "28d901088447799160ca43a4836bd041",
+     "identifiers": [
+      [
+       "mobile_app",
+       "PLAIN"
+      ]
+     ],
+     "name": "Plain",
+     "manufacturer": "Apple",
+     "model": "iPhone17,1",
+     "sw_version": "27.0",
+     "config_entries": [
+      "01JFAKEMOBILEAPPPLAIN00000"
+     ]
+    },
+    {
+     "id": "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0",
+     "identifiers": [
+      [
+       "mobile_app",
+       "11111111-2222-4333-8444-555555555555"
+      ]
+     ],
+     "name": " Phone",
+     "manufacturer": "Apple",
+     "model": "iPhone17,1",
+     "sw_version": "27.0.1",
+     "config_entries": [
+      "01JFAKEMOBILEAPPENTRY00000"
+     ]
+    },
+    {
+     "id": "ff2b6bf6063e47e4585c3e47a4cd7e67",
+     "identifiers": [
+      [
+       "mobile_app",
+       "LEGACY"
+      ]
+     ],
+     "name": "Legacy",
+     "manufacturer": "Apple",
+     "model": "iPhone17,1",
+     "sw_version": "27.0",
+     "config_entries": [
+      "01JFAKEMOBILEAPPLEGACY0000"
+     ]
+    }
+   ]
+  },
+  {
+   "type": "update_registration",
+   "request": {
+    "data_plaintext": "{\"app_version\":\"x\",\"device_name\":\"y\",\"manufacturer\":\"z\"}",
+    "nonce_hex": "4150502d4e4f4e43457570646174655f7265676973747261",
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"QVBQLU5PTkNFdXBkYXRlX3JlZ2lzdHJhJIKHjrn3LWiVC5D6k1s8kwlYQEo4ZrxP2+ohQ3phtwJzqWqqyYWQDGR8BJFfc46Lcs+pzKJGvjJjdAYrYMqFz0ZsjtonV\\/r8\",\"type\":\"update_registration\"}"
+   },
+   "response": {
+    "status": 200,
+    "headers": {
+     "Content-Type": "application/json; charset=utf-8"
+    },
+    "body": "{}"
+   },
+   "effects": {
+    "state_writes": [],
+    "events": [],
+    "service_calls": []
+   },
+   "note": "schema failure (model missing): 200 {} plain, nothing changed"
+  },
+  {
+   "type": "get_config",
+   "request": {
+    "data_plaintext": "{}",
+    "nonce_hex": "4150502d4e4f4e43456765745f636f6e6669670000000000",
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"QVBQLU5PTkNFZ2V0X2NvbmZpZwAAAAAAaF8m\\/0IS2YUDVoY+PYwY5\\/tw\",\"type\":\"get_config\"}"
+   },
+   "response": {
+    "status": 200,
+    "headers": {
+     "Content-Type": "application/json"
+    },
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"SEEtTk9OQ0UAAAAAAAAAAAAAAAAAAAAH6TsyVOvxBT/vPNTs69p2prxSDmXEU6Pbh+AV4UwSBNT92HY//H0VLEJvmFQV8ryVBfqjE+jakxChvVfEpmAn+630MpnaQeMzSHyYSOGf5HQ/ZnynyvW5WBEOs2vlTdtZvMCQ4uaTNsygY2PjNOQFJL5XC8dKY/dS1DWrNmq7zRIpIZw35a30WC0C/4AG00Ci4eyPLWqzFMU+eOoprpB+twRUkt9xJDgxw6t/iSTAwdgT77vjzQiUYAznbUwGF8RbWxtvL1Lx4iIIoOPfW+2SRlwlRh302CeUv41NCMLxH5x5S7woHXW+JB7duFeOWfgdqEEAHBiobXZUhU4po3bH8mzvL+eTP1wpTfAi26UFdEwUMCZxWam6z9I0PEDfCxk3VHDfT0l5HvZ5N1ILxS24Cbrs2PbmiJ97U6IOJ/bAffdQEIdq6DGZgKwfc7L+2YaTIFqUJsWXX4CcvyS9Xe2RGO1Hw489VKXm3bRwJlsa7KEO3YDx0MccwECQmSYCpNP+Rql1E3+X/cot8COCYtRRO/FRXL3j+XY423IXlR618k2egkX6e69yXquZQnUvY7HkRXuF2MMUIGv1mmlB+D3pFhp9UjEtOiU3J5EpfqiRn+MzkRV74nK0P11xLAcDehvzVglgWnnaHT8DXkDNnzUDjdDSjB7eSMO0waAp6V+455lIUrrsgeVBvS1kxQnMQURja3Ntz5bHVyOumAfes6Kh7s1ahSdFL2vKnpHzWJE6EUA7exMOCQC2y5YyIThXDx/mWMocBpXEf9wx54FDfX9HcaoC6TT2b4z/+plISI7XIJLzBVVVDaxUUWpOzfAeO700BB4ng9cIKgN8x5zBWtHfTqFUp57uSzpYI/f3FaRUattKejzs1k+IUyKDsn+iH+FNRyHw6u9QIi0Z/OtPQDQsE9fHoMJxeyad69nfCvxJhTxt+pddfE5xUYIC22DqUs0cnBnbqhFobKhPpq6wDyZStqCjxEtPU+W6ZmeQo/UOKI0cTJPEbeb5xJlQj6XbvceNriH6BqfF15eO1H4YiFDqEwrOFixUIci7HlG17GwrmsshQFSqOOwJfJSZwYUSCUfKy8MzUB/xVQGUn0+s6I54aMeBNvRZMSZc1SGmYxDoFGkPBrGRG+p5NPv55IJ4NFR8SMaSBpq9tDq8dSjgPd/Rs60aUf8LAc+US0Kx9WMbbCLghbin6Sn/eQYsRJRJ3+NQQxLBwGLv9TeQBCGHKkJ8nHPIy4jJJhC6FvaTZiR7CSSLQfQMxm0YGmEYs68EDXXZ6Kk/zvuFLGSfrphpox2hjB4A/3YG0woQ4ddmI0536Rh3SYxJ9x8NDayY4vqaMAjq5ODFQhaKgRz3G5Dm6JuLB3wsDFcNTuDXPBAnLRE13LuDo4CQG4oZjqCM9lZsdrWP5m6jbIDS72tQV5HPF3VNTVLh35T4L62ExmuUu62JUG8FCCWZVvstNeod4tIzIy3RC2pHM9h7x8Cve6HbWLoGSvfqLUWtTXfxeGuHLvsEd5WqLhfT+scXbovxKyjyn5P0N+AsOQD82H7alubuVYt6bcc8xO+Pg+ZqOUvPGwc20pc48FrXSOwksP6qZAwan1mikxlDjUg9lFkp8+b8O1iJExd0f/oGHe9rsi27/KsFSfF0Cx/K5NARi+8MOWY5BTxwxSnCsbllskPa0Dn0q+2GuvQ786yTiCyjfyo3+g49nZj5D0L0Cifj6nHHyGrew2NJYslgeSdGBsPuKNVoiP7dq8mFHq+DPIHtiALwNngaYsFxVFsGthjBP50WjELFqI4UoUuWuta59GmRn3S15iOHoQHOB6wXZxn+CRvVQ+gheR/szHAgTb68+ZCbTF7VpxXcO0NwjQipEAcsb03Zr12PEPjCjdYReOmHJjE5SsD8JI91ch8RpTCQo3W3fnRmLubHNQ==\"}",
+    "decrypted": "{\"latitude\":0.5,\"longitude\":0.5,\"elevation\":10,\"hass_device_id\":\"d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0\",\"unit_system\":{\"length\":\"km\",\"accumulated_precipitation\":\"mm\",\"area\":\"m²\",\"mass\":\"g\",\"pressure\":\"Pa\",\"temperature\":\"°C\",\"volume\":\"L\",\"wind_speed\":\"m/s\"},\"location_name\":\"Home\",\"time_zone\":\"Europe/London\",\"components\":[\"repairs\",\"mobile_app.notify\",\"sensor\",\"mobile_app.binary_sensor\",\"network\",\"zone\",\"device_tracker\",\"webhook\",\"person\",\"mobile_app.device_tracker\",\"mobile_app.sensor\",\"homeassistant\",\"auth\",\"mobile_app\",\"http\",\"binary_sensor\",\"websocket_api\",\"image_upload\",\"notify\",\"tag\",\"intent\"],\"version\":\"2026.6.1\",\"theme_color\":\"#2980b9\",\"entities\":{\"11111111-2222-4333-8444-555555555555\":{\"disabled\":false},\"battery_level\":{\"disabled\":false},\"storage\":{\"disabled\":false},\"battery_state\":{\"disabled\":false},\"connectivity_sim_1\":{\"disabled\":false},\"connectivity_sim_2\":{\"disabled\":false},\"geocoded_location\":{\"disabled\":false},\"connectivity_ssid\":{\"disabled\":false},\"connectivity_bssid\":{\"disabled\":false},\"connectivity_connection_type\":{\"disabled\":false},\"last_update_trigger\":{\"disabled\":false},\"kioskBrightness\":{\"disabled\":false},\"location-permission\":{\"disabled\":false},\"iphone-audio-output\":{\"disabled\":false},\"app-version\":{\"disabled\":false},\"kioskMode\":{\"disabled\":false},\"kioskVolume\":{\"disabled\":false},\"cameraMotion\":{\"disabled\":true},\"kioskScreensaver\":{\"disabled\":false},\"cameraStream\":{\"disabled\":true}}}",
+    "nonce_hex": "48412d4e4f4e434500000000000000000000000000000007"
+   },
+   "effects": {
+    "state_writes": [],
+    "events": [],
+    "service_calls": []
+   }
+  },
+  {
+   "type": "get_zones",
+   "request": {
+    "data_plaintext": "{}",
+    "nonce_hex": "4150502d4e4f4e43456765745f7a6f6e6573000000000000",
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"QVBQLU5PTkNFZ2V0X3pvbmVzAAAAAAAANHsC6KOMG4PYHFYXX95aWj8a\",\"type\":\"get_zones\"}"
+   },
+   "response": {
+    "status": 200,
+    "headers": {
+     "Content-Type": "application/json"
+    },
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"SEEtTk9OQ0UAAAAAAAAAAAAAAAAAAAAICzwJOgBF6QknJ1BjyijRZQVa2gVkBOlD5DvC5qBYSS+WQrnlmCBRhfCn/tiGbfrDTYCV4xwQbflLcCZu9Hi6zC1qR+2zP6EbvINcREpE4y09PVFfinw4ed5MOLPMxUuoYsYu6FDL+2j4dk5i4mkBHmmoAqm9t89tlvH6+Y/80cDskaXDkuoyCiReQUXigm/g+iVke88f0AfjPfMbaK+IzloEhVe28OJo7ePaTdQSq8L0FYdQVQOEzETAr0oHN3ZJFQnFS+m82FMAR0Rmeh1pxhw/QF6gUQXPfcQQ+qhKRnAfVnXJs97mZ87V6ACZiqw+PQLhjP/uWkvizsQ5lfIiahScLUj73jHuS2VafDaYWdm8lzrUYycFhy0PdQhNA+BHYDZ6dKhHMIGQR3dBk+MPpo70VcJRTUJQK9puB6kRE3fywnj95Es3apxs+4M+9NpIkFp0XjI9dPl6aYfTmYAKtgQ9VWO0dhOR+FWDfE2xxU3RkOVqdCsF5yNEbn9ulyGHUicQZVwF4fQ7/YIvcE+1tdQtRReDhfaOAU4cw6lXNeXl4UKuWSc93sHOgv2s\"}",
+    "decrypted": "[{\"entity_id\":\"zone.home\",\"state\":\"0\",\"attributes\":{\"latitude\":0.5,\"longitude\":0.5,\"radius\":100,\"passive\":false,\"persons\":[],\"editable\":true,\"icon\":\"mdi:home\",\"friendly_name\":\"Home\"},\"last_changed\":\"2026-11-14T19:56:22.559860+00:00\",\"last_reported\":\"2026-11-14T19:56:22.559860+00:00\",\"last_updated\":\"2026-11-14T19:56:22.559860+00:00\",\"context\":{\"id\":\"01M7DT3S4ZCGR6TB48BFT2RCTZ\",\"parent_id\":null,\"user_id\":null}}]",
+    "nonce_hex": "48412d4e4f4e434500000000000000000000000000000008"
+   },
+   "effects": {
+    "state_writes": [],
+    "events": [],
+    "service_calls": []
+   }
+  },
+  {
+   "type": "call_service",
+   "request": {
+    "data_plaintext": "{\"domain\":\"test\",\"service\":\"echo\",\"service_data\":{\"entity_id\":\"light.x\",\"n\":1}}",
+    "nonce_hex": "4150502d4e4f4e434563616c6c5f73657276696365000000",
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"QVBQLU5PTkNFY2FsbF9zZXJ2aWNlAAAAXxs\\/Z8arl3y40ZHlJepH4nMnOL5eo4+r8HDj+23zJEURrAbwY0Q2lrBotWihj877BtxjOZLgt5qZ5fa\\/hlThwolY07nrrvZyACvJEvc1u8MSLbr+5bQ+e04rcSlYQ\\/g=\",\"type\":\"call_service\"}"
+   },
+   "response": {
+    "status": 200,
+    "headers": {
+     "Content-Type": "application/json; charset=utf-8"
+    },
+    "body": "{}"
+   },
+   "effects": {
+    "state_writes": [],
+    "events": [],
+    "service_calls": [
+     {
+      "domain": "test",
+      "service": "echo",
+      "data": {
+       "entity_id": "light.x",
+       "n": 1
+      },
+      "context_user_id": "00112233445566778899aabbccddeeff"
+     }
+    ]
+   }
+  },
+  {
+   "type": "call_service",
+   "request": {
+    "data_plaintext": "{\"domain\":\"test\",\"service\":\"missing\",\"service_data\":{}}",
+    "nonce_hex": "4150502d4e4f4e434563616c6c5f73657276696365000000",
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"QVBQLU5PTkNFY2FsbF9zZXJ2aWNlAAAAK9TQyuRBHH\\/bOk3BuqzgRHMnOL5eo4+r8HDj+23zJEURrAbwY0Q2lrBotWiphdXnTZ4maNuwspaI9sC4gn\\/kgcdC0+b+p+I=\",\"type\":\"call_service\"}"
+   },
+   "response": {
+    "status": 200,
+    "headers": {},
+    "body": ""
+   },
+   "effects": {
+    "state_writes": [],
+    "events": [],
+    "service_calls": []
+   }
+  },
+  {
+   "type": "call_service",
+   "request": {
+    "data_plaintext": "{\"domain\":\"test\",\"service\":\"strict\",\"service_data\":{\"x\":\"a\"}}",
+    "nonce_hex": "4150502d4e4f4e434563616c6c5f73657276696365000000",
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"QVBQLU5PTkNFY2FsbF9zZXJ2aWNlAAAAdlg\\/wc4KAnEhoMjOwy2PRHMnOL5eo4+r8HDj+23zJEURrAbwY0Q2lrBotWi3mNT9R4RjZtXhpIGM6cq+uEThlNIBy6enor08WxWCC6g=\",\"type\":\"call_service\"}"
+   },
+   "response": {
+    "status": 200,
+    "headers": {},
+    "body": ""
+   },
+   "effects": {
+    "state_writes": [],
+    "events": [],
+    "service_calls": []
+   }
+  },
+  {
+   "type": "call_service",
+   "request": {
+    "data_plaintext": "{\"domain\":\"test\",\"service\":\"boom\"}",
+    "nonce_hex": "4150502d4e4f4e434563616c6c5f73657276696365000000",
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"QVBQLU5PTkNFY2FsbF9zZXJ2aWNlAAAAxWdAMtzIqTUQZoHn4HYImHMnOL5eo4+r8HDj+23zJEURrAbwY0Q2lrBotWimg8n5Bo0=\",\"type\":\"call_service\"}"
+   },
+   "response": {
+    "status": 200,
+    "headers": {},
+    "body": ""
+   },
+   "effects": {
+    "state_writes": [],
+    "events": [],
+    "service_calls": []
+   }
+  },
+  {
+   "type": "call_service",
+   "request": {
+    "data_plaintext": "{\"domain\":\"test\"}",
+    "nonce_hex": "4150502d4e4f4e434563616c6c5f73657276696365000000",
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"QVBQLU5PTkNFY2FsbF9zZXJ2aWNlAAAAlwioN4vYK5piKfDBpLmXwnMnOL5eo4+r8HDj+23zJEVA\",\"type\":\"call_service\"}"
+   },
+   "response": {
+    "status": 200,
+    "headers": {
+     "Content-Type": "application/json; charset=utf-8"
+    },
+    "body": "{}"
+   },
+   "effects": {
+    "state_writes": [],
+    "events": [],
+    "service_calls": []
+   }
+  },
+  {
+   "type": "fire_event",
+   "request": {
+    "data_plaintext": "{\"event_data\":{\"sourceDeviceName\":\" Phone\",\"zone\":\"zone.home\"},\"event_type\":\"ios.zone_entered\"}",
+    "nonce_hex": "4150502d4e4f4e4345666972655f6576656e740000000000",
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"QVBQLU5PTkNFZmlyZV9ldmVudAAAAAAAiWCOxLFLaNPMnymRbMPm\\/+De3CJiIlAcvfHW2Ujy8OuafHR3nZBxVYKHDT52oOYIlxc6Qx+aPqKMi9x11004TvEAe7u0GiHNouYdNT63UZIosmnKctL7dfSFsuzGBvJVJ8tIFCl4yNdaO0\\/BXks0\",\"type\":\"fire_event\"}"
+   },
+   "response": {
+    "status": 200,
+    "headers": {
+     "Content-Type": "application/json; charset=utf-8"
+    },
+    "body": "{}"
+   },
+   "effects": {
+    "state_writes": [],
+    "events": [
+     {
+      "event_type": "ios.zone_entered",
+      "data": {
+       "sourceDeviceName": " Phone",
+       "zone": "zone.home"
+      },
+      "origin": "REMOTE",
+      "context_user_id": "00112233445566778899aabbccddeeff"
+     }
+    ],
+    "service_calls": []
+   }
+  },
+  {
+   "type": "fire_event",
+   "request": {
+    "data_plaintext": "{\"event_data\":{\"action\":\"OPEN\"},\"event_type\":\"mobile_app_notification_action\"}",
+    "nonce_hex": "4150502d4e4f4e4345666972655f6576656e740000000000",
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"QVBQLU5PTkNFZmlyZV9ldmVudAAAAAAAK0B5AxXJKWtUVSSny\\/TMP+De3CJiIlAcvfHW2Ujy8OuIcHVskZsXCtahPh524\\/ZBl0huBiGGDriQ2ZV1lwA7RLFTNaSEFTSTlecfJHWsFNMssGXLaNLub\\/CJ\\/7jGEg==\",\"type\":\"fire_event\"}"
+   },
+   "response": {
+    "status": 200,
+    "headers": {
+     "Content-Type": "application/json; charset=utf-8"
+    },
+    "body": "{}"
+   },
+   "effects": {
+    "state_writes": [],
+    "events": [
+     {
+      "event_type": "mobile_app_notification_action",
+      "data": {
+       "action": "OPEN"
+      },
+      "origin": "REMOTE",
+      "context_user_id": "00112233445566778899aabbccddeeff"
+     }
+    ],
+    "service_calls": []
+   }
+  },
+  {
+   "type": "render_template",
+   "request": {
+    "data_plaintext": "{\"c|bad\":{\"template\":\"{{ x( }}\"},\"c|line1\":{\"template\":\"{{ 1 + 1 }}\"},\"c|line2\":{\"template\":\"{{ states('zone.home') }}\"}}",
+    "nonce_hex": "4150502d4e4f4e434572656e6465725f74656d706c617465",
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"QVBQLU5PTkNFcmVuZGVyX3RlbXBsYXRlUGSoWj9TAdQom5UENcUgqCw1BVjclJHsWCYEW9INqnPMCF8P65cLBIFH\\/9Vd5guXWpiOxmFXvpPO55yblukKFilHmMalpSkA89qVI\\/MBFTX0hMDrjY5sE+SEkurCRAgbI2nxE3kX\\/5XDbB2iPgVU+XtcEEUL3VR+LLob1vJWNBXEG+WA5nVOgm4=\",\"type\":\"render_template\"}"
+   },
+   "response": {
+    "status": 200,
+    "headers": {
+     "Content-Type": "application/json"
+    },
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"SEEtTk9OQ0UAAAAAAAAAAAAAAAAAAAAJh3bAUBPYQ72l84+TEZ5dAZw3gusxosvub+Bakgrzq6vh8MK1eAMyjhuub02bUcUniZ53Z56RVcgAsdg4FfiEWnMlgkdgzhIyuTbO3+4/5JKDrh0tRnnxSNrUn8dbDrVBmdCSVF67epB85gOVzynB\"}",
+    "decrypted": "{\"c|bad\":{\"error\":\"TemplateSyntaxError: unexpected '}', expected ')'\"},\"c|line1\":2,\"c|line2\":0}",
+    "nonce_hex": "48412d4e4f4e434500000000000000000000000000000009"
+   },
+   "effects": {
+    "state_writes": [],
+    "events": [],
+    "service_calls": []
+   }
+  },
+  {
+   "type": "stream_camera",
+   "request": {
+    "data_plaintext": "{\"camera_entity_id\":\"camera.none\"}",
+    "nonce_hex": "4150502d4e4f4e434573747265616d5f63616d6572610000",
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"QVBQLU5PTkNFc3RyZWFtX2NhbWVyYQAANeUqvj6uf+0C8fpeu8Qo8LwugpwqOWvxJnb9amA4qByP9y20oub8BPL2yu4IfdgQO\\/E=\",\"type\":\"stream_camera\"}"
+   },
+   "response": {
+    "status": 400,
+    "headers": {
+     "Content-Type": "application/json"
+    },
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"SEEtTk9OQ0UAAAAAAAAAAAAAAAAAAAAK9+rs1DhwIhJcpsl7c4hctqIsoH5rDgo/cqeA8AnyGLNa\"}",
+    "decrypted": "{\"success\":false}",
+    "nonce_hex": "48412d4e4f4e43450000000000000000000000000000000a"
+   },
+   "effects": {
+    "state_writes": [],
+    "events": [],
+    "service_calls": []
+   }
+  },
+  {
+   "type": "scan_tag",
+   "request": {
+    "data_plaintext": "{\"tag_id\":\"fake-tag-1\"}",
+    "nonce_hex": "4150502d4e4f4e43457363616e5f74616700000000000000",
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"QVBQLU5PTkNFc2Nhbl90YWcAAAAAAAAA8XBvhz\\/T6gwhTRgCbPeuDFGQ2ZZV1jT8h\\/Llxk8NJ39IoNueR91H\",\"type\":\"scan_tag\"}"
+   },
+   "response": {
+    "status": 200,
+    "headers": {
+     "Content-Type": "application/json; charset=utf-8"
+    },
+    "body": "{}"
+   },
+   "effects": {
+    "state_writes": [
+     {
+      "entity_id": "tag.fake_tag_1",
+      "state": "2026-11-14T19:56:22.705+00:00",
+      "attributes": {
+       "tag_id": "fake-tag-1",
+       "last_scanned_by_device_id": "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0",
+       "friendly_name": "Tag fake-tag-1"
+      },
+      "context_user_id": null
+     }
+    ],
+    "events": [
+     {
+      "event_type": "tag_scanned",
+      "data": {
+       "tag_id": "fake-tag-1",
+       "name": null,
+       "device_id": "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0"
+      },
+      "origin": "LOCAL",
+      "context_user_id": "00112233445566778899aabbccddeeff"
+     },
+     {
+      "event_type": "entity_registry_updated",
+      "data": {
+       "action": "create",
+       "entity_id": "tag.fake_tag_1"
+      },
+      "origin": "LOCAL",
+      "context_user_id": null
+     },
+     {
+      "event_type": "entity_registry_updated",
+      "data": {
+       "action": "update",
+       "entity_id": "tag.fake_tag_1",
+       "changes": {
+        "object_id_base": "fake-tag-1"
+       }
+      },
+      "origin": "LOCAL",
+      "context_user_id": null
+     }
+    ],
+    "service_calls": []
+   }
+  },
+  {
+   "type": "enable_encryption",
+   "request": {
+    "data_plaintext": "{}",
+    "nonce_hex": "4150502d4e4f4e4345656e61626c655f656e637279707469",
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"QVBQLU5PTkNFZW5hYmxlX2VuY3J5cHRpHIR5\\/m0h\\/wiKOTUbNPg57R3N\",\"type\":\"enable_encryption\"}"
+   },
+   "response": {
+    "status": 400,
+    "headers": {
+     "Content-Type": "application/json; charset=utf-8"
+    },
+    "body": "{\"success\": false, \"error\": {\"code\": \"encryption_already_enabled\", \"message\": \"Encryption already enabled\"}}"
+   },
+   "effects": {
+    "state_writes": [],
+    "events": [],
+    "service_calls": []
+   }
+  },
+  {
+   "type": "conversation_process",
+   "request": {
+    "data_plaintext": "{\"text\":\"hello\"}",
+    "nonce_hex": "4150502d4e4f4e4345636f6e766572736174696f6e5f7072",
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"QVBQLU5PTkNFY29udmVyc2F0aW9uX3ByV+K+vV2aV5fdIIm+uiBrdlUuYDmnfLtbgXUwC\\/k4DMM=\",\"type\":\"conversation_process\"}"
+   },
+   "response": {
+    "status": 200,
+    "headers": {},
+    "body": ""
+   },
+   "effects": {
+    "state_writes": [],
+    "events": [],
+    "service_calls": []
+   }
+  }
+ ],
+ "logs": [
+  "DEBUG homeassistant.components.mobile_app.helpers: Successfully decrypted mobile_app payload",
+  "DEBUG homeassistant.components.mobile_app.webhook: Received webhook payload from  Phone for type update_registration: {'app_data': {'push_token': 'fake-push-token', 'push_url': 'https://mobile-apps.home-assistant.io/api/sendPushNotification', 'start_live_activity_token': 'abababababababab'}, 'app_version': '2026.9.0 (2026.2874)', 'device_name': ' Phone', 'manufacturer': 'Apple', 'model': 'iPhone17,1', 'os_version': '27.0.1'}",
+  "DEBUG homeassistant.components.mobile_app.helpers: Successfully decrypted mobile_app payload",
+  "DEBUG homeassistant.components.mobile_app.webhook: Received webhook payload from  Phone for type update_registration: {'app_version': 'x', 'device_name': 'y', 'manufacturer': 'z'}",
+  "ERROR homeassistant.components.mobile_app.webhook: Received invalid webhook payload: required key not provided @ data['model']. Got None",
+  "DEBUG homeassistant.components.mobile_app.helpers: Successfully decrypted mobile_app payload",
+  "DEBUG homeassistant.components.mobile_app.webhook: Received webhook payload from  Phone for type update_registration: {'app_data': {'push_token': 'fake-push-token', 'push_url': 'https://mobile-apps.home-assistant.io/api/sendPushNotification', 'start_live_activity_token': 'abababababababab'}, 'app_version': '2026.9.0 (2026.2874)', 'device_name': ' Phone', 'manufacturer': 'Apple', 'model': 'iPhone17,1', 'os_version': '27.0.1'}",
+  "DEBUG homeassistant.components.mobile_app.helpers: Successfully decrypted mobile_app payload",
+  "DEBUG homeassistant.components.mobile_app.webhook: Received webhook payload from  Phone for type get_config: {}",
+  "DEBUG homeassistant.components.mobile_app.helpers: Successfully decrypted mobile_app payload",
+  "DEBUG homeassistant.components.mobile_app.webhook: Received webhook payload from  Phone for type get_zones: {}",
+  "DEBUG homeassistant.components.mobile_app.helpers: Successfully decrypted mobile_app payload",
+  "DEBUG homeassistant.components.mobile_app.webhook: Received webhook payload from  Phone for type call_service: {'domain': 'test', 'service': 'echo', 'service_data': {'entity_id': 'light.x', 'n': 1}}",
+  "DEBUG homeassistant.components.mobile_app.helpers: Successfully decrypted mobile_app payload",
+  "DEBUG homeassistant.components.mobile_app.webhook: Received webhook payload from  Phone for type call_service: {'domain': 'test', 'service': 'missing', 'service_data': {}}",
+  "ERROR homeassistant.components.mobile_app.webhook: Error when calling service during mobile_app webhook (device name:  Phone): Action test.missing not found",
+  "ERROR homeassistant.components.webhook: Error processing webhook 0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f",
+  "DEBUG homeassistant.components.mobile_app.helpers: Successfully decrypted mobile_app payload",
+  "DEBUG homeassistant.components.mobile_app.webhook: Received webhook payload from  Phone for type call_service: {'domain': 'test', 'service': 'strict', 'service_data': {'x': 'a'}}",
+  "ERROR homeassistant.components.mobile_app.webhook: Error when calling service during mobile_app webhook (device name:  Phone): expected int for dictionary value @ data['x']",
+  "ERROR homeassistant.components.webhook: Error processing webhook 0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f",
+  "DEBUG homeassistant.components.mobile_app.helpers: Successfully decrypted mobile_app payload",
+  "DEBUG homeassistant.components.mobile_app.webhook: Received webhook payload from  Phone for type call_service: {'domain': 'test', 'service': 'boom'}",
+  "ERROR homeassistant.components.mobile_app.webhook: Error when calling service during mobile_app webhook (device name:  Phone): boom",
+  "ERROR homeassistant.components.webhook: Error processing webhook 0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f",
+  "DEBUG homeassistant.components.mobile_app.helpers: Successfully decrypted mobile_app payload",
+  "DEBUG homeassistant.components.mobile_app.webhook: Received webhook payload from  Phone for type call_service: {'domain': 'test'}",
+  "ERROR homeassistant.components.mobile_app.webhook: Received invalid webhook payload: required key not provided @ data['service']. Got None",
+  "DEBUG homeassistant.components.mobile_app.helpers: Successfully decrypted mobile_app payload",
+  "DEBUG homeassistant.components.mobile_app.webhook: Received webhook payload from  Phone for type fire_event: {'event_data': {'sourceDeviceName': ' Phone', 'zone': 'zone.home'}, 'event_type': 'ios.zone_entered'}",
+  "DEBUG homeassistant.components.mobile_app.helpers: Successfully decrypted mobile_app payload",
+  "DEBUG homeassistant.components.mobile_app.webhook: Received webhook payload from  Phone for type fire_event: {'event_data': {'action': 'OPEN'}, 'event_type': 'mobile_app_notification_action'}",
+  "DEBUG homeassistant.components.mobile_app.helpers: Successfully decrypted mobile_app payload",
+  "DEBUG homeassistant.components.mobile_app.webhook: Received webhook payload from  Phone for type render_template: {'c|bad': {'template': '{{ x( }}'}, 'c|line1': {'template': '{{ 1 + 1 }}'}, 'c|line2': {'template': \"{{ states('zone.home') }}\"}}",
+  "DEBUG homeassistant.components.mobile_app.helpers: Successfully decrypted mobile_app payload",
+  "DEBUG homeassistant.components.mobile_app.webhook: Received webhook payload from  Phone for type stream_camera: {'camera_entity_id': 'camera.none'}",
+  "DEBUG homeassistant.components.mobile_app.helpers: Successfully decrypted mobile_app payload",
+  "DEBUG homeassistant.components.mobile_app.webhook: Received webhook payload from  Phone for type scan_tag: {'tag_id': 'fake-tag-1'}",
+  "DEBUG homeassistant.components.mobile_app.helpers: Successfully decrypted mobile_app payload",
+  "DEBUG homeassistant.components.mobile_app.webhook: Received webhook payload from  Phone for type enable_encryption: {}",
+  "WARNING homeassistant.components.mobile_app.webhook: Refusing to enable encryption for  Phone because it is already enabled!",
+  "DEBUG homeassistant.components.mobile_app.helpers: Successfully decrypted mobile_app payload",
+  "DEBUG homeassistant.components.mobile_app.webhook: Received webhook payload from  Phone for type conversation_process: {'text': 'hello'}",
+  "ERROR homeassistant.components.webhook: Error processing webhook 0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f"
+ ]
+}

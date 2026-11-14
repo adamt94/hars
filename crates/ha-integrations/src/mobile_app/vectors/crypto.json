@@ -1,0 +1,126 @@
+{
+ "secret": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+ "legacy_secret": "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789",
+ "hex_key_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+ "legacy_key_hex_of_SECRET": "3030303130323033303430353036303730383039306130623063306430653066",
+ "legacy_key_hex_of_LEGACY_SECRET": "6162636465663031323334353637383961626364656630313233343536373839",
+ "seal": [
+  {
+   "case": "empty object",
+   "key": "hex",
+   "key_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+   "nonce_hex": "000000000000000000000000000000000000000000000000",
+   "plaintext_utf8": "{}",
+   "sealed_b64": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFKzZFoRq90eb/Tv0PcPhCTFz",
+   "len_bytes": 42
+  },
+  {
+   "case": "empty object",
+   "key": "legacy",
+   "key_hex": "3030303130323033303430353036303730383039306130623063306430653066",
+   "nonce_hex": "000000000000000000000000000000000000000000000000",
+   "plaintext_utf8": "{}",
+   "sealed_b64": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMnQUMpUwqDmsNeEPrxvmu24e",
+   "len_bytes": 42
+  },
+  {
+   "case": "nonce 0x01..",
+   "key": "hex",
+   "key_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+   "nonce_hex": "0102030405060708090a0b0c0d0e0f101112131415161718",
+   "plaintext_utf8": "{\"type\":\"x\"}",
+   "sealed_b64": "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcY+8MaQ6N4fNtaOwdRLnkTqXAO4lFwOAVAJz/Xog==",
+   "len_bytes": 52
+  },
+  {
+   "case": "nonce 0x01..",
+   "key": "legacy",
+   "key_hex": "3030303130323033303430353036303730383039306130623063306430653066",
+   "nonce_hex": "0102030405060708090a0b0c0d0e0f101112131415161718",
+   "plaintext_utf8": "{\"type\":\"x\"}",
+   "sealed_b64": "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYa60TXokZIOpIHTljaQ5cRY9BikSYnVl+lRoD8Q==",
+   "len_bytes": 52
+  },
+  {
+   "case": "unicode + slash escape as the app sends",
+   "key": "hex",
+   "key_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+   "nonce_hex": "ffffffffffffffffffffffffffffffffffffffffffffffff",
+   "plaintext_utf8": "{\"a\":\"°C\",\"u\":\"https:\\/\\/x\"}",
+   "sealed_b64": "////////////////////////////////2JyTHXKdFz5OYGKJ4fI8Ejf2iruc8zJRSXZdE8W2Dt6qGgFCKH++6SaeVb8e",
+   "len_bytes": 69
+  },
+  {
+   "case": "unicode + slash escape as the app sends",
+   "key": "legacy",
+   "key_hex": "3030303130323033303430353036303730383039306130623063306430653066",
+   "nonce_hex": "ffffffffffffffffffffffffffffffffffffffffffffffff",
+   "plaintext_utf8": "{\"a\":\"°C\",\"u\":\"https:\\/\\/x\"}",
+   "sealed_b64": "////////////////////////////////7cth2BXYnApWIGTAbg4yluEvstoVztbHpa2tBbFcaR6Jcq84bk9I1XAnkq9L",
+   "len_bytes": 69
+  },
+  {
+   "case": "empty plaintext",
+   "key": "hex",
+   "key_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+   "nonce_hex": "101010101010101010101010101010101010101010101010",
+   "plaintext_utf8": "",
+   "sealed_b64": "EBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEn0sIp3R9T7c79qrWWpwJw==",
+   "len_bytes": 40
+  },
+  {
+   "case": "empty plaintext",
+   "key": "legacy",
+   "key_hex": "3030303130323033303430353036303730383039306130623063306430653066",
+   "nonce_hex": "101010101010101010101010101010101010101010101010",
+   "plaintext_utf8": "",
+   "sealed_b64": "EBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQlLsvJ0p11Z1WxitAJhZLzg==",
+   "len_bytes": 40
+  }
+ ],
+ "decrypt_payload": [
+  {
+   "case": "good",
+   "result": {
+    "k": 1
+   }
+  },
+  {
+   "case": "good with newline and spaces inserted",
+   "result": {
+    "k": 1
+   }
+  },
+  {
+   "case": "good without '=' padding",
+   "raises": "ValueError Error: Incorrect padding"
+  },
+  {
+   "case": "junk characters around (dropped by the non-strict decoder)",
+   "result": {
+    "k": 1
+   }
+  },
+  {
+   "case": "good, legacy helper",
+   "raises": "CryptoError subclass CryptoError: Decryption failed. Ciphertext failed verification"
+  },
+  {
+   "case": "hex-key ciphertext, wrong key",
+   "raises": "CryptoError subclass CryptoError: Decryption failed. Ciphertext failed verification"
+  },
+  {
+   "case": "valid box, plaintext not JSON",
+   "raises": "ValueError JSONDecodeError: invalid literal: line 1 column 1 (char 0)"
+  },
+  {
+   "case": "valid box, JSON scalar",
+   "result": 5
+  },
+  {
+   "case": "39 bytes",
+   "raises": "CryptoError subclass TypeError: Input ciphertext must be at least 16 long"
+  }
+ ],
+ "good_b64": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA1Ct9squXdCPcHT7zfSMqhTEsm2Oim8I="
+}

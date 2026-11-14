@@ -8,6 +8,7 @@ pub mod hue;
 pub mod lifx;
 pub mod light;
 pub mod met;
+pub mod mobile_app;
 pub mod naming;
 pub mod num;
 pub mod scene;

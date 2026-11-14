@@ -36,10 +36,30 @@ pub enum EventKind {
     },
 }
 
+/// HA's `EventOrigin`: where an event came from.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "UPPERCASE")]
+pub enum Origin {
+    #[default]
+    Local,
+    /// Fired on behalf of a remote client (e.g. the companion app).
+    Remote,
+}
+
+impl Origin {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Local => "LOCAL",
+            Self::Remote => "REMOTE",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct Event {
     #[serde(flatten)]
     pub kind: EventKind,
+    pub origin: Origin,
     #[serde(serialize_with = "crate::clock::serialize_iso")]
     pub time_fired: Timestamp,
     pub context: Context,
@@ -49,9 +69,16 @@ impl Event {
     pub fn new(kind: EventKind, time_fired: Timestamp, context: Context) -> Self {
         Self {
             kind,
+            origin: Origin::Local,
             time_fired,
             context,
         }
+    }
+
+    /// The same event, from `origin`.
+    pub fn with_origin(mut self, origin: Origin) -> Self {
+        self.origin = origin;
+        self
     }
 }
 

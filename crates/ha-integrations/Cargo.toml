@@ -12,6 +12,7 @@ workspace = true
 
 [dependencies]
 base64 = "0.22.1"
+crypto_secretbox = { version = "0.1.1", default-features = false, features = ["alloc", "salsa20"] }
 ha-components.workspace = true
 ha-core.workspace = true
 ha-http.workspace = true

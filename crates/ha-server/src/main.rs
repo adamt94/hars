@@ -126,6 +126,20 @@ async fn run(thp_disabled: std::io::Result<bool>) -> anyhow::Result<()> {
         profiles,
     );
     api_config.integrations = started.running;
+    // The apps' registrations, before the listener serves their webhooks:
+    // an unknown id makes the app register again.
+    let mobile_app = {
+        let dir = config_dir.clone();
+        let entries = entries.clone().unwrap_or_default();
+        tokio::task::spawn_blocking(move || {
+            ha_integrations::mobile_app::MobileApp::load(&dir, &entries)
+        })
+        .await?
+    };
+    if !mobile_app.is_empty() {
+        api_config.integrations.push("mobile_app");
+    }
+    api_config.mobile_app = Some(std::sync::Arc::new(mobile_app));
     // `configuration.yaml`'s automations (written now; triggers attach at
     // `homeassistant_started`).
     let automations = {

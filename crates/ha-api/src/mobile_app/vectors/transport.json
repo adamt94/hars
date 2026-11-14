@@ -1,0 +1,661 @@
+{
+ "cases": [
+  {
+   "case": "unregistered webhook id, POST",
+   "request": {
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBmYrXfQOFTHjyvTsuometnOLU\",\"type\":\"get_zones\"}"
+   },
+   "response": {
+    "status": 200,
+    "headers": {},
+    "body": "",
+    "effects": {
+     "state_writes": [],
+     "events": [],
+     "service_calls": []
+    },
+    "entry_flags": {
+     "no_legacy_encryption": true
+    }
+   }
+  },
+  {
+   "case": "unregistered webhook id, GET",
+   "request": {
+    "method": "GET",
+    "body": null
+   },
+   "response": {
+    "status": 200,
+    "headers": {},
+    "body": "",
+    "effects": {
+     "state_writes": [],
+     "events": [],
+     "service_calls": []
+    },
+    "entry_flags": {
+     "no_legacy_encryption": true
+    }
+   }
+  },
+  {
+   "case": "registered, GET (not in allowed methods)",
+   "request": {
+    "method": "GET",
+    "body": null
+   },
+   "response": {
+    "status": 405,
+    "headers": {},
+    "body": "",
+    "effects": {
+     "state_writes": [],
+     "events": [],
+     "service_calls": []
+    },
+    "entry_flags": {
+     "no_legacy_encryption": true
+    }
+   }
+  },
+  {
+   "case": "registered, HEAD",
+   "request": {
+    "method": "HEAD",
+    "body": null
+   },
+   "response": {
+    "status": 200,
+    "headers": {},
+    "body": "",
+    "effects": {
+     "state_writes": [],
+     "events": [],
+     "service_calls": []
+    },
+    "entry_flags": {
+     "no_legacy_encryption": true
+    }
+   }
+  },
+  {
+   "case": "registered, PUT",
+   "request": {
+    "method": "PUT",
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBmYrXfQOFTHjyvTsuometnOLU\",\"type\":\"get_zones\"}"
+   },
+   "response": {
+    "status": 200,
+    "headers": {
+     "Content-Type": "application/json"
+    },
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"SEEtTk9OQ0UAAAAAAAAAAAAAAAAAAAABl6CFKb1ehdJx6PTZIEn8EA0iV9B/x+tcfQcPHjTfLP+yzhkWSWeV9b500z5s9XZTNI84UrqP/hXFFZIPuIIDQHz49KzyHHFV2cDedIMfedc9+bdwKCdrZLXiFWMmmrppQ/RaffrCtzrIOaZzmpd+rxRJ1j5p33HPxfgeos0Gru1rarfhRHPH3leGkHnjI5yDoB3C0GQ/DtwW5EJj29HHmXTyYgT57uJ0QztPzPgT2UHSl4fRLGO/n5rqnNB+52VpMUw+Z9mbnaH4prP5Ulw+NZETgKElm+UNw+DZdtlq5sTK593t+4ZloK9HIi6TJy6u33yL9Mi4bUP+KGsuuK+txAYSmPsqENthVUgQ9VmuAKbwq6AcBzgSiDpwrY+erKGI5XaGQ7Eqn3UqLZBlz6pD+/DXiYANiiTiGfwAbXJHAkPNHkO7u7jnpggA7W8lIPHebbqNkqu809s3N2NmAYXel0xPU6+lj+fH0Chx9LQ9eJlTDMAertGbBalEbr3PpA94Nu2kXFgdUB644GEAu1DupREjjXajL5W20K90+5CnBmBEKvmqPg5A0GkXllk1\"}",
+    "effects": {
+     "state_writes": [],
+     "events": [],
+     "service_calls": []
+    },
+    "entry_flags": {
+     "no_legacy_encryption": true
+    }
+   }
+  },
+  {
+   "case": "registered, DELETE (no route method)",
+   "request": {
+    "method": "DELETE",
+    "body": null
+   },
+   "response": {
+    "status": 405,
+    "headers": {
+     "Content-Type": "text/plain; charset=utf-8",
+     "Allow": "GET,HEAD,OPTIONS,POST,PUT"
+    },
+    "body": "405: Method Not Allowed",
+    "effects": {
+     "state_writes": [],
+     "events": [],
+     "service_calls": []
+    },
+    "entry_flags": {
+     "no_legacy_encryption": true
+    }
+   }
+  },
+  {
+   "case": "body not JSON",
+   "request": {
+    "body": "not json"
+   },
+   "response": {
+    "status": 400,
+    "headers": {
+     "Content-Type": "application/json; charset=utf-8"
+    },
+    "body": "{}",
+    "effects": {
+     "state_writes": [],
+     "events": [],
+     "service_calls": []
+    },
+    "entry_flags": {
+     "no_legacy_encryption": true
+    }
+   }
+  },
+  {
+   "case": "empty body",
+   "request": {
+    "body": ""
+   },
+   "response": {
+    "status": 400,
+    "headers": {
+     "Content-Type": "application/json; charset=utf-8"
+    },
+    "body": "{}",
+    "effects": {
+     "state_writes": [],
+     "events": [],
+     "service_calls": []
+    },
+    "entry_flags": {
+     "no_legacy_encryption": true
+    }
+   }
+  },
+  {
+   "case": "JSON array body",
+   "request": {
+    "body": "[]"
+   },
+   "response": {
+    "status": 400,
+    "headers": {
+     "Content-Type": "application/json; charset=utf-8"
+    },
+    "body": "{\"success\": false, \"error\": {\"code\": \"encryption_required\", \"message\": \"Encryption required\"}}",
+    "effects": {
+     "state_writes": [],
+     "events": [],
+     "service_calls": []
+    },
+    "entry_flags": {
+     "no_legacy_encryption": true
+    }
+   }
+  },
+  {
+   "case": "JSON string body without the substring",
+   "request": {
+    "body": "\"x\""
+   },
+   "response": {
+    "status": 400,
+    "headers": {
+     "Content-Type": "application/json; charset=utf-8"
+    },
+    "body": "{\"success\": false, \"error\": {\"code\": \"encryption_required\", \"message\": \"Encryption required\"}}",
+    "effects": {
+     "state_writes": [],
+     "events": [],
+     "service_calls": []
+    },
+    "entry_flags": {
+     "no_legacy_encryption": true
+    }
+   }
+  },
+  {
+   "case": "JSON string body containing 'encrypted'",
+   "request": {
+    "body": "\"encrypted\""
+   },
+   "response": {
+    "status": 200,
+    "headers": {
+     "Content-Type": "application/json; charset=utf-8"
+    },
+    "body": "{}",
+    "effects": {
+     "state_writes": [],
+     "events": [],
+     "service_calls": []
+    },
+    "entry_flags": {
+     "no_legacy_encryption": true
+    }
+   }
+  },
+  {
+   "case": "JSON number body",
+   "request": {
+    "body": "1"
+   },
+   "response": {
+    "status": 200,
+    "headers": {},
+    "body": "",
+    "effects": {
+     "state_writes": [],
+     "events": [],
+     "service_calls": []
+    },
+    "entry_flags": {
+     "no_legacy_encryption": true
+    }
+   }
+  },
+  {
+   "case": "plaintext envelope on an encrypted registration",
+   "request": {
+    "body": "{\"data\":{},\"type\":\"get_zones\"}"
+   },
+   "response": {
+    "status": 400,
+    "headers": {
+     "Content-Type": "application/json; charset=utf-8"
+    },
+    "body": "{\"success\": false, \"error\": {\"code\": \"encryption_required\", \"message\": \"Encryption required\"}}",
+    "effects": {
+     "state_writes": [],
+     "events": [],
+     "service_calls": []
+    },
+    "entry_flags": {
+     "no_legacy_encryption": true
+    }
+   }
+  },
+  {
+   "case": "encrypted: false",
+   "request": {
+    "body": "{\"encrypted\":false,\"encrypted_data\":\"x\",\"type\":\"get_zones\"}"
+   },
+   "response": {
+    "status": 200,
+    "headers": {
+     "Content-Type": "application/json; charset=utf-8"
+    },
+    "body": "{}",
+    "effects": {
+     "state_writes": [],
+     "events": [],
+     "service_calls": []
+    },
+    "entry_flags": {
+     "no_legacy_encryption": true
+    }
+   }
+  },
+  {
+   "case": "missing type",
+   "request": {
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"AAAA\"}"
+   },
+   "response": {
+    "status": 200,
+    "headers": {
+     "Content-Type": "application/json; charset=utf-8"
+    },
+    "body": "{}",
+    "effects": {
+     "state_writes": [],
+     "events": [],
+     "service_calls": []
+    },
+    "entry_flags": {
+     "no_legacy_encryption": true
+    }
+   }
+  },
+  {
+   "case": "type not a string",
+   "request": {
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"AAAA\",\"type\":5}"
+   },
+   "response": {
+    "status": 200,
+    "headers": {
+     "Content-Type": "application/json; charset=utf-8"
+    },
+    "body": "{}",
+    "effects": {
+     "state_writes": [],
+     "events": [],
+     "service_calls": []
+    },
+    "entry_flags": {
+     "no_legacy_encryption": true
+    }
+   }
+  },
+  {
+   "case": "encrypted without encrypted_data",
+   "request": {
+    "body": "{\"encrypted\":true,\"type\":\"get_zones\"}"
+   },
+   "response": {
+    "status": 200,
+    "headers": {},
+    "body": "",
+    "effects": {
+     "state_writes": [],
+     "events": [],
+     "service_calls": []
+    },
+    "entry_flags": {
+     "no_legacy_encryption": true
+    }
+   }
+  },
+  {
+   "case": "extra key in envelope",
+   "request": {
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"AgICAgICAgICAgICAgICAgICAgICAgICyPi24d7Yb8qqAKnAeFBcgOx6\",\"local_metadata\":{},\"type\":\"get_zones\"}"
+   },
+   "response": {
+    "status": 200,
+    "headers": {
+     "Content-Type": "application/json; charset=utf-8"
+    },
+    "body": "{}",
+    "effects": {
+     "state_writes": [],
+     "events": [],
+     "service_calls": []
+    },
+    "entry_flags": {
+     "no_legacy_encryption": true
+    }
+   }
+  },
+  {
+   "case": "wrong key",
+   "request": {
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"AwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDBg0BTbF1w9ooAWsukHSLyI+R\",\"type\":\"get_zones\"}"
+   },
+   "response": {
+    "status": 200,
+    "headers": {
+     "Content-Type": "application/json; charset=utf-8"
+    },
+    "body": "{}",
+    "effects": {
+     "state_writes": [],
+     "events": [],
+     "service_calls": []
+    },
+    "entry_flags": {
+     "no_legacy_encryption": true
+    }
+   }
+  },
+  {
+   "case": "legacy key on a no_legacy_encryption registration",
+   "request": {
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"BAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE6SwHz2vFNXxt744TXeq4kw5g\",\"type\":\"get_zones\"}"
+   },
+   "response": {
+    "status": 200,
+    "headers": {
+     "Content-Type": "application/json; charset=utf-8"
+    },
+    "body": "{}",
+    "effects": {
+     "state_writes": [],
+     "events": [],
+     "service_calls": []
+    },
+    "entry_flags": {
+     "no_legacy_encryption": true
+    }
+   }
+  },
+  {
+   "case": "not base64",
+   "request": {
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"@@@\",\"type\":\"get_zones\"}"
+   },
+   "response": {
+    "status": 200,
+    "headers": {
+     "Content-Type": "application/json; charset=utf-8"
+    },
+    "body": "{}",
+    "effects": {
+     "state_writes": [],
+     "events": [],
+     "service_calls": []
+    },
+    "entry_flags": {
+     "no_legacy_encryption": true
+    }
+   }
+  },
+  {
+   "case": "base64 with junk characters (decoder drops them)",
+   "request": {
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"!BQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFR\\/F0REfbV2BMc+RijeblRoeT!\",\"type\":\"get_zones\"}"
+   },
+   "response": {
+    "status": 200,
+    "headers": {
+     "Content-Type": "application/json"
+    },
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"SEEtTk9OQ0UAAAAAAAAAAAAAAAAAAAACKSySKMtfDQiFkQDLiyvV7CZO6wK5LAh9rv4ChxlqxzJWu2oVNNe8B1B1jMOGVpKiiKNGdgCb+ou9vUhEYy4CkJAvgrXL7nisdtCMqPTx/koEKkBEe75w/tMQ3eq/OaG5Z6ZKEFdcrwgjfdEHOUx2IBNh8uGNHvjjLAYWu+sSF6bLiBbT7E1cunCo/NJdIE/++MguBif4v1sqjGzvOaN/lVm3SPYKBi1mdOaJzEUTVQMd5jSY4ajbrZTf28IFHOQDTQGVCOdNyR9stT46JxYTj05wt+R9G96UR8Lic65szpL3P7CxJReZLNxNUCSCfz8wHLq/zC5iYUB+hT6t+BvMd8eXtSsmungXGXJ9jVDlh5ByIGnULGF5afTjpnhmeBdVCdxpQ1H9SFPMNTFUdYzLHevlegPBjYfXJ6K8P17sXfo94o2vbDbIAM+O3CYv2Gq11ZGPlvPcguS0SNzoCkTr0C7hHYhX0yoTOpAs84Wyvtyc+Pv8eucaB3TPwuebHcKt8ZBeFh2xIIWSKzwEGMp6JdvM884w2Qkd0+B1B4MOznczjFjzo0EteeUw3LIG\"}",
+    "effects": {
+     "state_writes": [],
+     "events": [],
+     "service_calls": []
+    },
+    "entry_flags": {
+     "no_legacy_encryption": true
+    }
+   }
+  },
+  {
+   "case": "too short (< 24 + 16 bytes)",
+   "request": {
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4\",\"type\":\"get_zones\"}"
+   },
+   "response": {
+    "status": 200,
+    "headers": {
+     "Content-Type": "application/json; charset=utf-8"
+    },
+    "body": "{}",
+    "effects": {
+     "state_writes": [],
+     "events": [],
+     "service_calls": []
+    },
+    "entry_flags": {
+     "no_legacy_encryption": true
+    }
+   }
+  },
+  {
+   "case": "decrypts to non-JSON",
+   "request": {
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"BgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGe11Q\\/Ggnp6hV4thyO\\/0twccW3sc=\",\"type\":\"get_zones\"}"
+   },
+   "response": {
+    "status": 200,
+    "headers": {
+     "Content-Type": "application/json; charset=utf-8"
+    },
+    "body": "{}",
+    "effects": {
+     "state_writes": [],
+     "events": [],
+     "service_calls": []
+    },
+    "entry_flags": {
+     "no_legacy_encryption": true
+    }
+   }
+  },
+  {
+   "case": "decrypts to a JSON list",
+   "request": {
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHcBEhQR2CGL35t3NHo2Jk3k+I\",\"type\":\"get_zones\"}"
+   },
+   "response": {
+    "status": 200,
+    "headers": {
+     "Content-Type": "application/json"
+    },
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"SEEtTk9OQ0UAAAAAAAAAAAAAAAAAAAADHG9vhLeD4i2jOaA9D/vkHjjAttpcQAjS4LhtponY0MIuSVOtaU2+Stsy8l1Xshem3zBNEFGEumYxn/ANC3Svgtj6mgeMtKAL5Ne1I4tsxcQkIxOtNgQOopQLSjxDzxwzfmSKaikiJnq/QpHUvOoFn3P9jeJjlxNZBh91snST+lm9EftoRnkG+RkBWLgP2UizY6kJa1uq51Mh2rxaTLylpPQSE3zt/F+7WoqMkir3yvnBIkvZI9LuOLS//xr+aSaHyT2BCYY3IBhvRHEKLdvNhUvH58rcXoxV3XV7UD7av8CK0ZL+wzn2oUTGzWSxrgLwCBAXg7AeapUFa6/N2sDUbnhSG0BjtezfsL1HA5FYLWVaTXh8b5ANfBN/zy4iPoj4lVaAbA9v9bTR4fTzA1Jyobo4QAVxpxesQR2zKemCqKzS1+ZO1vFV4VsZ5F0nyuubqHoMZasEB1Rjkas9HSI2O4zqVU4fUSX40o0mdfas/BAMios5Tcwqo1GpHBjRVnIINl1TQ6toJYNPtRGiZ7YQ18wyPjpk/jWS0psh6N8WkdSYUOY6KPounyRnFMBy\"}",
+    "effects": {
+     "state_writes": [],
+     "events": [],
+     "service_calls": []
+    },
+    "entry_flags": {
+     "no_legacy_encryption": true
+    }
+   }
+  },
+  {
+   "case": "unknown type",
+   "request": {
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"CAgICAgICAgICAgICAgICAgICAgICAgIv1AVdG4oVMwocAUtt3sJIZpd\",\"type\":\"nope\"}"
+   },
+   "response": {
+    "status": 200,
+    "headers": {
+     "Content-Type": "application/json; charset=utf-8"
+    },
+    "body": "{}",
+    "effects": {
+     "state_writes": [],
+     "events": [],
+     "service_calls": []
+    },
+    "entry_flags": {
+     "no_legacy_encryption": true
+    }
+   }
+  },
+  {
+   "case": "content-type text/plain",
+   "request": {
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBmYrXfQOFTHjyvTsuometnOLU\",\"type\":\"get_zones\"}",
+    "headers": {
+     "Content-Type": "text/plain"
+    }
+   },
+   "response": {
+    "status": 200,
+    "headers": {
+     "Content-Type": "application/json"
+    },
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"SEEtTk9OQ0UAAAAAAAAAAAAAAAAAAAAEVaPLTyOT5M6MGJNcjZwqwvwRbMu7ZqrNHOrNo7RC5602dTqcYbC84oO1FNjTq7mc0H0RvOzAwuYHgTjzkWjZGlGqpUCaNEMv5BHxTPdC9NjscpVUDR6WpkbqeYtSiqalvKSxlqg1Ce4vcKoPLXUiHJWE6XQG9ptsLDcKx8CIEEkOHmQURmCcqAKqGSrNzsgsWHHCuYWEHQSDQTaPPgIzi5Y4gG7/2j0hf7CQ2ILXbMEJjBToqdSAIsRlHTraA6vWVdeJEKlAihDvWu/04WZ81QkNh4Is+lauv4s99bdVnp736EyWa/6YTMTlFf8r4CMK+HOQTEHWTgvEphf5vSSVVO+y13NUYxA6Wl8enG+VGD8X7EmPbpdFlsAdypns+xqMq/1j/RU/K8u+32TqupfAf23kYZ2I0fzylrWR2zgCH/z9VXQrkdTp9zE+vj/4upopbeAu+cJW+2hupbyCxpwNm+iHrsr7jZTFYHy5ORlOTzIM6GC76eXe21isNXBQ6zx7t759PLVGqVBHtJtQAMhR77VvSLVWoYf8zC2ys9rya8/YBntRY/4dtxyKLX3w\"}",
+    "effects": {
+     "state_writes": [],
+     "events": [],
+     "service_calls": []
+    },
+    "entry_flags": {
+     "no_legacy_encryption": true
+    }
+   }
+  },
+  {
+   "case": "webhook id of a removed entry (DATA_DELETED_IDS)",
+   "request": {
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBmYrXfQOFTHjyvTsuometnOLU\",\"type\":\"get_zones\"}"
+   },
+   "response": {
+    "status": 200,
+    "headers": {},
+    "body": "",
+    "effects": {
+     "state_writes": [],
+     "events": [],
+     "service_calls": []
+    },
+    "entry_flags": {
+     "no_legacy_encryption": true
+    }
+   }
+  },
+  {
+   "case": ".storage/mobile_app after removal",
+   "file": {
+    "version": 1,
+    "minor_version": 1,
+    "key": "mobile_app",
+    "data": {
+     "deleted_ids": [
+      "2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d"
+     ]
+    }
+   }
+  },
+  {
+   "case": "after restart: webhook id listed in .storage/mobile_app deleted_ids",
+   "request": {
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBmYrXfQOFTHjyvTsuometnOLU\",\"type\":\"get_zones\"}"
+   },
+   "response": {
+    "status": 410,
+    "headers": {},
+    "body": "",
+    "effects": {
+     "state_writes": [],
+     "events": [
+      {
+       "event_type": "user_added",
+       "data": {
+        "user_id": "956df77ec3b145e0979ac45ee011096a"
+       },
+       "origin": "LOCAL",
+       "context_user_id": null
+      }
+     ],
+     "service_calls": []
+    },
+    "entry_flags": {
+     "no_legacy_encryption": true
+    }
+   }
+  }
+ ],
+ "logs": [
+  "INFO homeassistant.components.webhook: Received message for unregistered webhook abababababababababababababababababababababababababababababababab from 127.0.0.1",
+  "INFO homeassistant.components.webhook: Received message for unregistered webhook abababababababababababababababababababababababababababababababab from 127.0.0.1",
+  "WARNING homeassistant.components.webhook: Webhook 0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f only supports POST,PUT methods but GET was received from 127.0.0.1",
+  "DEBUG homeassistant.components.mobile_app.helpers: Successfully decrypted mobile_app payload",
+  "DEBUG homeassistant.components.mobile_app.webhook: Received webhook payload from  Phone for type get_zones: {}",
+  "WARNING homeassistant.components.mobile_app.webhook: Received invalid JSON from mobile_app device:  Phone",
+  "WARNING homeassistant.components.mobile_app.webhook: Received invalid JSON from mobile_app device:  Phone",
+  "WARNING homeassistant.components.mobile_app.webhook: Refusing to accept unencrypted webhook from  Phone",
+  "WARNING homeassistant.components.mobile_app.webhook: Refusing to accept unencrypted webhook from  Phone",
+  "ERROR homeassistant.components.mobile_app.webhook: Received invalid webhook from  Phone with payload: expected a dictionary. Got 'encrypted'",
+  "ERROR homeassistant.components.webhook: Error processing webhook 0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f",
+  "WARNING homeassistant.components.mobile_app.webhook: Refusing to accept unencrypted webhook from  Phone",
+  "ERROR homeassistant.components.mobile_app.webhook: Received invalid webhook from  Phone with payload: extra keys not allowed @ data['encrypted']. Got False\nextra keys not allowed @ data['encrypted_data']. Got 'x'",
+  "ERROR homeassistant.components.mobile_app.webhook: Received invalid webhook from  Phone with payload: extra keys not allowed @ data['encrypted']. Got True\nextra keys not allowed @ data['encrypted_data']. Got 'AAAA'\nrequired key not provided @ data['type']. Got None",
+  "WARNING homeassistant.components.mobile_app.webhook: Ignoring encrypted payload because unable to decrypt",
+  "ERROR homeassistant.components.webhook: Error processing webhook 0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f",
+  "ERROR homeassistant.components.mobile_app.webhook: Received invalid webhook from  Phone with payload: extra keys not allowed @ data['encrypted']. Got True\nextra keys not allowed @ data['encrypted_data']. Got 'AgICAgICAgICAgICAgICAgICAgICAgICyPi24d7Yb8qqAKnAeFBcgOx6'\nextra keys not allowed @ data['local_metadata']. Got {}",
+  "WARNING homeassistant.components.mobile_app.webhook: Ignoring encrypted payload because unable to decrypt",
+  "WARNING homeassistant.components.mobile_app.webhook: Ignoring encrypted payload because unable to decrypt",
+  "WARNING homeassistant.components.mobile_app.webhook: Ignoring encrypted payload because unable to decrypt",
+  "DEBUG homeassistant.components.mobile_app.helpers: Successfully decrypted mobile_app payload",
+  "DEBUG homeassistant.components.mobile_app.webhook: Received webhook payload from  Phone for type get_zones: {}",
+  "WARNING homeassistant.components.mobile_app.webhook: Ignoring encrypted payload because unable to decrypt",
+  "WARNING homeassistant.components.mobile_app.webhook: Ignoring invalid JSON in encrypted payload: invalid literal: line 1 column 1 (char 0)",
+  "DEBUG homeassistant.components.mobile_app.helpers: Successfully decrypted mobile_app payload",
+  "DEBUG homeassistant.components.mobile_app.webhook: Received webhook payload from  Phone for type get_zones: []",
+  "DEBUG homeassistant.components.mobile_app.helpers: Successfully decrypted mobile_app payload",
+  "ERROR homeassistant.components.mobile_app.webhook: Received invalid webhook from  Phone of type: nope",
+  "DEBUG homeassistant.components.mobile_app.helpers: Successfully decrypted mobile_app payload",
+  "DEBUG homeassistant.components.mobile_app.webhook: Received webhook payload from  Phone for type get_zones: {}",
+  "INFO homeassistant.components.webhook: Received message for unregistered webhook 2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d from 127.0.0.1"
+ ]
+}

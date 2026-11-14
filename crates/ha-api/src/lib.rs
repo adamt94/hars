@@ -4,6 +4,7 @@
 mod auth;
 mod automation;
 pub mod brands;
+mod cv;
 mod frontend;
 mod frontend_data;
 mod i18n;
@@ -11,6 +12,7 @@ mod labs;
 #[rustfmt::skip]
 mod i18n_data;
 mod lovelace;
+mod mobile_app;
 #[rustfmt::skip]
 mod manifests_data;
 mod rest;
@@ -60,6 +62,8 @@ pub struct ApiConfig {
     pub brands: Option<Arc<brands::Brands>>,
     /// The automations, from `configuration.yaml`.
     pub automations: Option<ha_automation::Automations>,
+    /// The companion apps' registrations (`mobile_app`).
+    pub mobile_app: Option<Arc<ha_integrations::mobile_app::MobileApp>>,
 }
 
 /// What the WebSocket and `/api/config` need.
@@ -169,6 +173,7 @@ pub fn router(hass: Hass, auth: Auth, config: &ApiConfig) -> Router {
     // The WebSocket authenticates inside the protocol, not over HTTP.
     let mut router = api
         .merge(auth::routes(auth.clone()))
+        .merge(mobile_app::routes(shared.clone()))
         .merge(ws::routes(shared));
     if let Some(b) = &config.brands {
         router = router.merge(brands::routes(b.clone(), auth.clone()));
