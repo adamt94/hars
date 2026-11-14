@@ -203,9 +203,27 @@ pub fn iso_seconds(t: Timestamp) -> String {
     t.strftime("%Y-%m-%dT%H:%M:%S+00:00").to_string()
 }
 
-/// Python's `str(float)`: `60.0`, not `60`.
+/// Python's `repr(float)`: the shortest round-trip digits, `60.0` not
+/// `60`, and scientific (`1e-07`, `1.5e+16`) outside `1e-4..1e16`.
 pub fn py_float(x: f64) -> String {
-    if x.is_finite() && x.fract() == 0.0 && x.abs() < 1e16 {
+    if !x.is_finite() {
+        return if x.is_nan() {
+            "nan".into()
+        } else if x > 0.0 {
+            "inf".into()
+        } else {
+            "-inf".into()
+        };
+    }
+    let a = x.abs();
+    if a != 0.0 && !(1e-4..1e16).contains(&a) {
+        let s = format!("{x:e}");
+        let (mantissa, exp) = s.split_once('e').unwrap_or((&s, "0"));
+        let exp: i32 = exp.parse().unwrap_or(0);
+        let sign = if exp < 0 { '-' } else { '+' };
+        return format!("{mantissa}e{sign}{:02}", exp.abs());
+    }
+    if x.fract() == 0.0 {
         format!("{x:.1}")
     } else {
         x.to_string()

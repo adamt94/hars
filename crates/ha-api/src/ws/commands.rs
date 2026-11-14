@@ -71,7 +71,8 @@ pub(super) fn dispatch(conn: &mut Conn, id: u64, ty: &str, msg: &Map<String, Val
         },
     };
     if let Err(why) = res {
-        conn.out.error(json!(id), "invalid_format", &why);
+        let message = super::humanize(&Value::Object(msg.clone()), &why);
+        conn.out.error(json!(id), "invalid_format", &message);
     }
     true
 }

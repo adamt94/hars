@@ -344,6 +344,7 @@ async fn authenticate(
     let token = match auth_token(&msg) {
         Ok(token) => token,
         Err(why) => {
+            let why = humanize(&msg, &why);
             let reply = invalid(format!("Auth message incorrectly formatted: {why}"));
             let _ = socket.send(Message::Text(reply.into())).await;
             return None;
@@ -511,6 +512,111 @@ impl Conn {
 pub(crate) type Invalid = String;
 
 /// Reject keys beyond `id`, `type` and `allowed`, as voluptuous does.
+/// voluptuous's `humanize_error`, as HA sends a schema error: the message,
+/// `. Got `, and Python's `repr` of the value at the error's path (the
+/// whole message when it names none; `None` when nothing is there), cut to
+/// 500 characters.
+pub(crate) fn humanize(msg: &Value, why: &str) -> String {
+    let at = match why.rfind(" @ data") {
+        Some(i) => path_value(msg, &why[i + " @ data".len()..]),
+        None => Some(msg),
+    };
+    let mut got = String::new();
+    match at {
+        Some(v) => py_repr(&mut got, v),
+        None => got.push_str("None"),
+    }
+    if got.chars().count() > 500 {
+        got = got.chars().take(497).chain("...".chars()).collect();
+    }
+    format!("{why}. Got {got}")
+}
+
+/// The value at a voluptuous path such as `['integration'][0]`.
+fn path_value<'a>(mut v: &'a Value, mut path: &str) -> Option<&'a Value> {
+    while let Some(rest) = path.strip_prefix('[') {
+        let (segment, after) = if let Some(quoted) = rest.strip_prefix('\'') {
+            let end = quoted.find("']")?;
+            (Some(&quoted[..end]), &quoted[end + 2..])
+        } else {
+            let end = rest.find(']')?;
+            let i: usize = rest[..end].parse().ok()?;
+            v = v.as_array()?.get(i)?;
+            (None, &rest[end + 1..])
+        };
+        if let Some(key) = segment {
+            v = v.as_object()?.get(key)?;
+        }
+        path = after;
+    }
+    Some(v)
+}
+
+/// Python's `repr` of a JSON value.
+fn py_repr(out: &mut String, v: &Value) {
+    match v {
+        Value::Null => out.push_str("None"),
+        Value::Bool(true) => out.push_str("True"),
+        Value::Bool(false) => out.push_str("False"),
+        Value::Number(n) => match n.as_f64().filter(|_| n.is_f64()) {
+            Some(f) => out.push_str(&ha_integrations::sun::py_float(f)),
+            None => out.push_str(&n.to_string()),
+        },
+        Value::String(s) => py_repr_str(out, s),
+        Value::Array(items) => {
+            out.push('[');
+            for (i, item) in items.iter().enumerate() {
+                if i > 0 {
+                    out.push_str(", ");
+                }
+                py_repr(out, item);
+            }
+            out.push(']');
+        }
+        Value::Object(m) => {
+            out.push('{');
+            for (i, (k, item)) in m.iter().enumerate() {
+                if i > 0 {
+                    out.push_str(", ");
+                }
+                py_repr_str(out, k);
+                out.push_str(": ");
+                py_repr(out, item);
+            }
+            out.push('}');
+        }
+    }
+}
+
+/// Python's `repr` of a `str`: single quotes unless only `'` is inside,
+/// escapes for `\\`, the quote and control characters.
+fn py_repr_str(out: &mut String, s: &str) {
+    let quote = if s.contains('\'') && !s.contains('"') {
+        '"'
+    } else {
+        '\''
+    };
+    out.push(quote);
+    for c in s.chars() {
+        match c {
+            '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            c if c == quote => {
+                out.push('\\');
+                out.push(c);
+            }
+            c if (c as u32) < 0x100 && c.is_control() => {
+                out.push_str(&format!("\\x{:02x}", c as u32));
+            }
+            c if c.is_control() => out.push_str(&format!("\\u{:04x}", c as u32)),
+            c => out.push(c),
+        }
+    }
+    out.push(quote);
+}
+
 pub(crate) fn only_keys(msg: &Map<String, Value>, allowed: &[&str]) -> Result<(), Invalid> {
     let extra = msg
         .keys()
@@ -525,3 +631,41 @@ pub(crate) fn only_keys(msg: &Map<String, Value>, allowed: &[&str]) -> Result<()
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod humanize_tests {
+    use super::humanize;
+    use serde_json::json;
+
+    /// Each from voluptuous 0.15.2's `humanize_error` in CPython 3.14.
+    #[test]
+    fn like_voluptuous() {
+        let m = json!({"id": 1, "type": "t", "a": {"b": [1, 2.0, "it's", "say \"hi\"", "both ' \"", null, true, "tab\there\n", "é€", "ctl\u{1}"]}});
+        assert_eq!(
+            humanize(&m, "bad @ data['a']"),
+            r#"bad @ data['a']. Got {'b': [1, 2.0, "it's", 'say "hi"', 'both \' "', None, True, 'tab\there\n', 'é€', 'ctl\x01']}"#
+        );
+        let m = json!({"id": 1, "type": "t", "a": [{"k": 1e20}, {"k": 1e-7}]});
+        assert_eq!(
+            humanize(&m, "bad @ data['a'][1]['k']"),
+            "bad @ data['a'][1]['k']. Got 1e-07"
+        );
+        let m = json!({"id": 1, "type": "t"});
+        assert_eq!(
+            humanize(&m, "bad @ data['missing'][0]"),
+            "bad @ data['missing'][0]. Got None"
+        );
+        // No path: the whole message.
+        assert_eq!(
+            humanize(&m, "extra keys not allowed"),
+            "extra keys not allowed. Got {'id': 1, 'type': 't'}"
+        );
+        // Cut to 500 characters.
+        let m = json!({"s": "x".repeat(600)});
+        let got = humanize(&m, "long @ data['s']");
+        assert_eq!(
+            got,
+            format!("long @ data['s']. Got '{}...", "x".repeat(496))
+        );
+    }
+}

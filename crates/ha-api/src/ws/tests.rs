@@ -206,7 +206,11 @@ async fn message_ids_and_errors() {
     );
     assert_eq!(
         c.call(json!({"id": 6, "type": "get_states", "x": 1})).await,
-        err(json!(6), "invalid_format", "extra keys not allowed")
+        err(
+            json!(6),
+            "invalid_format",
+            "extra keys not allowed. Got {'id': 6, 'type': 'get_states', 'x': 1}"
+        )
     );
     // A failed command still uses its id.
     assert_eq!(
@@ -1081,7 +1085,7 @@ async fn weather_forecasts_are_served_and_pushed() {
     assert_eq!(e["error"]["code"], "invalid_format");
     assert_eq!(
         e["error"]["message"],
-        "Entity ID 'light.x' does not belong to domain 'weather' for dictionary value @ data['entity_id']"
+        "Entity ID 'light.x' does not belong to domain 'weather' for dictionary value @ data['entity_id']. Got 'light.x'"
     );
     let e = c.call(sub(6, "weather.forecast_home", "weekly")).await;
     assert_eq!(e["error"]["code"], "invalid_format");
@@ -1190,7 +1194,7 @@ async fn translations_and_icons_come_from_has_files() {
         .await;
     assert_eq!(
         r["error"]["message"],
-        "required key not provided @ data['category']"
+        "required key not provided @ data['category']. Got None"
     );
 
     let r = c
