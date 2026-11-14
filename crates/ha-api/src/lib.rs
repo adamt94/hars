@@ -32,6 +32,8 @@ pub struct ApiConfig {
     pub config_source: ConfigSource,
     /// The frontend's per-user and system settings.
     pub frontend_data: Arc<FrontendData>,
+    /// Entity, device, area, floor and label registries.
+    pub registries: Arc<ha_registry::Registries>,
 }
 
 /// What the WebSocket and `/api/config` need.

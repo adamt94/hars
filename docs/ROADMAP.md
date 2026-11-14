@@ -141,7 +141,8 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
       unsupported or unresolved (`import-report.json`). Stores `hars` reads
       are validated with its own loaders and copied byte for byte; a re-run
       that would replace state `hars` changed needs `--force`. It imports:
-  - [ ] Entity/device/area registries (unique-id mapping, disabled/hidden flags)
+  - [x] Entity/device/area/floor/label registries (HA's files as they are:
+        unique ids, disabled/hidden flags, names), read by `ha-registry`
   - [x] `core.config` (location, elevation, units, time zone)
   - [ ] `person`, zones
   - [ ] Lovelace dashboards and the dashboards list (`url_path` identity)
@@ -198,9 +199,10 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
       waits for (test replays it)
 - [ ] Bundle translations and icons (`frontend/get_translations`,
       `frontend/get_icons`), `manifest/list`, `brands/access_token`
-- [ ] WS registries: `config/entity_registry/list_for_display`,
-      `config/{device,area,floor,label}_registry/list`, and their `*_updated`
-      events (answered empty until M1's registries exist)
+- [x] WS registries: `config/entity_registry/list_for_display` (HA's display
+      keys, legacy device-name prefix stripping),
+      `config/{device,area,floor,label}_registry/list`
+- [ ] Registry `*_updated` events, once registries change at runtime
 - [ ] WS lovelace: `lovelace/info`, `lovelace/dashboards/list`,
       `lovelace/config` (`config_not_found` for Overview),
       `lovelace/config/save`, `lovelace/resources`

@@ -6,7 +6,7 @@
 //! `casefold()` differs from its `lower()`.
 
 /// `s.casefold()`.
-pub(crate) fn casefold(s: &str) -> String {
+pub fn casefold(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     for c in s.chars() {
         match FOLDS.binary_search_by_key(&(c as u32), |&(cp, _)| cp) {

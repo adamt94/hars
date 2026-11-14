@@ -13,6 +13,7 @@ rust-version = "1.85"
 ha-api = { path = "crates/ha-api" }
 ha-auth = { path = "crates/ha-auth" }
 ha-core = { path = "crates/ha-core" }
+ha-registry = { path = "crates/ha-registry" }
 
 [workspace.lints.rust]
 unsafe_code = "deny"

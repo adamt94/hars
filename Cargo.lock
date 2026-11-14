@@ -417,6 +417,7 @@ dependencies = [
  "futures-util",
  "ha-auth",
  "ha-core",
+ "ha-registry",
  "jiff",
  "parking_lot",
  "serde_json",
@@ -463,6 +464,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "ha-registry"
+version = "0.1.0"
+dependencies = [
+ "ha-core",
+ "jiff",
+ "serde",
+ "serde_json",
+ "tracing",
+]
+
+[[package]]
 name = "ha-server"
 version = "0.1.0"
 dependencies = [
@@ -471,6 +483,7 @@ dependencies = [
  "ha-api",
  "ha-auth",
  "ha-core",
+ "ha-registry",
  "mimalloc",
  "rustix",
  "serde",

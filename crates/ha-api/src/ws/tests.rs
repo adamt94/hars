@@ -813,3 +813,58 @@ async fn user_data_is_shared_between_a_users_connections() {
         "pong"
     );
 }
+
+#[tokio::test]
+async fn registry_lists_come_from_the_registries() {
+    let hass = Hass::new();
+    hass.start();
+    let auth = crate::test_util::auth(true);
+    let registries = ha_registry::Registries {
+        areas: vec![ha_registry::Area {
+            id: "kitchen".into(),
+            name: "Kitchen".into(),
+            ..Default::default()
+        }],
+        entities: vec![ha_registry::Entity {
+            entity_id: "light.kitchen".into(),
+            platform: "hue".into(),
+            area_id: Some("kitchen".into()),
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+    let config = crate::ApiConfig {
+        registries: std::sync::Arc::new(registries),
+        ..Default::default()
+    };
+    let app = crate::router(hass.clone(), auth.clone(), &config)
+        .into_make_service_with_connect_info::<std::net::SocketAddr>();
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let url = format!("ws://{}/api/websocket", listener.local_addr().unwrap());
+    tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+    let s = Server { url, hass, auth };
+    let mut c = Client::authed(&s, &token(&s.auth).0).await;
+
+    let areas = c
+        .call(json!({"id": 2, "type": "config/area_registry/list"}))
+        .await;
+    assert_eq!(areas["result"][0]["area_id"], "kitchen");
+    let entities = c
+        .call(json!({"id": 3, "type": "config/entity_registry/list_for_display"}))
+        .await;
+    assert_eq!(
+        entities["result"]["entities"],
+        json!([{"ei": "light.kitchen", "pl": "hue", "ai": "kitchen", "lb": []}])
+    );
+    for (id, ty) in [
+        (4, "config/device_registry/list"),
+        (5, "config/floor_registry/list"),
+        (6, "config/label_registry/list"),
+    ] {
+        assert_eq!(
+            c.call(json!({"id": id, "type": ty})).await["result"],
+            json!([]),
+            "{ty}"
+        );
+    }
+}

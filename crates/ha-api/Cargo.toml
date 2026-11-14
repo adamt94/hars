@@ -14,6 +14,7 @@ workspace = true
 axum = { version = "0.8.9", features = ["ws"] }
 ha-auth.workspace = true
 ha-core.workspace = true
+ha-registry.workspace = true
 futures-util = { version = "0.3", default-features = false, features = ["sink"] }
 jiff = "0.2.43"
 parking_lot = "0.12.5"

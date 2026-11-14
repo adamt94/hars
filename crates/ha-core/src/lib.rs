@@ -9,6 +9,7 @@
 //! Design rule: the hot path (state writes + event fan-out) must not allocate
 //! more than necessary and must never block on I/O.
 
+pub mod casefold;
 mod clock;
 pub mod config;
 mod context;

@@ -42,15 +42,21 @@ pub(super) fn dispatch(
         "frontend/get_icons" => only_keys(msg, &["category", "integration"]).map(|()| {
             conn.out.result(id, json!({"resources": {}}));
         }),
-        // Registries are empty until the importer and integrations fill them.
-        "config/entity_registry/list_for_display" => empty(
-            conn,
-            json!({"entity_categories": {"0": "config", "1": "diagnostic"}, "entities": []}),
-        ),
-        "config/device_registry/list"
+        "config/entity_registry/list_for_display"
+        | "config/device_registry/list"
         | "config/area_registry/list"
         | "config/floor_registry/list"
-        | "config/label_registry/list" => empty(conn, json!([])),
+        | "config/label_registry/list" => {
+            let r = &conn.shared.config.registries;
+            let list = match ty {
+                "config/entity_registry/list_for_display" => r.entities_for_display(),
+                "config/device_registry/list" => r.devices_json(),
+                "config/area_registry/list" => r.areas_json(),
+                "config/floor_registry/list" => r.floors_json(),
+                _ => r.labels_json(),
+            };
+            empty(conn, list)
+        }
         "lovelace/info" => empty(conn, json!({"resource_mode": "storage"})),
         "lovelace/config" => lovelace_config(conn, id, msg),
         "lovelace/resources" | "lovelace/resources/list" => empty(conn, json!([])),

@@ -31,6 +31,11 @@ const STORES: &[(&str, bool)] = &[
     ("onboarding", true),
     ("core.config", true),
     ("frontend.system_data", false),
+    (ha_registry::ENTITY_KEY, false),
+    (ha_registry::DEVICE_KEY, false),
+    (ha_registry::AREA_KEY, false),
+    (ha_registry::FLOOR_KEY, false),
+    (ha_registry::LABEL_KEY, false),
 ];
 
 /// Integrations `hars` implements, by domain; their config entries are
@@ -164,6 +169,8 @@ pub fn run(opts: &Options) -> anyhow::Result<Report> {
     })?;
     ha_core::config::CoreConfig::load(&staging.root)
         .map_err(|e| anyhow::anyhow!("core.config doesn't load ({})", sanitized(&e)))?;
+    ha_registry::Registries::load_strict(&staging.root)
+        .map_err(|e| anyhow::anyhow!("the registries don't load ({})", sanitized(&e)))?;
     for key in staging.keys()? {
         if key == "frontend.system_data" || key.starts_with(USER_DATA_PREFIX) {
             let store = Store::new(&staging.root, key.clone(), 1, 1, false);
@@ -244,7 +251,7 @@ fn unsupported_reason(key: &str) -> &'static str {
     match key {
         "core.config_entries" => "integrations: see config_entries",
         k if k.starts_with("core.") && k.ends_with("_registry") => {
-            "registries are not imported yet"
+            "this registry is not used by hars yet"
         }
         k if k.starts_with("lovelace") => "dashboards are not imported yet",
         _ => "not used by hars yet",

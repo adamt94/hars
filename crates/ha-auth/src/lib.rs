@@ -6,7 +6,6 @@
 //! writes what changed. The API is synchronous: password hashing and file
 //! writes block, so call those from `spawn_blocking`.
 
-mod casefold;
 pub mod indieauth;
 mod jwt;
 mod models;
@@ -703,7 +702,7 @@ impl Auth {
 
 /// `normalize_username`: `str.strip().casefold()`.
 fn normalize_username(username: &str) -> String {
-    casefold::casefold(username.trim())
+    ha_core::casefold::casefold(username.trim())
 }
 
 /// bcrypt only uses the first 72 bytes; HA truncates explicitly.
