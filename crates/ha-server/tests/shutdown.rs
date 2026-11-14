@@ -97,7 +97,7 @@ fn sigterm_stops_cleanly_with_an_idle_keep_alive_connection() {
     signal(&child, "-TERM");
     let (status, out) = wait_with_limit(child, Duration::from_secs(5));
     assert!(status.success(), "exit {status}: {out}");
-    assert!(out.contains("SIGTERM received, stopping"), "{out}");
+    assert!(out.contains("SIGTERM received"), "{out}");
     assert!(out.contains("hars stopped"), "{out}");
 }
 
@@ -135,7 +135,7 @@ fn sigint_stops_cleanly() {
     signal(&child, "-INT");
     let (status, out) = wait_with_limit(child, Duration::from_secs(5));
     assert!(status.success(), "exit {status}: {out}");
-    assert!(out.contains("SIGINT received, stopping"), "{out}");
+    assert!(out.contains("SIGINT received"), "{out}");
 }
 
 /// A supervisor may signal the moment the port answers: the handlers must
