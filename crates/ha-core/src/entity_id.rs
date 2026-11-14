@@ -23,7 +23,16 @@ pub fn valid_entity_id(s: &str) -> bool {
 
 /// Unicode category `Nd` (Unicode 16.0, as Python 3.14's `re` reads `\\d`).
 fn is_decimal(c: char) -> bool {
-    DECIMAL.iter().any(|&(lo, hi)| lo <= c && c <= hi)
+    decimal_value(c).is_some()
+}
+
+/// A Unicode decimal digit's value (Python's `int()` of one character):
+/// every `Nd` run is consecutive blocks of `0`-`9`.
+pub fn decimal_value(c: char) -> Option<u32> {
+    DECIMAL
+        .iter()
+        .find(|&&(lo, hi)| lo <= c && c <= hi)
+        .map(|&(lo, _)| (c as u32 - lo as u32) % 10)
 }
 
 const DECIMAL: [(char, char); 71] = [

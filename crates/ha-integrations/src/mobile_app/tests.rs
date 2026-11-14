@@ -100,3 +100,74 @@ fn webhooks_by_id() {
     assert!(matches!(app.webhook("disabled"), Webhook::Unknown));
     assert!(matches!(app.webhook("hue"), Webhook::Unknown));
 }
+
+fn sensors_fixture() -> (
+    ha_core::Hass,
+    Arc<ha_registry::Registry>,
+    Arc<Registration>,
+    sensor::Sensors,
+) {
+    let hass = ha_core::Hass::new();
+    let registry = ha_registry::Registry::in_memory(&hass, Default::default());
+    let reg = Arc::new(Registration::from_entry(&entry(true)).unwrap());
+    let sensors = sensor::Sensors::setup(&hass, registry.clone(), std::slice::from_ref(&reg));
+    (hass, registry, reg, sensors)
+}
+
+fn state_of(hass: &ha_core::Hass, id: &str) -> Option<String> {
+    hass.states()
+        .get(&ha_core::EntityId::parse(id).unwrap())
+        .map(|s| s.state.to_string())
+}
+
+/// Review regression: re-enabled without a state, a sensor restores the
+/// value it had when it was disabled (HA adds it, then restores).
+#[test]
+fn re_enabled_sensors_restore() {
+    let (hass, _, reg, sensors) = sensors_fixture();
+    let register = |extra: Value| {
+        let mut p = json!({"name": "Steps", "type": "sensor", "unique_id": "steps"});
+        p.as_object_mut()
+            .unwrap()
+            .extend(extra.as_object().unwrap().clone());
+        assert!(sensors.register(&reg, None, &p));
+    };
+    register(json!({"state": 42}));
+    assert_eq!(state_of(&hass, "sensor.phone_steps").as_deref(), Some("42"));
+    register(json!({"disabled": true}));
+    assert_eq!(state_of(&hass, "sensor.phone_steps"), None);
+    register(json!({"disabled": false}));
+    assert_eq!(state_of(&hass, "sensor.phone_steps").as_deref(), Some("42"));
+}
+
+/// Review regression: concurrent updates can't publish out of order: the
+/// state and what would be restored always agree.
+#[test]
+fn concurrent_updates_stay_consistent() {
+    let (hass, _, reg, sensors) = sensors_fixture();
+    assert!(sensors.register(
+        &reg,
+        None,
+        &json!({"name": "Steps", "type": "sensor", "unique_id": "steps", "state": 0})
+    ));
+    std::thread::scope(|s| {
+        for t in 0..8 {
+            let (sensors, reg) = (&sensors, &reg);
+            s.spawn(move || {
+                for i in 0..50 {
+                    let v = t * 1000 + i;
+                    sensors.update_states(
+                        reg,
+                        &json!([{"type": "sensor", "unique_id": "steps", "state": v}]),
+                    );
+                }
+            });
+        }
+    });
+    let state = state_of(&hass, "sensor.phone_steps").unwrap();
+    let dumped = hass
+        .restore()
+        .extra_data_now("sensor.phone_steps")
+        .expect("registered");
+    assert_eq!(dumped["native_value"].to_string(), state);
+}

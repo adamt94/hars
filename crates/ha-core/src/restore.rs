@@ -82,6 +82,12 @@ impl RestoreState {
             .filter(|v| !v.is_null())
     }
 
+    /// What an entity's extra restore data is now (what a dump would write).
+    pub fn extra_data_now(&self, entity_id: &str) -> Option<Value> {
+        let extra = self.entities.lock().get(entity_id).cloned().flatten()?;
+        extra()
+    }
+
     /// Mark an entity as one that restores itself, so its state is dumped.
     pub fn register(&self, entity_id: &str, extra: Option<ExtraData>) {
         self.entities.lock().insert(entity_id.to_owned(), extra);

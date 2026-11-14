@@ -166,6 +166,9 @@ pub struct Sensors {
     hass: Hass,
     registry: Arc<Registry>,
     inner: Arc<Mutex<Inner>>,
+    /// One command at a time (HA's event loop): a change and its write
+    /// can't interleave with another request's.
+    ops: Mutex<()>,
 }
 
 fn str_of<'a>(m: &'a Map<String, Value>, k: &str) -> Option<&'a str> {
@@ -190,6 +193,7 @@ impl Sensors {
             hass: hass.clone(),
             registry,
             inner: Arc::default(),
+            ops: Mutex::new(()),
         };
         let snap = this.registry.snapshot();
         for reg in registrations {
@@ -198,47 +202,57 @@ impl Sensors {
                     && e.config_entry_id.as_deref() == Some(reg.entry_id.as_str())
                     && e.disabled_by.is_none()
             }) {
-                let Some(kind) = row.entity_id.split('.').next().and_then(Kind::parse) else {
-                    continue;
-                };
-                let Some(unique) = row.unique_id.as_ref().and_then(Value::as_str) else {
-                    continue;
-                };
-                let Ok(entity_id) = EntityId::parse(&row.entity_id) else {
-                    continue;
-                };
-                let mut config = Map::new();
-                config.insert("state".into(), Value::Null);
-                config.insert("attributes".into(), json!({}));
-                let dc = row
-                    .device_class
-                    .clone()
-                    .or(row.original_device_class.clone());
-                config.insert("device_class".into(), json!(dc));
-                config.insert("icon".into(), json!(row.original_icon));
-                config.insert("unit_of_measurement".into(), json!(row.unit_of_measurement));
-                if kind == Kind::Sensor
-                    && let Some(sc) = row
-                        .capabilities
-                        .as_ref()
-                        .and_then(|c| c.object().get("state_class").cloned())
-                {
-                    config.insert("state_class".into(), sc);
-                }
-                let mut sensor = Sensor {
-                    entity_id,
-                    kind,
-                    name: row.original_name.clone(),
-                    config,
-                };
-                this.restore(&mut sensor);
-                let key = (kind, unique.to_owned());
-                this.register_restore(&sensor, key.clone());
-                this.write(&sensor);
-                this.inner.lock().sensors.insert(key, sensor);
+                this.add_entity(row);
             }
         }
         this
+    }
+
+    /// An entity for an enabled row (`async_added_to_hass`): the config
+    /// from the row, any pending update applied, then the last state
+    /// restored if it has none; then written.
+    fn add_entity(&self, row: &ha_registry::Entity) {
+        let Some(kind) = row.entity_id.split('.').next().and_then(Kind::parse) else {
+            return;
+        };
+        let Some(unique) = row.unique_id.as_ref().and_then(Value::as_str) else {
+            return;
+        };
+        let Ok(entity_id) = EntityId::parse(&row.entity_id) else {
+            return;
+        };
+        let mut config = Map::new();
+        config.insert("state".into(), Value::Null);
+        config.insert("attributes".into(), json!({}));
+        let dc = row
+            .device_class
+            .clone()
+            .or(row.original_device_class.clone());
+        config.insert("device_class".into(), json!(dc));
+        config.insert("icon".into(), json!(row.original_icon));
+        config.insert("unit_of_measurement".into(), json!(row.unit_of_measurement));
+        if kind == Kind::Sensor
+            && let Some(sc) = row
+                .capabilities
+                .as_ref()
+                .and_then(|c| c.object().get("state_class").cloned())
+        {
+            config.insert("state_class".into(), sc);
+        }
+        let mut sensor = Sensor {
+            entity_id,
+            kind,
+            name: row.original_name.clone(),
+            config,
+        };
+        let key = (kind, unique.to_owned());
+        if let Some(update) = self.inner.lock().pending.remove(&key) {
+            sensor.config.extend(update);
+        }
+        self.restore(&mut sensor);
+        self.register_restore(&sensor, key.clone());
+        self.write(&sensor);
+        self.inner.lock().sensors.insert(key, sensor);
     }
 
     /// `async_restore_last_state` (+ the sensor's extra data).
@@ -275,14 +289,8 @@ impl Sensors {
                 let extra = restore.last_extra_data(s.entity_id.as_str());
                 match extra.as_ref().and_then(Value::as_object) {
                     Some(data) => {
+                        // A date or datetime stays typed ({"__type", "isoformat"}).
                         let native = data.get("native_value").cloned().unwrap_or(Value::Null);
-                        // A datetime is stored as {"__type", "isoformat"}.
-                        let native = match &native {
-                            Value::Object(m) if m.contains_key("isoformat") => {
-                                m["isoformat"].clone()
-                            }
-                            _ => native,
-                        };
                         s.config.insert("state".into(), native);
                         s.config.insert(
                             "unit_of_measurement".into(),
@@ -309,7 +317,7 @@ impl Sensors {
                     let inner = inner.upgrade()?;
                     let inner = inner.lock();
                     let s = inner.sensors.get(&key)?;
-                    let native = native_value(&s.config).ok()?;
+                    let native = native_value(&s.config).map(|n| n.dump());
                     Some(json!({
                         "native_value": native.unwrap_or(Value::Null),
                         "native_unit_of_measurement": s.config.get("unit_of_measurement").cloned().unwrap_or(Value::Null),
@@ -337,7 +345,7 @@ impl Sensors {
                     None | Some(Value::Null) => "unknown".into(),
                     Some(v) => if truthy(v) { "on" } else { "off" }.into(),
                 },
-                Kind::Sensor => match sensor_state(&s.config) {
+                Kind::Sensor => match sensor_state(&s.config, &self.system_temperature()) {
                     Ok(state) => state,
                     Err(why) => {
                         tracing::warn!("not writing {}: {why}", s.entity_id);
@@ -356,9 +364,9 @@ impl Sensors {
             a.extend(extra.clone());
         }
         if s.kind == Kind::Sensor
-            && let Some(u) = s.config.get("unit_of_measurement").filter(|v| !v.is_null())
+            && let Some(u) = display_unit(&s.config, &self.system_temperature())
         {
-            a.insert("unit_of_measurement".into(), u.clone());
+            a.insert("unit_of_measurement".into(), u);
         }
         let or = |reg: Option<&String>, own: Option<&Value>| -> Option<Value> {
             reg.filter(|v| !v.is_empty())
@@ -383,6 +391,15 @@ impl Sensors {
         self.hass.set_state(s.entity_id.clone(), state, a);
     }
 
+    /// The unit system's temperature unit.
+    fn system_temperature(&self) -> String {
+        if self.hass.config().unit_system_v2 == "us_customary" {
+            "°F".into()
+        } else {
+            "°C".into()
+        }
+    }
+
     /// `_async_update_sensor_entity`: kept as the pending update, then
     /// applied if the entity is loaded.
     fn update(&self, key: Key, data: Map<String, Value>) {
@@ -405,6 +422,7 @@ impl Sensors {
     /// `update_sensor_states`: the per-sensor replies, in request order.
     /// `None` when the payload fails the outer schema (HA's `200 {}`).
     pub fn update_states(&self, reg: &Registration, payload: &Value) -> Option<Map<String, Value>> {
+        let _turn = self.ops.lock();
         let items: Vec<&Value> = match payload {
             Value::Array(a) => a.iter().collect(),
             v => vec![v],
@@ -456,6 +474,7 @@ impl Sensors {
     /// row updated (`disabled` included) and the update applied. `false`
     /// when the payload fails the schema (`200 {}`).
     pub fn register(&self, reg: &Registration, device_id: Option<&str>, payload: &Value) -> bool {
+        let _turn = self.ops.lock();
         let Some(data) = register_schema(payload) else {
             return false;
         };
@@ -548,37 +567,21 @@ impl Sensors {
             }
         }
         // HA reloads the whole entry 30 s after an enable; `hars` adds just
-        // this entity now (spec decision D2), with the pending update.
-        if enabling
-            && let Some(row) = self
-                .registry
-                .entity_by_unique_id(kind.domain(), DOMAIN, &store_key)
-            && let Ok(entity_id) = EntityId::parse(&row.entity_id)
-        {
-            let mut config = Map::new();
-            config.insert("state".into(), Value::Null);
-            config.insert("attributes".into(), json!({}));
-            config.insert(
-                "device_class".into(),
-                json!(
-                    row.device_class
-                        .clone()
-                        .or(row.original_device_class.clone())
-                ),
-            );
-            config.insert("icon".into(), json!(row.original_icon));
-            config.insert("unit_of_measurement".into(), json!(row.unit_of_measurement));
-            let sensor = Sensor {
-                entity_id,
-                kind,
-                name: row.original_name.clone(),
-                config,
-            };
-            self.register_restore(&sensor, key.clone());
-            self.inner.lock().sensors.insert(key.clone(), sensor);
+        // this entity now (spec decision D2): the update becomes its pending
+        // one, then it restores as any added entity does.
+        let enabled_row = enabling
+            .then(|| {
+                self.registry
+                    .entity_by_unique_id(kind.domain(), DOMAIN, &store_key)
+            })
+            .flatten();
+        if let Some(row) = enabled_row {
+            self.inner.lock().pending.insert(key.clone(), data.clone());
+            self.add_entity(&row);
+        } else {
+            self.update(key.clone(), data.clone());
         }
         let loaded = self.inner.lock().sensors.contains_key(&key);
-        self.update(key.clone(), data.clone());
         // The loaded entity's write reconciles the row with its own values
         // (`entity.py`): capabilities, original_device_class, and the name
         // it was created with.
@@ -803,19 +806,127 @@ fn register_schema(payload: &Value) -> Option<Map<String, Value>> {
     Some(out)
 }
 
-/// `_calculate_native_value`: `None` for no value or `unknown`; a parsed
-/// date or datetime for those classes; the value otherwise.
-fn native_value(config: &Map<String, Value>) -> Result<Option<Value>, String> {
+/// A sensor's native value: as the app sent it, or a parsed date or
+/// datetime (from a date/timestamp sensor's string, or restored typed).
+#[derive(Debug, Clone, PartialEq)]
+enum Native {
+    Plain(Value),
+    Date(jiff::civil::Date),
+    /// With its offset; `None` is naive.
+    DateTime(jiff::civil::DateTime, Option<jiff::tz::Offset>),
+}
+
+const DATE_TYPE: &str = "<class 'datetime.date'>";
+const DATETIME_TYPE: &str = "<class 'datetime.datetime'>";
+
+impl Native {
+    /// HA's JSON encoder for the restore store: dates and datetimes as
+    /// `{"__type": "<class …>", "isoformat": …}`.
+    fn dump(self) -> Value {
+        match self {
+            Self::Plain(v) => v,
+            Self::Date(d) => json!({"__type": DATE_TYPE, "isoformat": d.to_string()}),
+            Self::DateTime(dt, off) => {
+                json!({"__type": DATETIME_TYPE, "isoformat": py_isoformat(dt, off)})
+            }
+        }
+    }
+
+    /// Python's `str()` of the value.
+    fn py_str(&self) -> String {
+        match self {
+            Self::Plain(v) => stringify(v),
+            Self::Date(d) => d.to_string(),
+            Self::DateTime(dt, off) => py_isoformat(*dt, *off).replacen('T', " ", 1),
+        }
+    }
+}
+
+/// `datetime.isoformat()`: microseconds only when non-zero; the offset as
+/// `±HH:MM`.
+fn py_isoformat(dt: jiff::civil::DateTime, off: Option<jiff::tz::Offset>) -> String {
+    let mut out = dt.strftime("%Y-%m-%dT%H:%M:%S").to_string();
+    let micros = dt.subsec_nanosecond() / 1000;
+    if micros != 0 {
+        out.push_str(&format!(".{micros:06}"));
+    }
+    if let Some(off) = off {
+        let secs = off.seconds();
+        let sign = if secs < 0 { '-' } else { '+' };
+        let a = secs.unsigned_abs();
+        out.push_str(&format!("{sign}{:02}:{:02}", a / 3600, a / 60 % 60));
+        if a % 60 != 0 {
+            out.push_str(&format!(":{:02}", a % 60));
+        }
+    }
+    out
+}
+
+/// `dt_util.parse_datetime` (`datetime.fromisoformat`): a date, a time if
+/// any, an offset if any.
+fn parse_datetime(s: &str) -> Option<(jiff::civil::DateTime, Option<jiff::tz::Offset>)> {
+    let pieces = jiff::fmt::temporal::Pieces::parse(s).ok()?;
+    let time = pieces.time().unwrap_or(jiff::civil::Time::midnight());
+    Some((
+        pieces.date().to_datetime(time),
+        pieces.offset().map(|o| o.to_numeric_offset()),
+    ))
+}
+
+/// `_calculate_native_value`: `None` for no value or `unknown`; strings
+/// parsed only for `date` and `timestamp` sensors (an unparsable one
+/// stays a string); typed values restored as dates and datetimes.
+fn native_value(config: &Map<String, Value>) -> Option<Native> {
     let state = config.get("state").cloned().unwrap_or(Value::Null);
     if state.is_null() || state == "unknown" {
-        return Ok(None);
+        return None;
     }
-    Ok(Some(state))
+    if let Value::Object(m) = &state
+        && let (Some(ty), Some(iso)) = (str_of(m, "__type"), str_of(m, "isoformat"))
+    {
+        if ty == DATE_TYPE
+            && let Ok(d) = iso.parse::<jiff::civil::Date>()
+        {
+            return Some(Native::Date(d));
+        }
+        if ty == DATETIME_TYPE
+            && let Some((dt, off)) = parse_datetime(iso)
+        {
+            return Some(Native::DateTime(dt, off));
+        }
+    }
+    let dc = config.get("device_class").and_then(Value::as_str);
+    if let (Some(dc @ ("date" | "timestamp")), Value::String(s)) = (dc, &state)
+        && let Some((dt, off)) = parse_datetime(s)
+    {
+        return Some(if dc == "date" {
+            Native::Date(dt.date())
+        } else {
+            Native::DateTime(dt, off)
+        });
+    }
+    Some(Native::Plain(state))
+}
+
+/// The unit shown: a temperature in °C or °F follows the unit system.
+fn display_unit(config: &Map<String, Value>, system_temp: &str) -> Option<Value> {
+    let unit = config.get("unit_of_measurement").filter(|v| !v.is_null())?;
+    if converts_temperature(config, system_temp) {
+        return Some(json!(system_temp));
+    }
+    Some(unit.clone())
+}
+
+fn converts_temperature(config: &Map<String, Value>, system_temp: &str) -> bool {
+    let unit = config.get("unit_of_measurement").and_then(Value::as_str);
+    config.get("device_class").and_then(Value::as_str) == Some("temperature")
+        && matches!(unit, Some("°C" | "°F"))
+        && unit != Some(system_temp)
 }
 
 /// The sensor component's `state`, then `_stringify_state`.
-fn sensor_state(config: &Map<String, Value>) -> Result<String, String> {
-    let Some(value) = native_value(config)? else {
+fn sensor_state(config: &Map<String, Value>, system_temp: &str) -> Result<String, String> {
+    let Some(value) = native_value(config) else {
         return Ok("unknown".into());
     };
     let dc = config
@@ -828,21 +939,24 @@ fn sensor_state(config: &Map<String, Value>) -> Result<String, String> {
         return Err("a unit with a non-numeric device class".into());
     }
     match (dc, &value) {
-        (Some("timestamp" | "uptime"), Value::String(s)) => {
-            return timestamp(s).ok_or_else(|| format!("invalid timestamp {s:?}"));
+        // Only an aware datetime: anything else raises.
+        (Some("timestamp" | "uptime"), Native::DateTime(dt, Some(off))) => {
+            let t = off.to_timestamp(*dt).map_err(|e| e.to_string())?;
+            return Ok(t.strftime("%Y-%m-%dT%H:%M:%S+00:00").to_string());
         }
-        (Some("date"), Value::String(s)) => {
-            return date(s).ok_or_else(|| format!("invalid date {s:?}"));
-        }
-        (Some("timestamp" | "uptime" | "date"), _) => {
-            return Err("not a date".into());
-        }
-        (Some("enum"), _) => return Ok(stringify(&value)),
+        (Some("timestamp" | "uptime"), _) => return Err("not an aware datetime".into()),
+        (Some("date"), Native::Date(d)) => return Ok(d.to_string()),
+        (Some("date"), Native::DateTime(dt, off)) => return Ok(py_isoformat(*dt, *off)),
+        (Some("date"), Native::Plain(_)) => return Err("not a date".into()),
+        (Some("enum"), v) => return Ok(v.py_str()),
         _ => {}
     }
     let numeric = match dc {
         Some(d) if NON_NUMERIC.contains(&d) => false,
         _ => state_class.is_some() || unit.is_some() || dc.is_some(),
+    };
+    let Native::Plain(value) = value else {
+        return Ok(value.py_str());
     };
     if !numeric {
         return Ok(stringify(&value));
@@ -853,10 +967,19 @@ fn sensor_state(config: &Map<String, Value>) -> Result<String, String> {
         Value::String(s) => py_number(s),
         _ => None,
     };
-    match number {
-        Some(n) if n.is_finite() => {}
+    let number = match number {
+        Some(n) if n.is_finite() => n,
         Some(_) => return Err(format!("non-finite value {value}")),
         None => return Err(format!("non-numeric value {value}")),
+    };
+    if converts_temperature(config, system_temp) {
+        // HA's TemperatureConverter, then `_stringify_state` of a float.
+        let c = if system_temp == "°C" {
+            (number - 32.0) / 1.8
+        } else {
+            number * 1.8 + 32.0
+        };
+        return Ok(py_format(c, 15));
     }
     if state_class == Some("measurement_angle") && unit.and_then(Value::as_str) != Some("°") {
         return Err("measurement_angle needs °".into());
@@ -864,20 +987,34 @@ fn sensor_state(config: &Map<String, Value>) -> Result<String, String> {
     Ok(stringify(&value))
 }
 
-/// Python's `int(s)` (no `.`/`e`), else `float(s)`.
+/// Python's `int(s)` when there's no `.`/`e`, else `float(s)`: Unicode
+/// whitespace stripped, Unicode decimal digits, `_` only between digits.
 fn py_number(s: &str) -> Option<f64> {
-    let t = s.trim().replace('_', "");
-    if !s.contains('.') && !s.contains('e') {
-        if let Ok(i) = t.parse::<i64>() {
-            return Some(i as f64);
+    let t = s.trim_matches(|c: char| c.is_whitespace() || ('\x1c'..='\x1f').contains(&c));
+    let chars: Vec<char> = t.chars().collect();
+    let mut ascii = String::with_capacity(chars.len());
+    for (i, &c) in chars.iter().enumerate() {
+        if c == '_' {
+            let digit = |c: Option<&char>| c.is_some_and(|c| ha_core::decimal_value(*c).is_some());
+            if !(i > 0 && digit(chars.get(i - 1)) && digit(chars.get(i + 1))) {
+                return None;
+            }
+            continue;
+        }
+        match ha_core::decimal_value(c) {
+            Some(d) => ascii.push(char::from_digit(d, 10)?),
+            None if c.is_ascii() => ascii.push(c),
+            None => return None,
         }
     }
-    match t.to_ascii_lowercase().as_str() {
-        "nan" | "+nan" | "-nan" => Some(f64::NAN),
-        "inf" | "+inf" | "infinity" | "+infinity" => Some(f64::INFINITY),
-        "-inf" | "-infinity" => Some(f64::NEG_INFINITY),
-        _ => t.parse::<f64>().ok(),
+    if !s.contains('.') && !s.contains('e') {
+        let digits = ascii.strip_prefix(['+', '-']).unwrap_or(&ascii);
+        if !digits.is_empty() && digits.bytes().all(|b| b.is_ascii_digit()) {
+            return digits.parse::<f64>().ok();
+        }
     }
+    // Rust's float grammar is Python's here (`inf`, `nan`, `1.`, `.5`).
+    ascii.parse::<f64>().ok()
 }
 
 /// `_stringify_state`: strings as they are, floats to 15 significant
@@ -894,34 +1031,15 @@ fn stringify(v: &Value) -> String {
     }
 }
 
-/// `dt_util.parse_datetime`, then UTC, `isoformat(timespec="seconds")`. A
-/// naive value is an error, as HA's sensor raises.
-fn timestamp(s: &str) -> Option<String> {
-    let t: jiff::Timestamp = s.parse().ok()?;
-    Some(t.strftime("%Y-%m-%dT%H:%M:%S+00:00").to_string())
-}
-
-/// `parse_datetime(s).date().isoformat()`: the date as written (an
-/// offset doesn't move it).
-fn date(s: &str) -> Option<String> {
-    let parses = s.parse::<jiff::Timestamp>().is_ok()
-        || s.parse::<jiff::civil::DateTime>().is_ok()
-        || s.parse::<jiff::civil::Date>().is_ok();
-    if !parses {
-        return None;
-    }
-    s.get(..10)?
-        .parse::<jiff::civil::Date>()
-        .ok()
-        .map(|d| d.to_string())
-}
-
 /// Python's `repr` of a JSON value (for HA's error messages).
 fn py_repr(out: &mut String, v: &Value) {
     match v {
         Value::Null => out.push_str("None"),
         Value::Bool(b) => out.push_str(if *b { "True" } else { "False" }),
-        Value::Number(n) => out.push_str(&stringify(&Value::Number(n.clone()))),
+        Value::Number(n) => match n.as_f64().filter(|_| n.is_f64()) {
+            Some(f) => out.push_str(&crate::sun::py_float(f)),
+            None => out.push_str(&n.to_string()),
+        },
         Value::String(s) => {
             let q = if s.contains('\'') && !s.contains('"') {
                 '"'
@@ -964,5 +1082,125 @@ fn py_repr(out: &mut String, v: &Value) {
             }
             out.push('}');
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn cfg(v: Value) -> Map<String, Value> {
+        v.as_object().unwrap().clone()
+    }
+
+    /// Python's `int()`/`float()` on a numeric sensor's string (HA keeps
+    /// the string as written when it parses).
+    #[test]
+    fn numeric_strings_as_python() {
+        let state = |s: &str| {
+            sensor_state(
+                &cfg(json!({"state": s, "state_class": "measurement"})),
+                "°C",
+            )
+        };
+        assert_eq!(state("1_2").unwrap(), "1_2");
+        assert_eq!(state("\u{661}\u{662}").unwrap(), "\u{661}\u{662}");
+        assert_eq!(state(" 3.5 ").unwrap(), " 3.5 ");
+        assert_eq!(state("1e3").unwrap(), "1e3");
+        for bad in ["1__2", "_12", "12_", "1_.5", "abc", "nan", "inf", ""] {
+            assert!(state(bad).is_err(), "{bad:?}");
+        }
+    }
+
+    /// A temperature follows the unit system (HA's TemperatureConverter).
+    #[test]
+    fn temperatures_convert_to_the_unit_system() {
+        let c =
+            cfg(json!({"state": 77, "device_class": "temperature", "unit_of_measurement": "°F"}));
+        assert_eq!(sensor_state(&c, "°C").unwrap(), "25.0");
+        assert_eq!(display_unit(&c, "°C"), Some(json!("°C")));
+        assert_eq!(sensor_state(&c, "°F").unwrap(), "77");
+        let c = cfg(
+            json!({"state": "21.5", "device_class": "temperature", "unit_of_measurement": "°C"}),
+        );
+        assert_eq!(sensor_state(&c, "°F").unwrap(), "70.7");
+    }
+
+    #[test]
+    fn dates_and_timestamps_as_ha() {
+        let date = |s: &str| sensor_state(&cfg(json!({"state": s, "device_class": "date"})), "°C");
+        assert_eq!(date("20260101").unwrap(), "2026-01-01");
+        assert_eq!(date("2026-11-14").unwrap(), "2026-11-14");
+        assert_eq!(date("2026-11-14T23:00:00-05:00").unwrap(), "2026-11-14");
+        assert!(date("soon").is_err());
+        let ts =
+            |s: &str| sensor_state(&cfg(json!({"state": s, "device_class": "timestamp"})), "°C");
+        assert_eq!(
+            ts("2026-11-14T03:00:00-05:00").unwrap(),
+            "2026-11-14T08:00:00+00:00"
+        );
+        assert_eq!(
+            ts("2026-11-14T08:00:00.000+00:00").unwrap(),
+            "2026-11-14T08:00:00+00:00"
+        );
+        assert_eq!(
+            ts("2026-11-14T08:00:00Z").unwrap(),
+            "2026-11-14T08:00:00+00:00"
+        );
+        // Naive: HA's sensor raises.
+        assert!(ts("2026-11-14T08:00:00").is_err());
+        // Only date and timestamp sensors parse strings.
+        let up = sensor_state(
+            &cfg(json!({"state": "2026-01-01T00:00:00Z", "device_class": "uptime"})),
+            "°C",
+        );
+        assert!(up.is_err());
+    }
+
+    /// Dumped as HA's JSON encoder writes dates and datetimes, and
+    /// restored from that.
+    #[test]
+    fn typed_native_values_round_trip() {
+        let n = native_value(&cfg(
+            json!({"state": "2026-11-14T03:00:00.5-05:00", "device_class": "timestamp"}),
+        ))
+        .unwrap()
+        .dump();
+        assert_eq!(
+            n,
+            json!({"__type": "<class 'datetime.datetime'>", "isoformat": "2026-11-14T03:00:00.500000-05:00"})
+        );
+        let restored = cfg(json!({"state": n, "device_class": "timestamp"}));
+        assert_eq!(
+            sensor_state(&restored, "°C").unwrap(),
+            "2026-11-14T08:00:00+00:00"
+        );
+        let d = native_value(&cfg(json!({"state": "2026-11-14", "device_class": "date"})))
+            .unwrap()
+            .dump();
+        assert_eq!(
+            d,
+            json!({"__type": "<class 'datetime.date'>", "isoformat": "2026-11-14"})
+        );
+        let restored = cfg(json!({"state": d, "device_class": "date"}));
+        assert_eq!(sensor_state(&restored, "°C").unwrap(), "2026-11-14");
+        // Plain values dump as they are.
+        assert_eq!(
+            native_value(&cfg(json!({"state": 61}))).unwrap().dump(),
+            json!(61)
+        );
+    }
+
+    /// Error messages use Python's `repr` of floats.
+    #[test]
+    fn errors_repr_floats_as_python() {
+        let m = cfg(
+            json!({"state": 1, "type": "sensor", "unique_id": "x", "extra": 1.2345678901234567}),
+        );
+        let err = sensor_schema_full(&m).unwrap_err();
+        assert_eq!(
+            err,
+            "extra keys not allowed @ data['extra']. Got 1.2345678901234567"
+        );
     }
 }
