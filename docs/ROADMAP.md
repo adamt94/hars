@@ -136,14 +136,19 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
       (`homeassistant_start`/`started`/`stop`)
 
 ### M1: Import, registries, config & restore
-- [ ] Versioned, idempotent **importer** that reads a consistent copy of an HA
+- [x] Versioned, idempotent **importer** (`hars import`) that reads a consistent copy of an HA
       2026.6.1 config dir and writes a machine-readable report of anything
-      unsupported or unresolved. It imports:
+      unsupported or unresolved (`import-report.json`). Stores `hars` reads
+      are validated with its own loaders and copied byte for byte; a re-run
+      that would replace state `hars` changed needs `--force`. It imports:
   - [ ] Entity/device/area registries (unique-id mapping, disabled/hidden flags)
-  - [ ] `core.config` (location, elevation, units, time zone), `person`, zones
+  - [x] `core.config` (location, elevation, units, time zone)
+  - [ ] `person`, zones
   - [ ] Lovelace dashboards and the dashboards list (`url_path` identity)
-  - [ ] Auth: users, bcrypt hashes, **refresh tokens with ids, client ids and
-        `jwt_key`s**, so the iPhone and browser sessions survive
+  - [x] Auth: users, bcrypt hashes, **refresh tokens with ids, client ids and
+        `jwt_key`s**, so the iPhone and browser sessions survive (tested: an
+        imported HA refresh token refreshes against `hars`); frontend user
+        and system settings
   - [ ] Config entries: Hue host/key, LIFX host, SwitchBot token/secret,
         mobile_app registration (webhook id, secret, push data)
 - [ ] `configuration.yaml`: `!include`, `!secret`, `!include_dir_merge_named`;

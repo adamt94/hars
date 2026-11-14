@@ -1,6 +1,8 @@
 //! `hars` — the homeassistant-rust server.
 
 use ha_core::Hass;
+
+mod import;
 use std::future::IntoFuture;
 use std::time::Duration;
 use tracing_subscriber::EnvFilter;
@@ -214,7 +216,10 @@ fn config_dir() -> anyhow::Result<std::path::PathBuf> {
 }
 
 const USAGE: &str = "usage: hars                              run the server
-       hars auth add USERNAME PASSWORD  add a login (the first one becomes the owner)";
+       hars auth add USERNAME PASSWORD  add a login (the first one becomes the owner)
+       hars import HA_CONFIG_DIR [--dry-run] [--force]
+                                        take over a Home Assistant 2026.6 config
+                                        (a copy, with HA stopped)";
 
 /// Offline commands, like HA's `hass --script auth`. Run them with the
 /// server stopped: the server keeps its own copy of the auth state.
@@ -238,6 +243,19 @@ fn cli(args: &[String]) -> anyhow::Result<()> {
                     println!("added login {username:?}; its user is created at first login")
                 }
             }
+            Ok(())
+        }
+        ["import", source, flags @ ..]
+            if flags.iter().all(|f| matches!(*f, "--dry-run" | "--force")) =>
+        {
+            let opts = import::Options {
+                source: source.into(),
+                dest: config_dir()?,
+                dry_run: flags.contains(&"--dry-run"),
+                force: flags.contains(&"--force"),
+            };
+            let report = import::run(&opts)?;
+            print!("{}", import::summary(&report, &opts.dest));
             Ok(())
         }
         ["--help" | "-h" | "help"] => {

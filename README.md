@@ -43,6 +43,17 @@ docker run --rm -v hars-config:/config hars auth add USERNAME PASSWORD   # once:
 docker run --rm -p 8123:8123 -v hars-config:/config hars
 ```
 
+To take over an existing Home Assistant 2026.6 install instead, import a copy
+of its config directory (copied with HA stopped, or from a backup):
+
+```sh
+docker run --rm -v hars-config:/config -v /path/to/ha-config-copy:/ha:ro hars import /ha --dry-run
+docker run --rm -v hars-config:/config -v /path/to/ha-config-copy:/ha:ro hars import /ha
+```
+
+Users, passwords and logged-in sessions (browsers, the iPhone app) carry over
+unchanged; `import-report.json` lists what `hars` doesn't import yet.
+
 `/config` uses Home Assistant's own `.storage` file formats. Until `hars` has
 the onboarding screens, the first `auth add` creates the owner and marks
 onboarding complete; later ones add more logins. Run it while the server is

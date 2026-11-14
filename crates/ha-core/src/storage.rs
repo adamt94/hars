@@ -135,12 +135,18 @@ impl Store {
             key: &self.key,
             data,
         })?;
+        self.save_raw(&json)
+    }
+
+    /// Write an already-serialized store file as is (the importer copies
+    /// HA's files byte for byte), with the same atomic, durable write.
+    pub fn save_raw(&self, json: &[u8]) -> io::Result<()> {
         let dir = self.path.parent().expect("store path has a parent");
         fs::create_dir_all(dir)?;
         let tmp = dir.join(format!(".{}.tmp{}", self.key, std::process::id()));
         let result = (|| {
             let mut file = open_new(&tmp, self.private)?;
-            file.write_all(&json)?;
+            file.write_all(json)?;
             file.sync_all()?;
             fs::rename(&tmp, &self.path)?;
             // Make the rename itself durable: without this, power loss can
