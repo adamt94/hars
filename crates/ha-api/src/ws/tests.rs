@@ -63,13 +63,20 @@ impl Client {
         if let Some(v) = self.pending.pop_front() {
             return v;
         }
-        let frame = tokio::time::timeout(Duration::from_secs(5), self.ws.next())
-            .await
-            .expect("no message within 5 s")
-            .expect("stream ended")
-            .unwrap();
-        let Message::Text(text) = frame else {
-            panic!("unexpected frame {frame:?}")
+        // Heartbeat pings (200 ms in test builds) can arrive between
+        // messages on a slow machine; tungstenite answers them itself.
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+        let text = loop {
+            let frame = tokio::time::timeout_at(deadline, self.ws.next())
+                .await
+                .expect("no message within 5 s")
+                .expect("stream ended")
+                .unwrap();
+            match frame {
+                Message::Text(text) => break text,
+                Message::Ping(_) | Message::Pong(_) => continue,
+                other => panic!("unexpected frame {other:?}"),
+            }
         };
         match serde_json::from_str(&text).unwrap() {
             Value::Array(msgs) => {
