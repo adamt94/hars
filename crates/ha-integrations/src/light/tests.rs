@@ -40,7 +40,7 @@ fn colors(mode: ColorMode, s: &LightState) -> Value {
 fn color_temperature_mode_matches_ha() {
     for v in vectors("ct_mode_by_mirek").as_array().unwrap() {
         let mirek = v["mirek"].as_f64().unwrap();
-        let k = color::mired_to_kelvin(mirek);
+        let k = color::mired_to_kelvin(mirek).unwrap();
         assert_eq!(k, v["color_temp_kelvin"], "{v}");
         let s = LightState {
             color_temp_kelvin: Some(k),
@@ -86,7 +86,7 @@ fn turn_on_colours_convert_as_ha() {
         let got = color::rgb_to_xy(rgb[0], rgb[1], rgb[2]);
         assert_eq!(json!([got.0, got.1]), xy(&c["xy_for_xy_light"]), "{c}");
         assert_eq!(
-            json!(color::xy_to_temperature(got.0, got.1)),
+            json!(color::xy_to_temperature(got.0, got.1).unwrap()),
             c["kelvin_for_ct_light"],
             "{c}"
         );
@@ -96,7 +96,7 @@ fn turn_on_colours_convert_as_ha() {
         let got = color::hs_to_xy(h, s);
         assert_eq!(json!([got.0, got.1]), xy(&c["xy_for_xy_light"]), "{c}");
         assert_eq!(
-            json!(color::xy_to_temperature(got.0, got.1)),
+            json!(color::xy_to_temperature(got.0, got.1).unwrap()),
             c["kelvin_for_ct_light"],
             "{c}"
         );
@@ -117,7 +117,10 @@ fn turn_on_colours_convert_as_ha() {
     assert_eq!(color::color_name_to_rgb("not-a-colour"), None);
     assert_eq!(color::color_name_to_rgb("warm white"), None);
     // Python raises ZeroDivisionError here; hars reports an error.
-    assert_eq!(color::xy_to_temperature(0.3, 0.1858), None);
+    assert_eq!(
+        color::xy_to_temperature(0.3, 0.1858),
+        Err(ConversionError::DivisionByZero)
+    );
 }
 
 #[test]
@@ -447,4 +450,77 @@ async fn services_reach_the_targeted_available_lights() {
     .await;
     assert!(matches!(e, Err(ServiceError::Invalid(_))), "{e:?}");
     assert!(take().is_empty());
+}
+
+/// Where HA raises during conversion, the call fails with its message and
+/// nothing reaches the light.
+#[test]
+fn conversions_that_raise_in_ha_fail_the_call() {
+    let profiles = Profiles::default();
+    let rgbww = Capabilities {
+        modes: Modes::new([ColorMode::Rgbww]),
+        ..Default::default()
+    };
+    let s = LightState {
+        min_color_temp_kelvin: 2000,
+        max_color_temp_kelvin: 6500,
+        ..Default::default()
+    };
+    let p = Params {
+        color_temp_kelvin: Some(0),
+        brightness: Some(128),
+        ..Default::default()
+    };
+    assert_eq!(
+        process_turn_on(&p, "light.x", &rgbww, &s, &profiles),
+        Err(ConversionError::DivisionByZero)
+    );
+    // A subnormal y: `int(NaN)` in HA.
+    let rgb = Capabilities {
+        modes: Modes::new([ColorMode::Rgb]),
+        ..Default::default()
+    };
+    let p = Params {
+        xy_color: Some((0.3, 5e-324)),
+        ..Default::default()
+    };
+    let e = process_turn_on(&p, "light.x", &rgb, &s, &profiles).unwrap_err();
+    assert_eq!(e.to_string(), "cannot convert float NaN to integer");
+    // And the state keeps such colours null rather than inventing one.
+    let on = LightState {
+        on: true,
+        color_mode: Some(ColorMode::Xy),
+        xy_color: Some((0.3, 5e-324)),
+        ..Default::default()
+    };
+    let caps = Capabilities {
+        modes: Modes::new([ColorMode::Xy]),
+        ..Default::default()
+    };
+    let a = attributes(&caps, &on, true);
+    assert_eq!(
+        (a["hs_color"].clone(), a["rgb_color"].clone()),
+        (Value::Null, Value::Null)
+    );
+}
+
+#[test]
+fn quoted_profile_fields_load_as_in_python_csv() {
+    let mut profiles = Profiles::default();
+    profiles.read(
+        "test",
+        "id,x,y,brightness\nlight.desk.default,\"0.5\",\"0.4\",\"50\"\n\"quo\"\"ted\",0.5,0.4,60\n",
+    );
+    let mut p = Params::default();
+    profiles.apply_default("light.desk", false, &mut p);
+    assert_eq!(
+        (p.brightness, p.hs_color),
+        (Some(50), Some((32.484, 61.569)))
+    );
+    let mut p = Params {
+        profile: Some("quo\"ted".into()),
+        ..Default::default()
+    };
+    preprocess(&mut p, &profiles);
+    assert_eq!(p.brightness, Some(60));
 }

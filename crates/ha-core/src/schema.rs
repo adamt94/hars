@@ -287,25 +287,46 @@ fn check(kind: &Kind, value: &Value) -> Checked {
         },
         Kind::EntityIds => check_target("entity_id", value),
         Kind::IntClamp(min, max) => {
-            let n = match check(&Kind::Int(Range::ANY), value)? {
-                Some(v) => v.as_i64(),
-                None => value.as_i64(),
+            // Python's int() has no size limit, so any int (or float, or
+            // int string) clamps; only what int() rejects is an error.
+            let expected = || ("expected int".to_owned(), None);
+            let n: i128 = match value {
+                Value::Number(n) => match (n.as_i64(), n.as_u64(), n.as_f64()) {
+                    (Some(i), _, _) => i.into(),
+                    (_, Some(u), _) => u.into(),
+                    (_, _, Some(f)) if f.is_finite() => f.trunc().clamp(-1e30, 1e30) as i128,
+                    _ => return Err(expected()),
+                },
+                Value::Bool(b) => i128::from(*b),
+                Value::String(s) => match parse_python_int(s) {
+                    Some(n) => n,
+                    // Valid but beyond i128: its sign decides.
+                    None if is_python_int(s) => {
+                        if s.trim().starts_with('-') {
+                            i128::MIN
+                        } else {
+                            i128::MAX
+                        }
+                    }
+                    None => return Err(expected()),
+                },
+                _ => return Err(expected()),
             };
-            // Beyond i64, the clamp decides.
-            let n = n.unwrap_or(if value.as_f64().unwrap_or(0.0) < 0.0 {
-                *min
-            } else {
-                *max
-            });
-            let clamped = n.clamp(*min, *max);
-            Ok((clamped != n || !value.is_i64()).then(|| Value::from(clamped)))
+            let clamped = n.clamp(i128::from(*min), i128::from(*max)) as i64;
+            Ok((i128::from(clamped) != n || !value.is_i64()).then(|| Value::from(clamped)))
         }
         Kind::FloatClamp(min, max) => {
-            let n = match check(&Kind::Float(Range::ANY), value)? {
-                Some(v) => v.as_f64(),
-                None => value.as_f64(),
-            }
-            .unwrap_or(0.0);
+            // Python's float() takes `inf` (which clamps); NaN can't be
+            // carried in JSON, so it's refused.
+            let n = match value {
+                Value::Number(n) => n.as_f64().unwrap_or(0.0),
+                Value::Bool(b) => f64::from(u8::from(*b)),
+                Value::String(s) => match s.trim().parse::<f64>() {
+                    Ok(f) if !f.is_nan() => f,
+                    _ => return err("expected float".into()),
+                },
+                _ => return err("expected float".into()),
+            };
             let clamped = n.clamp(*min, *max);
             // `vol.Coerce(float)` makes a float of an int too.
             Ok((clamped != n || !value.is_f64())
@@ -316,6 +337,8 @@ fn check(kind: &Kind, value: &Value) -> Checked {
             let items: Vec<Value> = match value {
                 Value::Array(items) => items.clone(),
                 Value::String(s) => s.chars().map(|c| Value::String(c.into())).collect(),
+                // `tuple(mapping)` is its keys.
+                Value::Object(m) => m.keys().map(|k| Value::String(k.clone())).collect(),
                 _ => return err("expected tuple".into()),
             };
             if items.len() != kinds.len() {
@@ -373,6 +396,17 @@ fn check_target(key: &str, value: &Value) -> Checked {
         Value::Array(items) if items.iter().all(Value::is_string) => Ok(None),
         _ => Err(("value should be a string".into(), None)),
     }
+}
+
+/// Whether `int(str)` accepts `s`, whatever its size.
+fn is_python_int(s: &str) -> bool {
+    let t = s.trim();
+    let digits = t.strip_prefix(['+', '-']).unwrap_or(t);
+    !digits.is_empty()
+        && !digits.starts_with('_')
+        && !digits.ends_with('_')
+        && !digits.contains("__")
+        && digits.bytes().all(|b| b.is_ascii_digit() || b == b'_')
 }
 
 /// Python's `int(str)`: surrounding whitespace, an optional sign, and
@@ -705,6 +739,28 @@ mod tests {
         assert_eq!(ok(json!({"white": 300})), Some(json!({"white": 255})));
         assert_eq!(
             ok(json!({"rgb_color": ["1", 2, 3]})),
+            Some(json!({"rgb_color": [1, 2, 3]}))
+        );
+        // Python's ints have no limit: huge values clamp.
+        assert_eq!(
+            ok(json!({"brightness": 1e30})),
+            Some(json!({"brightness": 255}))
+        );
+        assert_eq!(
+            ok(json!({"brightness": "-9223372036854775809"})),
+            Some(json!({"brightness": 0}))
+        );
+        assert_eq!(
+            ok(json!({"brightness": "123456789012345678901234567890123456789012"})),
+            Some(json!({"brightness": 255}))
+        );
+        assert_eq!(
+            ok(json!({"transition": "inf"})),
+            Some(json!({"transition": 6553.0}))
+        );
+        // `tuple({...})` is its keys.
+        assert_eq!(
+            ok(json!({"rgb_color": {"1": 0, "2": 0, "3": 0}})),
             Some(json!({"rgb_color": [1, 2, 3]}))
         );
         for (v, msg) in [

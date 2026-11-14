@@ -174,9 +174,12 @@ fn convert_color(mode: ColorMode, s: &LightState, out: &mut Map<String, Value>) 
             }
         }
         ColorMode::Xy => {
-            if let Some((x, y)) = s.xy_color {
-                out.insert("hs_color".into(), pair(xy_to_hs(x, y)));
-                out.insert("rgb_color".into(), rgb_u8(xy_to_rgb(x, y)));
+            // Where HA's conversion raises, the colours stay null.
+            if let Some((x, y)) = s.xy_color
+                && let (Ok(hs), Ok(rgb)) = (xy_to_hs(x, y), xy_to_rgb(x, y))
+            {
+                out.insert("hs_color".into(), pair(hs));
+                out.insert("rgb_color".into(), rgb_u8(rgb));
                 let r6 = |v| crate::num::round(v, 6);
                 out.insert("xy_color".into(), pair((r6(x), r6(y))));
             }
@@ -198,12 +201,14 @@ fn convert_color(mode: ColorMode, s: &LightState, out: &mut Map<String, Value>) 
             }
         }
         ColorMode::Rgbww => {
-            if let Some(c) = s.rgbww_color {
-                let (lo, hi) = (
-                    s.min_color_temp_kelvin as f64,
-                    s.max_color_temp_kelvin as f64,
-                );
-                let rgb = rgbww_to_rgb(c[0], c[1], c[2], c[3], c[4], lo, hi).map(|v| v as f64);
+            let (lo, hi) = (
+                s.min_color_temp_kelvin as f64,
+                s.max_color_temp_kelvin as f64,
+            );
+            if let Some(c) = s.rgbww_color
+                && let Ok(rgb) = rgbww_to_rgb(c[0], c[1], c[2], c[3], c[4], lo, hi)
+            {
+                let rgb = rgb.map(|v| v as f64);
                 out.insert("hs_color".into(), pair(rgb_to_hs(rgb[0], rgb[1], rgb[2])));
                 out.insert("rgb_color".into(), rgb_ints(rgb));
                 out.insert("rgbww_color".into(), ints(c.map(|v| v as i64)));
@@ -419,12 +424,10 @@ pub fn preprocess(p: &mut Params, profiles: &Profiles) {
     }
 }
 
-/// A conversion that would fail in HA (a `ZeroDivisionError`).
-#[derive(Debug, PartialEq, Eq)]
-pub struct ConversionError;
+pub use color::ConversionError;
 
 fn xy_temp(xy: (f64, f64)) -> Result<i64, ConversionError> {
-    color::xy_to_temperature(xy.0, xy.1).ok_or(ConversionError)
+    color::xy_to_temperature(xy.0, xy.1)
 }
 
 /// `process_turn_on_params` for one light.
@@ -465,7 +468,7 @@ pub fn process_turn_on(
         if !modes.color_temp() && modes.contains(ColorMode::Rgbww) {
             p.color_temp_kelvin = None;
             let b = p.brightness.or(s.brightness).unwrap_or(0);
-            p.rgbww_color = Some(temperature_to_rgbww(k as f64, b as f64, lo, hi));
+            p.rgbww_color = Some(temperature_to_rgbww(k as f64, b as f64, lo, hi)?);
         } else if !modes.color_temp() {
             p.color_temp_kelvin = None;
             if modes.color() {
@@ -482,7 +485,7 @@ pub fn process_turn_on(
         } else if modes.contains(ColorMode::Rgbw) {
             p.rgbw_color = Some(rgb_to_rgbw(rgb[0], rgb[1], rgb[2]));
         } else if modes.contains(ColorMode::Rgbww) {
-            p.rgbww_color = Some(rgb_to_rgbww(rgb[0], rgb[1], rgb[2], lo, hi));
+            p.rgbww_color = Some(rgb_to_rgbww(rgb[0], rgb[1], rgb[2], lo, hi)?);
         } else if modes.contains(ColorMode::Xy) {
             p.xy_color = Some(hs_to_xy(hs.0, hs.1));
         } else if modes.color_temp() {
@@ -494,7 +497,7 @@ pub fn process_turn_on(
         if modes.contains(ColorMode::Rgbw) {
             p.rgbw_color = Some(rgb_to_rgbw(c[0], c[1], c[2]));
         } else if modes.contains(ColorMode::Rgbww) {
-            p.rgbww_color = Some(rgb_to_rgbww(c[0], c[1], c[2], lo, hi));
+            p.rgbww_color = Some(rgb_to_rgbww(c[0], c[1], c[2], lo, hi)?);
         } else if modes.contains(ColorMode::Hs) {
             p.hs_color = Some(rgb_to_hs(c[0], c[1], c[2]));
         } else if modes.contains(ColorMode::Xy) {
@@ -504,15 +507,15 @@ pub fn process_turn_on(
         }
     } else if let Some(xy) = p.xy_color.filter(|_| !modes.contains(ColorMode::Xy)) {
         p.xy_color = None;
-        let rgb = xy_to_rgb(xy.0, xy.1).map(f64::from);
+        let rgb = xy_to_rgb(xy.0, xy.1)?.map(f64::from);
         if modes.contains(ColorMode::Hs) {
-            p.hs_color = Some(xy_to_hs(xy.0, xy.1));
+            p.hs_color = Some(xy_to_hs(xy.0, xy.1)?);
         } else if modes.contains(ColorMode::Rgb) {
             p.rgb_color = Some(rgb.map(|v| v as i64));
         } else if modes.contains(ColorMode::Rgbw) {
             p.rgbw_color = Some(rgb_to_rgbw(rgb[0], rgb[1], rgb[2]));
         } else if modes.contains(ColorMode::Rgbww) {
-            p.rgbww_color = Some(rgb_to_rgbww(rgb[0], rgb[1], rgb[2], lo, hi));
+            p.rgbww_color = Some(rgb_to_rgbww(rgb[0], rgb[1], rgb[2], lo, hi)?);
         } else if modes.color_temp() {
             p.color_temp_kelvin = Some(xy_temp(xy)?);
         }
@@ -523,7 +526,7 @@ pub fn process_turn_on(
         if modes.contains(ColorMode::Rgb) {
             p.rgb_color = Some(rgb);
         } else if modes.contains(ColorMode::Rgbww) {
-            p.rgbww_color = Some(rgb_to_rgbww(f[0], f[1], f[2], lo, hi));
+            p.rgbww_color = Some(rgb_to_rgbww(f[0], f[1], f[2], lo, hi)?);
         } else if modes.contains(ColorMode::Hs) {
             p.hs_color = Some(rgb_to_hs(f[0], f[1], f[2]));
         } else if modes.contains(ColorMode::Xy) {
@@ -534,7 +537,7 @@ pub fn process_turn_on(
     } else if let Some(c) = p.rgbww_color.filter(|_| !modes.contains(ColorMode::Rgbww)) {
         p.rgbww_color = None;
         let c = c.map(|v| v as f64);
-        let rgb = rgbww_to_rgb(c[0], c[1], c[2], c[3], c[4], lo, hi);
+        let rgb = rgbww_to_rgb(c[0], c[1], c[2], c[3], c[4], lo, hi)?;
         let f = f3(rgb);
         if modes.contains(ColorMode::Rgb) {
             p.rgb_color = Some(rgb);
@@ -698,7 +701,7 @@ impl Lights {
         let caps = light.capabilities();
         let off = |p: &Params| turn_off_params(p, id, caps, &self.profiles);
         let state = light.state();
-        let invalid = |_| ServiceError::Failed("float division by zero".into());
+        let invalid = |e: ConversionError| ServiceError::Failed(e.to_string());
         match service {
             Service::TurnOff => light.turn_off(off(params)).await,
             Service::TurnOn => {

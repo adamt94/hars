@@ -108,8 +108,31 @@ impl Profiles {
 
 /// `Profile.SCHEMA`: `name, x, y, brightness[, transition]`; an empty field
 /// is `None`.
+/// Python's `csv.reader` (default dialect) on one line: `"` quotes a
+/// field, `""` inside quotes is a quote.
+fn csv_fields(line: &str) -> Vec<String> {
+    let mut fields = vec![String::new()];
+    let mut quoted = false;
+    let mut chars = line.chars().peekable();
+    while let Some(c) = chars.next() {
+        let field = fields.last_mut().expect("one field");
+        match c {
+            '"' if quoted && chars.peek() == Some(&'"') => {
+                field.push('"');
+                chars.next();
+            }
+            '"' if quoted => quoted = false,
+            '"' if field.is_empty() => quoted = true,
+            ',' if !quoted => fields.push(String::new()),
+            c => field.push(c),
+        }
+    }
+    fields
+}
+
 fn parse_row(line: &str) -> Option<(String, Profile)> {
-    let cells: Vec<&str> = line.split(',').collect();
+    let fields = csv_fields(line);
+    let cells: Vec<&str> = fields.iter().map(String::as_str).collect();
     if !(4..=5).contains(&cells.len()) {
         return None;
     }
@@ -143,11 +166,12 @@ fn parse_row(line: &str) -> Option<(String, Profile)> {
         Some(v) => Some(v.trim().parse::<f64>().ok()?.clamp(0.0, 6553.0)),
     };
     let hs = match (x, y) {
-        (Some(x), Some(y)) => Some(super::color::xy_to_hs(x, y)),
+        // A colour HA can't convert fails the row.
+        (Some(x), Some(y)) => Some(super::color::xy_to_hs(x, y).ok()?),
         _ => None,
     };
     Some((
-        cells[0].to_owned(),
+        fields[0].clone(),
         Profile {
             hs,
             brightness,
