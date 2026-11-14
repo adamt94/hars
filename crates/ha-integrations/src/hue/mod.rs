@@ -28,6 +28,9 @@ use store::{Change, Store};
 
 pub const DOMAIN: &str = "hue";
 
+/// A device's id and the lights on it.
+type DeviceLights = (String, Vec<Arc<HueLight>>);
+
 /// One bridge: its API, resources and entities.
 pub struct Bridge {
     hass: Hass,
@@ -148,9 +151,21 @@ impl Bridge {
             .flatten()
             .collect();
         let base = format!("{domain}.{}", ha_components::slugify(&parts.join(" ")));
+        // Ids in the registry, in the state machine, or given to an entity
+        // not yet written: each new entity gets its own.
         let taken = |id: &str| {
             self.registries.entities.iter().any(|e| e.entity_id == id)
                 || EntityId::parse(id).is_ok_and(|i| self.hass.states().get(&i).is_some())
+                || self
+                    .lights
+                    .read()
+                    .iter()
+                    .any(|l| l.entity_id.as_str() == id)
+                || self
+                    .groups
+                    .read()
+                    .iter()
+                    .any(|g| g.entity_id.as_str() == id)
         };
         let mut id = base.clone();
         let mut n = 2;
@@ -276,14 +291,16 @@ impl Bridge {
     ) {
         match change {
             Change::Added => {
-                if matches!(ty, "light" | "grouped_light") {
+                // A room or zone can arrive after its `grouped_light` (the
+                // race HA's `group.py` retries for): it makes that group.
+                if matches!(ty, "light" | "grouped_light" | "room" | "zone") {
                     self.add_entities();
                     let lights = self.lights.read().clone();
                     for l in lights.iter().filter(|l| l.rid == id) {
                         self.write_light(l);
                     }
                     let groups = self.groups.read().clone();
-                    for g in groups.iter().filter(|g| g.rid == id) {
+                    for g in groups.iter().filter(|g| g.rid == id || g.group == id) {
                         self.write_group(g);
                     }
                 }
@@ -299,6 +316,7 @@ impl Bridge {
                         .collect();
                     self.groups.write().retain(|g| g.rid != id);
                     for g in gone {
+                        self.services.remove(&g.entity_id);
                         self.hass.remove_state(&g.entity_id);
                     }
                 }
@@ -307,6 +325,7 @@ impl Bridge {
                         .write()
                         .retain(|l| !device_lights.iter().any(|d| d.rid == l.rid));
                     for l in device_lights {
+                        self.services.remove(&l.entity_id);
                         self.hass.remove_state(&l.entity_id);
                     }
                 }
@@ -386,18 +405,46 @@ impl Bridge {
     /// Fetch everything and apply the difference (after a reconnect).
     async fn reconcile(self: &Arc<Self>) {
         match self.api.fetch_all().await {
-            Ok(fresh) => {
+            Ok(fresh) => self.apply_snapshot(fresh),
+            Err(e) => tracing::warn!("hue: refreshing after reconnect failed: {e}"),
+        }
+    }
+
+    /// Apply a fresh snapshot: additions, changes and removals, each with
+    /// the writes an event for it would make.
+    fn apply_snapshot(self: &Arc<Self>, fresh: Vec<Value>) {
+        {
+            {
+                // What may be removed, known before the store forgets it:
+                // each resource's type, and each device's lights.
+                let (types, device_lights): (Vec<(String, String)>, Vec<DeviceLights>) = {
+                    let store = self.store.read();
+                    let types = ["device", "light", "grouped_light"]
+                        .into_iter()
+                        .flat_map(|t| store.of_type(t))
+                        .filter_map(|r| {
+                            Some((r["id"].as_str()?.to_owned(), r["type"].as_str()?.to_owned()))
+                        })
+                        .collect();
+                    let devices = store
+                        .of_type("device")
+                        .filter_map(|d| d["id"].as_str().map(str::to_owned))
+                        .collect::<Vec<_>>();
+                    drop(store);
+                    let lights = devices.into_iter().map(|d| {
+                        let l = self.lights_on_device(&d);
+                        (d, l)
+                    });
+                    (types, lights.collect())
+                };
                 let changes = self.store.write().reconcile(fresh);
                 for (change, id) in changes {
                     let ty = match change {
-                        Change::Deleted => {
-                            // Gone from the store: find it by what we hold.
-                            if self.groups.read().iter().any(|g| g.rid == id) {
-                                "grouped_light".to_owned()
-                            } else {
-                                String::new()
-                            }
-                        }
+                        Change::Deleted => types
+                            .iter()
+                            .find(|(i, _)| *i == id)
+                            .map(|(_, t)| t.clone())
+                            .unwrap_or_default(),
                         _ => self
                             .store
                             .read()
@@ -405,10 +452,14 @@ impl Bridge {
                             .and_then(|r| r["type"].as_str().map(str::to_owned))
                             .unwrap_or_default(),
                     };
-                    self.after(change, &ty, &id, Vec::new());
+                    let lights = device_lights
+                        .iter()
+                        .find(|(d, _)| *d == id)
+                        .map(|(_, l)| l.clone())
+                        .unwrap_or_default();
+                    self.after(change, &ty, &id, lights);
                 }
             }
-            Err(e) => tracing::warn!("hue: refreshing after reconnect failed: {e}"),
         }
     }
 

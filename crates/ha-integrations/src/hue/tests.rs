@@ -393,3 +393,97 @@ async fn follows_the_stream_reconciles_and_resumes() {
     assert!(s[1].contains("last-event-id: 1794665588:0"), "{}", s[1]);
     task.abort();
 }
+
+const LAMP: &str = "81c174c4-7664-4c0e-9604-d453834a8688";
+const LAMP_DEVICE: &str = "13592c33-2ede-42f1-8e4a-c0e241bf29c4";
+
+/// A device gone while disconnected takes its lights with it on the
+/// reconcile: their states, and their place as service targets.
+#[tokio::test]
+async fn a_reconcile_removes_what_the_bridge_no_longer_has() {
+    let (base, seen) = fake_bridge().await;
+    let b = bridge(Api::at(&base, "key"));
+    assert!(state_json(&b.hass, "light.bedroom_lamp").is_some());
+    let fresh: Vec<Value> = fixture("resource")["data"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|r| r["id"] != LAMP && r["id"] != LAMP_DEVICE && r["owner"]["rid"] != LAMP_DEVICE)
+        .cloned()
+        .collect();
+    b.apply_snapshot(fresh);
+    assert!(state_json(&b.hass, "light.bedroom_lamp").is_none());
+    let mut data = Map::new();
+    data.insert("entity_id".into(), json!("all"));
+    b.hass
+        .call_service("light", "turn_on", data, None, false, None)
+        .await
+        .unwrap();
+    assert!(
+        seen.lock().iter().all(|(_, p, _)| !p.ends_with(LAMP)),
+        "{:?}",
+        seen.lock()
+    );
+    assert_eq!(seen.lock().len(), 7);
+}
+
+/// Two new lights on same-named devices get different entity ids, and a
+/// group whose room arrives after it is still made.
+#[tokio::test]
+async fn new_resources_get_their_own_ids_and_late_rooms_their_groups() {
+    let b = bridge(offline());
+    // Both arrive in one reconcile, so both are made before either is
+    // written.
+    let mut fresh = fixture("resource")["data"].as_array().unwrap().clone();
+    for n in 1..=2 {
+        let (device, light) = (format!("dev-{n}"), format!("light-{n}"));
+        fresh.push(
+            json!({"id": device, "type": "device", "metadata": {"name": "Desk"},
+            "product_data": {"certified": true}, "services": [{"rid": light, "rtype": "light"}]}),
+        );
+        fresh.push(
+            json!({"id": light, "type": "light", "owner": {"rid": device, "rtype": "device"},
+            "on": {"on": true}, "dimming": {"brightness": 50.0}, "mode": "normal",
+            "dynamics": {"status": "none"}}),
+        );
+    }
+    b.apply_snapshot(fresh);
+    assert_eq!(state_json(&b.hass, "light.desk").unwrap().0, "on");
+    assert_eq!(state_json(&b.hass, "light.desk_2").unwrap().0, "on");
+    // The group before its room.
+    b.handle(
+        "add",
+        &json!({"id": "gl-new", "type": "grouped_light", "owner": {"rid": "room-new", "rtype": "room"}, "on": {"on": true}}),
+    );
+    b.handle(
+        "add",
+        &json!({"id": "room-new", "type": "room", "metadata": {"name": "Study"},
+            "children": [{"rid": "dev-1", "rtype": "device"}],
+            "services": [{"rid": "gl-new", "rtype": "grouped_light"}]}),
+    );
+    let (state, attrs) = state_json(&b.hass, "light.study").unwrap();
+    assert_eq!(
+        (state.as_str(), attrs["entity_id"].clone()),
+        ("on", json!([]))
+    );
+    assert_eq!(attrs["lights"], json!(["Desk"]));
+}
+
+/// Valid JSON of the wrong shape is no data, not a panic.
+#[tokio::test]
+async fn odd_bridge_answers_are_not_a_crash() {
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let base = format!("http://{}", listener.local_addr().unwrap());
+    tokio::spawn(async move {
+        loop {
+            let (mut s, _) = listener.accept().await.unwrap();
+            let mut buf = vec![0u8; 4096];
+            let _ = s.read(&mut buf).await;
+            let _ = s
+                .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\n[]")
+                .await;
+        }
+    });
+    let api = Api::at(&base, "key");
+    assert!(api.fetch_all().await.unwrap().is_empty());
+}

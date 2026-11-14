@@ -124,7 +124,8 @@ impl Api {
                 let d = first["description"].as_str().unwrap_or_default();
                 return Err(ApiError::Bridge(d.to_owned()));
             }
-            return Ok(json["data"].take());
+            // Any JSON may come back; only an object's `data` counts.
+            return Ok(json.get_mut("data").map(Value::take).unwrap_or_default());
         }
         Err(ApiError::Busy)
     }

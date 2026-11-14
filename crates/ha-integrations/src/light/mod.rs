@@ -674,6 +674,11 @@ impl Lights {
         self.lights.write().push(light);
     }
 
+    /// Stop serving a light that's gone.
+    pub fn remove(&self, entity_id: &EntityId) {
+        self.lights.write().retain(|l| l.entity_id() != entity_id);
+    }
+
     /// The targeted, available lights, as HA's entity services pick them.
     fn targets(&self, target: &EntityTarget, indirect: &[String]) -> Vec<Arc<dyn Light>> {
         let lights = self.lights.read();
