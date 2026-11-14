@@ -1,15 +1,24 @@
 //! The one outbound HTTP client integrations share: HTTP/1.1, TLS with
 //! Mozilla's CA roots compiled in (as HA ships `certifi`; no CA files are
-//! read, so making a client is cheap and does no I/O), a request timeout
-//! and a cap on how much of a response is read. One pooled connection per
-//! host is kept only while it's in use, so an idle `hars` holds no sockets.
+//! read, so making a client is cheap and does no I/O), timeouts and a cap
+//! on how much of a response is read. Connections are pooled only briefly,
+//! so an idle `hars` holds no sockets, and a limit on connections per
+//! client can be set (a Hue bridge allows few). Event streams
+//! (`text/event-stream`) are read line by line as they arrive.
+
+mod sse;
+mod tls;
+
+pub use sse::{EventStream, Line};
 
 use bytes::Bytes;
-use http_body_util::{BodyExt, Empty, Limited};
-use hyper::{Request, Uri, header::HeaderMap};
+use http_body_util::{BodyExt, Full, Limited};
+use hyper::{Method, Request, Uri, header::HeaderMap};
 use hyper_util::client::legacy::{Client as Hyper, connect::HttpConnector};
 use hyper_util::rt::TokioExecutor;
+use std::sync::Arc;
 use std::time::Duration;
+use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
 pub use hyper::{StatusCode, header};
 
@@ -35,15 +44,82 @@ pub struct Response {
 
 #[derive(Clone)]
 pub struct Client {
-    inner: Hyper<hyper_rustls::HttpsConnector<HttpConnector>, Empty<Bytes>>,
+    inner: Hyper<hyper_rustls::HttpsConnector<HttpConnector>, Full<Bytes>>,
     user_agent: header::HeaderValue,
     headers_timeout: Duration,
     total_timeout: Duration,
     max_body: usize,
+    /// At most this many requests (streams included) at once.
+    slots: Option<Arc<Semaphore>>,
 }
 
 /// aiohttp's `max_redirects`: the 10th redirect is an error.
 const MAX_REDIRECTS: usize = 10;
+
+/// How a [`Client`] is made.
+pub struct Builder {
+    user_agent: String,
+    verify_tls: bool,
+    max_connections: Option<usize>,
+    keepalive: bool,
+}
+
+impl Builder {
+    /// Accept any server certificate, as HA does for a Hue bridge
+    /// (`ssl=False`): its certificate is self-signed by the bridge maker's
+    /// own CA. The handshake's signatures are still checked.
+    pub fn danger_accept_any_certificate(mut self) -> Self {
+        self.verify_tls = false;
+        self
+    }
+
+    /// At most `n` requests in flight; an open event stream holds one.
+    pub fn max_connections(mut self, n: usize) -> Self {
+        self.max_connections = Some(n);
+        self
+    }
+
+    /// TCP keepalive on its connections (30 s idle, then 3 probes 10 s
+    /// apart): a silently dead peer is noticed by the kernel, with no
+    /// timer in `hars`.
+    pub fn tcp_keepalive(mut self) -> Self {
+        self.keepalive = true;
+        self
+    }
+
+    pub fn build(self) -> Result<Client, Error> {
+        let mut http = HttpConnector::new();
+        http.enforce_http(false);
+        if self.keepalive {
+            http.set_keepalive(Some(Duration::from_secs(30)));
+            http.set_keepalive_interval(Some(Duration::from_secs(10)));
+            http.set_keepalive_retries(Some(3));
+        }
+        let https = if self.verify_tls {
+            hyper_rustls::HttpsConnectorBuilder::new().with_webpki_roots()
+        } else {
+            let config = tls::accept_any().map_err(|e| Error::Request(e.to_string()))?;
+            hyper_rustls::HttpsConnectorBuilder::new().with_tls_config(config)
+        }
+        .https_or_http()
+        .enable_http1()
+        .wrap_connector(http);
+        let inner = Hyper::builder(TokioExecutor::new())
+            // Don't keep connections open between the (rare) requests.
+            .pool_idle_timeout(Duration::from_secs(5))
+            .pool_max_idle_per_host(1)
+            .build(https);
+        Ok(Client {
+            inner,
+            user_agent: header::HeaderValue::from_str(&self.user_agent)
+                .map_err(|e| Error::Request(e.to_string()))?,
+            headers_timeout: Duration::from_secs(30),
+            total_timeout: Duration::from_secs(300),
+            max_body: 4 * 1024 * 1024,
+            slots: self.max_connections.map(|n| Arc::new(Semaphore::new(n))),
+        })
+    }
+}
 
 impl Client {
     /// `user_agent` identifies `hars` to the services it calls (api.met.no
@@ -51,24 +127,16 @@ impl Client {
     /// (pyMetno's own timeout, redirects included), 300 s for everything
     /// (aiohttp's session default).
     pub fn new(user_agent: &str) -> Result<Self, Error> {
-        let https = hyper_rustls::HttpsConnectorBuilder::new()
-            .with_webpki_roots()
-            .https_or_http()
-            .enable_http1()
-            .build();
-        let inner = Hyper::builder(TokioExecutor::new())
-            // Don't keep connections open between the (rare) requests.
-            .pool_idle_timeout(Duration::from_secs(5))
-            .pool_max_idle_per_host(1)
-            .build(https);
-        Ok(Self {
-            inner,
-            user_agent: header::HeaderValue::from_str(user_agent)
-                .map_err(|e| Error::Request(e.to_string()))?,
-            headers_timeout: Duration::from_secs(30),
-            total_timeout: Duration::from_secs(300),
-            max_body: 4 * 1024 * 1024,
-        })
+        Self::builder(user_agent).build()
+    }
+
+    pub fn builder(user_agent: &str) -> Builder {
+        Builder {
+            user_agent: user_agent.to_owned(),
+            verify_tls: true,
+            max_connections: None,
+            keepalive: false,
+        }
     }
 
     /// How long to wait for the response headers, and for the whole
@@ -77,6 +145,14 @@ impl Client {
         self.headers_timeout = headers;
         self.total_timeout = total;
         self
+    }
+
+    /// A slot to make a request in, if connections are limited.
+    async fn slot(&self) -> Option<OwnedSemaphorePermit> {
+        match &self.slots {
+            Some(s) => s.clone().acquire_owned().await.ok(),
+            None => None,
+        }
     }
 
     /// `GET url` with extra headers, following redirects as aiohttp does
@@ -88,22 +164,62 @@ impl Client {
         url: &str,
         headers: &[(header::HeaderName, String)],
     ) -> Result<Response, Error> {
-        let start = tokio::time::Instant::now();
-        let headers_by = start + self.headers_timeout;
-        let total_by = start + self.total_timeout;
+        self.request(Method::GET, url, headers, None).await
+    }
+
+    /// `PUT url` with a JSON body (sent as `application/json`).
+    pub async fn put_json(
+        &self,
+        url: &str,
+        headers: &[(header::HeaderName, String)],
+        body: &serde_json::Value,
+    ) -> Result<Response, Error> {
+        let body = serde_json::to_vec(body).map_err(|e| Error::Request(e.to_string()))?;
+        self.request(Method::PUT, url, headers, Some(body.into()))
+            .await
+    }
+
+    fn build_request(
+        &self,
+        method: &Method,
+        uri: &Uri,
+        headers: &[(header::HeaderName, String)],
+        body: Option<&Bytes>,
+    ) -> Result<Request<Full<Bytes>>, Error> {
+        let mut req = Request::builder()
+            .method(method.clone())
+            .uri(uri.clone())
+            .header(header::USER_AGENT, self.user_agent.clone());
+        if body.is_some() {
+            req = req.header(header::CONTENT_TYPE, "application/json");
+        }
+        let mut req = req
+            .body(Full::new(body.cloned().unwrap_or_default()))
+            .map_err(|e| Error::Request(e.to_string()))?;
+        for (name, value) in headers {
+            let value =
+                header::HeaderValue::from_str(value).map_err(|e| Error::Request(e.to_string()))?;
+            req.headers_mut().insert(name.clone(), value);
+        }
+        Ok(req)
+    }
+
+    /// Send and follow redirects until a final response's headers.
+    async fn send(
+        &self,
+        method: Method,
+        url: &str,
+        headers: &[(header::HeaderName, String)],
+        body: Option<Bytes>,
+        headers_by: tokio::time::Instant,
+    ) -> Result<hyper::Response<hyper::body::Incoming>, Error> {
         let mut uri: Uri = url.parse().map_err(|_| Error::Url(url.to_owned()))?;
+        let mut method = method;
+        let mut body = body;
         let mut redirects = 0;
-        let res = loop {
-            let mut req = Request::get(uri.clone())
-                .header(header::USER_AGENT, self.user_agent.clone())
-                .body(Empty::<Bytes>::new())
-                .map_err(|e| Error::Request(e.to_string()))?;
-            for (name, value) in headers {
-                let value = header::HeaderValue::from_str(value)
-                    .map_err(|e| Error::Request(e.to_string()))?;
-                req.headers_mut().insert(name.clone(), value);
-            }
-            let res = tokio::time::timeout_at(headers_by.min(total_by), self.inner.request(req))
+        loop {
+            let req = self.build_request(&method, &uri, headers, body.as_ref())?;
+            let res = tokio::time::timeout_at(headers_by, self.inner.request(req))
                 .await
                 .map_err(|_| Error::Timeout(self.headers_timeout))?
                 .map_err(|e| Error::Request(e.to_string()))?;
@@ -111,9 +227,10 @@ impl Client {
                 .headers()
                 .get(header::LOCATION)
                 .and_then(|l| l.to_str().ok());
-            let redirect = matches!(res.status().as_u16(), 301 | 302 | 303 | 307 | 308);
+            let status = res.status().as_u16();
+            let redirect = matches!(status, 301 | 302 | 303 | 307 | 308);
             let Some(location) = location.filter(|_| redirect) else {
-                break res;
+                return Ok(res);
             };
             redirects += 1;
             if redirects >= MAX_REDIRECTS {
@@ -124,7 +241,7 @@ impl Client {
             // blocked may not lead to one that is. Name lookups count
             // against the headers deadline.
             let check = async { !blocked(&uri).await && blocked(&next).await };
-            if tokio::time::timeout_at(headers_by.min(total_by), check)
+            if tokio::time::timeout_at(headers_by, check)
                 .await
                 .map_err(|_| Error::Timeout(self.headers_timeout))?
             {
@@ -133,8 +250,31 @@ impl Client {
                     next.host().unwrap_or_default()
                 )));
             }
+            // aiohttp: 303 (and 301/302 after a POST) become a GET.
+            if status == 303 {
+                method = Method::GET;
+                body = None;
+            }
             uri = next;
-        };
+        }
+    }
+
+    /// One request: headers within the headers timeout, the whole exchange
+    /// within the total one, the body capped.
+    pub async fn request(
+        &self,
+        method: Method,
+        url: &str,
+        headers: &[(header::HeaderName, String)],
+        body: Option<Bytes>,
+    ) -> Result<Response, Error> {
+        let start = tokio::time::Instant::now();
+        let total_by = start + self.total_timeout;
+        let headers_by = (start + self.headers_timeout).min(total_by);
+        let _slot = tokio::time::timeout_at(total_by, self.slot())
+            .await
+            .map_err(|_| Error::Timeout(self.total_timeout))?;
+        let res = self.send(method, url, headers, body, headers_by).await?;
         let (parts, body) = res.into_parts();
         let body = tokio::time::timeout_at(total_by, Limited::new(body, self.max_body).collect())
             .await
@@ -154,6 +294,25 @@ impl Client {
             headers: parts.headers,
             body,
         })
+    }
+
+    /// `GET url` as an event stream: the headers within the headers
+    /// timeout, then lines as they come, with no time limit (pair it with
+    /// [`Builder::tcp_keepalive`]). The stream holds a connection slot.
+    pub async fn stream(
+        &self,
+        url: &str,
+        headers: &[(header::HeaderName, String)],
+    ) -> Result<EventStream, Error> {
+        let headers_by = tokio::time::Instant::now() + self.headers_timeout;
+        let slot = tokio::time::timeout_at(headers_by, self.slot())
+            .await
+            .map_err(|_| Error::Timeout(self.headers_timeout))?;
+        let res = self
+            .send(Method::GET, url, headers, None, headers_by)
+            .await?;
+        let (parts, body) = res.into_parts();
+        Ok(EventStream::new(parts.status, parts.headers, body, slot))
     }
 }
 
@@ -526,5 +685,187 @@ mod tests {
                 .get(&format!("http://127.0.0.1:{local_port}/"), &[])
                 .await
         ));
+    }
+
+    /// A server that answers each connection with `reply`, keeping what it
+    /// received.
+    async fn serve_each(reply: String, n: usize) -> (String, tokio::task::JoinHandle<Vec<String>>) {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let base = format!("http://{}", listener.local_addr().unwrap());
+        let task = tokio::spawn(async move {
+            let mut seen = Vec::new();
+            for _ in 0..n {
+                let (mut s, _) = listener.accept().await.unwrap();
+                let mut buf = vec![0u8; 8192];
+                let k = s.read(&mut buf).await.unwrap();
+                seen.push(String::from_utf8_lossy(&buf[..k]).into_owned());
+                s.write_all(reply.as_bytes()).await.unwrap();
+            }
+            seen
+        });
+        (base, task)
+    }
+
+    #[tokio::test]
+    async fn puts_json() {
+        let ok = "HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{}".to_owned();
+        let (base, server) = serve_each(ok, 1).await;
+        let client = Client::new("t").unwrap();
+        let res = client
+            .put_json(
+                &format!("{base}/clip/v2/resource/light/1"),
+                &[],
+                &serde_json::json!({"on": {"on": true}}),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status, StatusCode::OK);
+        let req = server.await.unwrap().remove(0);
+        assert!(
+            req.starts_with("PUT /clip/v2/resource/light/1 HTTP/1.1"),
+            "{req}"
+        );
+        assert!(
+            req.to_lowercase()
+                .contains("content-type: application/json")
+        );
+        assert!(req.ends_with(r#"{"on":{"on":true}}"#), "{req}");
+    }
+
+    #[tokio::test]
+    async fn streams_lines_as_they_come() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!(
+            "http://{}/eventstream/clip/v2",
+            listener.local_addr().unwrap()
+        );
+        let (more_tx, mut more_rx) = tokio::sync::mpsc::channel::<&'static [u8]>(4);
+        tokio::spawn(async move {
+            let (mut s, _) = listener.accept().await.unwrap();
+            let mut buf = vec![0u8; 4096];
+            let _ = s.read(&mut buf).await.unwrap();
+            s.write_all(
+                b"HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nConnection: close\r\n\r\n",
+            )
+            .await
+            .unwrap();
+            while let Some(chunk) = more_rx.recv().await {
+                s.write_all(chunk).await.unwrap();
+            }
+        });
+        let client = Client::builder("t").tcp_keepalive().build().unwrap();
+        more_tx.send(b": hi\n\nid: 17:0\nda").await.unwrap();
+        let mut stream = client.stream(&url, &[]).await.unwrap();
+        assert_eq!(stream.status, StatusCode::OK);
+        let line = |k: &str, v: &str| {
+            Some(Line {
+                key: k.into(),
+                value: v.into(),
+            })
+        };
+        assert_eq!(stream.next_line().await.unwrap(), line("", " hi"));
+        assert_eq!(stream.next_line().await.unwrap(), line("id", " 17:0"));
+        // The rest of a line split across reads, then lines without `:`.
+        more_tx.send(b"ta: [1]\r\nno colon here\n\n").await.unwrap();
+        assert_eq!(stream.next_line().await.unwrap(), line("data", " [1]"));
+        drop(more_tx);
+        assert_eq!(stream.next_line().await.unwrap(), None);
+    }
+
+    #[tokio::test]
+    async fn a_line_too_long_is_an_error() {
+        let body = "x".repeat(sse::MAX_LINE + 1);
+        let reply = format!(
+            "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+            body.len()
+        );
+        let (base, _server) = serve_each(reply, 1).await;
+        let client = Client::new("t").unwrap();
+        let mut stream = client.stream(&base, &[]).await.unwrap();
+        assert!(matches!(stream.next_line().await, Err(Error::TooLarge(_))));
+    }
+
+    #[tokio::test]
+    async fn a_held_stream_uses_a_connection_slot() {
+        let reply = "HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".to_owned();
+        let (base, _server) = serve_each(reply, 2).await;
+        let client = Client::builder("t").max_connections(1).build().unwrap();
+        let stream = client.stream(&base, &[]).await.unwrap();
+        let client2 = client.clone();
+        let url = base.clone();
+        let get = tokio::spawn(async move { client2.get(&url, &[]).await.map(|r| r.status) });
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        assert!(!get.is_finished(), "waits for the slot");
+        drop(stream);
+        assert_eq!(get.await.unwrap().unwrap(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn bridge_mode_accepts_a_self_signed_certificate() {
+        use rustls::pki_types::pem::PemObject;
+        use rustls::pki_types::{CertificateDer, PrivateKeyDer};
+        let cert = CertificateDer::from_pem_slice(include_bytes!("testdata/cert.pem")).unwrap();
+        let key = PrivateKeyDer::from_pem_slice(include_bytes!("testdata/key.pem")).unwrap();
+        let config = rustls::ServerConfig::builder_with_provider(Arc::new(
+            rustls::crypto::ring::default_provider(),
+        ))
+        .with_safe_default_protocol_versions()
+        .unwrap()
+        .with_no_client_auth()
+        .with_single_cert(vec![cert], key)
+        .unwrap();
+        let acceptor = tokio_rustls::TlsAcceptor::from(Arc::new(config));
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("https://{}/api/config", listener.local_addr().unwrap());
+        tokio::spawn(async move {
+            loop {
+                let (s, _) = listener.accept().await.unwrap();
+                let acceptor = acceptor.clone();
+                tokio::spawn(async move {
+                    // The verifying client gives up during the handshake.
+                    let Ok(mut s) = acceptor.accept(s).await else {
+                        return;
+                    };
+                    let mut buf = vec![0u8; 4096];
+                    let _ = s.read(&mut buf).await;
+                    let _ = s
+                        .write_all(
+                            b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\nok",
+                        )
+                        .await;
+                    let _ = s.shutdown().await;
+                });
+            }
+        });
+        let verifying = Client::new("t").unwrap();
+        assert!(matches!(
+            verifying.get(&url, &[]).await,
+            Err(Error::Request(_))
+        ));
+        let bridge = Client::builder("t")
+            .danger_accept_any_certificate()
+            .build()
+            .unwrap();
+        let res = bridge.get(&url, &[]).await.unwrap();
+        assert_eq!(&res.body[..], b"ok");
+    }
+
+    /// Against a real Hue bridge, read-only and unauthenticated:
+    /// `HARS_TEST_HUE_HOST=<ip> cargo test -p ha-http -- --ignored`.
+    #[tokio::test]
+    #[ignore]
+    async fn a_real_bridge_answers_in_bridge_mode() {
+        let host = std::env::var("HARS_TEST_HUE_HOST").expect("HARS_TEST_HUE_HOST");
+        let bridge = Client::builder("hars-test")
+            .danger_accept_any_certificate()
+            .build()
+            .unwrap();
+        let res = bridge
+            .get(&format!("https://{host}/api/config"), &[])
+            .await
+            .unwrap();
+        assert_eq!(res.status, StatusCode::OK);
+        let v: serde_json::Value = serde_json::from_slice(&res.body).unwrap();
+        assert!(v["bridgeid"].is_string(), "{v}");
     }
 }
