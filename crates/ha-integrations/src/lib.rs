@@ -7,10 +7,12 @@ pub mod components;
 pub mod hue;
 pub mod light;
 pub mod met;
+pub mod naming;
 pub mod num;
 pub mod scene;
 pub mod sun;
 pub mod switch;
+pub mod switchbot_cloud;
 pub mod weather;
 
 use ha_core::Hass;
@@ -39,7 +41,12 @@ pub fn load_entries(config_dir: &std::path::Path) -> Option<Vec<Map<String, Valu
 }
 
 /// The integrations `hars` can run, by HA domain.
-pub const SUPPORTED: &[&str] = &[sun::DOMAIN, met::DOMAIN, hue::DOMAIN];
+pub const SUPPORTED: &[&str] = &[
+    sun::DOMAIN,
+    met::DOMAIN,
+    hue::DOMAIN,
+    switchbot_cloud::DOMAIN,
+];
 
 /// Who `hars` says it is to the services it calls.
 pub const USER_AGENT: &str = concat!(
@@ -111,5 +118,25 @@ pub fn start(
         }
         running.extend(["hue", "light", "sensor", "binary_sensor", "switch", "scene"]);
     }
+    let switchbot: Vec<Map<String, Value>> = enabled(switchbot_cloud::DOMAIN).cloned().collect();
+    if !switchbot.is_empty() {
+        // The components exist from startup, as HA sets them up before
+        // the entries.
+        let _ = (
+            components.buttons(),
+            components.climates(),
+            components.switches(),
+        );
+        for entry in switchbot {
+            tokio::spawn(switchbot_cloud::run(
+                components.clone(),
+                entry,
+                switchbot_cloud::api::HOST.to_owned(),
+            ));
+        }
+        running.extend(["switchbot_cloud", "button", "climate", "sensor", "switch"]);
+    }
+    running.sort_unstable();
+    running.dedup();
     Started { running, weather }
 }

@@ -1,0 +1,58 @@
+[
+ {
+  "token": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "secret": "00000000000000000000000000000000",
+  "time.time()": "1794672672.345",
+  "string_to_sign": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff1794672672345b933a83a-f109-49d6-a5d7-fce2f5a39caf",
+  "headers": {
+   "Authorization": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+   "Content-Type": "application/json",
+   "charset": "utf8",
+   "t": "1794672672345",
+   "sign": "vHxVBVYUaqED6pdCcEVrubjf/PgHcxE4g/25FbCz3KU=",
+   "nonce": "b933a83a-f109-49d6-a5d7-fce2f5a39caf"
+  }
+ },
+ {
+  "token": "faketoken0123456789",
+  "secret": "fakesecret",
+  "time.time()": "1700000000.0",
+  "string_to_sign": "faketoken0123456789170000000000000000000-0000-4000-8000-000000000000",
+  "headers": {
+   "Authorization": "faketoken0123456789",
+   "Content-Type": "application/json",
+   "charset": "utf8",
+   "t": "1700000000000",
+   "sign": "kt9GXmd86KbLwVB1sbfvLVaCWQUGM2UpLCL3liFiULg=",
+   "nonce": "00000000-0000-4000-8000-000000000000"
+  }
+ },
+ {
+  "token": "faketoken0123456789",
+  "secret": "fakesecret",
+  "time.time()": "1700000000.0015",
+  "string_to_sign": "faketoken0123456789170000000000200000000-0000-4000-8000-000000000000",
+  "headers": {
+   "Authorization": "faketoken0123456789",
+   "Content-Type": "application/json",
+   "charset": "utf8",
+   "t": "1700000000002",
+   "sign": "dfUsDKK9J3rDf+9mij3dvKQe2Dtd4uwb9TOvIUGKGck=",
+   "nonce": "00000000-0000-4000-8000-000000000000"
+  }
+ },
+ {
+  "token": "tökén",
+  "secret": "sécret",
+  "time.time()": "1700000000.123",
+  "string_to_sign": "tökén170000000012312345678-1234-4234-8234-123456789abc",
+  "headers": {
+   "Authorization": "tökén",
+   "Content-Type": "application/json",
+   "charset": "utf8",
+   "t": "1700000000123",
+   "sign": "YItwg0jg4sqR3YyPEkRjPBHd7f5FX8ZX0JXkhLfD5ko=",
+   "nonce": "12345678-1234-4234-8234-123456789abc"
+  }
+ }
+]

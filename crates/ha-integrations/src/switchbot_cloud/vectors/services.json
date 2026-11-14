@@ -1,0 +1,1065 @@
+[
+ {
+  "call": "climate.set_hvac_mode",
+  "data": {
+   "entity_id": "climate.air_conditioner",
+   "hvac_mode": "cool"
+  },
+  "error": null,
+  "requests": [
+   {
+    "method": "POST",
+    "path": "/v1.1/devices/01-202301010000-00000001/commands",
+    "body": "{\"commandType\":\"command\",\"command\":\"setAll\",\"parameter\":\"21,2,1,on\"}"
+   }
+  ],
+  "after": {
+   "climate.air_conditioner": {
+    "state": "cool",
+    "temperature": 21,
+    "fan_mode": "auto"
+   },
+   "switch.air_conditioner": "unknown",
+   "button.towel_switch": "unknown"
+  }
+ },
+ {
+  "call": "climate.set_temperature",
+  "data": {
+   "entity_id": "climate.air_conditioner",
+   "temperature": 24
+  },
+  "error": null,
+  "requests": [
+   {
+    "method": "POST",
+    "path": "/v1.1/devices/01-202301010000-00000001/commands",
+    "body": "{\"commandType\":\"command\",\"command\":\"setAll\",\"parameter\":\"24,2,1,on\"}"
+   }
+  ],
+  "after": {
+   "climate.air_conditioner": {
+    "state": "cool",
+    "temperature": 24,
+    "fan_mode": "auto"
+   },
+   "switch.air_conditioner": "unknown",
+   "button.towel_switch": "unknown"
+  }
+ },
+ {
+  "call": "climate.set_temperature",
+  "data": {
+   "entity_id": "climate.air_conditioner",
+   "temperature": 21.5
+  },
+  "error": null,
+  "requests": [
+   {
+    "method": "POST",
+    "path": "/v1.1/devices/01-202301010000-00000001/commands",
+    "body": "{\"commandType\":\"command\",\"command\":\"setAll\",\"parameter\":\"21,2,1,on\"}"
+   }
+  ],
+  "after": {
+   "climate.air_conditioner": {
+    "state": "cool",
+    "temperature": 22,
+    "fan_mode": "auto"
+   },
+   "switch.air_conditioner": "unknown",
+   "button.towel_switch": "unknown"
+  }
+ },
+ {
+  "call": "climate.set_temperature",
+  "data": {
+   "entity_id": "climate.air_conditioner",
+   "temperature": 22.5
+  },
+  "error": null,
+  "requests": [
+   {
+    "method": "POST",
+    "path": "/v1.1/devices/01-202301010000-00000001/commands",
+    "body": "{\"commandType\":\"command\",\"command\":\"setAll\",\"parameter\":\"22,2,1,on\"}"
+   }
+  ],
+  "after": {
+   "climate.air_conditioner": {
+    "state": "cool",
+    "temperature": 22,
+    "fan_mode": "auto"
+   },
+   "switch.air_conditioner": "unknown",
+   "button.towel_switch": "unknown"
+  }
+ },
+ {
+  "call": "climate.set_temperature",
+  "data": {
+   "entity_id": "climate.air_conditioner",
+   "temperature": 22.7
+  },
+  "error": null,
+  "requests": [
+   {
+    "method": "POST",
+    "path": "/v1.1/devices/01-202301010000-00000001/commands",
+    "body": "{\"commandType\":\"command\",\"command\":\"setAll\",\"parameter\":\"22,2,1,on\"}"
+   }
+  ],
+  "after": {
+   "climate.air_conditioner": {
+    "state": "cool",
+    "temperature": 23,
+    "fan_mode": "auto"
+   },
+   "switch.air_conditioner": "unknown",
+   "button.towel_switch": "unknown"
+  }
+ },
+ {
+  "call": "climate.set_temperature",
+  "data": {
+   "entity_id": "climate.air_conditioner",
+   "temperature": "23"
+  },
+  "error": null,
+  "requests": [
+   {
+    "method": "POST",
+    "path": "/v1.1/devices/01-202301010000-00000001/commands",
+    "body": "{\"commandType\":\"command\",\"command\":\"setAll\",\"parameter\":\"23,2,1,on\"}"
+   }
+  ],
+  "after": {
+   "climate.air_conditioner": {
+    "state": "cool",
+    "temperature": 23,
+    "fan_mode": "auto"
+   },
+   "switch.air_conditioner": "unknown",
+   "button.towel_switch": "unknown"
+  }
+ },
+ {
+  "call": "climate.set_fan_mode",
+  "data": {
+   "entity_id": "climate.air_conditioner",
+   "fan_mode": "high"
+  },
+  "error": null,
+  "requests": [
+   {
+    "method": "POST",
+    "path": "/v1.1/devices/01-202301010000-00000001/commands",
+    "body": "{\"commandType\":\"command\",\"command\":\"setAll\",\"parameter\":\"23,2,4,on\"}"
+   }
+  ],
+  "after": {
+   "climate.air_conditioner": {
+    "state": "cool",
+    "temperature": 23,
+    "fan_mode": "high"
+   },
+   "switch.air_conditioner": "unknown",
+   "button.towel_switch": "unknown"
+  }
+ },
+ {
+  "call": "climate.set_temperature",
+  "data": {
+   "entity_id": "climate.air_conditioner",
+   "temperature": 26,
+   "hvac_mode": "heat"
+  },
+  "error": null,
+  "requests": [
+   {
+    "method": "POST",
+    "path": "/v1.1/devices/01-202301010000-00000001/commands",
+    "body": "{\"commandType\":\"command\",\"command\":\"setAll\",\"parameter\":\"26,2,4,on\"}"
+   }
+  ],
+  "after": {
+   "climate.air_conditioner": {
+    "state": "cool",
+    "temperature": 26,
+    "fan_mode": "high"
+   },
+   "switch.air_conditioner": "unknown",
+   "button.towel_switch": "unknown"
+  }
+ },
+ {
+  "call": "climate.turn_off",
+  "data": {
+   "entity_id": "climate.air_conditioner"
+  },
+  "error": null,
+  "requests": [
+   {
+    "method": "POST",
+    "path": "/v1.1/devices/01-202301010000-00000001/commands",
+    "body": "{\"commandType\":\"command\",\"command\":\"setAll\",\"parameter\":\"26,2,4,off\"}"
+   }
+  ],
+  "after": {
+   "climate.air_conditioner": {
+    "state": "off",
+    "temperature": 26,
+    "fan_mode": "high"
+   },
+   "switch.air_conditioner": "unknown",
+   "button.towel_switch": "unknown"
+  }
+ },
+ {
+  "call": "climate.set_temperature",
+  "data": {
+   "entity_id": "climate.air_conditioner",
+   "temperature": 25
+  },
+  "error": null,
+  "requests": [
+   {
+    "method": "POST",
+    "path": "/v1.1/devices/01-202301010000-00000001/commands",
+    "body": "{\"commandType\":\"command\",\"command\":\"setAll\",\"parameter\":\"25,4,4,on\"}"
+   }
+  ],
+  "after": {
+   "climate.air_conditioner": {
+    "state": "off",
+    "temperature": 25,
+    "fan_mode": "high"
+   },
+   "switch.air_conditioner": "unknown",
+   "button.towel_switch": "unknown"
+  }
+ },
+ {
+  "call": "climate.set_fan_mode",
+  "data": {
+   "entity_id": "climate.air_conditioner",
+   "fan_mode": "low"
+  },
+  "error": null,
+  "requests": [
+   {
+    "method": "POST",
+    "path": "/v1.1/devices/01-202301010000-00000001/commands",
+    "body": "{\"commandType\":\"command\",\"command\":\"setAll\",\"parameter\":\"25,4,2,on\"}"
+   }
+  ],
+  "after": {
+   "climate.air_conditioner": {
+    "state": "off",
+    "temperature": 25,
+    "fan_mode": "low"
+   },
+   "switch.air_conditioner": "unknown",
+   "button.towel_switch": "unknown"
+  }
+ },
+ {
+  "call": "climate.turn_off",
+  "data": {
+   "entity_id": "climate.air_conditioner"
+  },
+  "error": null,
+  "requests": [
+   {
+    "method": "POST",
+    "path": "/v1.1/devices/01-202301010000-00000001/commands",
+    "body": "{\"commandType\":\"command\",\"command\":\"setAll\",\"parameter\":\"25,4,2,off\"}"
+   }
+  ],
+  "after": {
+   "climate.air_conditioner": {
+    "state": "off",
+    "temperature": 25,
+    "fan_mode": "low"
+   },
+   "switch.air_conditioner": "unknown",
+   "button.towel_switch": "unknown"
+  }
+ },
+ {
+  "call": "climate.turn_on",
+  "data": {
+   "entity_id": "climate.air_conditioner"
+  },
+  "error": null,
+  "requests": [
+   {
+    "method": "POST",
+    "path": "/v1.1/devices/01-202301010000-00000001/commands",
+    "body": "{\"commandType\":\"command\",\"command\":\"setAll\",\"parameter\":\"25,4,2,on\"}"
+   }
+  ],
+  "after": {
+   "climate.air_conditioner": {
+    "state": "fan_only",
+    "temperature": 25,
+    "fan_mode": "low"
+   },
+   "switch.air_conditioner": "unknown",
+   "button.towel_switch": "unknown"
+  }
+ },
+ {
+  "call": "climate.set_hvac_mode",
+  "data": {
+   "entity_id": "climate.air_conditioner",
+   "hvac_mode": "dry"
+  },
+  "error": null,
+  "requests": [
+   {
+    "method": "POST",
+    "path": "/v1.1/devices/01-202301010000-00000001/commands",
+    "body": "{\"commandType\":\"command\",\"command\":\"setAll\",\"parameter\":\"25,3,2,on\"}"
+   }
+  ],
+  "after": {
+   "climate.air_conditioner": {
+    "state": "dry",
+    "temperature": 25,
+    "fan_mode": "low"
+   },
+   "switch.air_conditioner": "unknown",
+   "button.towel_switch": "unknown"
+  }
+ },
+ {
+  "call": "climate.toggle",
+  "data": {
+   "entity_id": "climate.air_conditioner"
+  },
+  "error": null,
+  "requests": [
+   {
+    "method": "POST",
+    "path": "/v1.1/devices/01-202301010000-00000001/commands",
+    "body": "{\"commandType\":\"command\",\"command\":\"setAll\",\"parameter\":\"25,3,2,off\"}"
+   }
+  ],
+  "after": {
+   "climate.air_conditioner": {
+    "state": "off",
+    "temperature": 25,
+    "fan_mode": "low"
+   },
+   "switch.air_conditioner": "unknown",
+   "button.towel_switch": "unknown"
+  }
+ },
+ {
+  "call": "climate.toggle",
+  "data": {
+   "entity_id": "climate.air_conditioner"
+  },
+  "error": null,
+  "requests": [
+   {
+    "method": "POST",
+    "path": "/v1.1/devices/01-202301010000-00000001/commands",
+    "body": "{\"commandType\":\"command\",\"command\":\"setAll\",\"parameter\":\"25,4,2,on\"}"
+   }
+  ],
+  "after": {
+   "climate.air_conditioner": {
+    "state": "fan_only",
+    "temperature": 25,
+    "fan_mode": "low"
+   },
+   "switch.air_conditioner": "unknown",
+   "button.towel_switch": "unknown"
+  }
+ },
+ {
+  "call": "climate.set_hvac_mode",
+  "data": {
+   "entity_id": "climate.air_conditioner",
+   "hvac_mode": "heat"
+  },
+  "error": null,
+  "requests": [
+   {
+    "method": "POST",
+    "path": "/v1.1/devices/01-202301010000-00000001/commands",
+    "body": "{\"commandType\":\"command\",\"command\":\"setAll\",\"parameter\":\"25,5,2,on\"}"
+   }
+  ],
+  "after": {
+   "climate.air_conditioner": {
+    "state": "heat",
+    "temperature": 25,
+    "fan_mode": "low"
+   },
+   "switch.air_conditioner": "unknown",
+   "button.towel_switch": "unknown"
+  }
+ },
+ {
+  "call": "climate.turn_on",
+  "data": {
+   "entity_id": "climate.air_conditioner"
+  },
+  "error": null,
+  "requests": [
+   {
+    "method": "POST",
+    "path": "/v1.1/devices/01-202301010000-00000001/commands",
+    "body": "{\"commandType\":\"command\",\"command\":\"setAll\",\"parameter\":\"25,5,2,on\"}"
+   }
+  ],
+  "after": {
+   "climate.air_conditioner": {
+    "state": "heat",
+    "temperature": 25,
+    "fan_mode": "low"
+   },
+   "switch.air_conditioner": "unknown",
+   "button.towel_switch": "unknown"
+  }
+ },
+ {
+  "call": "climate.set_hvac_mode",
+  "data": {
+   "entity_id": "climate.air_conditioner",
+   "hvac_mode": "heat_cool"
+  },
+  "error": null,
+  "requests": [
+   {
+    "method": "POST",
+    "path": "/v1.1/devices/01-202301010000-00000001/commands",
+    "body": "{\"commandType\":\"command\",\"command\":\"setAll\",\"parameter\":\"25,1,2,on\"}"
+   }
+  ],
+  "after": {
+   "climate.air_conditioner": {
+    "state": "heat_cool",
+    "temperature": 25,
+    "fan_mode": "low"
+   },
+   "switch.air_conditioner": "unknown",
+   "button.towel_switch": "unknown"
+  }
+ },
+ {
+  "call": "climate.set_hvac_mode",
+  "data": {
+   "entity_id": "climate.air_conditioner",
+   "hvac_mode": "fan_only"
+  },
+  "error": null,
+  "requests": [
+   {
+    "method": "POST",
+    "path": "/v1.1/devices/01-202301010000-00000001/commands",
+    "body": "{\"commandType\":\"command\",\"command\":\"setAll\",\"parameter\":\"25,4,2,on\"}"
+   }
+  ],
+  "after": {
+   "climate.air_conditioner": {
+    "state": "fan_only",
+    "temperature": 25,
+    "fan_mode": "low"
+   },
+   "switch.air_conditioner": "unknown",
+   "button.towel_switch": "unknown"
+  }
+ },
+ {
+  "call": "climate.set_hvac_mode",
+  "data": {
+   "entity_id": "climate.air_conditioner",
+   "hvac_mode": "off"
+  },
+  "error": null,
+  "requests": [
+   {
+    "method": "POST",
+    "path": "/v1.1/devices/01-202301010000-00000001/commands",
+    "body": "{\"commandType\":\"command\",\"command\":\"setAll\",\"parameter\":\"25,4,2,off\"}"
+   }
+  ],
+  "after": {
+   "climate.air_conditioner": {
+    "state": "off",
+    "temperature": 25,
+    "fan_mode": "low"
+   },
+   "switch.air_conditioner": "unknown",
+   "button.towel_switch": "unknown"
+  }
+ },
+ {
+  "call": "climate.set_hvac_mode",
+  "data": {
+   "entity_id": "climate.air_conditioner",
+   "hvac_mode": "auto"
+  },
+  "error": {
+   "kind": "ServiceValidationError (ws service_validation_error)",
+   "type": "ServiceValidationError",
+   "str": "HVAC mode auto is not valid. Valid HVAC modes are: heat_cool, cool, dry, fan_only, heat, off",
+   "translation_domain": "climate",
+   "translation_key": "not_valid_hvac_mode",
+   "translation_placeholders": {
+    "mode": "auto",
+    "modes": "heat_cool, cool, dry, fan_only, heat, off"
+   }
+  },
+  "requests": [],
+  "after": {
+   "climate.air_conditioner": {
+    "state": "off",
+    "temperature": 25,
+    "fan_mode": "low"
+   },
+   "switch.air_conditioner": "unknown",
+   "button.towel_switch": "unknown"
+  }
+ },
+ {
+  "call": "climate.set_hvac_mode",
+  "data": {
+   "entity_id": "climate.air_conditioner",
+   "hvac_mode": "bogus"
+  },
+  "error": {
+   "kind": "vol.Invalid (ws invalid_format)",
+   "type": "MultipleInvalid",
+   "str": "expected HVACMode or one of 'off', 'heat', 'cool', 'heat_cool', 'auto', 'dry', 'fan_only' for dictionary value @ data['hvac_mode']"
+  },
+  "requests": [],
+  "after": {
+   "climate.air_conditioner": {
+    "state": "off",
+    "temperature": 25,
+    "fan_mode": "low"
+   },
+   "switch.air_conditioner": "unknown",
+   "button.towel_switch": "unknown"
+  }
+ },
+ {
+  "call": "climate.set_fan_mode",
+  "data": {
+   "entity_id": "climate.air_conditioner",
+   "fan_mode": "turbo"
+  },
+  "error": {
+   "kind": "ServiceValidationError (ws service_validation_error)",
+   "type": "ServiceValidationError",
+   "str": "Fan mode turbo is not valid. Valid fan modes are: auto, low, medium, high",
+   "translation_domain": "climate",
+   "translation_key": "not_valid_fan_mode",
+   "translation_placeholders": {
+    "mode": "turbo",
+    "modes": "auto, low, medium, high"
+   }
+  },
+  "requests": [],
+  "after": {
+   "climate.air_conditioner": {
+    "state": "off",
+    "temperature": 25,
+    "fan_mode": "low"
+   },
+   "switch.air_conditioner": "unknown",
+   "button.towel_switch": "unknown"
+  }
+ },
+ {
+  "call": "climate.set_temperature",
+  "data": {
+   "entity_id": "climate.air_conditioner",
+   "temperature": 35.5
+  },
+  "error": {
+   "kind": "ServiceValidationError (ws service_validation_error)",
+   "type": "ServiceValidationError",
+   "str": "Provided temperature 35.5 is not valid. Accepted range is 7 to 35",
+   "translation_domain": "climate",
+   "translation_key": "temp_out_of_range",
+   "translation_placeholders": {
+    "check_temp": "35.5",
+    "min_temp": "7",
+    "max_temp": "35"
+   }
+  },
+  "requests": [],
+  "after": {
+   "climate.air_conditioner": {
+    "state": "off",
+    "temperature": 25,
+    "fan_mode": "low"
+   },
+   "switch.air_conditioner": "unknown",
+   "button.towel_switch": "unknown"
+  }
+ },
+ {
+  "call": "climate.set_temperature",
+  "data": {
+   "entity_id": "climate.air_conditioner",
+   "temperature": 6
+  },
+  "error": {
+   "kind": "ServiceValidationError (ws service_validation_error)",
+   "type": "ServiceValidationError",
+   "str": "Provided temperature 6.0 is not valid. Accepted range is 7 to 35",
+   "translation_domain": "climate",
+   "translation_key": "temp_out_of_range",
+   "translation_placeholders": {
+    "check_temp": "6.0",
+    "min_temp": "7",
+    "max_temp": "35"
+   }
+  },
+  "requests": [],
+  "after": {
+   "climate.air_conditioner": {
+    "state": "off",
+    "temperature": 25,
+    "fan_mode": "low"
+   },
+   "switch.air_conditioner": "unknown",
+   "button.towel_switch": "unknown"
+  }
+ },
+ {
+  "call": "climate.set_temperature",
+  "data": {
+   "entity_id": "climate.air_conditioner",
+   "target_temp_low": 18,
+   "target_temp_high": 24
+  },
+  "error": {
+   "kind": "ServiceValidationError (ws service_validation_error)",
+   "type": "ServiceValidationError",
+   "str": "Set temperature action was used with the 'Lower/Upper target temperature' parameter but the entity does not support it",
+   "translation_domain": "climate",
+   "translation_key": "missing_target_temperature_range_entity_feature",
+   "translation_placeholders": null
+  },
+  "requests": [],
+  "after": {
+   "climate.air_conditioner": {
+    "state": "off",
+    "temperature": 25,
+    "fan_mode": "low"
+   },
+   "switch.air_conditioner": "unknown",
+   "button.towel_switch": "unknown"
+  }
+ },
+ {
+  "call": "climate.set_temperature",
+  "data": {
+   "entity_id": "climate.air_conditioner",
+   "hvac_mode": "cool"
+  },
+  "error": {
+   "kind": "vol.Invalid (ws invalid_format)",
+   "type": "MultipleInvalid",
+   "str": "must contain at least one of temperature, target_temp_high, target_temp_low."
+  },
+  "requests": [],
+  "after": {
+   "climate.air_conditioner": {
+    "state": "off",
+    "temperature": 25,
+    "fan_mode": "low"
+   },
+   "switch.air_conditioner": "unknown",
+   "button.towel_switch": "unknown"
+  }
+ },
+ {
+  "call": "climate.set_preset_mode",
+  "data": {
+   "entity_id": "climate.air_conditioner",
+   "preset_mode": "eco"
+  },
+  "error": {
+   "kind": "ServiceValidationError (ws service_validation_error)",
+   "type": "ServiceNotSupported",
+   "str": "Entity climate.air_conditioner does not support action climate.set_preset_mode",
+   "translation_domain": "homeassistant",
+   "translation_key": "service_not_supported",
+   "translation_placeholders": {
+    "domain": "climate",
+    "service": "set_preset_mode",
+    "entity_id": "climate.air_conditioner"
+   }
+  },
+  "requests": [],
+  "after": {
+   "climate.air_conditioner": {
+    "state": "off",
+    "temperature": 25,
+    "fan_mode": "low"
+   },
+   "switch.air_conditioner": "unknown",
+   "button.towel_switch": "unknown"
+  }
+ },
+ {
+  "call": "climate.set_humidity",
+  "data": {
+   "entity_id": "climate.air_conditioner",
+   "humidity": 50
+  },
+  "error": {
+   "kind": "ServiceValidationError (ws service_validation_error)",
+   "type": "ServiceNotSupported",
+   "str": "Entity climate.air_conditioner does not support action climate.set_humidity",
+   "translation_domain": "homeassistant",
+   "translation_key": "service_not_supported",
+   "translation_placeholders": {
+    "domain": "climate",
+    "service": "set_humidity",
+    "entity_id": "climate.air_conditioner"
+   }
+  },
+  "requests": [],
+  "after": {
+   "climate.air_conditioner": {
+    "state": "off",
+    "temperature": 25,
+    "fan_mode": "low"
+   },
+   "switch.air_conditioner": "unknown",
+   "button.towel_switch": "unknown"
+  }
+ },
+ {
+  "call": "climate.set_swing_mode",
+  "data": {
+   "entity_id": "climate.air_conditioner",
+   "swing_mode": "on"
+  },
+  "error": {
+   "kind": "ServiceValidationError (ws service_validation_error)",
+   "type": "ServiceNotSupported",
+   "str": "Entity climate.air_conditioner does not support action climate.set_swing_mode",
+   "translation_domain": "homeassistant",
+   "translation_key": "service_not_supported",
+   "translation_placeholders": {
+    "domain": "climate",
+    "service": "set_swing_mode",
+    "entity_id": "climate.air_conditioner"
+   }
+  },
+  "requests": [],
+  "after": {
+   "climate.air_conditioner": {
+    "state": "off",
+    "temperature": 25,
+    "fan_mode": "low"
+   },
+   "switch.air_conditioner": "unknown",
+   "button.towel_switch": "unknown"
+  }
+ },
+ {
+  "call": "climate.set_temperature",
+  "data": {
+   "entity_id": "climate.air_conditioner",
+   "temperature": 7
+  },
+  "error": null,
+  "requests": [
+   {
+    "method": "POST",
+    "path": "/v1.1/devices/01-202301010000-00000001/commands",
+    "body": "{\"commandType\":\"command\",\"command\":\"setAll\",\"parameter\":\"7,4,2,on\"}"
+   }
+  ],
+  "after": {
+   "climate.air_conditioner": {
+    "state": "off",
+    "temperature": 7,
+    "fan_mode": "low"
+   },
+   "switch.air_conditioner": "unknown",
+   "button.towel_switch": "unknown"
+  }
+ },
+ {
+  "call": "climate.set_temperature",
+  "data": {
+   "entity_id": "climate.air_conditioner",
+   "temperature": 35
+  },
+  "error": null,
+  "requests": [
+   {
+    "method": "POST",
+    "path": "/v1.1/devices/01-202301010000-00000001/commands",
+    "body": "{\"commandType\":\"command\",\"command\":\"setAll\",\"parameter\":\"35,4,2,on\"}"
+   }
+  ],
+  "after": {
+   "climate.air_conditioner": {
+    "state": "off",
+    "temperature": 35,
+    "fan_mode": "low"
+   },
+   "switch.air_conditioner": "unknown",
+   "button.towel_switch": "unknown"
+  }
+ },
+ {
+  "call": "climate.set_temperature",
+  "data": {
+   "entity_id": "climate.air_conditioner",
+   "temperature": 7.9
+  },
+  "error": null,
+  "requests": [
+   {
+    "method": "POST",
+    "path": "/v1.1/devices/01-202301010000-00000001/commands",
+    "body": "{\"commandType\":\"command\",\"command\":\"setAll\",\"parameter\":\"7,4,2,on\"}"
+   }
+  ],
+  "after": {
+   "climate.air_conditioner": {
+    "state": "off",
+    "temperature": 8,
+    "fan_mode": "low"
+   },
+   "switch.air_conditioner": "unknown",
+   "button.towel_switch": "unknown"
+  }
+ },
+ {
+  "call": "switch.toggle",
+  "data": {
+   "entity_id": "switch.air_conditioner"
+  },
+  "error": null,
+  "requests": [
+   {
+    "method": "POST",
+    "path": "/v1.1/devices/01-202301010000-00000001/commands",
+    "body": "{\"commandType\":\"command\",\"command\":\"turnOn\",\"parameter\":\"default\"}"
+   }
+  ],
+  "after": {
+   "climate.air_conditioner": {
+    "state": "off",
+    "temperature": 8,
+    "fan_mode": "low"
+   },
+   "switch.air_conditioner": "on",
+   "button.towel_switch": "unknown"
+  }
+ },
+ {
+  "call": "switch.turn_on",
+  "data": {
+   "entity_id": "switch.air_conditioner"
+  },
+  "error": null,
+  "requests": [
+   {
+    "method": "POST",
+    "path": "/v1.1/devices/01-202301010000-00000001/commands",
+    "body": "{\"commandType\":\"command\",\"command\":\"turnOn\",\"parameter\":\"default\"}"
+   }
+  ],
+  "after": {
+   "climate.air_conditioner": {
+    "state": "off",
+    "temperature": 8,
+    "fan_mode": "low"
+   },
+   "switch.air_conditioner": "on",
+   "button.towel_switch": "unknown"
+  }
+ },
+ {
+  "call": "switch.toggle",
+  "data": {
+   "entity_id": "switch.air_conditioner"
+  },
+  "error": null,
+  "requests": [
+   {
+    "method": "POST",
+    "path": "/v1.1/devices/01-202301010000-00000001/commands",
+    "body": "{\"commandType\":\"command\",\"command\":\"turnOff\",\"parameter\":\"default\"}"
+   }
+  ],
+  "after": {
+   "climate.air_conditioner": {
+    "state": "off",
+    "temperature": 8,
+    "fan_mode": "low"
+   },
+   "switch.air_conditioner": "off",
+   "button.towel_switch": "unknown"
+  }
+ },
+ {
+  "call": "switch.turn_off",
+  "data": {
+   "entity_id": "switch.air_conditioner"
+  },
+  "error": null,
+  "requests": [
+   {
+    "method": "POST",
+    "path": "/v1.1/devices/01-202301010000-00000001/commands",
+    "body": "{\"commandType\":\"command\",\"command\":\"turnOff\",\"parameter\":\"default\"}"
+   }
+  ],
+  "after": {
+   "climate.air_conditioner": {
+    "state": "off",
+    "temperature": 8,
+    "fan_mode": "low"
+   },
+   "switch.air_conditioner": "off",
+   "button.towel_switch": "unknown"
+  }
+ },
+ {
+  "call": "button.press",
+  "data": {
+   "entity_id": "button.towel_switch"
+  },
+  "error": null,
+  "requests": [
+   {
+    "method": "POST",
+    "path": "/v1.1/devices/AABBCC000001/commands",
+    "body": "{\"commandType\":\"command\",\"command\":\"press\",\"parameter\":\"default\"}"
+   }
+  ],
+  "after": {
+   "climate.air_conditioner": {
+    "state": "off",
+    "temperature": 8,
+    "fan_mode": "low"
+   },
+   "switch.air_conditioner": "off",
+   "button.towel_switch": "2026-11-14T16:11:23.964934+00:00"
+  }
+ },
+ {
+  "call": "button.press",
+  "data": {
+   "entity_id": "button.towel_switch"
+  },
+  "error": null,
+  "requests": [
+   {
+    "method": "POST",
+    "path": "/v1.1/devices/AABBCC000001/commands",
+    "body": "{\"commandType\":\"command\",\"command\":\"press\",\"parameter\":\"default\"}"
+   }
+  ],
+  "after": {
+   "climate.air_conditioner": {
+    "state": "off",
+    "temperature": 8,
+    "fan_mode": "low"
+   },
+   "switch.air_conditioner": "off",
+   "button.towel_switch": "2026-11-14T16:11:23.965348+00:00"
+  }
+ },
+ {
+  "climate_final_full_state": {
+   "state": "off",
+   "attributes": {
+    "hvac_modes": [
+     "heat_cool",
+     "cool",
+     "dry",
+     "fan_only",
+     "heat",
+     "off"
+    ],
+    "min_temp": 7,
+    "max_temp": 35,
+    "target_temp_step": 1,
+    "fan_modes": [
+     "auto",
+     "low",
+     "medium",
+     "high"
+    ],
+    "current_temperature": null,
+    "temperature": 8,
+    "fan_mode": "low",
+    "assumed_state": true,
+    "friendly_name": "Air Conditioner",
+    "supported_features": 393
+   }
+  }
+ },
+ {
+  "one_command_on_the_wire": {
+   "method": "POST",
+   "path": "/v1.1/devices/01-202301010000-00000001/commands",
+   "headers": [
+    [
+     "Host",
+     "127.0.0.1:53622"
+    ],
+    [
+     "User-Agent",
+     "HomeAssistant/2026.6.1 aiohttp/3.13.5 Python/3.14"
+    ],
+    [
+     "Authorization",
+     "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    ],
+    [
+     "Content-Type",
+     "application/json"
+    ],
+    [
+     "charset",
+     "utf8"
+    ],
+    [
+     "t",
+     "1794672683966"
+    ],
+    [
+     "sign",
+     "sTfFHNfQU19iXvy0KUXAqTNPOmJs4F0oYmc0k2ms8Kw="
+    ],
+    [
+     "nonce",
+     "f3e57f25-a7c5-40a9-b448-956f1b778dab"
+    ],
+    [
+     "Accept",
+     "*/*"
+    ],
+    [
+     "Accept-Encoding",
+     "gzip, deflate, zstd"
+    ],
+    [
+     "Content-Length",
+     "66"
+    ]
+   ],
+   "body": "{\"commandType\":\"command\",\"command\":\"turnOn\",\"parameter\":\"default\"}"
+  }
+ }
+]

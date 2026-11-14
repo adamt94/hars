@@ -47,6 +47,49 @@ pub fn round_int(x: f64) -> i64 {
     x.round_ties_even() as i64
 }
 
+/// Python's `format(x, ".{p}")` for a float (the format spec without a
+/// type): `g`-like with `p` significant digits, but fixed notation keeps
+/// at least one digit after the point, and scientific notation starts at
+/// an exponent of `p - 1`. HA formats float sensor states this way
+/// (`f"{value:.15}"`).
+pub fn py_format(x: f64, p: usize) -> String {
+    if x.is_nan() {
+        return "nan".into();
+    }
+    if x.is_infinite() {
+        return if x > 0.0 { "inf" } else { "-inf" }.into();
+    }
+    let p = p.max(1);
+    // Correctly rounded to p significant digits, as Python's.
+    let sci = format!("{:.*e}", p - 1, x);
+    let (mantissa, exp) = sci.split_once('e').unwrap_or((&sci, "0"));
+    let exp: i64 = exp.parse().unwrap_or(0);
+    let (sign, mantissa) = match mantissa.strip_prefix('-') {
+        Some(m) => ("-", m),
+        None => ("", mantissa),
+    };
+    let digits: String = mantissa.chars().filter(char::is_ascii_digit).collect();
+    let digits = digits.trim_end_matches('0');
+    let digits = if digits.is_empty() { "0" } else { digits };
+    if exp < -4 || exp >= p as i64 - 1 {
+        let (first, rest) = digits.split_at(1);
+        let dot = if rest.is_empty() { "" } else { "." };
+        let esign = if exp < 0 { '-' } else { '+' };
+        return format!("{sign}{first}{dot}{rest}e{esign}{:02}", exp.abs());
+    }
+    if exp < 0 {
+        let zeros = "0".repeat((-exp - 1) as usize);
+        return format!("{sign}0.{zeros}{digits}");
+    }
+    let int_len = exp as usize + 1;
+    if digits.len() <= int_len {
+        let zeros = "0".repeat(int_len - digits.len());
+        return format!("{sign}{digits}{zeros}.0");
+    }
+    let (int, frac) = digits.split_at(int_len);
+    format!("{sign}{int}.{frac}")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -69,6 +112,37 @@ mod tests {
         assert!(round(-0.04, 1).is_sign_negative());
         for (x, want) in [(72.5, 72), (73.5, 74), (4.5, 4), (2.5, 2)] {
             assert_eq!(round_int(x), want, "round({x})");
+        }
+    }
+
+    #[test]
+    fn formats_as_python() {
+        // `format(x, ".15")` in CPython 3.14.
+        for (x, want) in [
+            (21.7, "21.7"),
+            (21.0, "21.0"),
+            (-3.25, "-3.25"),
+            (0.0, "0.0"),
+            (-0.0, "-0.0"),
+            (100.0, "100.0"),
+            (0.1 + 0.2, "0.3"),
+            (21.700000000000003, "21.7"),
+            (1e16, "1e+16"),
+            (1.5e-05, "1.5e-05"),
+            (123456789.12345679, "123456789.123457"),
+            (22.35, "22.35"),
+            (1e15, "1e+15"),
+            (99.99999999999999, "100.0"),
+            (1e14, "1e+14"),
+            (123456789012345.0, "1.23456789012345e+14"),
+            (12345678901234.0, "12345678901234.0"),
+            (0.0001, "0.0001"),
+            (1.0 / 3.0, "0.333333333333333"),
+            (1e100, "1e+100"),
+            (5e-324, "4.94065645841247e-324"),
+            (f64::INFINITY, "inf"),
+        ] {
+            assert_eq!(py_format(x, 15), want, "{x:?}");
         }
     }
 }

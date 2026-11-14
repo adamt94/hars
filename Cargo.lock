@@ -519,14 +519,18 @@ dependencies = [
 name = "ha-integrations"
 version = "0.1.0"
 dependencies = [
+ "base64",
  "ha-components",
  "ha-core",
  "ha-http",
  "ha-registry",
+ "hmac",
  "jiff",
  "parking_lot",
+ "rand",
  "serde",
  "serde_json",
+ "sha2",
  "thiserror",
  "tokio",
  "tracing",

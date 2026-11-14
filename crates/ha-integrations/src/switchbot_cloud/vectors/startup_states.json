@@ -1,0 +1,70 @@
+{
+ "button.towel_switch": {
+  "state": "unknown",
+  "attributes": {
+   "friendly_name": "Towel switch"
+  }
+ },
+ "climate.air_conditioner": {
+  "state": "fan_only",
+  "attributes": {
+   "hvac_modes": [
+    "heat_cool",
+    "cool",
+    "dry",
+    "fan_only",
+    "heat",
+    "off"
+   ],
+   "min_temp": 7,
+   "max_temp": 35,
+   "target_temp_step": 1,
+   "fan_modes": [
+    "auto",
+    "low",
+    "medium",
+    "high"
+   ],
+   "current_temperature": null,
+   "temperature": 21,
+   "fan_mode": "auto",
+   "assumed_state": true,
+   "friendly_name": "Air Conditioner",
+   "supported_features": 393
+  }
+ },
+ "sensor.hub_2_9d_humidity": {
+  "state": "49",
+  "attributes": {
+   "state_class": "measurement",
+   "unit_of_measurement": "%",
+   "device_class": "humidity",
+   "friendly_name": "Hub 2 9D Humidity"
+  }
+ },
+ "sensor.hub_2_9d_temperature": {
+  "state": "21.7",
+  "attributes": {
+   "state_class": "measurement",
+   "unit_of_measurement": "°C",
+   "device_class": "temperature",
+   "friendly_name": "Hub 2 9D Temperature"
+  }
+ },
+ "sensor.towel_switch_battery": {
+  "state": "100",
+  "attributes": {
+   "state_class": "measurement",
+   "unit_of_measurement": "%",
+   "device_class": "battery",
+   "friendly_name": "Towel switch Battery"
+  }
+ },
+ "switch.air_conditioner": {
+  "state": "unknown",
+  "attributes": {
+   "device_class": "switch",
+   "friendly_name": "Air Conditioner"
+  }
+ }
+}

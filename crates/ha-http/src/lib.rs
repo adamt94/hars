@@ -13,14 +13,14 @@ pub use sse::{EventStream, Line};
 
 use bytes::Bytes;
 use http_body_util::{BodyExt, Full, Limited};
-use hyper::{Method, Request, Uri, header::HeaderMap};
+use hyper::{Request, Uri, header::HeaderMap};
 use hyper_util::client::legacy::{Client as Hyper, connect::HttpConnector};
 use hyper_util::rt::TokioExecutor;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
-pub use hyper::{StatusCode, header};
+pub use hyper::{Method, StatusCode, header};
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {

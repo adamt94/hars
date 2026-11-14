@@ -309,9 +309,17 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
       bounded retries, offline → `unavailable`, re-read state after a
       transition (the ack is not the final state); on/off/brightness/kelvin/HSBK;
       identify/restart buttons
-- [ ] `switchbot_cloud`: poll every 600 s (~430 req/day of the 10k/day quota,
-      leaving headroom while HA and `hars` run side by side); Bot press is never
-      auto-retried; IR climate + switch with assumed state; Hub 2 sensors; Bot battery
+- [x] `switchbot_cloud`: the library's signing, envelope and error classes;
+      HA's setup classification and retry ladder; Hub 2 and Bot polled every
+      600 s (HA stops polling the Bot once its webhook is set; `hars` never
+      touches the webhook endpoints, so it keeps polling: ~290 req/day); the
+      Bot's button (press never retried, time written first) and battery; the
+      IR climate (`assumed_state`, `setAll` maths, restore) and its switch
+      (`unknown` until commanded; HA doesn't restore it); HA's float state
+      format. Matched against HA's own code on the real GET responses: all 6
+      entities, the 40-call service sequence, command errors, polling,
+      setup failures, restore cases; checked once against the real API
+- [ ] `switchbot_cloud`: Bots in switch mode and the other device types
 - [ ] Acceptance: every inventory entity matches its HA fixture attributes, and
       every frontend control (light colour/temp, climate mode/setpoint) works
 
