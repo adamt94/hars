@@ -83,7 +83,7 @@ async fn run(thp_disabled: std::io::Result<bool>) -> anyhow::Result<()> {
     api_config.frontend_data = {
         let dir = config_dir.clone();
         std::sync::Arc::new(
-            tokio::task::spawn_blocking(move || ha_api::FrontendData::load(&dir)).await??,
+            tokio::task::spawn_blocking(move || ha_api::FrontendData::load(&dir)).await?,
         )
     };
     api_config.config_dir = std::path::absolute(&config_dir)?.display().to_string();

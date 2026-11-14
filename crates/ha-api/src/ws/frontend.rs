@@ -115,15 +115,13 @@ fn set_data(
     data.set(&scope, &key, value);
     let out = conn.out.clone();
     tokio::spawn(async move {
-        let saved = tokio::task::spawn_blocking(move || data.save(&scope)).await;
-        match saved {
-            Ok(Ok(())) => out.result(id, Value::Null),
-            Ok(Err(e)) => out.error(
+        match data.save(&scope).await {
+            Ok(()) => out.result(id, Value::Null),
+            Err(e) => out.error(
                 json!(id),
                 "home_assistant_error",
                 &format!("Saving failed: {e}"),
             ),
-            Err(e) => out.error(json!(id), "unknown_error", &e.to_string()),
         };
     });
     Ok(())
