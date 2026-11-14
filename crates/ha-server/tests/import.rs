@@ -338,3 +338,92 @@ fn refuses_other_ha_versions_and_its_own_directory() {
         let _ = std::fs::remove_dir_all(d);
     }
 }
+
+/// The destination's supported stores end up exactly the source's: a store
+/// the source doesn't have is removed (with --force), not left stale.
+#[test]
+fn stores_missing_from_the_source_are_removed() {
+    let src = temp("partial");
+    ha_config(&src);
+    std::fs::remove_file(src.join(".storage/onboarding")).unwrap();
+    let dest = temp("partial-dest");
+    assert!(hars(&dest, &["auth", "add", "bob", "pw"]).status.success()); // an older owner
+
+    let out = hars(&dest, &["import", src.to_str().unwrap()]);
+    assert!(!out.status.success());
+    assert!(
+        String::from_utf8_lossy(&out.stderr).contains("onboarding (removed)"),
+        "{out:?}"
+    );
+    // Nothing changed.
+    assert!(read_json(&dest.join(".storage/auth"))["data"]["users"][0]["name"] == "bob");
+
+    let out = hars(&dest, &["import", src.to_str().unwrap(), "--force"]);
+    assert!(out.status.success(), "{out:?}");
+    let report = read_json(&dest.join("import-report.json"));
+    assert_eq!(report["removed"], json!(["onboarding"]));
+    assert!(!dest.join(".storage/onboarding").exists());
+    assert_eq!(
+        read_json(&dest.join(".storage/auth"))["data"]["users"][0]["name"],
+        "adam"
+    );
+    for d in [src, dest] {
+        let _ = std::fs::remove_dir_all(d);
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn a_symlinked_store_is_refused() {
+    let src = temp("symlink");
+    ha_config(&src);
+    std::fs::rename(src.join(".storage/auth"), src.join("auth-bytes")).unwrap();
+    std::os::unix::fs::symlink("../auth-bytes", src.join(".storage/auth")).unwrap();
+    let dest = temp("symlink-dest");
+    let out = hars(&dest, &["import", src.to_str().unwrap()]);
+    assert!(!out.status.success());
+    assert!(
+        String::from_utf8_lossy(&out.stderr).contains("auth in the source is not a regular file"),
+        "{out:?}"
+    );
+    assert!(!dest.join(".storage").exists());
+    for d in [src, dest] {
+        let _ = std::fs::remove_dir_all(d);
+    }
+}
+
+/// Frontend settings that don't load are skipped, with a reason that
+/// doesn't quote the file.
+#[test]
+fn bad_frontend_settings_are_skipped_without_quoting_them() {
+    let src = temp("bad-frontend");
+    let owner = ha_config(&src);
+    write_store(&src, "frontend.system_data", 2, 1, json!({}));
+    let user_data = format!("frontend.user_data_{owner}");
+    std::fs::write(
+        src.join(".storage").join(&user_data),
+        r#"{"version": 1, "key": "x", "data": "SYNTHETIC_SECRET_MARKER"}"#,
+    )
+    .unwrap();
+    let dest = temp("bad-frontend-dest");
+    let out = hars(&dest, &["import", src.to_str().unwrap()]);
+    assert!(out.status.success(), "{out:?}");
+    let report = std::fs::read_to_string(dest.join("import-report.json")).unwrap();
+    assert!(!String::from_utf8_lossy(&out.stdout).contains("SYNTHETIC"));
+    assert!(!report.contains("SYNTHETIC"));
+    let report: Value = serde_json::from_str(&report).unwrap();
+    let skipped: Vec<&str> = report["skipped"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|s| s["key"].as_str().unwrap())
+        .collect();
+    assert!(
+        skipped.contains(&"frontend.system_data") && skipped.contains(&user_data.as_str()),
+        "{skipped:?}"
+    );
+    assert!(!dest.join(".storage/frontend.system_data").exists());
+    for d in [src, dest] {
+        let _ = std::fs::remove_dir_all(d);
+    }
+}

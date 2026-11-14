@@ -52,6 +52,9 @@ pub struct Report {
     pub imported: Vec<String>,
     /// Of those, the ones that replaced a different copy in the destination.
     pub replaced: Vec<String>,
+    /// Supported stores the destination had and the source doesn't: removed,
+    /// so the destination matches the source.
+    pub removed: Vec<String>,
     /// Stores left behind, and why.
     pub skipped: Vec<Skipped>,
     /// Every config entry, with whether `hars` can run it yet.
@@ -79,7 +82,8 @@ pub fn run(opts: &Options) -> anyhow::Result<Report> {
     let source = std::fs::canonicalize(&opts.source)
         .with_context(|| format!("reading {}", opts.source.display()))?;
     std::fs::create_dir_all(&opts.dest)?;
-    if std::fs::canonicalize(&opts.dest)? == source {
+    let dest = std::fs::canonicalize(&opts.dest)?;
+    if dest == source {
         bail!("the source and destination are the same directory");
     }
 
@@ -94,17 +98,13 @@ pub fn run(opts: &Options) -> anyhow::Result<Report> {
         );
     }
 
-    // Validate with the loaders the server uses. They only read.
-    ha_auth::Auth::load(&source, ha_core::Clock::system())
-        .context("the auth stores don't load; is the copy consistent?")?;
-    ha_core::config::CoreConfig::load(&source).context("core.config doesn't load")?;
-
     let mut report = Report {
         importer_version: IMPORTER_VERSION,
         ha_version,
         dry_run: opts.dry_run,
         imported: Vec::new(),
         replaced: Vec::new(),
+        removed: Vec::new(),
         skipped: Vec::new(),
         config_entries: config_entries(&source)?,
         yaml: [
@@ -119,89 +119,261 @@ pub fn run(opts: &Options) -> anyhow::Result<Report> {
         .collect(),
     };
 
-    // What to copy: the stores `hars` reads that exist in the source.
-    let mut copies: Vec<(String, bool)> = Vec::new();
-    for key in storage_keys(&source)? {
-        if let Some(&(_, private)) = STORES.iter().find(|(k, _)| *k == key) {
-            copies.push((key, private));
-        } else if key.starts_with(USER_DATA_PREFIX) {
-            let store = Store::new(&source, key.clone(), 1, 1, false);
-            match store.load::<Map<String, Value>>() {
-                Ok(_) => copies.push((key, false)),
-                Err(e) => report.skipped.push(Skipped {
+    // 1. Read the source's supported stores once, into a staging directory.
+    //    Validation and the commit both use exactly these bytes.
+    let staging = Staging::new(&dest)?;
+    for (key, kind) in storage_keys(&source)? {
+        let Some(private) = supported(&key) else {
+            report.skipped.push(Skipped {
+                reason: unsupported_reason(&key).into(),
+                key,
+            });
+            continue;
+        };
+        if kind != Kind::File {
+            bail!("{key} in the source is not a regular file (a symlink?); copy the real file");
+        }
+        let bytes = std::fs::read(source.join(".storage").join(&key))?;
+        Store::new(&staging.root, key.clone(), 1, 1, private).save_raw(&bytes)?;
+    }
+
+    // 2. Validate the staged copy with the loaders the server uses. Auth and
+    //    core.config must load; frontend settings that don't are left out.
+    ha_auth::Auth::load(&staging.root, ha_core::Clock::system()).map_err(|e| {
+        anyhow::anyhow!(
+            "the auth stores don't load ({}); is the copy consistent?",
+            sanitized(&e)
+        )
+    })?;
+    ha_core::config::CoreConfig::load(&staging.root)
+        .map_err(|e| anyhow::anyhow!("core.config doesn't load ({})", sanitized(&e)))?;
+    for key in staging.keys()? {
+        if key == "frontend.system_data" || key.starts_with(USER_DATA_PREFIX) {
+            let store = Store::new(&staging.root, key.clone(), 1, 1, false);
+            if let Err(e) = store.load::<Map<String, Value>>() {
+                std::fs::remove_file(store.path())?;
+                report.skipped.push(Skipped {
                     key,
-                    reason: format!("doesn't load: {e}"),
-                }),
+                    reason: format!("doesn't load ({})", sanitized(&e)),
+                });
             }
-        } else {
-            let reason = match key.as_str() {
-                "core.config_entries" => "integrations: see config_entries".into(),
-                k if k.starts_with("core.") && k.ends_with("_registry") => {
-                    "registries are not imported yet".into()
-                }
-                k if k.starts_with("lovelace") => "dashboards are not imported yet".into(),
-                _ => "not used by hars yet".into(),
-            };
-            report.skipped.push(Skipped { key, reason });
         }
     }
 
-    // Refuse to overwrite state the destination changed since, unless asked.
-    let changed: Vec<String> = copies
-        .iter()
-        .filter(|(key, _)| {
-            let dest = opts.dest.join(".storage").join(key);
-            dest.exists()
-                && std::fs::read(&dest).ok()
-                    != std::fs::read(source.join(".storage").join(key)).ok()
-        })
-        .map(|(key, _)| key.clone())
-        .collect();
-    if !changed.is_empty() && !opts.force && !opts.dry_run {
+    // 3. The plan: the destination's supported stores become exactly the
+    //    staged ones. A store the source doesn't have is removed, since a
+    //    missing store means defaults (no users, not onboarded).
+    let staged = staging.keys()?;
+    let mut in_dest: Vec<String> = Vec::new();
+    for (key, kind) in storage_keys(&dest)? {
+        if supported(&key).is_some() {
+            if kind != Kind::File {
+                bail!("{key} in {} is not a regular file", dest.display());
+            }
+            in_dest.push(key);
+        }
+    }
+    let read = |dir: &Path, key: &str| std::fs::read(dir.join(".storage").join(key)).ok();
+    for key in &in_dest {
+        match staged.contains(key) {
+            false => report.removed.push(key.clone()),
+            true if read(&dest, key) != read(&staging.root, key) => {
+                report.replaced.push(key.clone())
+            }
+            true => {}
+        }
+    }
+    report.imported = staged.clone();
+    if !opts.force && !opts.dry_run && !(report.replaced.is_empty() && report.removed.is_empty()) {
+        let mut changed = report.replaced.clone();
+        changed.extend(report.removed.iter().map(|k| format!("{k} (removed)")));
         bail!(
             "{} already has different {}; re-run with --force to replace them",
-            opts.dest.display(),
+            dest.display(),
             changed.join(", ")
         );
     }
+    if opts.dry_run {
+        return Ok(report);
+    }
 
-    report.replaced = changed;
-    for (key, private) in &copies {
-        if !opts.dry_run {
-            let bytes = std::fs::read(source.join(".storage").join(key))?;
-            Store::new(&opts.dest, key.clone(), 1, 1, *private)
-                .save_raw(&bytes)
-                .with_context(|| format!("writing {key}"))?;
+    // 4. Commit: everything or nothing.
+    let mut changes: Vec<Change> = Vec::new();
+    for key in &staged {
+        if read(&dest, key) != read(&staging.root, key) {
+            changes.push(Change::Put(key.clone()));
         }
-        report.imported.push(key.clone());
     }
+    changes.extend(report.removed.iter().cloned().map(Change::Remove));
+    commit(&staging, &dest, &changes, |from, to| {
+        std::fs::rename(from, to)
+    })?;
 
-    if !opts.dry_run {
-        let json = serde_json::to_vec_pretty(&report)?;
-        std::fs::write(opts.dest.join(REPORT_FILE), json)?;
-    }
+    let json = serde_json::to_vec_pretty(&report)?;
+    std::fs::write(dest.join(REPORT_FILE), json)?;
     Ok(report)
 }
 
-/// The `.storage` keys in a config directory, sorted. Temporary and
-/// quarantined files are left out.
-fn storage_keys(config_dir: &Path) -> anyhow::Result<Vec<String>> {
+/// Whether `hars` reads a store, and whether HA writes it owner-only.
+fn supported(key: &str) -> Option<bool> {
+    STORES
+        .iter()
+        .find(|(k, _)| *k == key)
+        .map(|&(_, private)| private)
+        .or_else(|| key.starts_with(USER_DATA_PREFIX).then_some(false))
+}
+
+fn unsupported_reason(key: &str) -> &'static str {
+    match key {
+        "core.config_entries" => "integrations: see config_entries",
+        k if k.starts_with("core.") && k.ends_with("_registry") => {
+            "registries are not imported yet"
+        }
+        k if k.starts_with("lovelace") => "dashboards are not imported yet",
+        _ => "not used by hars yet",
+    }
+}
+
+/// A store error without the data: serde's messages can quote file contents.
+fn sanitized(e: &ha_core::storage::StoreError) -> String {
+    use ha_core::storage::StoreError;
+    match e {
+        StoreError::Json { source, .. } => format!(
+            "{:?} error at line {} column {}",
+            source.classify(),
+            source.line(),
+            source.column()
+        ),
+        StoreError::Io { source, .. } => format!("{:?}", source.kind()),
+        StoreError::TooNew {
+            found, supported, ..
+        }
+        | StoreError::TooOld {
+            found, supported, ..
+        } => {
+            format!("version {found}, expected {supported}")
+        }
+    }
+}
+
+/// `dest/.import-staging`, laid out like a config dir; removed when dropped.
+struct Staging {
+    root: PathBuf,
+}
+
+impl Staging {
+    fn new(dest: &Path) -> anyhow::Result<Self> {
+        let root = dest.join(".import-staging");
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join(".storage"))?;
+        Ok(Self { root })
+    }
+
+    fn keys(&self) -> anyhow::Result<Vec<String>> {
+        Ok(storage_keys(&self.root)?
+            .into_iter()
+            .map(|(k, _)| k)
+            .collect())
+    }
+}
+
+impl Drop for Staging {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.root);
+    }
+}
+
+#[derive(Debug)]
+enum Change {
+    Put(String),
+    Remove(String),
+}
+
+/// Apply the changes with renames. The destination's current files are moved
+/// to `.import-backup` first; if any step fails, everything done so far is
+/// undone. `rename` is injectable so the rollback can be tested.
+fn commit(
+    staging: &Staging,
+    dest: &Path,
+    changes: &[Change],
+    mut rename: impl FnMut(&Path, &Path) -> std::io::Result<()>,
+) -> anyhow::Result<()> {
+    let storage = dest.join(".storage");
+    let backup = dest.join(".import-backup");
+    let _ = std::fs::remove_dir_all(&backup);
+    std::fs::create_dir_all(&backup)?;
+    std::fs::create_dir_all(&storage)?;
+
+    // What was done, to undo in reverse on failure.
+    let mut moved_out: Vec<String> = Vec::new();
+    let mut put: Vec<String> = Vec::new();
+    let result = (|| -> std::io::Result<()> {
+        for change in changes {
+            let (Change::Put(key) | Change::Remove(key)) = change;
+            let current = storage.join(key);
+            if current.exists() {
+                rename(&current, &backup.join(key))?;
+                moved_out.push(key.clone());
+            }
+            if let Change::Put(key) = change {
+                rename(&staging.root.join(".storage").join(key), &current)?;
+                put.push(key.clone());
+            }
+        }
+        #[cfg(unix)]
+        std::fs::File::open(&storage)?.sync_all()?;
+        Ok(())
+    })();
+
+    if let Err(e) = result {
+        for key in put.iter().rev() {
+            let _ = std::fs::remove_file(storage.join(key));
+        }
+        let mut restored = true;
+        for key in moved_out.iter().rev() {
+            restored &= std::fs::rename(backup.join(key), storage.join(key)).is_ok();
+        }
+        if restored {
+            let _ = std::fs::remove_dir_all(&backup);
+            bail!("import failed and was rolled back; nothing changed: {e}");
+        }
+        bail!(
+            "import failed ({e}) and could not be fully rolled back; the previous files are in {}",
+            backup.display()
+        );
+    }
+    let _ = std::fs::remove_dir_all(&backup);
+    Ok(())
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum Kind {
+    File,
+    Other,
+}
+
+/// The `.storage` entries in a config directory, sorted, with whether each
+/// is a regular file (symlinks are not followed). Temporary and quarantined
+/// files are left out.
+fn storage_keys(config_dir: &Path) -> anyhow::Result<Vec<(String, Kind)>> {
     let mut keys = Vec::new();
     let Ok(entries) = std::fs::read_dir(config_dir.join(".storage")) else {
         return Ok(keys);
     };
     for entry in entries {
         let entry = entry?;
-        if !entry.file_type()?.is_file() {
-            continue;
-        }
         let name = entry.file_name().to_string_lossy().into_owned();
         if name.starts_with('.') || name.contains(".corrupt.") || name.starts_with("tmp") {
             continue;
         }
-        keys.push(name);
+        let kind = if entry.file_type()?.is_file() {
+            Kind::File
+        } else {
+            Kind::Other
+        };
+        keys.push((name, kind));
     }
-    keys.sort();
+    keys.sort_by(|a, b| a.0.cmp(&b.0));
     Ok(keys)
 }
 
@@ -257,6 +429,9 @@ pub fn summary(report: &Report, dest: &Path) -> String {
     if !report.replaced.is_empty() {
         out.push_str(&format!("  replaced: {}\n", report.replaced.join(", ")));
     }
+    if !report.removed.is_empty() {
+        out.push_str(&format!("  removed: {}\n", report.removed.join(", ")));
+    }
     for s in &report.skipped {
         out.push_str(&format!("  skipped {}: {}\n", s.key, s.reason));
     }
@@ -282,4 +457,104 @@ pub fn summary(report: &Report, dest: &Path) -> String {
         out.push_str(&format!("Report: {}\n", dest.join(REPORT_FILE).display()));
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A commit that fails half-way leaves the destination as it was.
+    #[test]
+    fn a_failed_commit_is_rolled_back() {
+        let dest =
+            std::env::temp_dir().join(format!("hars-import-rollback-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dest);
+        let storage = dest.join(".storage");
+        std::fs::create_dir_all(&storage).unwrap();
+        std::fs::write(storage.join("auth"), "old auth").unwrap();
+        std::fs::write(storage.join("auth_provider.homeassistant"), "old provider").unwrap();
+        std::fs::write(storage.join("onboarding"), "old onboarding").unwrap();
+
+        let staging = Staging::new(&dest).unwrap();
+        std::fs::write(staging.root.join(".storage/auth"), "new auth").unwrap();
+        std::fs::write(
+            staging.root.join(".storage/auth_provider.homeassistant"),
+            "new provider",
+        )
+        .unwrap();
+        let changes = [
+            Change::Put("auth".into()),
+            Change::Put("auth_provider.homeassistant".into()),
+            Change::Remove("onboarding".into()),
+        ];
+        // The fourth rename (moving the new provider in) fails.
+        let mut calls = 0;
+        let err = commit(&staging, &dest, &changes, |from, to| {
+            calls += 1;
+            if calls == 4 {
+                return Err(std::io::Error::other("disk full"));
+            }
+            std::fs::rename(from, to)
+        })
+        .unwrap_err();
+        assert!(err.to_string().contains("rolled back"), "{err}");
+        for (key, old) in [
+            ("auth", "old auth"),
+            ("auth_provider.homeassistant", "old provider"),
+            ("onboarding", "old onboarding"),
+        ] {
+            assert_eq!(
+                std::fs::read_to_string(storage.join(key)).unwrap(),
+                old,
+                "{key}"
+            );
+        }
+        assert!(!dest.join(".import-backup").exists());
+
+        // And the same changes, staged again, all apply without the failure.
+        drop(staging);
+        let staging = Staging::new(&dest).unwrap();
+        std::fs::write(staging.root.join(".storage/auth"), "new auth").unwrap();
+        std::fs::write(
+            staging.root.join(".storage/auth_provider.homeassistant"),
+            "new provider",
+        )
+        .unwrap();
+        commit(&staging, &dest, &changes, |from, to| {
+            std::fs::rename(from, to)
+        })
+        .unwrap();
+        assert_eq!(
+            std::fs::read_to_string(storage.join("auth")).unwrap(),
+            "new auth"
+        );
+        assert!(!storage.join("onboarding").exists());
+        drop(staging);
+        std::fs::remove_dir_all(dest).unwrap();
+    }
+
+    #[test]
+    fn errors_never_quote_file_contents() {
+        let dir = std::env::temp_dir().join(format!("hars-import-sanitize-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join(".storage")).unwrap();
+        std::fs::write(
+            dir.join(".storage/x"),
+            r#"{"version": 1, "key": "x", "data": "SYNTHETIC_SECRET_MARKER"}"#,
+        )
+        .unwrap();
+        let err = Store::new(&dir, "x", 1, 1, false)
+            .load::<Map<String, Value>>()
+            .unwrap_err();
+        assert!(
+            err.to_string().contains("SYNTHETIC_SECRET_MARKER"),
+            "serde does quote it"
+        );
+        assert!(
+            !sanitized(&err).contains("SYNTHETIC"),
+            "{}",
+            sanitized(&err)
+        );
+        std::fs::remove_dir_all(dir).unwrap();
+    }
 }
