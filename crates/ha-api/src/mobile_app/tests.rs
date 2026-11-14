@@ -122,12 +122,14 @@ async fn send(app: &App, id: &str, method: &str, body: Option<&str>, ct: Option<
         .body(Body::from(body.unwrap_or_default().to_owned()))
         .unwrap();
     let res = app.router.clone().oneshot(req).await.unwrap();
-    let header = |name| {
-        res.headers()
-            .get(name)
-            .map(|v: &HeaderValue| v.to_str().unwrap().to_owned())
+    let (content_type, allow) = {
+        let h = res.headers();
+        let get = |name| {
+            h.get(name)
+                .map(|v: &HeaderValue| v.to_str().unwrap().to_owned())
+        };
+        (get(header::CONTENT_TYPE), get(header::ALLOW))
     };
-    let (content_type, allow) = (header(header::CONTENT_TYPE), header(header::ALLOW));
     let status = res.status().as_u16();
     let body = axum::body::to_bytes(res.into_body(), usize::MAX)
         .await
@@ -438,4 +440,113 @@ fn urls_as_cv_url() {
     for bad in ["ftp://x", "https://", "x", "https://x:99999", "https://x:p"] {
         assert!(!is_url(bad), "{bad}");
     }
+}
+
+/// HA: a sealed `null` is `webhook_payload is None`, so plain `{}`.
+#[tokio::test]
+async fn a_sealed_null_is_an_empty_reply() {
+    let app = app();
+    let sealed = Key::hex(SECRET).unwrap().seal(b"null");
+    let body = json!({"type": "get_config", "encrypted": true, "encrypted_data": sealed});
+    let got = send(&app, WEBHOOK, "POST", Some(&body.to_string()), None).await;
+    assert_eq!(
+        (got.status, got.content_type.as_deref(), got.body.as_str()),
+        (200, Some("application/json; charset=utf-8"), "{}")
+    );
+}
+
+/// The check and the new secret are one step: only one request wins.
+#[tokio::test]
+async fn concurrent_enable_encryption_gives_one_secret() {
+    let mut e = entry();
+    let data = e["data"].as_object_mut().unwrap();
+    data.insert("supports_encryption".into(), json!(false));
+    data.remove("no_legacy_encryption");
+    let app = Arc::new(app_with(&[e]));
+    let tasks: Vec<_> = (0..16)
+        .map(|_| {
+            let app = app.clone();
+            tokio::spawn(async move {
+                send(
+                    &app,
+                    WEBHOOK,
+                    "POST",
+                    Some(r#"{"type":"enable_encryption"}"#),
+                    None,
+                )
+                .await
+            })
+        })
+        .collect();
+    let mut won = 0;
+    for t in tasks {
+        let got = t.await.unwrap();
+        match got.status {
+            200 => won += 1,
+            // Later plaintext requests are refused, before or after the
+            // check: `encryption_required` or `encryption_already_enabled`.
+            400 => assert!(got.body.contains("encryption_"), "{}", got.body),
+            s => panic!("{s}"),
+        }
+    }
+    assert_eq!(won, 1);
+}
+
+/// Over the cap, reading the body raises: HA's catch-all empty `200`.
+#[tokio::test]
+async fn oversized_bodies_are_an_empty_200() {
+    let app = app();
+    let big = format!(
+        r#"{{"type":"get_zones","data":{{"x":"{}"}}}}"#,
+        "a".repeat(BODY_LIMIT)
+    );
+    let got = send(&app, WEBHOOK, "POST", Some(&big), None).await;
+    assert_eq!(
+        (got.status, got.content_type, got.body.as_str()),
+        (200, None, "")
+    );
+}
+
+/// The command runs to completion when the client hangs up (`shield`).
+#[tokio::test]
+async fn a_hung_up_request_still_runs() {
+    let app = app();
+    let (tx, rx) = tokio::sync::oneshot::channel::<()>();
+    let rx = Arc::new(parking_lot::Mutex::new(Some(rx)));
+    let done = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let flag = done.clone();
+    app.hass
+        .services()
+        .register("test", "slow", ha_core::SupportsResponse::None, move |_| {
+            let rx = rx.lock().take();
+            let flag = flag.clone();
+            async move {
+                if let Some(rx) = rx {
+                    let _ = rx.await;
+                }
+                flag.store(true, std::sync::atomic::Ordering::SeqCst);
+                Ok(None)
+            }
+        });
+    let sealed = Key::hex(SECRET)
+        .unwrap()
+        .seal(br#"{"domain":"test","service":"slow"}"#);
+    let body =
+        json!({"type": "call_service", "encrypted": true, "encrypted_data": sealed}).to_string();
+    let req = Request::post(format!("/api/webhook/{WEBHOOK}"))
+        .body(Body::from(body))
+        .unwrap();
+    let pending = tokio::spawn(app.router.clone().oneshot(req));
+    tokio::task::yield_now().await;
+    tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+    // The client goes away, then the service is allowed to finish.
+    pending.abort();
+    tx.send(()).unwrap();
+    for _ in 0..100 {
+        if done.load(std::sync::atomic::Ordering::SeqCst) {
+            return;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+    }
+    panic!("the service was cancelled with the request");
 }

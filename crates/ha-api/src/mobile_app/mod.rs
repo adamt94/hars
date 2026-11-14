@@ -228,8 +228,11 @@ pub(crate) async fn handle(shared: &Shared, reg: &Arc<Registration>, body: &[u8]
         Sent::Plain(data) => data,
         Sent::Encrypted(None) => return Reply::Bare(StatusCode::OK),
         Sent::Encrypted(Some(data)) => match reg.open(&data) {
+            // A sealed `null` is `webhook_payload is None` (the flag is still set).
+            (Opened::Json(Value::Null), _) | (Opened::Failed, _) => {
+                return empty_okay(StatusCode::OK);
+            }
             (Opened::Json(v), _) => v,
-            (Opened::Failed, _) => return empty_okay(StatusCode::OK),
         },
     };
     command(shared, reg, &envelope.ty, payload).await
@@ -409,14 +412,13 @@ async fn command(shared: &Shared, reg: &Arc<Registration>, ty: &str, payload: Va
         "get_config" => webhook_response(reg, StatusCode::OK, &get_config(shared, reg)),
         "update_registration" => update_registration(reg, &payload),
         "enable_encryption" => {
-            if reg.supports_encryption() {
-                return error_response("encryption_already_enabled", "Encryption already enabled");
-            }
             let secret: String = rand::random::<[u8; 32]>()
                 .iter()
                 .map(|b| format!("{b:02x}"))
                 .collect();
-            reg.set_secret(secret.clone());
+            if !reg.enable_encryption(secret.clone()) {
+                return error_response("encryption_already_enabled", "Encryption already enabled");
+            }
             Reply::Json {
                 status: StatusCode::OK,
                 charset: true,

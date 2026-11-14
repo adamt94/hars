@@ -360,9 +360,9 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
       every frontend control (light colour/temp, climate mode/setpoint) works
 
 ### M5: iPhone companion app
-- [ ] Imported registration works unchanged: `/api/webhook/{webhook_id}` with
+- [x] Imported registration works unchanged: `/api/webhook/{webhook_id}` with
       **encryption** (libsodium secretbox, `no_legacy_encryption`), encrypted
-      response envelopes
+      response envelopes; HA's 29 transport cases match
 - [ ] Webhook commands: `register_sensor`, `update_sensor_states`,
       `update_location`, `get_config` (entity enabled-state sync), `get_zones`,
       `update_registration`, `call_service`, `fire_event`

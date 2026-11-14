@@ -145,11 +145,16 @@ impl Registration {
         data.clone()
     }
 
-    /// `enable_encryption` on a plaintext registration: a new secret.
-    pub fn set_secret(&self, secret: String) {
+    /// `enable_encryption`: on a plaintext registration, set `secret` and
+    /// turn encryption on, atomically. `false` if it already encrypts.
+    pub fn enable_encryption(&self, secret: String) -> bool {
         let mut data = self.data.write();
+        if data.get("supports_encryption").is_some_and(truthy) {
+            return false;
+        }
         data.insert("secret".into(), Value::String(secret));
         data.insert("supports_encryption".into(), Value::Bool(true));
+        true
     }
 }
 
