@@ -92,7 +92,6 @@ impl Client {
         let headers_by = start + self.headers_timeout;
         let total_by = start + self.total_timeout;
         let mut uri: Uri = url.parse().map_err(|_| Error::Url(url.to_owned()))?;
-        let from_blocked = blocked(&uri).await;
         let mut redirects = 0;
         let res = loop {
             let mut req = Request::get(uri.clone())
@@ -121,7 +120,14 @@ impl Client {
                 return Err(Error::Request(format!("{MAX_REDIRECTS} redirects")));
             }
             let next = resolve(&uri, location).ok_or_else(|| Error::Url(location.to_owned()))?;
-            if !from_blocked && blocked(&next).await {
+            // HA's guard, per hop: a redirect from a host that isn't
+            // blocked may not lead to one that is. Name lookups count
+            // against the headers deadline.
+            let check = async { !blocked(&uri).await && blocked(&next).await };
+            if tokio::time::timeout_at(headers_by.min(total_by), check)
+                .await
+                .map_err(|_| Error::Timeout(self.headers_timeout))?
+            {
                 return Err(Error::Request(format!(
                     "redirect to a blocked address: {}",
                     next.host().unwrap_or_default()
@@ -162,12 +168,22 @@ fn resolve(base: &Uri, location: &str) -> Option<Uri> {
                 .chars()
                 .all(|c| c.is_ascii_alphanumeric() || matches!(c, '+' | '-' | '.'))
     });
-    if has_scheme {
-        return r.parse().ok();
-    }
     let scheme = base.scheme_str()?;
-    if let Some(rest) = r.strip_prefix("//") {
-        return format!("{scheme}://{rest}").parse().ok();
+    let absolute = if has_scheme {
+        Some(r.to_owned())
+    } else {
+        r.strip_prefix("//")
+            .map(|rest| format!("{scheme}://{rest}"))
+    };
+    if let Some(absolute) = absolute {
+        // Its own path still loses its dot segments.
+        let uri: Uri = absolute.parse().ok()?;
+        let (Some(scheme), Some(authority)) = (uri.scheme_str(), uri.authority()) else {
+            return Some(uri);
+        };
+        let query = uri.query().map_or(String::new(), |q| format!("?{q}"));
+        let path = remove_dot_segments(uri.path());
+        return format!("{scheme}://{authority}{path}{query}").parse().ok();
     }
     let authority = base.authority()?;
     let (path, query) = match r.split_once('?') {
@@ -428,6 +444,11 @@ mod tests {
             ("g/./h", "http://a/b/c/g/h"),
             ("g/../h", "http://a/b/c/h"),
             ("https://other.example/x?y", "https://other.example/x?y"),
+            (
+                "https://other.example/x/../f?y",
+                "https://other.example/f?y",
+            ),
+            ("//other.example/x/./../f", "http://other.example/f"),
         ] {
             let got = resolve(&base, r).map(|u| u.to_string());
             assert_eq!(got.as_deref(), Some(want), "{r:?}");
@@ -460,24 +481,50 @@ mod tests {
         else {
             return;
         };
-        let Ok(listener) = tokio::net::TcpListener::bind((ip, 0)).await else {
+        /// Answers each connection with a redirect to `to(n)`.
+        async fn redirector(
+            listener: tokio::net::TcpListener,
+            to: impl Fn(usize) -> String + Send + 'static,
+        ) {
+            for n in 0.. {
+                let Ok((mut s, _)) = listener.accept().await else {
+                    return;
+                };
+                let mut buf = vec![0u8; 4096];
+                let _ = s.read(&mut buf).await;
+                let reply = format!(
+                    "HTTP/1.1 302 Found\r\nLocation: {}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+                    to(n)
+                );
+                let _ = s.write_all(reply.as_bytes()).await;
+            }
+        }
+        let Ok(public) = tokio::net::TcpListener::bind((ip, 0)).await else {
             return;
         };
-        let url = format!("http://{}/", listener.local_addr().unwrap());
-        tokio::spawn(async move {
-            let (mut s, _) = listener.accept().await.unwrap();
-            let mut buf = vec![0u8; 4096];
-            let _ = s.read(&mut buf).await.unwrap();
-            s.write_all(
-                b"HTTP/1.1 302 Found\r\nLocation: http://127.1:8123/\r\nContent-Length: 0\r\n\r\n",
-            )
-            .await
-            .unwrap();
-        });
+        let local = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let (public_at, local_port) = (
+            public.local_addr().unwrap(),
+            local.local_addr().unwrap().port(),
+        );
+        // The public host sends everyone to `127.1` (loopback, spelt so
+        // only a name lookup sees it); the local one sends its first
+        // visitor to the public host.
+        tokio::spawn(redirector(public, move |_| {
+            format!("http://127.1:{local_port}/")
+        }));
+        tokio::spawn(redirector(local, move |_| format!("http://{public_at}/")));
         let client = Client::new("t").unwrap();
-        assert!(matches!(
-            client.get(&url, &[]).await,
-            Err(Error::Request(e)) if e.contains("blocked")
+        let blocked = |r: Result<Response, Error>| matches!(r, Err(Error::Request(e)) if e.contains("blocked"));
+        assert!(blocked(
+            client.get(&format!("http://{public_at}/"), &[]).await
+        ));
+        // Loopback to public is allowed, but the public host's redirect
+        // back to loopback is not: each hop is judged by its own origin.
+        assert!(blocked(
+            client
+                .get(&format!("http://127.0.0.1:{local_port}/"), &[])
+                .await
         ));
     }
 }

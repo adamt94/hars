@@ -44,14 +44,18 @@ impl Num {
 /// Python 3.14's `sum()` from int 0: ints add exactly until the first
 /// float, which is added plainly; everything after it is added with
 /// Neumaier's compensation, and the compensation is applied at the end.
+/// If the ints overflow a C `long` first, CPython drops to plain `+` for
+/// the rest (with exact ints), and so does this.
 pub fn py_sum(values: &[Num]) -> Num {
-    // Python's ints don't overflow; a sum of i64s can't overflow i128.
     let mut it = values.iter();
-    let mut int: i128 = 0;
+    let mut int: i64 = 0;
     let mut f = loop {
         match it.next() {
-            None => return i64::try_from(int).map_or(Num::Float(int as f64), Num::Int),
-            Some(Num::Int(v)) => int += i128::from(*v),
+            None => return Num::Int(int),
+            Some(Num::Int(v)) => match int.checked_add(*v) {
+                Some(n) => int = n,
+                None => return plain_sum(Num2::Int(i128::from(int) + i128::from(*v)), it),
+            },
             Some(Num::Float(x)) => break int as f64 + x,
         }
     };
@@ -70,6 +74,28 @@ pub fn py_sum(values: &[Num]) -> Num {
         f += c;
     }
     Num::Float(f)
+}
+
+/// An int that may outgrow i64, or a float: CPython's generic `sum()`.
+#[derive(Clone, Copy)]
+enum Num2 {
+    Int(i128),
+    Float(f64),
+}
+
+/// The rest of a `sum()` with plain `+`, ints kept exact.
+fn plain_sum<'a>(mut acc: Num2, rest: impl Iterator<Item = &'a Num>) -> Num {
+    for v in rest {
+        acc = match (acc, *v) {
+            (Num2::Int(a), Num::Int(b)) => Num2::Int(a + i128::from(b)),
+            (Num2::Int(a), Num::Float(b)) => Num2::Float(a as f64 + b),
+            (Num2::Float(a), b) => Num2::Float(a + b.f64()),
+        };
+    }
+    match acc {
+        Num2::Int(i) => i64::try_from(i).map_or(Num::Float(i as f64), Num::Int),
+        Num2::Float(f) => Num::Float(f),
+    }
 }
 
 /// Python's `round(x, n)` for a float: correctly rounded from the exact

@@ -570,6 +570,15 @@ fn sums_like_python() {
         // Python's ints don't overflow.
         (vec![I(i64::MAX), I(2), I(-i64::MAX), F(0.0)], F(2.0)),
         (vec![I(i64::MAX), I(1), I(-i64::MAX)], I(1)),
+        // After an overflow CPython adds plainly, with no compensation.
+        (
+            vec![I(i64::MAX), I(2), I(-i64::MAX), F(1e16), F(1.0), F(-1e16)],
+            F(4.0),
+        ),
+        (
+            vec![I(i64::MAX), I(1), I(-i64::MAX), F(0.52), F(0.91), F(0.62)],
+            F(3.0500000000000003),
+        ),
     ] {
         assert_eq!(py_sum(&xs), want, "sum({xs:?})");
     }
