@@ -250,8 +250,11 @@ impl Client {
                     next.host().unwrap_or_default()
                 )));
             }
-            // aiohttp: 303 (and 301/302 after a POST) become a GET.
-            if status == 303 {
+            // aiohttp: a 303 (but for HEAD), and a 301/302 after a POST,
+            // become a GET without a body; anything else is repeated.
+            if (status == 303 && method != Method::HEAD)
+                || (matches!(status, 301 | 302) && method == Method::POST)
+            {
                 method = Method::GET;
                 body = None;
             }
@@ -867,5 +870,69 @@ mod tests {
         assert_eq!(res.status, StatusCode::OK);
         let v: serde_json::Value = serde_json::from_slice(&res.body).unwrap();
         assert!(v["bridgeid"].is_string(), "{v}");
+    }
+
+    #[tokio::test]
+    async fn redirects_change_the_method_as_aiohttp() {
+        let moved = |code: &str| {
+            format!(
+                "HTTP/1.1 {code}\r\nLocation: /next\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+            )
+        };
+        let ok = "HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".to_owned();
+        let client = Client::new("t").unwrap();
+        let body = Some(Bytes::from_static(b"{}"));
+        for (method, code, want) in [
+            (Method::POST, "302 Found", "GET /next HTTP/1.1"),
+            (Method::POST, "301 Moved", "GET /next HTTP/1.1"),
+            (Method::PUT, "302 Found", "PUT /next HTTP/1.1"),
+            (Method::PUT, "303 See Other", "GET /next HTTP/1.1"),
+            (Method::PUT, "307 Temporary", "PUT /next HTTP/1.1"),
+        ] {
+            let (base, server) = serve(vec![moved(code), ok.clone()]).await;
+            let res = client
+                .request(method.clone(), &format!("{base}/a"), &[], body.clone())
+                .await
+                .unwrap();
+            assert_eq!(res.status, StatusCode::OK);
+            assert_eq!(server.await.unwrap()[1], want, "{method} after {code}");
+        }
+    }
+
+    #[tokio::test]
+    async fn lines_that_arent_utf8_are_dropped_and_the_limit_is_exact() {
+        let mut body = b"data: \xff\xfe bad\ndata: ok\n".to_vec();
+        // An unterminated last line of exactly the limit is fine.
+        body.extend(std::iter::once(b'a').chain(std::iter::once(b':')));
+        body.extend(std::iter::repeat_n(b'x', sse::MAX_LINE - 2));
+        let mut reply = format!(
+            "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+            body.len()
+        )
+        .into_bytes();
+        reply.extend(body);
+        let (base, _server) = serve_bytes(reply).await;
+        let client = Client::new("t").unwrap();
+        let mut stream = client.stream(&base, &[]).await.unwrap();
+        assert_eq!(stream.next_line().await.unwrap().unwrap().value, " ok");
+        let last = stream.next_line().await.unwrap().unwrap();
+        assert_eq!(
+            (last.key.as_str(), last.value.len()),
+            ("a", sse::MAX_LINE - 2)
+        );
+        assert_eq!(stream.next_line().await.unwrap(), None);
+    }
+
+    /// One connection answered with raw bytes.
+    async fn serve_bytes(reply: Vec<u8>) -> (String, tokio::task::JoinHandle<()>) {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let base = format!("http://{}", listener.local_addr().unwrap());
+        let task = tokio::spawn(async move {
+            let (mut s, _) = listener.accept().await.unwrap();
+            let mut buf = vec![0u8; 4096];
+            let _ = s.read(&mut buf).await.unwrap();
+            s.write_all(&reply).await.unwrap();
+        });
+        (base, task)
     }
 }
