@@ -71,6 +71,12 @@ pub(super) fn dispatch(
             empty(conn, r)
         }
         "repairs/list_issues" => empty(conn, json!({"issues": []})),
+        "brands/access_token" => {
+            let token = conn.shared.config.brands.as_ref()?.token();
+            super::sensor::validate(msg, false).map(|()| {
+                conn.out.result(id, json!({ "token": token }));
+            })
+        }
         "labs/list" => only_keys(msg, &[]).map(|()| {
             if conn.principal.permission < Permission::Admin {
                 conn.out.error(json!(id), "unauthorized", "Unauthorized");

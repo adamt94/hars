@@ -14,7 +14,7 @@ fn tables() -> Value {
 
 /// The command's schema as voluptuous applies it: every extra key and
 /// bad value (in key order), then missing required keys, one per line.
-fn validate(msg: &Map<String, Value>, device_class: bool) -> Result<(), Invalid> {
+pub(super) fn validate(msg: &Map<String, Value>, device_class: bool) -> Result<(), Invalid> {
     let mut errors = Vec::new();
     for (k, v) in msg {
         match k.as_str() {

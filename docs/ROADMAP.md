@@ -219,8 +219,11 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
       generated preview features, `.storage/core.labs` (imported), and
       `labs_updated`; `system_log.write`/`clear` (the frontend reports its
       errors there; they go to the log)
-- [ ] `manifest/list`, `brands/access_token` (proxied brand images),
-      `system_log/list`, other languages
+- [x] Brands: `brands/access_token` (two live tokens, rotated every 30
+      min) and `/api/brands/{integration,hardware}/…` proxied from HA's CDN
+      with HA's disk cache (`.cache/brands`, 404s cached, 30-day background
+      refresh, the placeholder image)
+- [ ] `manifest/list`, `system_log/list`, other languages
 - [x] WS registries: `config/entity_registry/list_for_display` (HA's display
       keys, legacy device-name prefix stripping),
       `config/{device,area,floor,label}_registry/list`

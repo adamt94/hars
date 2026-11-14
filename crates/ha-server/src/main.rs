@@ -117,6 +117,13 @@ async fn run(thp_disabled: std::io::Result<bool>) -> anyhow::Result<()> {
         profiles,
     );
     api_config.integrations = started.running;
+    api_config.brands = match ha_api::brands::Brands::new(&config_dir, ha_api::brands::CDN) {
+        Ok(b) => Some(b),
+        Err(e) => {
+            tracing::error!("brands: {e}");
+            None
+        }
+    };
     api_config.weather = started.weather;
     api_config.lovelace = {
         let dir = config_dir.clone();

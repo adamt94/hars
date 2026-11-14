@@ -18,13 +18,17 @@ struct Server {
 }
 
 async fn server() -> Server {
+    server_with(crate::ApiConfig {
+        config_dir: "/config".into(),
+        ..Default::default()
+    })
+    .await
+}
+
+async fn server_with(config: crate::ApiConfig) -> Server {
     let hass = Hass::new();
     hass.start();
     let auth = crate::test_util::auth(true);
-    let config = crate::ApiConfig {
-        config_dir: "/config".into(),
-        ..Default::default()
-    };
     let app = crate::router(hass.clone(), auth.clone(), &config)
         .into_make_service_with_connect_info::<std::net::SocketAddr>();
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -1342,4 +1346,34 @@ async fn sensor_unit_tables_are_has() {
         r["error"]["message"],
         "extra keys not allowed @ data['extra']. Got True\nrequired key not provided @ data['device_class']. Got None"
     );
+}
+
+#[tokio::test]
+async fn brands_access_token() {
+    let dir = std::env::temp_dir().join(format!("hars-ws-brands-{}", std::process::id()));
+    let brands = crate::brands::Brands::new(&dir, "http://127.0.0.1:9").unwrap();
+    let s = server_with(crate::ApiConfig {
+        brands: Some(brands.clone()),
+        ..Default::default()
+    })
+    .await;
+    let mut c = Client::authed(&s, &token(&s.auth).0).await;
+    let r = c
+        .call(json!({"id": 2, "type": "brands/access_token"}))
+        .await;
+    assert_eq!(r["result"], json!({"token": brands.token()}));
+    let r = c.call(json!({"id": 3, "type": "get_config"})).await;
+    assert!(
+        r["result"]["components"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("brands"))
+    );
+    // Without brands (no cache dir), the command doesn't exist.
+    let s = server().await;
+    let mut c = Client::authed(&s, &token(&s.auth).0).await;
+    let r = c
+        .call(json!({"id": 2, "type": "brands/access_token"}))
+        .await;
+    assert_eq!(r["error"]["code"], "unknown_command");
 }

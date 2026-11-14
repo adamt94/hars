@@ -2,6 +2,7 @@
 //! frontend, served unchanged from disk.
 
 mod auth;
+pub mod brands;
 mod frontend;
 mod frontend_data;
 mod i18n;
@@ -52,6 +53,8 @@ pub struct ApiConfig {
     pub integrations: Vec<&'static str>,
     /// Weather entities' forecasts.
     pub weather: Arc<ha_integrations::weather::Weather>,
+    /// Brand images and their access tokens.
+    pub brands: Option<Arc<brands::Brands>>,
 }
 
 /// What the WebSocket and `/api/config` need.
@@ -81,6 +84,9 @@ pub(crate) fn components(config: &ApiConfig) -> Vec<&'static str> {
     ];
     if config.frontend.is_some() {
         c.push("frontend");
+    }
+    if config.brands.is_some() {
+        c.push("brands");
     }
     c.extend(&config.integrations);
     c.sort_unstable();
@@ -159,6 +165,9 @@ pub fn router(hass: Hass, auth: Auth, config: &ApiConfig) -> Router {
     let mut router = api
         .merge(auth::routes(auth.clone()))
         .merge(ws::routes(shared));
+    if let Some(b) = &config.brands {
+        router = router.merge(brands::routes(b.clone(), auth.clone()));
+    }
     if let Some(fe) = &config.frontend {
         router = router.merge(frontend::routes(fe.clone(), auth, config.lovelace.clone()));
     }
