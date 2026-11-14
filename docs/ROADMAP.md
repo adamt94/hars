@@ -368,17 +368,21 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
 - [x] Imported registration works unchanged: `/api/webhook/{webhook_id}` with
       **encryption** (libsodium secretbox, `no_legacy_encryption`), encrypted
       response envelopes; HA's 29 transport cases match
-- [ ] Webhook commands: `register_sensor`, `update_sensor_states`,
+- [x] Webhook commands: `register_sensor`, `update_sensor_states`,
       `update_location`, `get_config` (entity enabled-state sync), `get_zones`,
-      `update_registration`, `call_service`, `fire_event`
-  - [x] all but `update_location`; sensors and binary sensors restore as HA's
-        `RestoreSensor` (17 of `startup.json`), and HA's `sensors.json` (updates,
-        registrations, re-registrations, disable/enable) matches
+      `update_registration`, `call_service`, `fire_event`. Sensors and binary
+      sensors restore as HA's `RestoreSensor` (17 of `startup.json`); HA's
+      `sensors.json` (updates, registrations, re-registrations,
+      disable/enable) and all 20 `location.json` tracker steps match
+  - [ ] persist entry changes (`update_registration`, `no_legacy_encryption`,
+        `enable_encryption`) to `core.config_entries`, and the device update
 - [ ] `/api/mobile_app/registrations` for fresh registrations (re-pair fallback)
 - [x] WS `subscribe_entities` `include`/`exclude` filters (HA's `entityfilter`
       cases 1-6, `fnmatch` globs, `cv.entity_ids`): the app subscribes to
       zones and persons only
 - [ ] `device_tracker.phone` → `person` → Map dashboard updates live
+      (tracker → person → zone done and vectored; the live Map check is left
+      for cutover)
 - [ ] Acceptance: the existing app session keeps working after cutover without
       logging in again; sensors and location update over LAN; dashboards and
       controls work in the app

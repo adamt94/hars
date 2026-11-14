@@ -419,6 +419,13 @@ async fn command(shared: &Shared, reg: &Arc<Registration>, ty: &str, payload: Va
                 None => ok(),
             }
         }
+        "update_location" => {
+            // Valid or not, HA answers `{}`.
+            if let Some(t) = shared.config.mobile_app.as_ref().and_then(|a| a.trackers()) {
+                t.update(reg, &payload);
+            }
+            ok()
+        }
         "register_sensor" => {
             let Some(sensors) = shared.config.mobile_app.as_ref().and_then(|a| a.sensors()) else {
                 return ok();

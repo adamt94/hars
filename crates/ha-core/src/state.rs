@@ -99,6 +99,18 @@ impl Serialize for Reported {
     }
 }
 
+/// How a write treats the existing state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum WriteMode {
+    /// An unchanged write only moves `last_reported`.
+    Normal,
+    /// Only if there is no state yet.
+    IfAbsent,
+    /// HA's `force_update`: a new state and `state_changed` even when
+    /// nothing changed (`last_changed` kept).
+    Force,
+}
+
 #[derive(Default)]
 pub struct StateMachine {
     states: RwLock<HashMap<EntityId, Arc<State>>>,
@@ -235,16 +247,19 @@ impl StateMachine {
         context: Option<Context>,
         clock: &Clock,
         bus: &EventBus,
-        if_absent: bool,
+        mode: WriteMode,
     ) -> Arc<State> {
         let mut states = self.states.write();
         let old = states.get(&entity_id).cloned();
         // Checked under the same lock as the write: nothing slips between.
-        if if_absent && let Some(o) = &old {
+        if mode == WriteMode::IfAbsent
+            && let Some(o) = &old
+        {
             return o.clone();
         }
 
-        if let Some(o) = &old
+        if mode != WriteMode::Force
+            && let Some(o) = &old
             && o.state == state
             && o.attributes == attributes
         {
@@ -292,6 +307,26 @@ mod tests {
     use crate::{EventKind, Hass};
 
     use super::*;
+
+    /// HA's `force_update`: an unchanged write still fires, with a new
+    /// `last_updated` and the old `last_changed`.
+    #[tokio::test]
+    async fn forced_writes_fire_when_unchanged() {
+        let hass = Hass::new();
+        let id = EntityId::parse("device_tracker.phone").unwrap();
+        let first = hass.set_state(id.clone(), "home", Attributes::new());
+        let mut rx = hass.bus().subscribe();
+        let same = hass.set_state(id.clone(), "home", Attributes::new());
+        assert!(Arc::ptr_eq(&first, &same));
+        assert!(rx.try_recv().is_err());
+        let forced = hass.set_state_forced(id.clone(), "home", Attributes::new());
+        assert!(!Arc::ptr_eq(&first, &forced));
+        assert_eq!(forced.last_changed, first.last_changed);
+        assert!(matches!(
+            rx.try_recv().unwrap().kind,
+            EventKind::StateChanged { .. }
+        ));
+    }
 
     #[tokio::test]
     async fn set_state_fires_only_on_change() {

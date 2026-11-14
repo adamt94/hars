@@ -1,0 +1,2105 @@
+{
+ "exchanges": [
+  {
+   "initial": {
+    "device_tracker.phone": {
+     "state": "unknown",
+     "attributes": {
+      "in_zones": [],
+      "source_type": "gps",
+      "battery_level": 70,
+      "friendly_name": " Phone"
+     }
+    },
+    "person.adam": {
+     "state": "unknown",
+     "attributes": {
+      "editable": true,
+      "id": "adam",
+      "device_trackers": [
+       "device_tracker.phone"
+      ],
+      "in_zones": [],
+      "user_id": "00112233445566778899aabbccddeeff",
+      "friendly_name": "adam"
+     }
+    },
+    "zone.home": {
+     "state": "0",
+     "attributes": {
+      "latitude": 0.5,
+      "longitude": 0.5,
+      "radius": 100,
+      "passive": false,
+      "persons": [],
+      "editable": true,
+      "icon": "mdi:home",
+      "friendly_name": "Home"
+     }
+    }
+   }
+  },
+  {
+   "type": "update_location",
+   "request": {
+    "data_plaintext": "{\"battery\":70}",
+    "nonce_hex": "4150502d4e4f4e43457570646174655f6c6f636174696f6e",
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"QVBQLU5PTkNFdXBkYXRlX2xvY2F0aW9uh9GLjKoURfselOGNX1Bqr1pUAYeLiW5of9r58aJv\",\"type\":\"update_location\"}"
+   },
+   "response": {
+    "status": 200,
+    "headers": {
+     "Content-Type": "application/json; charset=utf-8"
+    },
+    "body": "{}"
+   },
+   "effects": {
+    "state_writes": [
+     {
+      "entity_id": "device_tracker.phone",
+      "state": "unknown",
+      "attributes": {
+       "in_zones": [],
+       "source_type": "gps",
+       "battery_level": 70,
+       "friendly_name": " Phone"
+      },
+      "context_user_id": null
+     }
+    ],
+    "events": [
+     {
+      "event_type": "user_added",
+      "data": {
+       "user_id": "ef42dd1bcb4b4293aa16ffeeb698910a"
+      },
+      "origin": "LOCAL",
+      "context_user_id": null
+     }
+    ],
+    "service_calls": []
+   },
+   "case": "battery only (as the user's last update)",
+   "after": {
+    "device_tracker.phone": {
+     "state": "unknown",
+     "attributes": {
+      "in_zones": [],
+      "source_type": "gps",
+      "battery_level": 70,
+      "friendly_name": " Phone"
+     }
+    },
+    "person.adam": {
+     "state": "unknown",
+     "attributes": {
+      "editable": true,
+      "id": "adam",
+      "device_trackers": [
+       "device_tracker.phone"
+      ],
+      "in_zones": [],
+      "user_id": "00112233445566778899aabbccddeeff",
+      "friendly_name": "adam"
+     }
+    },
+    "zone.home": {
+     "state": "0",
+     "attributes": {
+      "latitude": 0.5,
+      "longitude": 0.5,
+      "radius": 100,
+      "passive": false,
+      "persons": [],
+      "editable": true,
+      "icon": "mdi:home",
+      "friendly_name": "Home"
+     }
+    }
+   }
+  },
+  {
+   "type": "update_location",
+   "request": {
+    "data_plaintext": "{\"altitude\":12.5,\"battery\":70,\"course\":90.7,\"gps\":[0.5,0.5],\"gps_accuracy\":5,\"speed\":1.9,\"vertical_accuracy\":3.2}",
+    "nonce_hex": "4150502d4e4f4e43457570646174655f6c6f636174696f6e",
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"QVBQLU5PTkNFdXBkYXRlX2xvY2F0aW9uP9ip67YJ5wb8L+PIgda9ZFpUAoqLlH9vYp3h\\/KMgXpgEIg9OAWE5h4o+eGOeNXfVC5OYKIzYtQB46Uqn2mpJOnk8+aptzG9pt51\\/mEiqVIO+ak0aBZFpiwew+QORiM678beQpm5hcsM7lszkFq7jkhzXZiLkbbbrbXaAiioQxN3R\",\"type\":\"update_location\"}"
+   },
+   "response": {
+    "status": 200,
+    "headers": {
+     "Content-Type": "application/json; charset=utf-8"
+    },
+    "body": "{}"
+   },
+   "effects": {
+    "state_writes": [
+     {
+      "entity_id": "device_tracker.phone",
+      "state": "home",
+      "attributes": {
+       "in_zones": [
+        "zone.home"
+       ],
+       "source_type": "gps",
+       "battery_level": 70,
+       "latitude": 0.5,
+       "longitude": 0.5,
+       "gps_accuracy": 5.0,
+       "altitude": 12.5,
+       "course": 90,
+       "speed": 1,
+       "vertical_accuracy": 3,
+       "friendly_name": " Phone"
+      },
+      "context_user_id": null
+     },
+     {
+      "entity_id": "person.adam",
+      "state": "home",
+      "attributes": {
+       "editable": true,
+       "id": "adam",
+       "device_trackers": [
+        "device_tracker.phone"
+       ],
+       "in_zones": [
+        "zone.home"
+       ],
+       "latitude": 0.5,
+       "longitude": 0.5,
+       "gps_accuracy": 5.0,
+       "source": "device_tracker.phone",
+       "user_id": "00112233445566778899aabbccddeeff",
+       "friendly_name": "adam"
+      },
+      "context_user_id": null
+     },
+     {
+      "entity_id": "zone.home",
+      "state": "1",
+      "attributes": {
+       "latitude": 0.5,
+       "longitude": 0.5,
+       "radius": 100,
+       "passive": false,
+       "persons": [
+        "person.adam"
+       ],
+       "editable": true,
+       "icon": "mdi:home",
+       "friendly_name": "Home"
+      },
+      "context_user_id": null
+     }
+    ],
+    "events": [],
+    "service_calls": []
+   },
+   "case": "gps at home",
+   "after": {
+    "device_tracker.phone": {
+     "state": "home",
+     "attributes": {
+      "in_zones": [
+       "zone.home"
+      ],
+      "source_type": "gps",
+      "battery_level": 70,
+      "latitude": 0.5,
+      "longitude": 0.5,
+      "gps_accuracy": 5.0,
+      "altitude": 12.5,
+      "course": 90,
+      "speed": 1,
+      "vertical_accuracy": 3,
+      "friendly_name": " Phone"
+     }
+    },
+    "person.adam": {
+     "state": "home",
+     "attributes": {
+      "editable": true,
+      "id": "adam",
+      "device_trackers": [
+       "device_tracker.phone"
+      ],
+      "in_zones": [
+       "zone.home"
+      ],
+      "latitude": 0.5,
+      "longitude": 0.5,
+      "gps_accuracy": 5.0,
+      "source": "device_tracker.phone",
+      "user_id": "00112233445566778899aabbccddeeff",
+      "friendly_name": "adam"
+     }
+    },
+    "zone.home": {
+     "state": "1",
+     "attributes": {
+      "latitude": 0.5,
+      "longitude": 0.5,
+      "radius": 100,
+      "passive": false,
+      "persons": [
+       "person.adam"
+      ],
+      "editable": true,
+      "icon": "mdi:home",
+      "friendly_name": "Home"
+     }
+    }
+   }
+  },
+  {
+   "type": "update_location",
+   "request": {
+    "data_plaintext": "{\"battery\":69,\"gps\":[0.501349,0.5],\"gps_accuracy\":10}",
+    "nonce_hex": "4150502d4e4f4e43457570646174655f6c6f636174696f6e",
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"QVBQLU5PTkNFdXBkYXRlX2xvY2F0aW9u2nsQIiQulWgj5wwLu+Y\\/v1pUAYeLiW5of9r58Ks+UspYc08VLiVywMMtcWCXNWWYUbvGeY6K\\/GYppB7+imxaMHk8k6o+\",\"type\":\"update_location\"}"
+   },
+   "response": {
+    "status": 200,
+    "headers": {
+     "Content-Type": "application/json; charset=utf-8"
+    },
+    "body": "{}"
+   },
+   "effects": {
+    "state_writes": [
+     {
+      "entity_id": "device_tracker.phone",
+      "state": "not_home",
+      "attributes": {
+       "in_zones": [],
+       "source_type": "gps",
+       "battery_level": 69,
+       "latitude": 0.501349,
+       "longitude": 0.5,
+       "gps_accuracy": 10.0,
+       "friendly_name": " Phone"
+      },
+      "context_user_id": null
+     },
+     {
+      "entity_id": "person.adam",
+      "state": "not_home",
+      "attributes": {
+       "editable": true,
+       "id": "adam",
+       "device_trackers": [
+        "device_tracker.phone"
+       ],
+       "in_zones": [],
+       "latitude": 0.501349,
+       "longitude": 0.5,
+       "gps_accuracy": 10.0,
+       "source": "device_tracker.phone",
+       "user_id": "00112233445566778899aabbccddeeff",
+       "friendly_name": "adam"
+      },
+      "context_user_id": null
+     },
+     {
+      "entity_id": "zone.home",
+      "state": "0",
+      "attributes": {
+       "latitude": 0.5,
+       "longitude": 0.5,
+       "radius": 100,
+       "passive": false,
+       "persons": [],
+       "editable": true,
+       "icon": "mdi:home",
+       "friendly_name": "Home"
+      },
+      "context_user_id": null
+     }
+    ],
+    "events": [],
+    "service_calls": []
+   },
+   "case": "150 m north, accuracy 10 (outside)",
+   "after": {
+    "device_tracker.phone": {
+     "state": "not_home",
+     "attributes": {
+      "in_zones": [],
+      "source_type": "gps",
+      "battery_level": 69,
+      "latitude": 0.501349,
+      "longitude": 0.5,
+      "gps_accuracy": 10.0,
+      "friendly_name": " Phone"
+     }
+    },
+    "person.adam": {
+     "state": "not_home",
+     "attributes": {
+      "editable": true,
+      "id": "adam",
+      "device_trackers": [
+       "device_tracker.phone"
+      ],
+      "in_zones": [],
+      "latitude": 0.501349,
+      "longitude": 0.5,
+      "gps_accuracy": 10.0,
+      "source": "device_tracker.phone",
+      "user_id": "00112233445566778899aabbccddeeff",
+      "friendly_name": "adam"
+     }
+    },
+    "zone.home": {
+     "state": "0",
+     "attributes": {
+      "latitude": 0.5,
+      "longitude": 0.5,
+      "radius": 100,
+      "passive": false,
+      "persons": [],
+      "editable": true,
+      "icon": "mdi:home",
+      "friendly_name": "Home"
+     }
+    }
+   }
+  },
+  {
+   "type": "update_location",
+   "request": {
+    "data_plaintext": "{\"battery\":69,\"gps\":[0.501349,0.5],\"gps_accuracy\":60}",
+    "nonce_hex": "4150502d4e4f4e43457570646174655f6c6f636174696f6e",
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"QVBQLU5PTkNFdXBkYXRlX2xvY2F0aW9uhIvEDIgwReoy8Djs3fNrvVpUAYeLiW5of9r58Ks+UspYc08VLiVywMMtcWCXNWWYUbvGeY6K\\/GYppB7+imxaMHk8lKo+\",\"type\":\"update_location\"}"
+   },
+   "response": {
+    "status": 200,
+    "headers": {
+     "Content-Type": "application/json; charset=utf-8"
+    },
+    "body": "{}"
+   },
+   "effects": {
+    "state_writes": [
+     {
+      "entity_id": "device_tracker.phone",
+      "state": "home",
+      "attributes": {
+       "in_zones": [
+        "zone.home"
+       ],
+       "source_type": "gps",
+       "battery_level": 69,
+       "latitude": 0.501349,
+       "longitude": 0.5,
+       "gps_accuracy": 60.0,
+       "friendly_name": " Phone"
+      },
+      "context_user_id": null
+     },
+     {
+      "entity_id": "person.adam",
+      "state": "home",
+      "attributes": {
+       "editable": true,
+       "id": "adam",
+       "device_trackers": [
+        "device_tracker.phone"
+       ],
+       "in_zones": [
+        "zone.home"
+       ],
+       "latitude": 0.501349,
+       "longitude": 0.5,
+       "gps_accuracy": 60.0,
+       "source": "device_tracker.phone",
+       "user_id": "00112233445566778899aabbccddeeff",
+       "friendly_name": "adam"
+      },
+      "context_user_id": null
+     },
+     {
+      "entity_id": "zone.home",
+      "state": "1",
+      "attributes": {
+       "latitude": 0.5,
+       "longitude": 0.5,
+       "radius": 100,
+       "passive": false,
+       "persons": [
+        "person.adam"
+       ],
+       "editable": true,
+       "icon": "mdi:home",
+       "friendly_name": "Home"
+      },
+      "context_user_id": null
+     }
+    ],
+    "events": [],
+    "service_calls": []
+   },
+   "case": "150 m north, accuracy 60 (dist - radius < accuracy → inside)",
+   "after": {
+    "device_tracker.phone": {
+     "state": "home",
+     "attributes": {
+      "in_zones": [
+       "zone.home"
+      ],
+      "source_type": "gps",
+      "battery_level": 69,
+      "latitude": 0.501349,
+      "longitude": 0.5,
+      "gps_accuracy": 60.0,
+      "friendly_name": " Phone"
+     }
+    },
+    "person.adam": {
+     "state": "home",
+     "attributes": {
+      "editable": true,
+      "id": "adam",
+      "device_trackers": [
+       "device_tracker.phone"
+      ],
+      "in_zones": [
+       "zone.home"
+      ],
+      "latitude": 0.501349,
+      "longitude": 0.5,
+      "gps_accuracy": 60.0,
+      "source": "device_tracker.phone",
+      "user_id": "00112233445566778899aabbccddeeff",
+      "friendly_name": "adam"
+     }
+    },
+    "zone.home": {
+     "state": "1",
+     "attributes": {
+      "latitude": 0.5,
+      "longitude": 0.5,
+      "radius": 100,
+      "passive": false,
+      "persons": [
+       "person.adam"
+      ],
+      "editable": true,
+      "icon": "mdi:home",
+      "friendly_name": "Home"
+     }
+    }
+   }
+  },
+  {
+   "type": "update_location",
+   "request": {
+    "data_plaintext": "{\"battery\":69,\"gps\":[0.501349,0.5],\"gps_accuracy\":50.0}",
+    "nonce_hex": "4150502d4e4f4e43457570646174655f6c6f636174696f6e",
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"QVBQLU5PTkNFdXBkYXRlX2xvY2F0aW9unrmzpChwtXqtVIpvsxr1FVpUAYeLiW5of9r58Ks+UspYc08VLiVywMMtcWCXNWWYUbvGeY6K\\/GYppB7+imxaMHk8l6ptyT4=\",\"type\":\"update_location\"}"
+   },
+   "response": {
+    "status": 200,
+    "headers": {
+     "Content-Type": "application/json; charset=utf-8"
+    },
+    "body": "{}"
+   },
+   "effects": {
+    "state_writes": [
+     {
+      "entity_id": "device_tracker.phone",
+      "state": "home",
+      "attributes": {
+       "in_zones": [
+        "zone.home"
+       ],
+       "source_type": "gps",
+       "battery_level": 69,
+       "latitude": 0.501349,
+       "longitude": 0.5,
+       "gps_accuracy": 50.0,
+       "friendly_name": " Phone"
+      },
+      "context_user_id": null
+     },
+     {
+      "entity_id": "person.adam",
+      "state": "home",
+      "attributes": {
+       "editable": true,
+       "id": "adam",
+       "device_trackers": [
+        "device_tracker.phone"
+       ],
+       "in_zones": [
+        "zone.home"
+       ],
+       "latitude": 0.501349,
+       "longitude": 0.5,
+       "gps_accuracy": 50.0,
+       "source": "device_tracker.phone",
+       "user_id": "00112233445566778899aabbccddeeff",
+       "friendly_name": "adam"
+      },
+      "context_user_id": null
+     }
+    ],
+    "events": [],
+    "service_calls": []
+   },
+   "case": "150 m north, accuracy 50 (dist - radius == ~50: boundary)",
+   "after": {
+    "device_tracker.phone": {
+     "state": "home",
+     "attributes": {
+      "in_zones": [
+       "zone.home"
+      ],
+      "source_type": "gps",
+      "battery_level": 69,
+      "latitude": 0.501349,
+      "longitude": 0.5,
+      "gps_accuracy": 50.0,
+      "friendly_name": " Phone"
+     }
+    },
+    "person.adam": {
+     "state": "home",
+     "attributes": {
+      "editable": true,
+      "id": "adam",
+      "device_trackers": [
+       "device_tracker.phone"
+      ],
+      "in_zones": [
+       "zone.home"
+      ],
+      "latitude": 0.501349,
+      "longitude": 0.5,
+      "gps_accuracy": 50.0,
+      "source": "device_tracker.phone",
+      "user_id": "00112233445566778899aabbccddeeff",
+      "friendly_name": "adam"
+     }
+    },
+    "zone.home": {
+     "state": "1",
+     "attributes": {
+      "latitude": 0.5,
+      "longitude": 0.5,
+      "radius": 100,
+      "passive": false,
+      "persons": [
+       "person.adam"
+      ],
+      "editable": true,
+      "icon": "mdi:home",
+      "friendly_name": "Home"
+     }
+    }
+   }
+  },
+  {
+   "type": "update_location",
+   "request": {
+    "data_plaintext": "{\"battery\":68,\"in_zones\":[\"zone.home\"],\"location_name\":\"home\"}",
+    "nonce_hex": "4150502d4e4f4e43457570646174655f6c6f636174696f6e",
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"QVBQLU5PTkNFdXBkYXRlX2xvY2F0aW9u1uSzWEWbM4CFkS3bRvbvPVpUAYeLiW5of9r58Ko+UsRGXxdAG3Av18lHYC7BdzCYDImHPsunoxskqB7qjGRWJwRow\\/cm23l78cdP0Uiw\",\"type\":\"update_location\"}"
+   },
+   "response": {
+    "status": 200,
+    "headers": {
+     "Content-Type": "application/json; charset=utf-8"
+    },
+    "body": "{}"
+   },
+   "effects": {
+    "state_writes": [
+     {
+      "entity_id": "device_tracker.phone",
+      "state": "home",
+      "attributes": {
+       "in_zones": [
+        "zone.home"
+       ],
+       "source_type": "gps",
+       "battery_level": 68,
+       "friendly_name": " Phone"
+      },
+      "context_user_id": null
+     },
+     {
+      "entity_id": "person.adam",
+      "state": "home",
+      "attributes": {
+       "editable": true,
+       "id": "adam",
+       "device_trackers": [
+        "device_tracker.phone"
+       ],
+       "in_zones": [
+        "zone.home"
+       ],
+       "source": "device_tracker.phone",
+       "user_id": "00112233445566778899aabbccddeeff",
+       "friendly_name": "adam"
+      },
+      "context_user_id": null
+     }
+    ],
+    "events": [],
+    "service_calls": []
+   },
+   "case": "in_zones from the app (2026.6+ zoneOnly), no gps",
+   "after": {
+    "device_tracker.phone": {
+     "state": "home",
+     "attributes": {
+      "in_zones": [
+       "zone.home"
+      ],
+      "source_type": "gps",
+      "battery_level": 68,
+      "friendly_name": " Phone"
+     }
+    },
+    "person.adam": {
+     "state": "home",
+     "attributes": {
+      "editable": true,
+      "id": "adam",
+      "device_trackers": [
+       "device_tracker.phone"
+      ],
+      "in_zones": [
+       "zone.home"
+      ],
+      "source": "device_tracker.phone",
+      "user_id": "00112233445566778899aabbccddeeff",
+      "friendly_name": "adam"
+     }
+    },
+    "zone.home": {
+     "state": "1",
+     "attributes": {
+      "latitude": 0.5,
+      "longitude": 0.5,
+      "radius": 100,
+      "passive": false,
+      "persons": [
+       "person.adam"
+      ],
+      "editable": true,
+      "icon": "mdi:home",
+      "friendly_name": "Home"
+     }
+    }
+   }
+  },
+  {
+   "type": "update_location",
+   "request": {
+    "data_plaintext": "{\"battery\":68,\"in_zones\":[]}",
+    "nonce_hex": "4150502d4e4f4e43457570646174655f6c6f636174696f6e",
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"QVBQLU5PTkNFdXBkYXRlX2xvY2F0aW9uGiVtML\\/4VidXREkJ5rFR9FpUAYeLiW5of9r58Ko+UsRGXxdAG3Av18lHHyk=\",\"type\":\"update_location\"}"
+   },
+   "response": {
+    "status": 200,
+    "headers": {
+     "Content-Type": "application/json; charset=utf-8"
+    },
+    "body": "{}"
+   },
+   "effects": {
+    "state_writes": [
+     {
+      "entity_id": "device_tracker.phone",
+      "state": "not_home",
+      "attributes": {
+       "in_zones": [],
+       "source_type": "gps",
+       "battery_level": 68,
+       "friendly_name": " Phone"
+      },
+      "context_user_id": null
+     },
+     {
+      "entity_id": "person.adam",
+      "state": "not_home",
+      "attributes": {
+       "editable": true,
+       "id": "adam",
+       "device_trackers": [
+        "device_tracker.phone"
+       ],
+       "in_zones": [],
+       "source": "device_tracker.phone",
+       "user_id": "00112233445566778899aabbccddeeff",
+       "friendly_name": "adam"
+      },
+      "context_user_id": null
+     },
+     {
+      "entity_id": "zone.home",
+      "state": "0",
+      "attributes": {
+       "latitude": 0.5,
+       "longitude": 0.5,
+       "radius": 100,
+       "passive": false,
+       "persons": [],
+       "editable": true,
+       "icon": "mdi:home",
+       "friendly_name": "Home"
+      },
+      "context_user_id": null
+     }
+    ],
+    "events": [],
+    "service_calls": []
+   },
+   "case": "in_zones empty list",
+   "after": {
+    "device_tracker.phone": {
+     "state": "not_home",
+     "attributes": {
+      "in_zones": [],
+      "source_type": "gps",
+      "battery_level": 68,
+      "friendly_name": " Phone"
+     }
+    },
+    "person.adam": {
+     "state": "not_home",
+     "attributes": {
+      "editable": true,
+      "id": "adam",
+      "device_trackers": [
+       "device_tracker.phone"
+      ],
+      "in_zones": [],
+      "source": "device_tracker.phone",
+      "user_id": "00112233445566778899aabbccddeeff",
+      "friendly_name": "adam"
+     }
+    },
+    "zone.home": {
+     "state": "0",
+     "attributes": {
+      "latitude": 0.5,
+      "longitude": 0.5,
+      "radius": 100,
+      "passive": false,
+      "persons": [],
+      "editable": true,
+      "icon": "mdi:home",
+      "friendly_name": "Home"
+     }
+    }
+   }
+  },
+  {
+   "type": "update_location",
+   "request": {
+    "data_plaintext": "{\"in_zones\":[\"zone.nowhere\"]}",
+    "nonce_hex": "4150502d4e4f4e43457570646174655f6c6f636174696f6e",
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"QVBQLU5PTkNFdXBkYXRlX2xvY2F0aW9uIPkpWRro+U3kYeoYORwNJ1pUCoigh2R0Y4vh\\/MkwCsJGZUNBGmI0kIF5YAnT\",\"type\":\"update_location\"}"
+   },
+   "response": {
+    "status": 200,
+    "headers": {
+     "Content-Type": "application/json; charset=utf-8"
+    },
+    "body": "{}"
+   },
+   "effects": {
+    "state_writes": [
+     {
+      "entity_id": "device_tracker.phone",
+      "state": "not_home",
+      "attributes": {
+       "in_zones": [],
+       "source_type": "gps",
+       "friendly_name": " Phone"
+      },
+      "context_user_id": null
+     }
+    ],
+    "events": [],
+    "service_calls": []
+   },
+   "case": "in_zones naming a missing zone",
+   "after": {
+    "device_tracker.phone": {
+     "state": "not_home",
+     "attributes": {
+      "in_zones": [],
+      "source_type": "gps",
+      "friendly_name": " Phone"
+     }
+    },
+    "person.adam": {
+     "state": "not_home",
+     "attributes": {
+      "editable": true,
+      "id": "adam",
+      "device_trackers": [
+       "device_tracker.phone"
+      ],
+      "in_zones": [],
+      "source": "device_tracker.phone",
+      "user_id": "00112233445566778899aabbccddeeff",
+      "friendly_name": "adam"
+     }
+    },
+    "zone.home": {
+     "state": "0",
+     "attributes": {
+      "latitude": 0.5,
+      "longitude": 0.5,
+      "radius": 100,
+      "passive": false,
+      "persons": [],
+      "editable": true,
+      "icon": "mdi:home",
+      "friendly_name": "Home"
+     }
+    }
+   }
+  },
+  {
+   "type": "update_location",
+   "request": {
+    "data_plaintext": "{\"location_name\":\"home\"}",
+    "nonce_hex": "4150502d4e4f4e43457570646174655f6c6f636174696f6e",
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"QVBQLU5PTkNFdXBkYXRlX2xvY2F0aW9uedezQGgIRZDK2De1YsisQlpUD4mcnH9zaZacqPN\\/FY8SIgVAGHB+iA==\",\"type\":\"update_location\"}"
+   },
+   "response": {
+    "status": 200,
+    "headers": {
+     "Content-Type": "application/json; charset=utf-8"
+    },
+    "body": "{}"
+   },
+   "effects": {
+    "state_writes": [
+     {
+      "entity_id": "device_tracker.phone",
+      "state": "home",
+      "attributes": {
+       "in_zones": [],
+       "source_type": "gps",
+       "friendly_name": " Phone"
+      },
+      "context_user_id": null
+     },
+     {
+      "entity_id": "person.adam",
+      "state": "home",
+      "attributes": {
+       "editable": true,
+       "id": "adam",
+       "device_trackers": [
+        "device_tracker.phone"
+       ],
+       "in_zones": [],
+       "source": "device_tracker.phone",
+       "user_id": "00112233445566778899aabbccddeeff",
+       "friendly_name": "adam"
+      },
+      "context_user_id": null
+     },
+     {
+      "entity_id": "zone.home",
+      "state": "1",
+      "attributes": {
+       "latitude": 0.5,
+       "longitude": 0.5,
+       "radius": 100,
+       "passive": false,
+       "persons": [
+        "person.adam"
+       ],
+       "editable": true,
+       "icon": "mdi:home",
+       "friendly_name": "Home"
+      },
+      "context_user_id": null
+     }
+    ],
+    "events": [],
+    "service_calls": []
+   },
+   "case": "location_name home (old app)",
+   "after": {
+    "device_tracker.phone": {
+     "state": "home",
+     "attributes": {
+      "in_zones": [],
+      "source_type": "gps",
+      "friendly_name": " Phone"
+     }
+    },
+    "person.adam": {
+     "state": "home",
+     "attributes": {
+      "editable": true,
+      "id": "adam",
+      "device_trackers": [
+       "device_tracker.phone"
+      ],
+      "in_zones": [],
+      "source": "device_tracker.phone",
+      "user_id": "00112233445566778899aabbccddeeff",
+      "friendly_name": "adam"
+     }
+    },
+    "zone.home": {
+     "state": "1",
+     "attributes": {
+      "latitude": 0.5,
+      "longitude": 0.5,
+      "radius": 100,
+      "passive": false,
+      "persons": [
+       "person.adam"
+      ],
+      "editable": true,
+      "icon": "mdi:home",
+      "friendly_name": "Home"
+     }
+    }
+   }
+  },
+  {
+   "type": "update_location",
+   "request": {
+    "data_plaintext": "{\"location_name\":\"not_home\"}",
+    "nonce_hex": "4150502d4e4f4e43457570646174655f6c6f636174696f6e",
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"QVBQLU5PTkNFdXBkYXRlX2xvY2F0aW9uZ\\/Dn5T+9AM0MeG1TSO1DpFpUD4mcnH9zaZacqPN\\/FY8SIgNAAUo0mp55YCk=\",\"type\":\"update_location\"}"
+   },
+   "response": {
+    "status": 200,
+    "headers": {
+     "Content-Type": "application/json; charset=utf-8"
+    },
+    "body": "{}"
+   },
+   "effects": {
+    "state_writes": [
+     {
+      "entity_id": "device_tracker.phone",
+      "state": "not_home",
+      "attributes": {
+       "in_zones": [],
+       "source_type": "gps",
+       "friendly_name": " Phone"
+      },
+      "context_user_id": null
+     },
+     {
+      "entity_id": "person.adam",
+      "state": "not_home",
+      "attributes": {
+       "editable": true,
+       "id": "adam",
+       "device_trackers": [
+        "device_tracker.phone"
+       ],
+       "in_zones": [],
+       "source": "device_tracker.phone",
+       "user_id": "00112233445566778899aabbccddeeff",
+       "friendly_name": "adam"
+      },
+      "context_user_id": null
+     },
+     {
+      "entity_id": "zone.home",
+      "state": "0",
+      "attributes": {
+       "latitude": 0.5,
+       "longitude": 0.5,
+       "radius": 100,
+       "passive": false,
+       "persons": [],
+       "editable": true,
+       "icon": "mdi:home",
+       "friendly_name": "Home"
+      },
+      "context_user_id": null
+     }
+    ],
+    "events": [],
+    "service_calls": []
+   },
+   "case": "location_name not_home",
+   "after": {
+    "device_tracker.phone": {
+     "state": "not_home",
+     "attributes": {
+      "in_zones": [],
+      "source_type": "gps",
+      "friendly_name": " Phone"
+     }
+    },
+    "person.adam": {
+     "state": "not_home",
+     "attributes": {
+      "editable": true,
+      "id": "adam",
+      "device_trackers": [
+       "device_tracker.phone"
+      ],
+      "in_zones": [],
+      "source": "device_tracker.phone",
+      "user_id": "00112233445566778899aabbccddeeff",
+      "friendly_name": "adam"
+     }
+    },
+    "zone.home": {
+     "state": "0",
+     "attributes": {
+      "latitude": 0.5,
+      "longitude": 0.5,
+      "radius": 100,
+      "passive": false,
+      "persons": [],
+      "editable": true,
+      "icon": "mdi:home",
+      "friendly_name": "Home"
+     }
+    }
+   }
+  },
+  {
+   "type": "update_location",
+   "request": {
+    "data_plaintext": "{\"location_name\":\"Work\"}",
+    "nonce_hex": "4150502d4e4f4e43457570646174655f6c6f636174696f6e",
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"QVBQLU5PTkNFdXBkYXRlX2xvY2F0aW9uaj+RGf7J6LdxvGWSLfXK6lpUD4mcnH9zaZacqPN\\/FY8SIjpAB35+iA==\",\"type\":\"update_location\"}"
+   },
+   "response": {
+    "status": 200,
+    "headers": {
+     "Content-Type": "application/json; charset=utf-8"
+    },
+    "body": "{}"
+   },
+   "effects": {
+    "state_writes": [
+     {
+      "entity_id": "device_tracker.phone",
+      "state": "Work",
+      "attributes": {
+       "in_zones": [],
+       "source_type": "gps",
+       "friendly_name": " Phone"
+      },
+      "context_user_id": null
+     },
+     {
+      "entity_id": "person.adam",
+      "state": "Work",
+      "attributes": {
+       "editable": true,
+       "id": "adam",
+       "device_trackers": [
+        "device_tracker.phone"
+       ],
+       "in_zones": [],
+       "source": "device_tracker.phone",
+       "user_id": "00112233445566778899aabbccddeeff",
+       "friendly_name": "adam"
+      },
+      "context_user_id": null
+     }
+    ],
+    "events": [],
+    "service_calls": []
+   },
+   "case": "location_name unknown zone name",
+   "after": {
+    "device_tracker.phone": {
+     "state": "Work",
+     "attributes": {
+      "in_zones": [],
+      "source_type": "gps",
+      "friendly_name": " Phone"
+     }
+    },
+    "person.adam": {
+     "state": "Work",
+     "attributes": {
+      "editable": true,
+      "id": "adam",
+      "device_trackers": [
+       "device_tracker.phone"
+      ],
+      "in_zones": [],
+      "source": "device_tracker.phone",
+      "user_id": "00112233445566778899aabbccddeeff",
+      "friendly_name": "adam"
+     }
+    },
+    "zone.home": {
+     "state": "0",
+     "attributes": {
+      "latitude": 0.5,
+      "longitude": 0.5,
+      "radius": 100,
+      "passive": false,
+      "persons": [],
+      "editable": true,
+      "icon": "mdi:home",
+      "friendly_name": "Home"
+     }
+    }
+   }
+  },
+  {
+   "type": "update_location",
+   "request": {
+    "data_plaintext": "{\"gps\":[0.5044966,0.5],\"gps_accuracy\":5,\"location_name\":\"home\"}",
+    "nonce_hex": "4150502d4e4f4e43457570646174655f6c6f636174696f6e",
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"QVBQLU5PTkNFdXBkYXRlX2xvY2F0aW9usJEpz48dKiB\\/biBDUL0p0FpUBJaM3zFBNtb29qYmSZseLF0BQEhw15RsMQvPejbDFoeJIsvAuhVqqxLomXlQJjVZzPsunGFju8BN2Q\\/vWQ==\",\"type\":\"update_location\"}"
+   },
+   "response": {
+    "status": 200,
+    "headers": {
+     "Content-Type": "application/json; charset=utf-8"
+    },
+    "body": "{}"
+   },
+   "effects": {
+    "state_writes": [
+     {
+      "entity_id": "device_tracker.phone",
+      "state": "home",
+      "attributes": {
+       "in_zones": [],
+       "source_type": "gps",
+       "latitude": 0.5044966,
+       "longitude": 0.5,
+       "gps_accuracy": 5.0,
+       "friendly_name": " Phone"
+      },
+      "context_user_id": null
+     },
+     {
+      "entity_id": "person.adam",
+      "state": "home",
+      "attributes": {
+       "editable": true,
+       "id": "adam",
+       "device_trackers": [
+        "device_tracker.phone"
+       ],
+       "in_zones": [],
+       "latitude": 0.5044966,
+       "longitude": 0.5,
+       "gps_accuracy": 5.0,
+       "source": "device_tracker.phone",
+       "user_id": "00112233445566778899aabbccddeeff",
+       "friendly_name": "adam"
+      },
+      "context_user_id": null
+     },
+     {
+      "entity_id": "zone.home",
+      "state": "1",
+      "attributes": {
+       "latitude": 0.5,
+       "longitude": 0.5,
+       "radius": 100,
+       "passive": false,
+       "persons": [
+        "person.adam"
+       ],
+       "editable": true,
+       "icon": "mdi:home",
+       "friendly_name": "Home"
+      },
+      "context_user_id": null
+     }
+    ],
+    "events": [],
+    "service_calls": []
+   },
+   "case": "location_name + gps outside",
+   "after": {
+    "device_tracker.phone": {
+     "state": "home",
+     "attributes": {
+      "in_zones": [],
+      "source_type": "gps",
+      "latitude": 0.5044966,
+      "longitude": 0.5,
+      "gps_accuracy": 5.0,
+      "friendly_name": " Phone"
+     }
+    },
+    "person.adam": {
+     "state": "home",
+     "attributes": {
+      "editable": true,
+      "id": "adam",
+      "device_trackers": [
+       "device_tracker.phone"
+      ],
+      "in_zones": [],
+      "latitude": 0.5044966,
+      "longitude": 0.5,
+      "gps_accuracy": 5.0,
+      "source": "device_tracker.phone",
+      "user_id": "00112233445566778899aabbccddeeff",
+      "friendly_name": "adam"
+     }
+    },
+    "zone.home": {
+     "state": "1",
+     "attributes": {
+      "latitude": 0.5,
+      "longitude": 0.5,
+      "radius": 100,
+      "passive": false,
+      "persons": [
+       "person.adam"
+      ],
+      "editable": true,
+      "icon": "mdi:home",
+      "friendly_name": "Home"
+     }
+    }
+   }
+  },
+  {
+   "type": "update_location",
+   "request": {
+    "data_plaintext": "{\"gps\":[0.5,0.5],\"gps_accuracy\":5,\"speed\":-0.5}",
+    "nonce_hex": "4150502d4e4f4e43457570646174655f6c6f636174696f6e",
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"QVBQLU5PTkNFdXBkYXRlX2xvY2F0aW9upBsfFxsgsr4KoNFIfrJVLlpUBJaM3zFBNtb26qI8RfAEIgpfBko9lpBpMDXNYHeMUcrIKJmf6l1q\\/VC71jhE\",\"type\":\"update_location\"}"
+   },
+   "response": {
+    "status": 200,
+    "headers": {
+     "Content-Type": "application/json; charset=utf-8"
+    },
+    "body": "{}"
+   },
+   "effects": {
+    "state_writes": [
+     {
+      "entity_id": "device_tracker.phone",
+      "state": "home",
+      "attributes": {
+       "in_zones": [
+        "zone.home"
+       ],
+       "source_type": "gps",
+       "latitude": 0.5,
+       "longitude": 0.5,
+       "gps_accuracy": 5.0,
+       "speed": 0,
+       "friendly_name": " Phone"
+      },
+      "context_user_id": null
+     },
+     {
+      "entity_id": "person.adam",
+      "state": "home",
+      "attributes": {
+       "editable": true,
+       "id": "adam",
+       "device_trackers": [
+        "device_tracker.phone"
+       ],
+       "in_zones": [
+        "zone.home"
+       ],
+       "latitude": 0.5,
+       "longitude": 0.5,
+       "gps_accuracy": 5.0,
+       "source": "device_tracker.phone",
+       "user_id": "00112233445566778899aabbccddeeff",
+       "friendly_name": "adam"
+      },
+      "context_user_id": null
+     }
+    ],
+    "events": [],
+    "service_calls": []
+   },
+   "case": "speed -0.5 (int(-0.5) == 0 passes positive_int)",
+   "after": {
+    "device_tracker.phone": {
+     "state": "home",
+     "attributes": {
+      "in_zones": [
+       "zone.home"
+      ],
+      "source_type": "gps",
+      "latitude": 0.5,
+      "longitude": 0.5,
+      "gps_accuracy": 5.0,
+      "speed": 0,
+      "friendly_name": " Phone"
+     }
+    },
+    "person.adam": {
+     "state": "home",
+     "attributes": {
+      "editable": true,
+      "id": "adam",
+      "device_trackers": [
+       "device_tracker.phone"
+      ],
+      "in_zones": [
+       "zone.home"
+      ],
+      "latitude": 0.5,
+      "longitude": 0.5,
+      "gps_accuracy": 5.0,
+      "source": "device_tracker.phone",
+      "user_id": "00112233445566778899aabbccddeeff",
+      "friendly_name": "adam"
+     }
+    },
+    "zone.home": {
+     "state": "1",
+     "attributes": {
+      "latitude": 0.5,
+      "longitude": 0.5,
+      "radius": 100,
+      "passive": false,
+      "persons": [
+       "person.adam"
+      ],
+      "editable": true,
+      "icon": "mdi:home",
+      "friendly_name": "Home"
+     }
+    }
+   }
+  },
+  {
+   "type": "update_location",
+   "request": {
+    "data_plaintext": "{\"gps\":[0.5,0.5],\"gps_accuracy\":5,\"speed\":-1.5}",
+    "nonce_hex": "4150502d4e4f4e43457570646174655f6c6f636174696f6e",
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"QVBQLU5PTkNFdXBkYXRlX2xvY2F0aW9uP8gToIG0oQcN9sGUk05TflpUBJaM3zFBNtb26qI8RfAEIgpfBko9lpBpMDXNYHeMUcrIKJmf6l1q\\/VC61jhE\",\"type\":\"update_location\"}"
+   },
+   "response": {
+    "status": 200,
+    "headers": {
+     "Content-Type": "application/json; charset=utf-8"
+    },
+    "body": "{}"
+   },
+   "effects": {
+    "state_writes": [],
+    "events": [],
+    "service_calls": []
+   },
+   "case": "speed -1.5 → invalid",
+   "after": {
+    "device_tracker.phone": {
+     "state": "home",
+     "attributes": {
+      "in_zones": [
+       "zone.home"
+      ],
+      "source_type": "gps",
+      "latitude": 0.5,
+      "longitude": 0.5,
+      "gps_accuracy": 5.0,
+      "speed": 0,
+      "friendly_name": " Phone"
+     }
+    },
+    "person.adam": {
+     "state": "home",
+     "attributes": {
+      "editable": true,
+      "id": "adam",
+      "device_trackers": [
+       "device_tracker.phone"
+      ],
+      "in_zones": [
+       "zone.home"
+      ],
+      "latitude": 0.5,
+      "longitude": 0.5,
+      "gps_accuracy": 5.0,
+      "source": "device_tracker.phone",
+      "user_id": "00112233445566778899aabbccddeeff",
+      "friendly_name": "adam"
+     }
+    },
+    "zone.home": {
+     "state": "1",
+     "attributes": {
+      "latitude": 0.5,
+      "longitude": 0.5,
+      "radius": 100,
+      "passive": false,
+      "persons": [
+       "person.adam"
+      ],
+      "editable": true,
+      "icon": "mdi:home",
+      "friendly_name": "Home"
+     }
+    }
+   }
+  },
+  {
+   "type": "update_location",
+   "request": {
+    "data_plaintext": "{\"gps\":[0.5,0.5]}",
+    "nonce_hex": "4150502d4e4f4e43457570646174655f6c6f636174696f6e",
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"QVBQLU5PTkNFdXBkYXRlX2xvY2F0aW9uDf9\\/H5P0UudUDDcUcaKyFlpUBJaM3zFBNtb26qI8RfBV\",\"type\":\"update_location\"}"
+   },
+   "response": {
+    "status": 200,
+    "headers": {
+     "Content-Type": "application/json; charset=utf-8"
+    },
+    "body": "{}"
+   },
+   "effects": {
+    "state_writes": [],
+    "events": [],
+    "service_calls": []
+   },
+   "case": "gps without gps_accuracy → invalid",
+   "after": {
+    "device_tracker.phone": {
+     "state": "home",
+     "attributes": {
+      "in_zones": [
+       "zone.home"
+      ],
+      "source_type": "gps",
+      "latitude": 0.5,
+      "longitude": 0.5,
+      "gps_accuracy": 5.0,
+      "speed": 0,
+      "friendly_name": " Phone"
+     }
+    },
+    "person.adam": {
+     "state": "home",
+     "attributes": {
+      "editable": true,
+      "id": "adam",
+      "device_trackers": [
+       "device_tracker.phone"
+      ],
+      "in_zones": [
+       "zone.home"
+      ],
+      "latitude": 0.5,
+      "longitude": 0.5,
+      "gps_accuracy": 5.0,
+      "source": "device_tracker.phone",
+      "user_id": "00112233445566778899aabbccddeeff",
+      "friendly_name": "adam"
+     }
+    },
+    "zone.home": {
+     "state": "1",
+     "attributes": {
+      "latitude": 0.5,
+      "longitude": 0.5,
+      "radius": 100,
+      "passive": false,
+      "persons": [
+       "person.adam"
+      ],
+      "editable": true,
+      "icon": "mdi:home",
+      "friendly_name": "Home"
+     }
+    }
+   }
+  },
+  {
+   "type": "update_location",
+   "request": {
+    "data_plaintext": "{\"gps\":[0.5,0.5],\"gps_accuracy\":0}",
+    "nonce_hex": "4150502d4e4f4e43457570646174655f6c6f636174696f6e",
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"QVBQLU5PTkNFdXBkYXRlX2xvY2F0aW9uBhEA6DZRmEUDSViXEUyifVpUBJaM3zFBNtb26qI8RfAEIgpfBko9lpBpMDXNYHeMVJs=\",\"type\":\"update_location\"}"
+   },
+   "response": {
+    "status": 200,
+    "headers": {
+     "Content-Type": "application/json; charset=utf-8"
+    },
+    "body": "{}"
+   },
+   "effects": {
+    "state_writes": [
+     {
+      "entity_id": "device_tracker.phone",
+      "state": "home",
+      "attributes": {
+       "in_zones": [
+        "zone.home"
+       ],
+       "source_type": "gps",
+       "latitude": 0.5,
+       "longitude": 0.5,
+       "gps_accuracy": 0.0,
+       "friendly_name": " Phone"
+      },
+      "context_user_id": null
+     },
+     {
+      "entity_id": "person.adam",
+      "state": "home",
+      "attributes": {
+       "editable": true,
+       "id": "adam",
+       "device_trackers": [
+        "device_tracker.phone"
+       ],
+       "in_zones": [
+        "zone.home"
+       ],
+       "latitude": 0.5,
+       "longitude": 0.5,
+       "gps_accuracy": 0.0,
+       "source": "device_tracker.phone",
+       "user_id": "00112233445566778899aabbccddeeff",
+       "friendly_name": "adam"
+      },
+      "context_user_id": null
+     }
+    ],
+    "events": [],
+    "service_calls": []
+   },
+   "case": "gps_accuracy 0",
+   "after": {
+    "device_tracker.phone": {
+     "state": "home",
+     "attributes": {
+      "in_zones": [
+       "zone.home"
+      ],
+      "source_type": "gps",
+      "latitude": 0.5,
+      "longitude": 0.5,
+      "gps_accuracy": 0.0,
+      "friendly_name": " Phone"
+     }
+    },
+    "person.adam": {
+     "state": "home",
+     "attributes": {
+      "editable": true,
+      "id": "adam",
+      "device_trackers": [
+       "device_tracker.phone"
+      ],
+      "in_zones": [
+       "zone.home"
+      ],
+      "latitude": 0.5,
+      "longitude": 0.5,
+      "gps_accuracy": 0.0,
+      "source": "device_tracker.phone",
+      "user_id": "00112233445566778899aabbccddeeff",
+      "friendly_name": "adam"
+     }
+    },
+    "zone.home": {
+     "state": "1",
+     "attributes": {
+      "latitude": 0.5,
+      "longitude": 0.5,
+      "radius": 100,
+      "passive": false,
+      "persons": [
+       "person.adam"
+      ],
+      "editable": true,
+      "icon": "mdi:home",
+      "friendly_name": "Home"
+     }
+    }
+   }
+  },
+  {
+   "type": "update_location",
+   "request": {
+    "data_plaintext": "{\"battery\":101}",
+    "nonce_hex": "4150502d4e4f4e43457570646174655f6c6f636174696f6e",
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"QVBQLU5PTkNFdXBkYXRlX2xvY2F0aW9us5UCSzEeuPzVZ5LqLplL2lpUAYeLiW5of9r596IjDQ==\",\"type\":\"update_location\"}"
+   },
+   "response": {
+    "status": 200,
+    "headers": {
+     "Content-Type": "application/json; charset=utf-8"
+    },
+    "body": "{}"
+   },
+   "effects": {
+    "state_writes": [
+     {
+      "entity_id": "device_tracker.phone",
+      "state": "unknown",
+      "attributes": {
+       "in_zones": [],
+       "source_type": "gps",
+       "battery_level": 101,
+       "friendly_name": " Phone"
+      },
+      "context_user_id": null
+     },
+     {
+      "entity_id": "zone.home",
+      "state": "0",
+      "attributes": {
+       "latitude": 0.5,
+       "longitude": 0.5,
+       "radius": 100,
+       "passive": false,
+       "persons": [],
+       "editable": true,
+       "icon": "mdi:home",
+       "friendly_name": "Home"
+      },
+      "context_user_id": null
+     },
+     {
+      "entity_id": "person.adam",
+      "state": "unknown",
+      "attributes": {
+       "editable": true,
+       "id": "adam",
+       "device_trackers": [
+        "device_tracker.phone"
+       ],
+       "in_zones": [],
+       "user_id": "00112233445566778899aabbccddeeff",
+       "friendly_name": "adam"
+      },
+      "context_user_id": null
+     }
+    ],
+    "events": [],
+    "service_calls": []
+   },
+   "case": "battery 101",
+   "after": {
+    "device_tracker.phone": {
+     "state": "unknown",
+     "attributes": {
+      "in_zones": [],
+      "source_type": "gps",
+      "battery_level": 101,
+      "friendly_name": " Phone"
+     }
+    },
+    "person.adam": {
+     "state": "unknown",
+     "attributes": {
+      "editable": true,
+      "id": "adam",
+      "device_trackers": [
+       "device_tracker.phone"
+      ],
+      "in_zones": [],
+      "user_id": "00112233445566778899aabbccddeeff",
+      "friendly_name": "adam"
+     }
+    },
+    "zone.home": {
+     "state": "0",
+     "attributes": {
+      "latitude": 0.5,
+      "longitude": 0.5,
+      "radius": 100,
+      "passive": false,
+      "persons": [],
+      "editable": true,
+      "icon": "mdi:home",
+      "friendly_name": "Home"
+     }
+    }
+   }
+  },
+  {
+   "type": "update_location",
+   "request": {
+    "data_plaintext": "{\"battery\":1,\"wifi\":\"x\"}",
+    "nonce_hex": "4150502d4e4f4e43457570646174655f6c6f636174696f6e",
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"QVBQLU5PTkNFdXBkYXRlX2xvY2F0aW9uWhKIbttNaq02b0z0P1\\/6flpUAYeLiW5of9r5974wB8ROaU8VV21+iA==\",\"type\":\"update_location\"}"
+   },
+   "response": {
+    "status": 200,
+    "headers": {
+     "Content-Type": "application/json; charset=utf-8"
+    },
+    "body": "{}"
+   },
+   "effects": {
+    "state_writes": [],
+    "events": [],
+    "service_calls": []
+   },
+   "case": "unknown key → invalid",
+   "after": {
+    "device_tracker.phone": {
+     "state": "unknown",
+     "attributes": {
+      "in_zones": [],
+      "source_type": "gps",
+      "battery_level": 101,
+      "friendly_name": " Phone"
+     }
+    },
+    "person.adam": {
+     "state": "unknown",
+     "attributes": {
+      "editable": true,
+      "id": "adam",
+      "device_trackers": [
+       "device_tracker.phone"
+      ],
+      "in_zones": [],
+      "user_id": "00112233445566778899aabbccddeeff",
+      "friendly_name": "adam"
+     }
+    },
+    "zone.home": {
+     "state": "0",
+     "attributes": {
+      "latitude": 0.5,
+      "longitude": 0.5,
+      "radius": 100,
+      "passive": false,
+      "persons": [],
+      "editable": true,
+      "icon": "mdi:home",
+      "friendly_name": "Home"
+     }
+    }
+   }
+  },
+  {
+   "type": "update_location",
+   "request": {
+    "data_plaintext": "{}",
+    "nonce_hex": "4150502d4e4f4e43457570646174655f6c6f636174696f6e",
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"QVBQLU5PTkNFdXBkYXRlX2xvY2F0aW9uUxIFbHPQcK\\/GlttC4xKx8VoL\",\"type\":\"update_location\"}"
+   },
+   "response": {
+    "status": 200,
+    "headers": {
+     "Content-Type": "application/json; charset=utf-8"
+    },
+    "body": "{}"
+   },
+   "effects": {
+    "state_writes": [
+     {
+      "entity_id": "device_tracker.phone",
+      "state": "unknown",
+      "attributes": {
+       "in_zones": [],
+       "source_type": "gps",
+       "friendly_name": " Phone"
+      },
+      "context_user_id": null
+     }
+    ],
+    "events": [],
+    "service_calls": []
+   },
+   "case": "empty payload",
+   "after": {
+    "device_tracker.phone": {
+     "state": "unknown",
+     "attributes": {
+      "in_zones": [],
+      "source_type": "gps",
+      "friendly_name": " Phone"
+     }
+    },
+    "person.adam": {
+     "state": "unknown",
+     "attributes": {
+      "editable": true,
+      "id": "adam",
+      "device_trackers": [
+       "device_tracker.phone"
+      ],
+      "in_zones": [],
+      "user_id": "00112233445566778899aabbccddeeff",
+      "friendly_name": "adam"
+     }
+    },
+    "zone.home": {
+     "state": "0",
+     "attributes": {
+      "latitude": 0.5,
+      "longitude": 0.5,
+      "radius": 100,
+      "passive": false,
+      "persons": [],
+      "editable": true,
+      "icon": "mdi:home",
+      "friendly_name": "Home"
+     }
+    }
+   }
+  },
+  {
+   "type": "update_location",
+   "request": {
+    "data_plaintext": "{\"battery\":70,\"gps\":[0.5,0.5],\"gps_accuracy\":5}",
+    "nonce_hex": "4150502d4e4f4e43457570646174655f6c6f636174696f6e",
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"QVBQLU5PTkNFdXBkYXRlX2xvY2F0aW9uijeBq3VqUF1zxS1iWO\\/XHVpUAYeLiW5of9r58aI+UspYc08VLiVywN8sbGHzNXfRFJW1OoqZ+ksppASpwjhE\",\"type\":\"update_location\"}"
+   },
+   "response": {
+    "status": 200,
+    "headers": {
+     "Content-Type": "application/json; charset=utf-8"
+    },
+    "body": "{}"
+   },
+   "effects": {
+    "state_writes": [
+     {
+      "entity_id": "device_tracker.phone",
+      "state": "home",
+      "attributes": {
+       "in_zones": [
+        "zone.home"
+       ],
+       "source_type": "gps",
+       "battery_level": 70,
+       "latitude": 0.5,
+       "longitude": 0.5,
+       "gps_accuracy": 5.0,
+       "friendly_name": " Phone"
+      },
+      "context_user_id": null
+     },
+     {
+      "entity_id": "person.adam",
+      "state": "home",
+      "attributes": {
+       "editable": true,
+       "id": "adam",
+       "device_trackers": [
+        "device_tracker.phone"
+       ],
+       "in_zones": [
+        "zone.home"
+       ],
+       "latitude": 0.5,
+       "longitude": 0.5,
+       "gps_accuracy": 5.0,
+       "source": "device_tracker.phone",
+       "user_id": "00112233445566778899aabbccddeeff",
+       "friendly_name": "adam"
+      },
+      "context_user_id": null
+     },
+     {
+      "entity_id": "zone.home",
+      "state": "1",
+      "attributes": {
+       "latitude": 0.5,
+       "longitude": 0.5,
+       "radius": 100,
+       "passive": false,
+       "persons": [
+        "person.adam"
+       ],
+       "editable": true,
+       "icon": "mdi:home",
+       "friendly_name": "Home"
+      },
+      "context_user_id": null
+     }
+    ],
+    "events": [],
+    "service_calls": []
+   },
+   "case": "back home",
+   "after": {
+    "device_tracker.phone": {
+     "state": "home",
+     "attributes": {
+      "in_zones": [
+       "zone.home"
+      ],
+      "source_type": "gps",
+      "battery_level": 70,
+      "latitude": 0.5,
+      "longitude": 0.5,
+      "gps_accuracy": 5.0,
+      "friendly_name": " Phone"
+     }
+    },
+    "person.adam": {
+     "state": "home",
+     "attributes": {
+      "editable": true,
+      "id": "adam",
+      "device_trackers": [
+       "device_tracker.phone"
+      ],
+      "in_zones": [
+       "zone.home"
+      ],
+      "latitude": 0.5,
+      "longitude": 0.5,
+      "gps_accuracy": 5.0,
+      "source": "device_tracker.phone",
+      "user_id": "00112233445566778899aabbccddeeff",
+      "friendly_name": "adam"
+     }
+    },
+    "zone.home": {
+     "state": "1",
+     "attributes": {
+      "latitude": 0.5,
+      "longitude": 0.5,
+      "radius": 100,
+      "passive": false,
+      "persons": [
+       "person.adam"
+      ],
+      "editable": true,
+      "icon": "mdi:home",
+      "friendly_name": "Home"
+     }
+    }
+   }
+  },
+  {
+   "restore_rows": [
+    {
+     "state": {
+      "entity_id": "person.adam",
+      "state": "home",
+      "attributes": {
+       "editable": true,
+       "id": "adam",
+       "device_trackers": [
+        "device_tracker.phone"
+       ],
+       "in_zones": [
+        "zone.home"
+       ],
+       "latitude": 0.5,
+       "longitude": 0.5,
+       "gps_accuracy": 5.0,
+       "source": "device_tracker.phone",
+       "user_id": "00112233445566778899aabbccddeeff",
+       "friendly_name": "adam"
+      },
+      "last_changed": "2026-11-14T19:56:33.184169+00:00",
+      "last_reported": "2026-11-14T19:56:33.184169+00:00",
+      "last_updated": "2026-11-14T19:56:33.184169+00:00",
+      "context": {
+       "id": "01M7DT43H09JEQHY92TNF9XPTX",
+       "parent_id": null,
+       "user_id": null
+      }
+     },
+     "extra_data": null,
+     "last_seen": "2026-11-14T19:56:33.184474+00:00"
+    },
+    {
+     "state": {
+      "entity_id": "device_tracker.phone",
+      "state": "home",
+      "attributes": {
+       "in_zones": [
+        "zone.home"
+       ],
+       "source_type": "gps",
+       "battery_level": 70,
+       "latitude": 0.5,
+       "longitude": 0.5,
+       "gps_accuracy": 5.0,
+       "friendly_name": " Phone"
+      },
+      "last_changed": "2026-11-14T19:56:33.184094+00:00",
+      "last_reported": "2026-11-14T19:56:33.184094+00:00",
+      "last_updated": "2026-11-14T19:56:33.184094+00:00",
+      "context": {
+       "id": "01M7DT43H0QRG4WN3SN9M5247W",
+       "parent_id": null,
+       "user_id": null
+      }
+     },
+     "extra_data": {
+      "data": {
+       "battery": 70,
+       "gps": [
+        0.5,
+        0.5
+       ],
+       "gps_accuracy": 5.0
+      }
+     },
+     "last_seen": "2026-11-14T19:56:33.184474+00:00"
+    }
+   ]
+  }
+ ],
+ "logs": [
+  "DEBUG homeassistant.components.mobile_app.helpers: Successfully decrypted mobile_app payload",
+  "DEBUG homeassistant.components.mobile_app.webhook: Received webhook payload from  Phone for type update_location: {'battery': 70}",
+  "DEBUG homeassistant.components.mobile_app.helpers: Successfully decrypted mobile_app payload",
+  "DEBUG homeassistant.components.mobile_app.webhook: Received webhook payload from  Phone for type update_location: {'altitude': 12.5, 'battery': 70, 'course': 90.7, 'gps': [0.5, 0.5], 'gps_accuracy': 5, 'speed': 1.9, 'vertical_accuracy': 3.2}",
+  "DEBUG homeassistant.components.mobile_app.helpers: Successfully decrypted mobile_app payload",
+  "DEBUG homeassistant.components.mobile_app.webhook: Received webhook payload from  Phone for type update_location: {'battery': 69, 'gps': [0.501349, 0.5], 'gps_accuracy': 10}",
+  "DEBUG homeassistant.components.mobile_app.helpers: Successfully decrypted mobile_app payload",
+  "DEBUG homeassistant.components.mobile_app.webhook: Received webhook payload from  Phone for type update_location: {'battery': 69, 'gps': [0.501349, 0.5], 'gps_accuracy': 60}",
+  "DEBUG homeassistant.components.mobile_app.helpers: Successfully decrypted mobile_app payload",
+  "DEBUG homeassistant.components.mobile_app.webhook: Received webhook payload from  Phone for type update_location: {'battery': 69, 'gps': [0.501349, 0.5], 'gps_accuracy': 50.0}",
+  "DEBUG homeassistant.components.mobile_app.helpers: Successfully decrypted mobile_app payload",
+  "DEBUG homeassistant.components.mobile_app.webhook: Received webhook payload from  Phone for type update_location: {'battery': 68, 'in_zones': ['zone.home'], 'location_name': 'home'}",
+  "DEBUG homeassistant.components.mobile_app.helpers: Successfully decrypted mobile_app payload",
+  "DEBUG homeassistant.components.mobile_app.webhook: Received webhook payload from  Phone for type update_location: {'battery': 68, 'in_zones': []}",
+  "DEBUG homeassistant.components.mobile_app.helpers: Successfully decrypted mobile_app payload",
+  "DEBUG homeassistant.components.mobile_app.webhook: Received webhook payload from  Phone for type update_location: {'in_zones': ['zone.nowhere']}",
+  "DEBUG homeassistant.components.mobile_app.helpers: Successfully decrypted mobile_app payload",
+  "DEBUG homeassistant.components.mobile_app.webhook: Received webhook payload from  Phone for type update_location: {'location_name': 'home'}",
+  "DEBUG homeassistant.components.mobile_app.helpers: Successfully decrypted mobile_app payload",
+  "DEBUG homeassistant.components.mobile_app.webhook: Received webhook payload from  Phone for type update_location: {'location_name': 'not_home'}",
+  "DEBUG homeassistant.components.mobile_app.helpers: Successfully decrypted mobile_app payload",
+  "DEBUG homeassistant.components.mobile_app.webhook: Received webhook payload from  Phone for type update_location: {'location_name': 'Work'}",
+  "DEBUG homeassistant.components.mobile_app.helpers: Successfully decrypted mobile_app payload",
+  "DEBUG homeassistant.components.mobile_app.webhook: Received webhook payload from  Phone for type update_location: {'gps': [0.5044966, 0.5], 'gps_accuracy': 5, 'location_name': 'home'}",
+  "DEBUG homeassistant.components.mobile_app.helpers: Successfully decrypted mobile_app payload",
+  "DEBUG homeassistant.components.mobile_app.webhook: Received webhook payload from  Phone for type update_location: {'gps': [0.5, 0.5], 'gps_accuracy': 5, 'speed': -0.5}",
+  "DEBUG homeassistant.components.mobile_app.helpers: Successfully decrypted mobile_app payload",
+  "DEBUG homeassistant.components.mobile_app.webhook: Received webhook payload from  Phone for type update_location: {'gps': [0.5, 0.5], 'gps_accuracy': 5, 'speed': -1.5}",
+  "ERROR homeassistant.components.mobile_app.webhook: Received invalid webhook payload: value must be at least 0 for dictionary value @ data['speed']. Got -1.5",
+  "DEBUG homeassistant.components.mobile_app.helpers: Successfully decrypted mobile_app payload",
+  "DEBUG homeassistant.components.mobile_app.webhook: Received webhook payload from  Phone for type update_location: {'gps': [0.5, 0.5]}",
+  "ERROR homeassistant.components.mobile_app.webhook: Received invalid webhook payload: dependency violation - key \"gps\" requires key \"gps_accuracy\" to exist. Got {'gps': [0.5, 0.5]}",
+  "DEBUG homeassistant.components.mobile_app.helpers: Successfully decrypted mobile_app payload",
+  "DEBUG homeassistant.components.mobile_app.webhook: Received webhook payload from  Phone for type update_location: {'gps': [0.5, 0.5], 'gps_accuracy': 0}",
+  "DEBUG homeassistant.components.mobile_app.helpers: Successfully decrypted mobile_app payload",
+  "DEBUG homeassistant.components.mobile_app.webhook: Received webhook payload from  Phone for type update_location: {'battery': 101}",
+  "DEBUG homeassistant.components.mobile_app.helpers: Successfully decrypted mobile_app payload",
+  "DEBUG homeassistant.components.mobile_app.webhook: Received webhook payload from  Phone for type update_location: {'battery': 1, 'wifi': 'x'}",
+  "ERROR homeassistant.components.mobile_app.webhook: Received invalid webhook payload: extra keys not allowed @ data['wifi']. Got 'x'",
+  "DEBUG homeassistant.components.mobile_app.helpers: Successfully decrypted mobile_app payload",
+  "DEBUG homeassistant.components.mobile_app.webhook: Received webhook payload from  Phone for type update_location: {}",
+  "DEBUG homeassistant.components.mobile_app.helpers: Successfully decrypted mobile_app payload",
+  "DEBUG homeassistant.components.mobile_app.webhook: Received webhook payload from  Phone for type update_location: {'battery': 70, 'gps': [0.5, 0.5], 'gps_accuracy': 5}"
+ ]
+}

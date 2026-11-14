@@ -23,6 +23,7 @@ fn vector(name: &str) -> Value {
         "sensors" => include_str!("vectors/sensors.json"),
         "startup" => include_str!("vectors/startup.json"),
         "restore" => include_str!("vectors/restore_state_phone.json"),
+        "location" => include_str!("vectors/location.json"),
         _ => unreachable!(),
     };
     serde_json::from_str(text).unwrap()
@@ -710,5 +711,83 @@ fn check_rows(registry: &ha_registry::Registry, rows: &Value, i: usize) {
         for (k, v) in want.as_object().unwrap() {
             assert_eq!(&got[k], v, "{i} {id} {k}");
         }
+    }
+}
+
+/// HA's `location.json`: the tracker after each `update_location`, and
+/// what it dumps for restore.
+#[tokio::test]
+async fn location_updates_as_ha() {
+    let app = app();
+    let v = vector("location");
+    let steps = v["exchanges"].as_array().unwrap();
+    assert_eq!(
+        state_json(&app.hass, "device_tracker.phone"),
+        steps[0]["initial"]["device_tracker.phone"]
+    );
+    let mut feed = app.hass.subscribe_state_changes();
+    let mut n = 0;
+    for step in &steps[1..] {
+        if let Some(rows) = step.get("restore_rows") {
+            let want = rows
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|r| r["state"]["entity_id"] == "device_tracker.phone")
+                .unwrap();
+            let got = app
+                .hass
+                .restore()
+                .extra_data_now("device_tracker.phone")
+                .unwrap();
+            assert_eq!(got, want["extra_data"]);
+            continue;
+        }
+        let case = step["case"].as_str().unwrap_or_default();
+        let got = send(
+            &app,
+            WEBHOOK,
+            "POST",
+            step["request"]["body"].as_str(),
+            None,
+        )
+        .await;
+        assert_eq!((got.status, got.body.as_str()), (200, "{}"), "{case}");
+        let want = &step["after"]["device_tracker.phone"];
+        assert_eq!(
+            state_json(&app.hass, "device_tracker.phone"),
+            *want,
+            "{case}"
+        );
+        // Valid updates always write (`force_update`); invalid ones don't.
+        let wrote = std::iter::from_fn(|| feed.try_recv()).any(|e| {
+            matches!(&e.kind, EventKind::StateChanged { entity_id, .. }
+                if entity_id.as_str() == "device_tracker.phone")
+        });
+        assert_eq!(wrote, !case.contains("invalid"), "{case}");
+        n += 1;
+    }
+    assert_eq!(n, 20);
+}
+
+/// The tracker and notify entity restore as HA's `startup.json`; the
+/// notify services fail cleanly.
+#[tokio::test]
+async fn tracker_and_notify_restore_as_ha() {
+    let app = app();
+    let v = vector("startup");
+    for id in ["device_tracker.phone", "notify.phone"] {
+        assert_eq!(state_json(&app.hass, id), v["states"][id], "{id}");
+    }
+    for service in ["send_message", "mobile_app_phone"] {
+        let err = app
+            .hass
+            .call_service("notify", service, Map::new(), None, false, None)
+            .await
+            .unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "Push notifications are not supported by hars yet"
+        );
     }
 }

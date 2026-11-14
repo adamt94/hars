@@ -215,7 +215,27 @@ impl Hass {
             context,
             &inner.clock,
             &inner.bus,
-            false,
+            state::WriteMode::Normal,
+        )
+    }
+
+    /// HA's `force_update` write: `state_changed` fires even when nothing
+    /// changed (trackers whose location is pushed).
+    pub fn set_state_forced(
+        &self,
+        entity_id: EntityId,
+        state: impl Into<smol_str::SmolStr>,
+        attributes: Attributes,
+    ) -> Arc<State> {
+        let inner = &*self.inner;
+        inner.states.set(
+            entity_id,
+            state.into(),
+            attributes,
+            None,
+            &inner.clock,
+            &inner.bus,
+            state::WriteMode::Force,
         )
     }
 
@@ -235,7 +255,7 @@ impl Hass {
             None,
             &inner.clock,
             &inner.bus,
-            true,
+            state::WriteMode::IfAbsent,
         );
     }
 

@@ -3,6 +3,7 @@
 
 pub mod crypto;
 pub mod sensor;
+pub mod tracker;
 
 use crypto::Key;
 use parking_lot::RwLock;
@@ -159,6 +160,33 @@ impl Registration {
     }
 }
 
+/// The notify services the app's registration brings (`notify.send_message`
+/// and the legacy `notify.mobile_app_<device>`), which fail: `hars` sends
+/// no push notifications.
+fn register_notify_services(hass: &ha_core::Hass, registrations: &[Arc<Registration>]) {
+    if registrations.is_empty() {
+        return;
+    }
+    let fail = |_| async {
+        Err(ha_core::ServiceError::Failed(
+            "Push notifications are not supported by hars yet".into(),
+        ))
+    };
+    let services = hass.services();
+    services.register(
+        "notify",
+        "send_message",
+        ha_core::SupportsResponse::None,
+        fail,
+    );
+    for reg in registrations {
+        if let Some(name) = reg.device_name() {
+            let service = format!("mobile_app_{}", ha_core::slugify(&name));
+            services.register("notify", service, ha_core::SupportsResponse::None, fail);
+        }
+    }
+}
+
 /// Python truthiness of a JSON value.
 pub fn truthy(v: &Value) -> bool {
     match v {
@@ -178,6 +206,7 @@ pub struct MobileApp {
     registrations: RwLock<HashMap<Arc<str>, Arc<Registration>>>,
     deleted_ids: HashSet<String>,
     sensors: std::sync::OnceLock<sensor::Sensors>,
+    trackers: std::sync::OnceLock<tracker::Trackers>,
 }
 
 /// The webhook's view of an id.
@@ -220,6 +249,7 @@ impl MobileApp {
             registrations: RwLock::new(registrations),
             deleted_ids: deleted_ids.into_iter().collect(),
             sensors: std::sync::OnceLock::new(),
+            trackers: std::sync::OnceLock::new(),
         }
     }
 
@@ -229,7 +259,17 @@ impl MobileApp {
         let regs: Vec<Arc<Registration>> = self.registrations.read().values().cloned().collect();
         let _ = self
             .sensors
-            .set(sensor::Sensors::setup(hass, registry, &regs));
+            .set(sensor::Sensors::setup(hass, registry.clone(), &regs));
+        let _ = self
+            .trackers
+            .set(tracker::Trackers::setup(hass, registry.clone(), &regs));
+        tracker::setup_notify(hass, &registry, &regs);
+        register_notify_services(hass, &regs);
+    }
+
+    /// The trackers, once [`MobileApp::setup`] ran.
+    pub fn trackers(&self) -> Option<&tracker::Trackers> {
+        self.trackers.get()
     }
 
     /// The sensors, once [`MobileApp::setup`] ran.
