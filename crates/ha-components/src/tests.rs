@@ -382,3 +382,34 @@ async fn a_non_gps_home_tracker_wins() {
     );
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// Occupancy is settled when `start` returns: automations attached right
+/// after see the home zone already at 1, not a later "arrival".
+#[tokio::test]
+async fn zones_are_settled_when_start_returns() {
+    let dir = std::env::temp_dir().join(format!("hars-tracking-start-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let (hass, components) = tracking_setup(&dir);
+    hass.set_state(
+        EntityId::parse("device_tracker.phone").unwrap(),
+        "home",
+        json!({"source_type": "gps"}).as_object().unwrap().clone(),
+    );
+    let mut feed = hass.subscribe_state_changes();
+    components.start(&hass);
+    // No yield: the task hasn't run.
+    assert_eq!(state_of(&hass, "person.adam")["state"], "home");
+    assert_eq!(state_of(&hass, "zone.home")["state"], "1");
+    // Person, then zone, in HA's order.
+    let order: Vec<String> = std::iter::from_fn(|| feed.try_recv())
+        .filter_map(|e| match &e.kind {
+            ha_core::EventKind::StateChanged { entity_id, .. } => Some(entity_id.to_string()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(order, ["person.adam", "zone.home"]);
+    // The task doesn't write either again once it catches up.
+    settle().await;
+    assert!(feed.try_recv().is_none());
+    let _ = std::fs::remove_dir_all(&dir);
+}

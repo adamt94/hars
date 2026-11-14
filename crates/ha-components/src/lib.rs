@@ -40,6 +40,29 @@ struct Tracked {
     zones: Vec<Zone>,
     /// Set at `homeassistant_start`: people follow their trackers from then.
     started: bool,
+    /// Every person's trackers, to skip other state changes cheaply.
+    trackers: HashSet<String>,
+}
+
+impl Tracked {
+    /// Recompute a person, then the zones: HA's zones update inside the
+    /// person's `state_changed`, so both happen under one lock, in order,
+    /// before anything else reads them.
+    fn update(&mut self, hass: &Hass, person: usize) {
+        let state = self.persons[person].update(hass);
+        let entity_id = &self.persons[person].entity_id;
+        for zone in &mut self.zones {
+            let before = zone.persons.len();
+            if zone.holds(Some(&state)) {
+                zone.persons.insert(entity_id.to_string());
+            } else {
+                zone.persons.remove(entity_id.as_str());
+            }
+            if zone.persons.len() != before {
+                zone.write(hass);
+            }
+        }
+    }
 }
 
 /// A person entity: what its state is made from.
@@ -91,7 +114,11 @@ impl Zone {
 impl Person {
     /// `_update_extra_state_attributes` and the write, from a source state
     /// (or none: `unknown`).
-    fn write(&self, hass: &Hass, source: Option<(&ha_core::State, &ha_core::State)>) {
+    fn write(
+        &self,
+        hass: &Hass,
+        source: Option<(&ha_core::State, &ha_core::State)>,
+    ) -> Arc<ha_core::State> {
         let mut a = self.base.clone();
         a.insert("editable".into(), json!(true));
         a.insert("id".into(), json!(self.id));
@@ -116,12 +143,12 @@ impl Person {
         if let Some(user) = &self.user_id {
             a.insert("user_id".into(), json!(user));
         }
-        hass.set_state(self.entity_id.clone(), state, a);
+        hass.set_state(self.entity_id.clone(), state, a)
     }
 
     /// `_update_state`: the latest GPS tracker, unless a non-GPS tracker
     /// says `home`; trackers in `unknown`/`unavailable` don't count.
-    fn update(&self, hass: &Hass) {
+    fn update(&self, hass: &Hass) -> Arc<ha_core::State> {
         let latest = |prev: Option<Arc<ha_core::State>>, cur: Arc<ha_core::State>| match prev {
             Some(p) if cur.last_updated <= p.last_updated => Some(p),
             _ => Some(cur),
@@ -158,7 +185,7 @@ impl Person {
             }
             None => gps.or(not_home).map(|s| (s.clone(), s)),
         };
-        self.write(hass, chosen.as_ref().map(|(l, c)| (&**l, &**c)));
+        self.write(hass, chosen.as_ref().map(|(l, c)| (&**l, &**c)))
     }
 }
 
@@ -306,7 +333,9 @@ impl Components {
                 .and_then(|v| serde_json::from_value::<RestoredState>(v).ok());
             match last {
                 Some(last) => p.write_restored(hass, &last),
-                None => p.write(hass, None),
+                None => {
+                    p.write(hass, None);
+                }
             }
             persons.push(Arc::new(p));
         }
@@ -332,6 +361,10 @@ impl Components {
             tracked.push(zone);
         }
         let mut t = self.entities.lock();
+        t.trackers = persons
+            .iter()
+            .flat_map(|p| p.device_trackers.iter().cloned())
+            .collect();
         t.persons = persons;
         t.zones = tracked;
     }
@@ -339,73 +372,43 @@ impl Components {
     /// `homeassistant_start`: people read their trackers, and follow them
     /// from now on.
     pub fn start(&self, hass: &Hass) {
-        let persons = {
-            let mut t = self.entities.lock();
-            t.started = true;
-            t.persons.clone()
-        };
-        for p in persons {
-            p.update(hass);
+        // One lock for the whole pass: the task can't interleave a newer
+        // tracker reading with it.
+        let mut t = self.entities.lock();
+        t.started = true;
+        for i in 0..t.persons.len() {
+            t.update(hass, i);
         }
     }
 
-    /// Follow tracker and person changes (one task; it sleeps until a
-    /// state changes).
+    /// Follow tracker changes (one task; it sleeps until a state changes).
     pub fn track(self: &Arc<Self>, hass: &Hass) -> tokio::task::JoinHandle<()> {
         let mut feed = hass.subscribe_state_changes();
         feed.snapshot.clear();
         let (this, hass) = (self.clone(), hass.clone());
         tokio::spawn(async move {
             while let Some(event) = feed.recv().await {
-                let ha_core::EventKind::StateChanged {
-                    entity_id,
-                    new_state,
-                    ..
-                } = &event.kind
-                else {
+                let ha_core::EventKind::StateChanged { entity_id, .. } = &event.kind else {
                     continue;
                 };
-                this.changed(&hass, entity_id, new_state.as_deref());
+                this.changed(&hass, entity_id);
             }
         })
     }
 
-    fn changed(&self, hass: &Hass, entity_id: &EntityId, new_state: Option<&ha_core::State>) {
-        if entity_id.domain() == "person" {
-            // `_person_state_change_listener`: write only when the count changes.
-            let mut t = self.entities.lock();
-            let changed: Vec<usize> = t
-                .zones
-                .iter_mut()
-                .enumerate()
-                .filter_map(|(i, zone)| {
-                    let before = zone.persons.len();
-                    if zone.holds(new_state) {
-                        zone.persons.insert(entity_id.to_string());
-                    } else {
-                        zone.persons.remove(entity_id.as_str());
-                    }
-                    (zone.persons.len() != before).then_some(i)
-                })
-                .collect();
-            for i in changed {
-                t.zones[i].write(hass);
-            }
+    fn changed(&self, hass: &Hass, entity_id: &EntityId) {
+        let mut t = self.entities.lock();
+        if !t.started || !t.trackers.contains(entity_id.as_str()) {
             return;
         }
-        let persons: Vec<Arc<Person>> = {
-            let t = self.entities.lock();
-            if !t.started {
-                return;
-            }
-            t.persons
+        for i in 0..t.persons.len() {
+            if t.persons[i]
+                .device_trackers
                 .iter()
-                .filter(|p| p.device_trackers.iter().any(|d| d == entity_id.as_str()))
-                .cloned()
-                .collect()
-        };
-        for p in persons {
-            p.update(hass);
+                .any(|d| d == entity_id.as_str())
+            {
+                t.update(hass, i);
+            }
         }
     }
 
