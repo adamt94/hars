@@ -98,20 +98,7 @@ fn plain_sum<'a>(mut acc: Num2, rest: impl Iterator<Item = &'a Num>) -> Num {
     }
 }
 
-/// Python's `round(x, n)` for a float: correctly rounded from the exact
-/// binary value, ties to even (Rust's fixed-precision formatting rounds
-/// the same way).
-pub fn round(x: f64, n: usize) -> f64 {
-    if !x.is_finite() {
-        return x;
-    }
-    format!("{x:.n$}").parse().unwrap_or(x)
-}
-
-/// Python's `round(x)`: an int, ties to even.
-pub fn round_int(x: f64) -> i64 {
-    x.round_ties_even() as i64
-}
+pub use crate::num::{round, round_int};
 
 /// One field as it appears in the JSON.
 #[derive(Debug, Clone, Copy, Default, PartialEq)]

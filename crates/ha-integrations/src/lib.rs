@@ -1,7 +1,9 @@
 //! Integrations: what turns devices and services into entities. Each one is
 //! started for its config entries (HA's `core.config_entries`).
 
+pub mod light;
 pub mod met;
+pub mod num;
 pub mod sun;
 pub mod weather;
 

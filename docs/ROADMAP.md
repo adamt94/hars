@@ -258,6 +258,13 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
       HA gets). `Expires` isn't used to fetch more often: HA's cadence is
       observable. Not yet: options-flow edits, removing legacy `*-hourly`
       registry entries, the restored `unavailable` state during setup retries
+- [x] The `light` entity component, shared by `hue` and `lifx`: HA's
+      `util/color` maths and `light.turn_on`/`turn_off`/`toggle` processing
+      (schema with exclusive groups and clamps, profiles including
+      `light_profiles.csv` defaults, colour names, brightness steps, every
+      colour-space conversion, filtering by capability), capability and state
+      attributes; matched against HA's own code on 348 mireks, 4536 kelvins,
+      600 xy points and 48 service calls
 - [ ] `hue` v2: full snapshot on connect, then SSE partial-resource merge;
       reconcile after reconnect; bounded 429/503 retry; mDNS rediscovery if the
       imported host moves; link-button re-pair only if the key is rejected.
