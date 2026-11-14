@@ -20,6 +20,8 @@ pub const IMPORTER_VERSION: u32 = 1;
 /// The HA release whose formats `hars` reads.
 const SUPPORTED_HA: &str = "2026.6.";
 const REPORT_FILE: &str = "import-report.json";
+/// Where a commit keeps the destination's previous files until it's done.
+const BACKUP_DIR: &str = ".import-backup";
 const USER_DATA_PREFIX: &str = "frontend.user_data_";
 
 /// The stores `hars` reads, with whether HA writes them owner-only.
@@ -118,6 +120,21 @@ pub fn run(opts: &Options) -> anyhow::Result<Report> {
         .map(str::to_owned)
         .collect(),
     };
+
+    if !source.join(".storage").is_dir() {
+        bail!(
+            "{} has no .storage directory: has this Home Assistant been set up?",
+            source.display()
+        );
+    }
+    let backup = dest.join(BACKUP_DIR);
+    if backup.exists() {
+        bail!(
+            "an earlier import could not roll back and left the previous files in {}; \
+             move them back into .storage (or delete that directory) first",
+            backup.display()
+        );
+    }
 
     // 1. Read the source's supported stores once, into a staging directory.
     //    Validation and the commit both use exactly these bytes.
@@ -299,9 +316,9 @@ fn commit(
     mut rename: impl FnMut(&Path, &Path) -> std::io::Result<()>,
 ) -> anyhow::Result<()> {
     let storage = dest.join(".storage");
-    let backup = dest.join(".import-backup");
-    let _ = std::fs::remove_dir_all(&backup);
-    std::fs::create_dir_all(&backup)?;
+    let backup = dest.join(BACKUP_DIR);
+    // `run` refuses to start while a backup is left over; never delete one.
+    std::fs::create_dir(&backup).with_context(|| format!("{} already exists", backup.display()))?;
     std::fs::create_dir_all(&storage)?;
 
     // What was done, to undo in reverse on failure.
@@ -355,10 +372,15 @@ enum Kind {
 /// The `.storage` entries in a config directory, sorted, with whether each
 /// is a regular file (symlinks are not followed). Temporary and quarantined
 /// files are left out.
+/// A missing `.storage` is empty; any other error (permissions) is an error,
+/// never an empty list: that would read as "remove everything".
 fn storage_keys(config_dir: &Path) -> anyhow::Result<Vec<(String, Kind)>> {
     let mut keys = Vec::new();
-    let Ok(entries) = std::fs::read_dir(config_dir.join(".storage")) else {
-        return Ok(keys);
+    let dir = config_dir.join(".storage");
+    let entries = match std::fs::read_dir(&dir) {
+        Ok(entries) => entries,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(keys),
+        Err(e) => return Err(e).with_context(|| format!("listing {}", dir.display())),
     };
     for entry in entries {
         let entry = entry?;

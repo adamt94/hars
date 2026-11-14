@@ -427,3 +427,61 @@ fn bad_frontend_settings_are_skipped_without_quoting_them() {
         let _ = std::fs::remove_dir_all(d);
     }
 }
+
+#[cfg(unix)]
+#[test]
+fn an_unreadable_source_is_an_error_not_an_empty_install() {
+    use std::os::unix::fs::PermissionsExt;
+    let src = temp("unreadable");
+    ha_config(&src);
+    let dest = temp("unreadable-dest");
+    assert!(hars(&dest, &["auth", "add", "bob", "pw"]).status.success());
+    let storage = src.join(".storage");
+    std::fs::set_permissions(&storage, std::fs::Permissions::from_mode(0o300)).unwrap();
+    let out = hars(&dest, &["import", src.to_str().unwrap(), "--force"]);
+    std::fs::set_permissions(&storage, std::fs::Permissions::from_mode(0o755)).unwrap();
+    assert!(!out.status.success(), "{out:?}");
+    assert_eq!(
+        read_json(&dest.join(".storage/auth"))["data"]["users"][0]["name"],
+        "bob"
+    );
+
+    // No .storage at all: refused too.
+    let empty = temp("no-storage");
+    std::fs::create_dir_all(&empty).unwrap();
+    std::fs::write(empty.join(".HA_VERSION"), "2026.6.1").unwrap();
+    let out = hars(&dest, &["import", empty.to_str().unwrap(), "--force"]);
+    assert!(
+        String::from_utf8_lossy(&out.stderr).contains("no .storage directory"),
+        "{out:?}"
+    );
+    assert!(dest.join(".storage/auth").exists());
+    for d in [src, dest, empty] {
+        let _ = std::fs::remove_dir_all(d);
+    }
+}
+
+/// A backup left by a rollback that failed is the only copy of the old
+/// files: a later import must not delete it.
+#[test]
+fn a_leftover_backup_blocks_the_next_import() {
+    let src = temp("leftover");
+    ha_config(&src);
+    let dest = temp("leftover-dest");
+    let backup = dest.join(".import-backup");
+    std::fs::create_dir_all(&backup).unwrap();
+    std::fs::write(backup.join("auth"), "previous auth").unwrap();
+    let out = hars(&dest, &["import", src.to_str().unwrap(), "--force"]);
+    assert!(!out.status.success());
+    assert!(
+        String::from_utf8_lossy(&out.stderr).contains("could not roll back"),
+        "{out:?}"
+    );
+    assert_eq!(
+        std::fs::read_to_string(backup.join("auth")).unwrap(),
+        "previous auth"
+    );
+    for d in [src, dest] {
+        let _ = std::fs::remove_dir_all(d);
+    }
+}
