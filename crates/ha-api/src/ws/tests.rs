@@ -1377,3 +1377,46 @@ async fn brands_access_token() {
         .await;
     assert_eq!(r["error"]["code"], "unknown_command");
 }
+
+#[tokio::test]
+async fn manifests_as_ha() {
+    let s = server().await;
+    let mut c = Client::authed(&s, &token(&s.auth).0).await;
+    let r = c
+        .call(json!({"id": 2, "type": "manifest/list", "integrations": ["hue", "nope", "hue", "sun"]}))
+        .await;
+    let list = r["result"].as_array().unwrap();
+    assert_eq!(list.len(), 2);
+    assert_eq!(list[0]["name"], "Philips Hue");
+    assert_eq!(list[1]["domain"], "sun");
+    // Every loaded integration with a manifest.
+    let r = c.call(json!({"id": 3, "type": "manifest/list"})).await;
+    let names: Vec<&str> = r["result"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|m| m["domain"].as_str().unwrap())
+        .collect();
+    assert!(
+        names.contains(&"websocket_api") && names.contains(&"zone"),
+        "{names:?}"
+    );
+    let r = c
+        .call(json!({"id": 4, "type": "manifest/get", "integration": "lifx"}))
+        .await;
+    assert_eq!(r["result"]["iot_class"], "local_polling");
+    let r = c
+        .call(json!({"id": 5, "type": "manifest/get", "integration": "nope"}))
+        .await;
+    assert_eq!(
+        r["error"],
+        json!({"code": "not_found", "message": "Integration not found"})
+    );
+    let r = c
+        .call(json!({"id": 6, "type": "manifest/list", "integrations": "hue"}))
+        .await;
+    assert_eq!(
+        r["error"]["message"],
+        "expected a list for dictionary value @ data['integrations']. Got 'hue'"
+    );
+}

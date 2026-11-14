@@ -10,6 +10,7 @@
 mod commands;
 mod entities;
 mod frontend;
+mod manifest;
 mod sensor;
 mod weather;
 

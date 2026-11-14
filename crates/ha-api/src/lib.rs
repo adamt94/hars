@@ -10,6 +10,8 @@ mod labs;
 #[rustfmt::skip]
 mod i18n_data;
 mod lovelace;
+#[rustfmt::skip]
+mod manifests_data;
 mod rest;
 pub mod system_log;
 mod ws;
