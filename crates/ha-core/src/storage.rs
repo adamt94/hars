@@ -284,8 +284,9 @@ mod tests {
 
 /// HA's `Store.async_delay_save`: a write `delay` after the **last**
 /// change (each change pushes it back), of the data as it is at write
-/// time. One task per store sleeps until the deadline, and waits on a
-/// `Notify` (no timer) while nothing is pending.
+/// time. One task per store sleeps until the deadline (woken early by a
+/// reschedule), and waits on a `Notify` (no timer) while nothing is
+/// pending. The task lives as long as the runtime.
 pub struct DelayedSave {
     due: parking_lot::Mutex<Option<tokio::time::Instant>>,
     wake: tokio::sync::Notify,
@@ -309,23 +310,19 @@ impl DelayedSave {
             write: Box::new(write),
             name: name.into(),
         });
-        let task = std::sync::Arc::downgrade(&this);
+        let task = this.clone();
         tokio::spawn(async move {
+            let this = task;
             loop {
-                let Some(this) = task.upgrade() else { return };
                 let due = *this.due.lock();
                 match due {
-                    None => {
-                        // Holds the `Arc` while idle; the task ends with the
-                        // runtime.
-                        this.wake.notified().await;
-                    }
-                    Some(at) => {
-                        drop(this);
-                        tokio::time::sleep_until(at).await;
-                        let Some(this) = task.upgrade() else { return };
-                        // Pushed back meanwhile: sleep again.
-                        let ready = {
+                    // Nothing pending: no timer.
+                    None => this.wake.notified().await,
+                    Some(at) if at <= tokio::time::Instant::now() => {
+                        // Claimed under the write lock, so a flush waits
+                        // for this write rather than seeing nothing due.
+                        let turn = this.writing.lock().await;
+                        let claimed = {
                             let mut due = this.due.lock();
                             if *due == Some(at) {
                                 *due = None;
@@ -334,8 +331,15 @@ impl DelayedSave {
                                 false
                             }
                         };
-                        if ready {
-                            this.write_now().await;
+                        if claimed {
+                            this.write_locked(turn).await;
+                        }
+                    }
+                    // A reschedule (earlier or later) wakes the sleep.
+                    Some(at) => {
+                        tokio::select! {
+                            () = tokio::time::sleep_until(at) => {}
+                            () = this.wake.notified() => {}
                         }
                     }
                 }
@@ -355,15 +359,16 @@ impl DelayedSave {
         self.due.lock().is_some()
     }
 
-    /// Write now if anything is pending (`homeassistant_final_write`).
+    /// Write now if anything is pending, after any write in progress
+    /// (`homeassistant_final_write`).
     pub async fn flush(self: &std::sync::Arc<Self>) {
+        let turn = self.writing.lock().await;
         if self.due.lock().take().is_some() {
-            self.write_now().await;
+            self.write_locked(turn).await;
         }
     }
 
-    async fn write_now(self: &std::sync::Arc<Self>) {
-        let _turn = self.writing.lock().await;
+    async fn write_locked(self: &std::sync::Arc<Self>, _turn: tokio::sync::MutexGuard<'_, ()>) {
         let this = self.clone();
         let res = tokio::task::spawn_blocking(move || (this.write)()).await;
         match res {
@@ -415,6 +420,36 @@ mod delayed_save_tests {
         assert!(!save.pending());
         advance(Duration::from_secs(60)).await;
         assert_eq!(n.load(Ordering::SeqCst), 1);
+    }
+
+    /// Review regression: a nearer deadline (running, 10 s) replaces a
+    /// farther one (starting, 180 s) and is met.
+    #[tokio::test(start_paused = true)]
+    async fn a_nearer_deadline_wakes_the_sleep() {
+        let (n, save) = counter();
+        save.schedule(Duration::from_secs(180));
+        advance(Duration::from_secs(1)).await;
+        save.schedule(Duration::from_secs(10));
+        advance(Duration::from_secs(11)).await;
+        assert_eq!(n.load(Ordering::SeqCst), 1);
+    }
+
+    /// Review regression: a flush during a write waits for it.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn flush_waits_for_a_write_in_progress() {
+        let done = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let d = done.clone();
+        let save = DelayedSave::spawn("slow", move || {
+            std::thread::sleep(Duration::from_millis(300));
+            d.store(true, Ordering::SeqCst);
+            Ok(())
+        });
+        save.schedule(Duration::ZERO);
+        // Let the task claim the write.
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        assert!(!save.pending());
+        save.flush().await;
+        assert!(done.load(Ordering::SeqCst));
     }
 
     #[tokio::test(start_paused = true)]

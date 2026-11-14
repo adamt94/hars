@@ -30,6 +30,7 @@ pub struct Registry {
     /// One writer at a time, so no change is lost between copy and swap.
     writer: Mutex<()>,
     saves: Option<[Arc<DelayedSave>; 2]>,
+    entry_domains: RwLock<Option<EntryDomains>>,
 }
 
 /// What an integration wants a row to have (HA's keyword arguments to
@@ -75,6 +76,34 @@ fn random_id() -> String {
     format!("{:032x}", rand::random::<u128>())
 }
 
+/// One write: a copy of the registries, and what to publish after it is
+/// swapped in.
+struct Tx {
+    r: Registries,
+    events: Vec<(&'static str, Value)>,
+    save_entities: bool,
+    save_devices: bool,
+}
+
+impl Tx {
+    fn entity_event(&mut self, data: Value) {
+        self.events.push(("entity_registry_updated", data));
+        self.save_entities = true;
+    }
+
+    fn device_event(&mut self, data: Value) {
+        self.events.push(("device_registry_updated", data));
+        self.save_devices = true;
+    }
+}
+
+/// The domain of a config entry by id, if it exists.
+pub type EntryDomains = Arc<dyn Fn(&str) -> Option<String> + Send + Sync>;
+
+/// `LOW_PRIO_CONFIG_ENTRY_DOMAINS`: their entries yield a device's primary
+/// entry to another integration's.
+const LOW_PRIO_DOMAINS: [&str; 4] = ["homekit_controller", "matter", "mqtt", "upnp"];
+
 impl Registry {
     /// Kept in memory only (tests, and checking a copy).
     pub fn in_memory(hass: &Hass, registries: Registries) -> Arc<Self> {
@@ -83,6 +112,7 @@ impl Registry {
             snap: RwLock::new(Arc::new(registries)),
             writer: Mutex::new(()),
             saves: None,
+            entry_domains: RwLock::new(None),
         })
     }
 
@@ -113,8 +143,15 @@ impl Registry {
                 snap: RwLock::new(Arc::new(registries)),
                 writer: Mutex::new(()),
                 saves: Some([save(true), save(false)]),
+                entry_domains: RwLock::new(None),
             }
         })
+    }
+
+    /// How to find a config entry's domain (for a device's primary entry).
+    /// Without it, an existing primary entry is never replaced.
+    pub fn set_entry_domains(&self, f: EntryDomains) {
+        *self.entry_domains.write() = Some(f);
     }
 
     /// The registries as they are now.
@@ -122,7 +159,7 @@ impl Registry {
         self.snap.read().clone()
     }
 
-    /// Write whatever is pending (at stop).
+    /// Write whatever is pending, and wait for a write in progress (at stop).
     pub async fn flush(&self) {
         if let Some(saves) = &self.saves {
             for s in saves {
@@ -142,24 +179,36 @@ impl Registry {
         }
     }
 
-    fn fire(&self, event_type: &str, data: Value) {
-        let now = self.hass.clock().now();
-        self.hass.bus().fire(Event::new(
-            EventKind::Custom {
-                name: event_type.into(),
-                data,
-            },
-            now,
-            Context::at(now),
-        ));
-    }
-
-    /// Run `f` on a copy of the registries and swap it in.
-    fn change<T>(&self, f: impl FnOnce(&mut Registries) -> T) -> T {
+    /// One write, start to finish under the writer lock: read and change a
+    /// copy, swap it in, then publish its events and schedule the saves, so
+    /// lookups can't race creation and events come in commit order.
+    fn write<T>(&self, f: impl FnOnce(&mut Tx) -> T) -> T {
         let _turn = self.writer.lock();
-        let mut next = (*self.snapshot()).clone();
-        let out = f(&mut next);
-        *self.snap.write() = Arc::new(next);
+        let mut tx = Tx {
+            r: (*self.snapshot()).clone(),
+            events: Vec::new(),
+            save_entities: false,
+            save_devices: false,
+        };
+        let out = f(&mut tx);
+        *self.snap.write() = Arc::new(tx.r);
+        if tx.save_entities {
+            self.schedule_save(true);
+        }
+        if tx.save_devices {
+            self.schedule_save(false);
+        }
+        let now = self.hass.clock().now();
+        for (name, data) in tx.events {
+            self.hass.bus().fire(Event::new(
+                EventKind::Custom {
+                    name: name.into(),
+                    data,
+                },
+                now,
+                Context::at(now),
+            ));
+        }
         out
     }
 
@@ -184,18 +233,20 @@ impl Registry {
         disabled_by: Option<String>,
         patch: EntityPatch,
     ) -> Arc<Entity> {
-        if let Some(existing) = self.entity_by_unique_id(domain, platform, unique_id) {
-            self.update_entity(&existing.entity_id, patch);
-            return self
-                .entity_by_unique_id(domain, platform, unique_id)
-                .unwrap_or(existing);
-        }
         let now = now_iso(&self.hass);
-        let row = self.change(|r| {
+        self.write(|tx| {
+            if let Some(i) =
+                tx.r.entities
+                    .iter()
+                    .position(|e| is_unique(e, domain, platform, unique_id))
+            {
+                update_row(tx, i, &patch, &now);
+                return tx.r.entities[i].clone();
+            }
             let object_id_base = patch.object_id_base.clone().flatten();
             let device_id = patch.device_id.clone().flatten();
             let entity_id = generate_entity_id(
-                r,
+                &tx.r,
                 &self.hass,
                 domain,
                 platform,
@@ -232,19 +283,14 @@ impl Registry {
                 unit_of_measurement: patch.unit_of_measurement.clone().flatten(),
                 ..Default::default()
             });
-            r.entities.push(row.clone());
+            tracing::info!(
+                "Registered new {domain}.{platform} entity: {}",
+                row.entity_id
+            );
+            tx.r.entities.push(row.clone());
+            tx.entity_event(json!({"action": "create", "entity_id": row.entity_id}));
             row
-        });
-        tracing::info!(
-            "Registered new {domain}.{platform} entity: {}",
-            row.entity_id
-        );
-        self.schedule_save(true);
-        self.fire(
-            "entity_registry_updated",
-            json!({"action": "create", "entity_id": row.entity_id}),
-        );
-        row
+        })
     }
 
     /// `async_update_entity`: the fields of `patch` that differ are
@@ -252,23 +298,13 @@ impl Registry {
     /// old values. Nothing happens when nothing differs (`None`).
     pub fn update_entity(&self, entity_id: &str, patch: EntityPatch) -> Option<Map<String, Value>> {
         let now = now_iso(&self.hass);
-        let changes = self.change(|r| {
-            let i = r.entities.iter().position(|e| e.entity_id == entity_id)?;
-            let mut row = (*r.entities[i]).clone();
-            let changes = apply(&mut row, &patch);
-            if changes.is_empty() {
-                return None;
-            }
-            row.modified_at = Some(now);
-            r.entities[i] = Arc::new(row);
-            Some(changes)
-        })?;
-        self.schedule_save(true);
-        self.fire(
-            "entity_registry_updated",
-            json!({"action": "update", "entity_id": entity_id, "changes": changes}),
-        );
-        Some(changes)
+        self.write(|tx| {
+            let i =
+                tx.r.entities
+                    .iter()
+                    .position(|e| e.entity_id == entity_id)?;
+            update_row(tx, i, &patch, &now)
+        })
     }
 
     /// `async_remove`: the row moves to `deleted_entities` (replacing an
@@ -276,165 +312,172 @@ impl Registry {
     /// config entry. The caller removes the state.
     pub fn remove_entity(&self, entity_id: &str) {
         let now = self.hass.clock().now();
-        let removed = self.change(|r| {
-            let i = r.entities.iter().position(|e| e.entity_id == entity_id)?;
-            let row = r.entities.remove(i);
+        self.write(|tx| {
+            let Some(i) = tx.r.entities.iter().position(|e| e.entity_id == entity_id) else {
+                return;
+            };
+            let row = tx.r.entities.remove(i);
             let orphaned = row
                 .config_entry_id
                 .is_none()
                 .then(|| now.as_microsecond() as f64 / 1e6);
             let deleted = DeletedEntity::of(&row, ha_core::isoformat(now), orphaned);
-            let raw = serde_json::value::to_raw_value(&deleted).ok()?;
             let key = deleted.key();
-            let mut kept: Vec<RawRow> = r
-                .entity_file
-                .deleted
-                .iter()
-                .filter(|d| deleted_key(d).as_ref() != Some(&key))
-                .cloned()
-                .collect();
-            kept.push(raw);
-            r.entity_file.deleted = Arc::new(kept);
-            Some(())
+            let mut kept: Vec<RawRow> =
+                tx.r.entity_file
+                    .deleted
+                    .iter()
+                    .filter(|d| deleted_key(d).as_ref() != Some(&key))
+                    .cloned()
+                    .collect();
+            if let Ok(raw) = serde_json::value::to_raw_value(&deleted) {
+                kept.push(raw);
+            }
+            tx.r.entity_file.deleted = Arc::new(kept);
+            tx.entity_event(json!({"action": "remove", "entity_id": entity_id}));
         });
-        if removed.is_some() {
-            self.schedule_save(true);
-            self.fire(
-                "entity_registry_updated",
-                json!({"action": "remove", "entity_id": entity_id}),
-            );
-        }
     }
 
-    /// `async_get_or_create` for a device, as `mobile_app` calls it: found
-    /// by identifier, else created; the config entry is added; changed
-    /// fields fire one `update` with the old values. A name change ripples
-    /// into the device's legacy-named entities (`changes: {}` each).
+    /// `async_get_or_create` for a device, as `mobile_app` calls it
+    /// (`device_info_type` "primary"): found by identifier, else created;
+    /// the config entry is added, and made primary when the device has
+    /// none, or its primary entry is gone or a low-priority integration's;
+    /// changed fields fire one `update` with the old values. A name change
+    /// ripples into the device's legacy-named entities (`changes: {}`).
     pub fn get_or_create_device(&self, info: DeviceInfo) -> Arc<Device> {
         let now = now_iso(&self.hass);
-        let (device, event, renamed) = self.change(
-            |r| -> (Arc<Device>, Option<Value>, Option<Option<String>>) {
-                let found = r
-                    .devices
-                    .iter()
-                    .position(|d| d.identifiers.iter().any(|i| info.identifiers.contains(i)));
-                let (i, mut d, is_new) = match found {
-                    Some(i) => (Some(i), (*r.devices[i]).clone(), false),
-                    None => (
-                        None,
-                        Device {
-                            id: random_id(),
-                            created_at: Some(now.clone()),
-                            modified_at: Some(now.clone()),
-                            ..Default::default()
-                        },
-                        true,
-                    ),
+        let domains = self.entry_domains.read().clone();
+        self.write(|tx| {
+            let r = &mut tx.r;
+            let found = r
+                .devices
+                .iter()
+                .position(|d| d.identifiers.iter().any(|i| info.identifiers.contains(i)));
+            let (i, mut d, is_new) = match found {
+                Some(i) => (Some(i), (*r.devices[i]).clone(), false),
+                None => (
+                    None,
+                    Device {
+                        id: random_id(),
+                        created_at: Some(now.clone()),
+                        modified_at: Some(now.clone()),
+                        ..Default::default()
+                    },
+                    true,
+                ),
+            };
+            let old_name = d.display_name().map(str::to_owned);
+            let mut changes = Map::new();
+            let entry = &info.config_entry_id;
+            if d.primary_config_entry.as_ref() != Some(entry) {
+                let replace = match (&d.primary_config_entry, &domains) {
+                    (None, _) => true,
+                    (Some(primary), Some(domains)) => {
+                        domains(primary).is_none_or(|dom| LOW_PRIO_DOMAINS.contains(&dom.as_str()))
+                    }
+                    (Some(_), None) => false,
                 };
-                let mut changes = Map::new();
-                let entry = &info.config_entry_id;
-                if d.primary_config_entry.is_none() {
+                if replace {
                     changes.insert("primary_config_entry".into(), json!(d.primary_config_entry));
                     d.primary_config_entry = Some(entry.clone());
                 }
-                if !d.config_entries.contains(entry) {
-                    changes.insert("config_entries".into(), json!(d.config_entries));
-                    changes.insert(
-                        "config_entries_subentries".into(),
-                        Value::Object(d.config_entries_subentries.clone()),
-                    );
-                    d.config_entries.push(entry.clone());
-                    d.config_entries_subentries
-                        .insert(entry.clone(), json!([null]));
-                }
-                let new_ids: Vec<Value> = info
-                    .identifiers
-                    .iter()
-                    .filter(|id| !d.identifiers.contains(id))
-                    .cloned()
-                    .collect();
-                if !new_ids.is_empty() {
-                    changes.insert("identifiers".into(), json!(d.identifiers));
-                    d.identifiers.extend(new_ids);
-                }
-                let mut set = |key: &str, field: &mut Option<String>, value: &Option<String>| {
-                    if value.is_some() && field != value {
-                        changes.insert(key.into(), json!(field));
-                        field.clone_from(value);
-                    }
-                };
-                set("manufacturer", &mut d.manufacturer, &info.manufacturer);
-                set("model", &mut d.model, &info.model);
-                set("name", &mut d.name, &info.name);
-                set("sw_version", &mut d.sw_version, &info.sw_version);
-                if !is_new && changes.is_empty() {
-                    return (r.devices[i.expect("found")].clone(), None, None);
-                }
-                d.modified_at = Some(now.clone());
-                // The display name before, if `name` changed.
-                let renamed = (!is_new && changes.contains_key("name")).then(|| {
-                    let old = i.map(|i| r.devices[i].clone());
-                    old.and_then(|o| o.display_name().map(str::to_owned))
-                });
-                let device = Arc::new(d);
-                match i {
-                    Some(i) => r.devices[i] = device.clone(),
-                    None => r.devices.push(device.clone()),
-                }
-                let event = if is_new {
-                    json!({"action": "create", "device_id": device.id})
-                } else {
-                    json!({"action": "update", "device_id": device.id, "changes": changes})
-                };
-                (device, Some(event), renamed)
-            },
-        );
-        let Some(event) = event else {
-            return device;
-        };
-        self.schedule_save(false);
-        self.fire("device_registry_updated", event);
-        if let Some(old_name) = renamed {
-            self.device_renamed(&device, old_name.as_deref());
-        }
-        device
-    }
-
-    /// `async_device_modified` for a `name` change: each legacy-named
-    /// entity's unprefixed name (not stored) is recomputed; where it
-    /// differs, `modified_at` is bumped and `update` fires with empty
-    /// `changes`.
-    fn device_renamed(&self, device: &Device, old_name: Option<&str>) {
-        let new_name = device.display_name();
-        let unprefixed = |name: Option<&str>, device: Option<&str>| strip_prefix(name?, device?);
-        let now = now_iso(&self.hass);
-        let touched = self.change(|r| {
-            let mut touched = Vec::new();
-            for e in r.entities.iter_mut() {
-                if e.device_id.as_deref() != Some(device.id.as_str()) || e.has_entity_name {
-                    continue;
-                }
-                let name = e.original_name.as_deref();
-                if unprefixed(name, old_name) == unprefixed(name, new_name) {
-                    continue;
-                }
-                let mut row = (**e).clone();
-                row.modified_at = Some(now.clone());
-                touched.push(row.entity_id.clone());
-                *e = Arc::new(row);
             }
-            touched
-        });
-        if touched.is_empty() {
-            return;
+            if !d.config_entries.contains(entry) {
+                changes.insert("config_entries".into(), json!(d.config_entries));
+                changes.insert(
+                    "config_entries_subentries".into(),
+                    Value::Object(d.config_entries_subentries.clone()),
+                );
+                d.config_entries.push(entry.clone());
+                d.config_entries_subentries
+                    .insert(entry.clone(), json!([null]));
+            }
+            let new_ids: Vec<Value> = info
+                .identifiers
+                .iter()
+                .filter(|id| !d.identifiers.contains(id))
+                .cloned()
+                .collect();
+            if !new_ids.is_empty() {
+                changes.insert("identifiers".into(), json!(d.identifiers));
+                d.identifiers.extend(new_ids);
+            }
+            let mut set = |key: &str, field: &mut Option<String>, value: &Option<String>| {
+                if value.is_some() && field != value {
+                    changes.insert(key.into(), json!(field));
+                    field.clone_from(value);
+                }
+            };
+            set("manufacturer", &mut d.manufacturer, &info.manufacturer);
+            set("model", &mut d.model, &info.model);
+            set("name", &mut d.name, &info.name);
+            set("sw_version", &mut d.sw_version, &info.sw_version);
+            if !is_new && changes.is_empty() {
+                return r.devices[i.expect("found")].clone();
+            }
+            d.modified_at = Some(now.clone());
+            let renamed = !is_new && changes.contains_key("name");
+            let device = Arc::new(d);
+            match i {
+                Some(i) => r.devices[i] = device.clone(),
+                None => r.devices.push(device.clone()),
+            }
+            tx.device_event(if is_new {
+                json!({"action": "create", "device_id": device.id})
+            } else {
+                json!({"action": "update", "device_id": device.id, "changes": changes})
+            });
+            if renamed {
+                device_renamed(tx, &device, old_name.as_deref(), &now);
+            }
+            device
+        })
+    }
+}
+
+fn is_unique(e: &Entity, domain: &str, platform: &str, unique_id: &str) -> bool {
+    e.platform == platform
+        && e.entity_id.split('.').next() == Some(domain)
+        && e.unique_id.as_ref().and_then(Value::as_str) == Some(unique_id)
+}
+
+/// Apply `patch` to row `i`: on a change, bump `modified_at` and queue the
+/// `update` event with the old values.
+fn update_row(tx: &mut Tx, i: usize, patch: &EntityPatch, now: &str) -> Option<Map<String, Value>> {
+    let mut row = (*tx.r.entities[i]).clone();
+    let changes = apply(&mut row, patch);
+    if changes.is_empty() {
+        return None;
+    }
+    row.modified_at = Some(now.to_owned());
+    let entity_id = row.entity_id.clone();
+    tx.r.entities[i] = Arc::new(row);
+    tx.entity_event(json!({"action": "update", "entity_id": entity_id, "changes": changes}));
+    Some(changes)
+}
+
+/// `async_device_modified` for a `name` change: each legacy-named entity's
+/// unprefixed name (not stored) is recomputed; where it differs,
+/// `modified_at` is bumped and `update` fires with empty `changes`.
+fn device_renamed(tx: &mut Tx, device: &Device, old_name: Option<&str>, now: &str) {
+    let new_name = device.display_name();
+    let unprefixed = |name: Option<&str>, device: Option<&str>| strip_prefix(name?, device?);
+    let mut touched = Vec::new();
+    for e in tx.r.entities.iter_mut() {
+        if e.device_id.as_deref() != Some(device.id.as_str()) || e.has_entity_name {
+            continue;
         }
-        self.schedule_save(true);
-        for entity_id in touched {
-            self.fire(
-                "entity_registry_updated",
-                json!({"action": "update", "entity_id": entity_id, "changes": {}}),
-            );
+        let name = e.original_name.as_deref();
+        if unprefixed(name, old_name) == unprefixed(name, new_name) {
+            continue;
         }
+        let mut row = (**e).clone();
+        row.modified_at = Some(now.to_owned());
+        touched.push(row.entity_id.clone());
+        *e = Arc::new(row);
+    }
+    for entity_id in touched {
+        tx.entity_event(json!({"action": "update", "entity_id": entity_id, "changes": {}}));
     }
 }
 
@@ -444,11 +487,9 @@ fn find_unique<'a>(
     platform: &str,
     unique_id: &str,
 ) -> Option<&'a Arc<Entity>> {
-    r.entities.iter().find(|e| {
-        e.platform == platform
-            && e.entity_id.split('.').next() == Some(domain)
-            && e.unique_id.as_ref().and_then(Value::as_str) == Some(unique_id)
-    })
+    r.entities
+        .iter()
+        .find(|e| is_unique(e, domain, platform, unique_id))
 }
 
 /// Apply `patch`, returning the old values of what changed.

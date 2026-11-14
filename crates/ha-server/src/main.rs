@@ -119,6 +119,23 @@ async fn run(thp_disabled: std::io::Result<bool>) -> anyhow::Result<()> {
         let dir = config_dir.clone();
         tokio::task::spawn_blocking(move || ha_integrations::load_entries(&dir)).await?
     };
+    {
+        // A device's primary config entry yields to a new one when its
+        // entry is gone or a low-priority integration's (HA).
+        let domains: std::collections::HashMap<String, String> = entries
+            .iter()
+            .flatten()
+            .filter_map(|e| {
+                Some((
+                    e.get("entry_id")?.as_str()?.to_owned(),
+                    e.get("domain")?.as_str()?.to_owned(),
+                ))
+            })
+            .collect();
+        registry.set_entry_domains(std::sync::Arc::new(move |id: &str| {
+            domains.get(id).cloned()
+        }));
+    }
     ha_api::system_log::register(&hass);
     let profiles = {
         let dir = config_dir.clone();

@@ -526,3 +526,129 @@ async fn saves_are_delayed_as_ha() {
     assert_eq!(std::fs::read(&file).unwrap(), b"untouched");
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// Review regression: concurrent get-or-create of one unique id makes one
+/// row, and each entity's events alternate create/remove in commit order.
+#[test]
+fn concurrent_writes_are_serialised() {
+    let hass = Hass::new();
+    let reg = Registry::in_memory(&hass, Registries::default());
+    let barrier = std::sync::Barrier::new(32);
+    std::thread::scope(|s| {
+        for _ in 0..32 {
+            s.spawn(|| {
+                barrier.wait();
+                reg.get_or_create_entity("sensor", "p", "same", None, EntityPatch::default());
+            });
+        }
+    });
+    assert_eq!(reg.snapshot().entities.len(), 1);
+
+    let mut rx = hass.bus().subscribe();
+    let barrier = std::sync::Barrier::new(8);
+    std::thread::scope(|s| {
+        for t in 0..8 {
+            let (reg, barrier) = (&reg, &barrier);
+            s.spawn(move || {
+                barrier.wait();
+                for _ in 0..20 {
+                    let e = reg.get_or_create_entity(
+                        "sensor",
+                        "p",
+                        "flip",
+                        None,
+                        EntityPatch::default(),
+                    );
+                    if t % 2 == 0 {
+                        reg.remove_entity(&e.entity_id);
+                    }
+                }
+            });
+        }
+    });
+    let mut last: Option<String> = None;
+    for (_, data) in events(&mut rx) {
+        if data["entity_id"] != "sensor.p_flip" {
+            continue;
+        }
+        let action = data["action"].as_str().unwrap().to_owned();
+        if let Some(prev) = &last {
+            assert_ne!(prev, &action, "two {action}s in a row");
+        }
+        last = Some(action);
+    }
+    // The registry agrees with the last event.
+    let exists = reg
+        .snapshot()
+        .entities
+        .iter()
+        .any(|e| e.entity_id == "sensor.p_flip");
+    assert_eq!(exists, last.as_deref() == Some("create"));
+}
+
+/// HA's `device_info_type == "primary"`: the entry becomes primary when
+/// the device has none, or its primary entry is gone or a low-priority
+/// integration's.
+#[test]
+fn primary_config_entries_as_ha() {
+    let hass = Hass::new();
+    let device = |id: &str, primary: &str| {
+        Arc::new(Device {
+            id: id.into(),
+            identifiers: vec![json!(["mobile_app", id])],
+            config_entries: vec![primary.into()],
+            primary_config_entry: Some(primary.into()),
+            ..Default::default()
+        })
+    };
+    let reg = Registry::in_memory(
+        &hass,
+        Registries {
+            devices: crate::rows![],
+            ..Default::default()
+        },
+    );
+    reg.write(|tx| {
+        tx.r.devices = vec![
+            device("a", "mqtt-entry"),
+            device("b", "hue-entry"),
+            device("c", "gone-entry"),
+        ];
+    });
+    let info = |id: &str| DeviceInfo {
+        config_entry_id: ENTRY.into(),
+        identifiers: vec![json!(["mobile_app", id])],
+        ..Default::default()
+    };
+    // Without knowing the entries, an existing primary stays.
+    assert_eq!(
+        reg.get_or_create_device(info("a"))
+            .primary_config_entry
+            .as_deref(),
+        Some("mqtt-entry")
+    );
+    reg.set_entry_domains(Arc::new(|id: &str| match id {
+        "mqtt-entry" => Some("mqtt".into()),
+        "hue-entry" => Some("hue".into()),
+        _ => None,
+    }));
+    let mut rx = hass.bus().subscribe();
+    let a = reg.get_or_create_device(info("a"));
+    assert_eq!(a.primary_config_entry.as_deref(), Some(ENTRY));
+    assert_eq!(
+        events(&mut rx)[0].1["changes"]["primary_config_entry"],
+        "mqtt-entry"
+    );
+    assert_eq!(
+        reg.get_or_create_device(info("b"))
+            .primary_config_entry
+            .as_deref(),
+        Some("hue-entry")
+    );
+    assert_eq!(
+        reg.get_or_create_device(info("c"))
+            .primary_config_entry
+            .as_deref(),
+        Some(ENTRY)
+    );
+}
