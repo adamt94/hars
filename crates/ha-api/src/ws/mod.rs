@@ -527,13 +527,12 @@ pub(crate) type Invalid = String;
 /// whole message when it names none; `None` when nothing is there), cut to
 /// 500 characters.
 pub(crate) fn humanize(msg: &Value, why: &str) -> String {
-    // Several errors (voluptuous's `MultipleInvalid`): one line each.
+    // Several errors (voluptuous's `MultipleInvalid`): one line each,
+    // sorted as `humanize_error` sorts them.
     if why.contains('\n') {
-        return why
-            .lines()
-            .map(|line| humanize(msg, line))
-            .collect::<Vec<_>>()
-            .join("\n");
+        let mut lines: Vec<String> = why.lines().map(|line| humanize(msg, line)).collect();
+        lines.sort_unstable();
+        return lines.join("\n");
     }
     let at = match why.rfind(" @ data") {
         Some(i) => path_value(msg, &why[i + " @ data".len()..]),

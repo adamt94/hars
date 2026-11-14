@@ -1412,8 +1412,21 @@ async fn manifests_as_ha() {
         r["error"],
         json!({"code": "not_found", "message": "Integration not found"})
     );
+    // Loaded ones first (`zone` is), then the rest, each as asked.
     let r = c
-        .call(json!({"id": 6, "type": "manifest/list", "integrations": "hue"}))
+        .call(json!({"id": 7, "type": "manifest/list", "integrations": ["hue", "zone"]}))
+        .await;
+    assert_eq!(r["result"][0]["domain"], "zone");
+    // voluptuous's errors, sorted.
+    let r = c
+        .call(json!({"id": 8, "type": "manifest/list", "a": 1, "integrations": 3}))
+        .await;
+    assert_eq!(
+        r["error"]["message"],
+        "expected a list for dictionary value @ data['integrations']. Got 3\nextra keys not allowed @ data['a']. Got 1"
+    );
+    let r = c
+        .call(json!({"id": 9, "type": "manifest/list", "integrations": "hue"}))
         .await;
     assert_eq!(
         r["error"]["message"],

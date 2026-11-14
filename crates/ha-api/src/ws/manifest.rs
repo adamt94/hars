@@ -72,6 +72,13 @@ pub(super) fn dispatch(
                         .map(str::to_owned)
                         .collect()
                 });
+            // `async_get_integrations`: the ones already loaded (cached)
+            // first, then the rest, each in the order asked.
+            let loaded = crate::components(&conn.shared.config);
+            let (mut asked, rest): (Vec<String>, Vec<String>) = asked
+                .into_iter()
+                .partition(|d| loaded.contains(&d.as_str()));
+            asked.extend(rest);
             let mut seen = Vec::new();
             let mut parts = Vec::new();
             for d in asked {

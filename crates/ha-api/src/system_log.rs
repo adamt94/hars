@@ -91,9 +91,18 @@ fn clear() {
 /// A `tracing` layer keeping warnings and errors (HA's handler is at
 /// WARNING). The logger is the event's `logger` field if it has one (as
 /// `system_log.write` sets), else its target.
-pub fn layer<S: tracing::Subscriber>() -> impl tracing_subscriber::Layer<S> {
-    SystemLogLayer
+pub fn layer<S>() -> impl tracing_subscriber::Layer<S>
+where
+    S: tracing::Subscriber + for<'a> tracing_subscriber::registry::LookupSpan<'a>,
+{
+    use tracing_subscriber::Layer;
+    // Its own filter, so DEBUG/TRACE call sites stay disabled.
+    SystemLogLayer.with_filter(tracing_subscriber::filter::LevelFilter::WARN)
 }
+
+/// Where HA's `system_log.write` logs from (`_figure_out_source` finds
+/// the service handler's call), so every write of a logger is one entry.
+const WRITE_SOURCE: (&str, u32) = ("components/system_log/__init__.py", 329);
 
 struct SystemLogLayer;
 
@@ -101,6 +110,8 @@ struct SystemLogLayer;
 struct Fields {
     message: String,
     logger: Option<String>,
+    /// `system_log.write`'s own entry: already stored.
+    stored: bool,
 }
 
 impl tracing::field::Visit for Fields {
@@ -109,6 +120,12 @@ impl tracing::field::Visit for Fields {
             "logger" => self.logger = Some(value.to_owned()),
             "message" => self.message = value.to_owned(),
             _ => {}
+        }
+    }
+
+    fn record_bool(&mut self, field: &tracing::field::Field, value: bool) {
+        if field.name() == "stored" {
+            self.stored = value;
         }
     }
 
@@ -131,6 +148,9 @@ impl<S: tracing::Subscriber> tracing_subscriber::Layer<S> for SystemLogLayer {
         };
         let mut f = Fields::default();
         event.record(&mut f);
+        if f.stored {
+            return;
+        }
         let name = f.logger.unwrap_or_else(|| meta.target().replace("::", "."));
         let source = (
             meta.file().unwrap_or_default().to_owned(),
@@ -159,12 +179,32 @@ pub fn register(hass: &Hass) {
             let text = |k: &str| call.data.get(k).and_then(Value::as_str);
             let message = text("message").unwrap_or_default();
             let logger = text("logger").unwrap_or("homeassistant.components.system_log.external");
-            match text("level").unwrap_or("error") {
+            let level = text("level").unwrap_or("error");
+            // Stored here (one source for every write, HA's level names),
+            // then only printed.
+            let name = match level {
+                "warning" => Some("WARNING"),
+                "error" => Some("ERROR"),
+                "critical" => Some("CRITICAL"),
+                _ => None,
+            };
+            if let Some(name) = name {
+                let now = jiff::Timestamp::now().as_microsecond() as f64 / 1e6;
+                let (file, line) = WRITE_SOURCE;
+                add(
+                    logger,
+                    name,
+                    (file.to_owned(), line),
+                    message.to_owned(),
+                    now,
+                );
+            }
+            match level {
                 "debug" => tracing::debug!(logger, "{message}"),
                 "info" => tracing::info!(logger, "{message}"),
-                "warning" => tracing::warn!(logger, "{message}"),
+                "warning" => tracing::warn!(logger, stored = true, "{message}"),
                 // `error` and `critical`.
-                _ => tracing::error!(logger, "{message}"),
+                _ => tracing::error!(logger, stored = true, "{message}"),
             }
             Ok(None)
         },
@@ -186,8 +226,11 @@ mod tests {
     use super::*;
     use serde_json::json;
 
+    // The guard only serializes tests; nothing else takes it.
+    #[allow(clippy::await_holding_lock)]
     #[tokio::test]
     async fn write_checks_its_data_as_has_schema() {
+        let _guard = SERIAL.lock();
         let hass = Hass::new();
         register(&hass);
         let call = |data: Value| {
@@ -219,9 +262,12 @@ mod tests {
         assert_eq!(clear, Ok(None));
     }
 
-    /// One test touches the process-wide store, so nothing races it.
+    /// The tests share the process-wide store.
+    static SERIAL: parking_lot::Mutex<()> = parking_lot::Mutex::new(());
+
     #[test]
     fn dedups_as_has_store() {
+        let _guard = SERIAL.lock();
         use tracing_subscriber::layer::SubscriberExt;
         clear();
         let subscriber = tracing_subscriber::registry().with(layer());
@@ -231,6 +277,9 @@ mod tests {
                 tracing::warn!("boom {}", i % 2);
             }
             tracing::info!("not kept");
+            // Its own filter: lower levels aren't even evaluated.
+            assert!(!tracing::enabled!(tracing::Level::DEBUG));
+            assert!(tracing::enabled!(tracing::Level::WARN));
             tracing::error!(logger = "frontend.js.latest", "bad");
             for i in 0..60 {
                 add("x", "ERROR", ("f".into(), i), "m".into(), 0.0);
@@ -264,5 +313,42 @@ mod tests {
         );
         clear();
         assert_eq!(list(), json!([]));
+    }
+
+    /// Writes through the service: one entry per logger whatever the
+    /// level (HA logs them from one place), the first level kept, and
+    /// `critical` named as such.
+    // The guard only serializes tests; nothing else takes it.
+    #[allow(clippy::await_holding_lock)]
+    #[tokio::test]
+    async fn service_writes_as_ha() {
+        let _guard = SERIAL.lock();
+        clear();
+        let hass = Hass::new();
+        register(&hass);
+        let write = |data: Value| {
+            let hass = hass.clone();
+            async move {
+                let Value::Object(data) = data else { panic!() };
+                hass.call_service("system_log", "write", data, None, false, None)
+                    .await
+                    .unwrap();
+            }
+        };
+        write(json!({"message": "warning", "level": "warning", "logger": "test.logger"})).await;
+        write(json!({"message": "error", "level": "error", "logger": "test.logger"})).await;
+        write(json!({"message": "boom", "level": "critical", "logger": "other"})).await;
+        write(json!({"message": "quiet", "level": "info", "logger": "other"})).await;
+        let all = list();
+        assert_eq!(all.as_array().unwrap().len(), 2, "{all}");
+        assert_eq!(all[0]["level"], "CRITICAL");
+        assert_eq!(all[1]["count"], 2);
+        assert_eq!(all[1]["level"], "WARNING");
+        assert_eq!(all[1]["message"], json!(["warning", "error"]));
+        assert_eq!(
+            all[1]["source"],
+            json!(["components/system_log/__init__.py", 329])
+        );
+        clear();
     }
 }
