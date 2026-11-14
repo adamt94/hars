@@ -60,9 +60,7 @@ async fn post_state(
     Ok(Json(json!(hass.set_state(id, state, attributes))))
 }
 
-/// Same shape as Home Assistant's `GET /api/services`. Service descriptions
-/// (`services.yaml`) are not loaded yet, so each one is `{"fields": {}}` plus
-/// `response` metadata, as HA reports for a service without a description.
+/// Same shape as Home Assistant's `GET /api/services`.
 async fn list_services(State(hass): State<Hass>) -> Json<Value> {
     let domains: Vec<Value> = hass
         .services()
@@ -71,23 +69,23 @@ async fn list_services(State(hass): State<Hass>) -> Json<Value> {
         .map(|(domain, services)| {
             let services: serde_json::Map<String, Value> = services
                 .into_iter()
-                .map(|(name, supports)| {
-                    let description = match supports {
-                        SupportsResponse::None => json!({ "fields": {} }),
-                        SupportsResponse::Optional => {
-                            json!({ "fields": {}, "response": { "optional": true } })
-                        }
-                        SupportsResponse::Only => {
-                            json!({ "fields": {}, "response": { "optional": false } })
-                        }
-                    };
-                    (name.to_string(), description)
-                })
+                .map(|(name, supports)| (name.to_string(), service_description(supports)))
                 .collect();
             json!({ "domain": domain, "services": services })
         })
         .collect();
     Json(Value::Array(domains))
+}
+
+/// A service's description. `services.yaml` isn't loaded yet, so it is
+/// `{"fields": {}}` plus `response` metadata, as HA reports for a service
+/// without a description.
+pub(crate) fn service_description(supports: SupportsResponse) -> Value {
+    match supports {
+        SupportsResponse::None => json!({ "fields": {} }),
+        SupportsResponse::Optional => json!({ "fields": {}, "response": { "optional": true } }),
+        SupportsResponse::Only => json!({ "fields": {}, "response": { "optional": false } }),
+    }
 }
 
 fn message(status: StatusCode, message: impl std::fmt::Display) -> Response {
@@ -99,6 +97,7 @@ fn message(status: StatusCode, message: impl std::fmt::Display) -> Response {
 /// `?return_response` `{"changed_states": [...], "service_response": {...}}`.
 async fn call_service(
     State(hass): State<Hass>,
+    principal: Option<axum::Extension<ha_auth::Principal>>,
     Path((domain, service)): Path<(String, String)>,
     Query(query): Query<Vec<(String, String)>>,
     body: String,
@@ -114,8 +113,11 @@ async fn call_service(
         }
     };
     let return_response = query.iter().any(|(key, _)| key == "return_response");
-    // No auth yet, so no user; HA uses the request's user here.
-    let context = Context::at(hass.clock().now());
+    // The caller's user, as HA's `self.context(request)`.
+    let mut context = Context::at(hass.clock().now());
+    if let Some(axum::Extension(p)) = principal {
+        context = context.with_user(p.user_id.as_str());
+    }
 
     // Subscribe before the call so no change it causes is missed.
     let mut rx = hass.bus().subscribe();

@@ -126,8 +126,13 @@ fn full_login_issues_working_tokens() {
         TokenError::InvalidClient
     );
 
-    // Revoking the refresh token kills its access tokens at once.
+    // Revoking the refresh token kills its access tokens at once, and tells
+    // open connections.
+    let mut revocations = auth.subscribe_revocations();
+    assert!(auth.is_token_live(&p.refresh_token_id));
     assert!(auth.revoke(&refresh));
+    assert_eq!(revocations.try_recv().unwrap(), p.refresh_token_id);
+    assert!(!auth.is_token_live(&p.refresh_token_id));
     assert!(
         auth.validate_access_token(&again.access_token, lan())
             .is_none()

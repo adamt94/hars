@@ -174,14 +174,17 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
       admin-only services once services exist that need it
 - [ ] REST bodies parsed as JSON whatever the `Content-Type`, as HA does
       (today a missing `application/json` is a 415)
-- [ ] REST `/api/config` (truthful `components` list, version, units, location)
-- [ ] WS core: `auth`, `ping`, `supported_features` (**coalescing only once it
+- [x] REST `/api/config` (truthful `components` list, version, units, location),
+      from HA's `.storage/core.config` (1.4)
+- [x] WS core: `auth`, `ping`, `supported_features` (**coalescing only once it
       is negotiated**), `subscribe_events`/`unsubscribe_events`, `get_states`,
       `get_config`, `get_services`, `call_service`, `get_panels`,
-      `auth/current_user`
-- [ ] WS `subscribe_entities`: compressed `a`/`c`/`r` diffs, attribute
-      removals, context; subscribe and snapshot taken atomically; a lagged
-      client gets a fresh snapshot
+      `auth/current_user`; HA's id rules and error codes, the 55 s heartbeat,
+      4096-message cut-off, and close on token revocation. Binary 2.70 → 3.08 MiB
+- [x] WS `subscribe_entities`: compressed `a`/`c`/`r` diffs, attribute
+      removals, context; subscribe and snapshot taken atomically. A client
+      that falls behind is disconnected, as in HA, and gets a fresh snapshot
+      when the frontend reconnects
 - [ ] WS frontend: `frontend/get_themes`, `frontend/get_translations`,
       `frontend/subscribe_user_data`, `frontend/subscribe_system_data`,
       `frontend/set_user_data`, `manifest/list`, `brands/access_token`

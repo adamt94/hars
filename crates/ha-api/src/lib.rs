@@ -4,6 +4,7 @@
 mod auth;
 mod frontend;
 mod rest;
+mod ws;
 
 pub use frontend::Frontend;
 
@@ -14,6 +15,7 @@ use axum::{
 };
 use ha_auth::Auth;
 use ha_core::Hass;
+use ha_core::config::ConfigSource;
 use std::sync::Arc;
 
 /// What the API serves besides the REST endpoints.
@@ -22,6 +24,75 @@ pub struct ApiConfig {
     /// The `hass_frontend` directory from the pinned
     /// `home-assistant-frontend` release. `None` serves the API only.
     pub frontend: Option<Arc<Frontend>>,
+    /// The config directory, as `get_config` reports it.
+    pub config_dir: String,
+    /// Whether `.storage/core.config` existed (`config_source`).
+    pub config_source: ConfigSource,
+}
+
+/// What the WebSocket and `/api/config` need.
+#[derive(Clone)]
+pub(crate) struct Shared {
+    pub hass: Hass,
+    pub auth: Auth,
+    pub config: Arc<ApiConfig>,
+}
+
+/// The integrations `hars` implements, by HA domain: `get_config`'s
+/// `components`. The frontend gates features on this list, so it only names
+/// what really works.
+fn components(config: &ApiConfig) -> Vec<&'static str> {
+    let mut c = vec!["api", "auth", "http", "onboarding", "websocket_api"];
+    if config.frontend.is_some() {
+        c.push("frontend");
+    }
+    c
+}
+
+/// `hass.config.as_dict()`, for `get_config` and `GET /api/config`.
+/// `external_url` is left out for `local_only` users, as HA does.
+pub(crate) fn config_json(shared: &Shared, local_only: bool) -> serde_json::Value {
+    let c = shared.hass.config();
+    let mut v = serde_json::json!({
+        "allowlist_external_dirs": [],
+        "allowlist_external_urls": [],
+        "components": components(&shared.config),
+        "config_dir": shared.config.config_dir,
+        "config_source": shared.config.config_source.as_str(),
+        "country": c.country,
+        "currency": c.currency,
+        "debug": false,
+        "elevation": c.elevation,
+        "external_url": c.external_url,
+        "internal_url": c.internal_url,
+        "language": c.language,
+        "latitude": c.latitude,
+        "location_name": c.location_name,
+        "longitude": c.longitude,
+        "radius": c.radius,
+        "recovery_mode": false,
+        "safe_mode": false,
+        "state": shared.hass.core_state(),
+        "time_zone": c.time_zone,
+        "unit_system": c.unit_system(),
+        "version": ha_auth::HA_VERSION,
+        "whitelist_external_dirs": [],
+    });
+    if local_only {
+        v.as_object_mut().expect("object").remove("external_url");
+    }
+    v
+}
+
+async fn api_config(
+    axum::extract::State(shared): axum::extract::State<Shared>,
+    axum::Extension(principal): axum::Extension<ha_auth::Principal>,
+) -> axum::Json<serde_json::Value> {
+    let local_only = shared
+        .auth
+        .user(&principal.user_id)
+        .is_some_and(|u| u.local_only);
+    axum::Json(config_json(&shared, local_only))
 }
 
 /// Every route, with the headers HA adds to every response. `/api/*`
@@ -30,11 +101,25 @@ pub struct ApiConfig {
 /// Serve it with `into_make_service_with_connect_info::<SocketAddr>()`:
 /// login flows and `local_only` users depend on the client's address.
 pub fn router(hass: Hass, auth: Auth, config: &ApiConfig) -> Router {
-    let api = rest::router(hass).route_layer(axum::middleware::from_fn_with_state(
-        auth.clone(),
-        auth::require_auth,
-    ));
-    let mut router = api.merge(auth::routes(auth.clone()));
+    let shared = Shared {
+        hass: hass.clone(),
+        auth: auth.clone(),
+        config: Arc::new(config.clone()),
+    };
+    let config_route = Router::new()
+        .route("/api/config", axum::routing::get(api_config))
+        .with_state(shared.clone());
+    let api =
+        rest::router(hass)
+            .merge(config_route)
+            .route_layer(axum::middleware::from_fn_with_state(
+                auth.clone(),
+                auth::require_auth,
+            ));
+    // The WebSocket authenticates inside the protocol, not over HTTP.
+    let mut router = api
+        .merge(auth::routes(auth.clone()))
+        .merge(ws::routes(shared));
     if let Some(fe) = &config.frontend {
         router = router.merge(frontend::routes(fe.clone(), auth));
     }

@@ -101,3 +101,12 @@ anonymous, 15 s after each step):
 The baseline gained 0.5 MiB, mostly the larger binary's mapped pages. The
 first login adds 0.4 MiB: mimalloc keeps the heap the blocking thread used for
 bcrypt. Each further login costs about 20 KiB (a refresh token in memory).
+
+### WebSocket API, 2026-11-14
+
+Same harness as above (no WebSocket client connected). An open connection
+costs one timer: the 55 s heartbeat ping.
+
+| binary | start→/api/ | idle RSS | idle PSS | idle CPU | wakeups/s | threads | run |
+|---|---|---|---|---|---|---|---|
+| 3.08 MiB | 9 ms | 5.5 MiB | 4.6 MiB | 0.000 % | 0.00 | 3 | 15s warm-up, 30s quiet |

@@ -182,6 +182,8 @@ struct Inner {
     /// Serializes [`Auth::save`] so an older snapshot never lands last.
     save_lock: Mutex<()>,
     bcrypt_cost: u32,
+    /// Ids of revoked refresh tokens, so open WebSockets using them close.
+    revoked: tokio::sync::broadcast::Sender<String>,
 }
 
 /// Shared handle; cheap to clone.
@@ -247,6 +249,7 @@ impl Auth {
             }),
             save_lock: Mutex::new(()),
             bcrypt_cost,
+            revoked: tokio::sync::broadcast::channel(16).0,
         })))
     }
 
@@ -608,12 +611,44 @@ impl Auth {
         let mut s = self.0.state.lock();
         match find_by_token(&s.data.refresh_tokens, refresh_token) {
             Some(i) => {
-                s.data.refresh_tokens.remove(i);
+                let token = s.data.refresh_tokens.remove(i);
                 s.dirty |= DIRTY_AUTH;
+                let _ = self.0.revoked.send(token.id);
                 true
             }
             None => false,
         }
+    }
+
+    /// Refresh token ids as they are revoked. A receiver that lags has
+    /// missed some; it should re-check its token with [`Auth::is_token_live`].
+    pub fn subscribe_revocations(&self) -> tokio::sync::broadcast::Receiver<String> {
+        self.0.revoked.subscribe()
+    }
+
+    /// Whether a refresh token still exists and hasn't expired.
+    pub fn is_token_live(&self, refresh_token_id: &str) -> bool {
+        let now = self.now_f64();
+        self.0
+            .state
+            .lock()
+            .data
+            .refresh_tokens
+            .iter()
+            .any(|t| t.id == refresh_token_id && !expired(t, now))
+    }
+
+    /// The credentials linked to a user, as `auth/current_user` lists them.
+    pub fn credentials_of(&self, user_id: &str) -> Vec<Credential> {
+        self.0
+            .state
+            .lock()
+            .data
+            .credentials
+            .iter()
+            .filter(|c| c.user_id == user_id)
+            .cloned()
+            .collect()
     }
 
     /// Validate a `Bearer` access token (`async_validate_access_token` plus

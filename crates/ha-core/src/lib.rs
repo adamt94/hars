@@ -10,6 +10,7 @@
 //! more than necessary and must never block on I/O.
 
 mod clock;
+pub mod config;
 mod context;
 mod entity_id;
 mod event;
@@ -49,6 +50,7 @@ struct HassInner {
     states: StateMachine,
     services: ServiceRegistry,
     core_state: AtomicU8,
+    config: parking_lot::RwLock<Arc<config::CoreConfig>>,
 }
 
 impl Hass {
@@ -68,6 +70,15 @@ impl Hass {
 
     pub fn clock(&self) -> &Clock {
         &self.inner.clock
+    }
+
+    /// Location, units and locale (`hass.config`).
+    pub fn config(&self) -> Arc<config::CoreConfig> {
+        self.inner.config.read().clone()
+    }
+
+    pub fn set_config(&self, config: config::CoreConfig) {
+        *self.inner.config.write() = Arc::new(config);
     }
 
     pub fn core_state(&self) -> CoreState {

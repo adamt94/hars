@@ -76,7 +76,7 @@ fn json_message(status: StatusCode, message: &str) -> Response {
 
 /// `@log_invalid_auth` / `process_wrong_login`: a warning per failed attempt.
 /// HA's IP bans are off by default, so `hars` doesn't ban.
-fn log_invalid(ip: Option<IpAddr>, what: &str) {
+pub(crate) fn log_invalid(ip: Option<IpAddr>, what: &str) {
     match ip {
         Some(ip) => {
             tracing::warn!("login attempt or request with invalid authentication from {ip}: {what}")

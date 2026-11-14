@@ -356,6 +356,7 @@ mod tests {
     async fn get_with(auth: Auth, path: &str, accept_encoding: Option<&str>) -> Response {
         let config = crate::ApiConfig {
             frontend: Some(fake_frontend()),
+            ..Default::default()
         };
         let mut req = Request::get(path);
         if let Some(enc) = accept_encoding {

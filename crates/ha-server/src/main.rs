@@ -73,8 +73,15 @@ async fn run(thp_disabled: std::io::Result<bool>) -> anyhow::Result<()> {
 
     let hass = Hass::new();
     let addr = std::env::var("HARS_BIND").unwrap_or_else(|_| "0.0.0.0:8123".into());
-    let api_config = api_config()?;
+    let mut api_config = api_config()?;
     let config_dir = config_dir()?;
+    let (core_config, config_source) = {
+        let dir = config_dir.clone();
+        tokio::task::spawn_blocking(move || ha_core::config::CoreConfig::load(&dir)).await??
+    };
+    hass.set_config(core_config);
+    api_config.config_dir = std::path::absolute(&config_dir)?.display().to_string();
+    api_config.config_source = config_source;
     let auth = {
         let (dir, clock) = (config_dir.clone(), hass.clock().clone());
         tokio::task::spawn_blocking(move || ha_auth::Auth::load(&dir, clock)).await??
@@ -185,6 +192,7 @@ fn api_config() -> anyhow::Result<ha_api::ApiConfig> {
     tracing::info!("serving the frontend from {}", frontend.root().display());
     Ok(ha_api::ApiConfig {
         frontend: Some(std::sync::Arc::new(frontend)),
+        ..Default::default()
     })
 }
 

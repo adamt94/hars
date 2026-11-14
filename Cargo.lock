@@ -414,11 +414,15 @@ name = "ha-api"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "futures-util",
  "ha-auth",
  "ha-core",
+ "jiff",
+ "parking_lot",
  "serde_json",
  "serde_urlencoded",
  "tokio",
+ "tokio-tungstenite",
  "tower",
  "tower-http",
  "tracing",
@@ -439,6 +443,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "thiserror",
+ "tokio",
  "tracing",
 ]
 
