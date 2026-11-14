@@ -57,6 +57,14 @@ pub(super) fn dispatch(
             };
             empty(conn, list)
         }
+        "zone/list" => {
+            let r = conn.shared.config.components.zones_json();
+            empty(conn, r)
+        }
+        "person/list" => {
+            let r = conn.shared.config.components.persons_json();
+            empty(conn, r)
+        }
         "lovelace/info" => empty(conn, json!({"resource_mode": "storage"})),
         "lovelace/config" => lovelace_config(conn, id, msg),
         "lovelace/config/save" => lovelace_save(conn, id, msg, false),

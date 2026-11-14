@@ -973,3 +973,17 @@ async fn dashboards_are_served_saved_and_announced() {
     assert_eq!(r["error"]["code"], "unauthorized");
     std::fs::remove_dir_all(dir).unwrap();
 }
+
+#[tokio::test]
+async fn zone_and_person_lists() {
+    let s = server().await;
+    let mut c = Client::authed(&s, &token(&s.auth).0).await;
+    assert_eq!(
+        c.call(json!({"id": 2, "type": "zone/list"})).await["result"],
+        json!([])
+    );
+    assert_eq!(
+        c.call(json!({"id": 3, "type": "person/list"})).await["result"],
+        json!({"storage": [], "config": []})
+    );
+}

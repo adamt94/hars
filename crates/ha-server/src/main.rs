@@ -88,6 +88,13 @@ async fn run(thp_disabled: std::io::Result<bool>) -> anyhow::Result<()> {
             tokio::task::spawn_blocking(move || ha_registry::Registries::load(&dir)).await??,
         )
     };
+    let components = {
+        let dir = config_dir.clone();
+        tokio::task::spawn_blocking(move || ha_components::Components::load(&dir)).await?
+    };
+    // Zone and person entities, before anything can read the states.
+    components.setup(&hass, &api_config.registries);
+    api_config.components = std::sync::Arc::new(components);
     api_config.lovelace = {
         let dir = config_dir.clone();
         std::sync::Arc::new(

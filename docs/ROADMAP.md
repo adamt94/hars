@@ -144,7 +144,8 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
   - [x] Entity/device/area/floor/label registries (HA's files as they are:
         unique ids, disabled/hidden flags, names), read by `ha-registry`
   - [x] `core.config` (location, elevation, units, time zone)
-  - [ ] `person`, zones
+  - [x] `person`, zones (`.storage/person`, `.storage/zone`, `zone.home` from
+        `core.config`; states before any tracker reports; tracking comes in M5)
   - [x] Lovelace dashboards and the dashboards list (`url_path` identity),
         resources; storage mode (YAML dashboards come with `configuration.yaml`)
   - [x] Auth: users, bcrypt hashes, **refresh tokens with ids, client ids and

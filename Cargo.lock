@@ -416,6 +416,7 @@ dependencies = [
  "axum",
  "futures-util",
  "ha-auth",
+ "ha-components",
  "ha-core",
  "ha-registry",
  "jiff",
@@ -446,6 +447,17 @@ dependencies = [
  "sha2",
  "thiserror",
  "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "ha-components"
+version = "0.1.0"
+dependencies = [
+ "ha-core",
+ "ha-registry",
+ "serde",
+ "serde_json",
  "tracing",
 ]
 
@@ -483,6 +495,7 @@ dependencies = [
  "axum",
  "ha-api",
  "ha-auth",
+ "ha-components",
  "ha-core",
  "ha-registry",
  "mimalloc",

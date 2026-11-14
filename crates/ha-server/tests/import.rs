@@ -277,6 +277,18 @@ fn imports_an_ha_install_and_keeps_its_sessions() {
     );
     assert_eq!(status, 200, "{body}");
     let config: Value = serde_json::from_str(&body).unwrap();
+    // `zone.home` comes from the imported location.
+    let (status, states) = http(
+        port,
+        "GET",
+        "/api/states/zone.home",
+        &[("Authorization", &format!("Bearer {access}"))],
+        "",
+    );
+    assert_eq!(status, 200, "{states}");
+    let home: Value = serde_json::from_str(&states).unwrap();
+    assert_eq!(home["attributes"]["latitude"], 52.37);
+    assert_eq!(home["attributes"]["friendly_name"], "Home");
     assert_eq!(
         (config["latitude"].clone(), config["time_zone"].clone()),
         (json!(52.37), json!("Europe/Amsterdam"))

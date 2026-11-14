@@ -13,6 +13,7 @@ workspace = true
 [dependencies]
 axum = { version = "0.8.9", features = ["ws"] }
 ha-auth.workspace = true
+ha-components.workspace = true
 ha-core.workspace = true
 ha-registry.workspace = true
 futures-util = { version = "0.3", default-features = false, features = ["sink"] }

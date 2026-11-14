@@ -19,6 +19,7 @@ crates/
   ha-core/     event bus, state machine, services, clock, `.storage` files
   ha-auth/     users, credentials, login flows, refresh/access tokens (HA's `homeassistant/auth`)
   ha-registry/ entity, device, area, floor and label registries (HA's `helpers/*_registry`)
+  ha-components/ built-in components that create entities: zone, person
   ha-api/      REST API, auth HTTP views, the official frontend
   ha-server/   `hars` binary: wiring, signals, allocator, `hars auth add`
 ```

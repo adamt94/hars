@@ -38,6 +38,8 @@ pub struct ApiConfig {
     pub registries: Arc<ha_registry::Registries>,
     /// Lovelace dashboards.
     pub lovelace: Arc<Lovelace>,
+    /// Stored zones and people.
+    pub components: Arc<ha_components::Components>,
 }
 
 /// What the WebSocket and `/api/config` need.
@@ -59,8 +61,10 @@ fn components(config: &ApiConfig) -> Vec<&'static str> {
         "lovelace",
         "onboarding",
         "persistent_notification",
+        "person",
         "repairs",
         "websocket_api",
+        "zone",
     ];
     if config.frontend.is_some() {
         c.push("frontend");
