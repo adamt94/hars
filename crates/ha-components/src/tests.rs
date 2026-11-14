@@ -196,3 +196,189 @@ fn old_person_stores_load_like_ha() {
     assert_eq!(adam.attributes["device_trackers"], json!([]));
     std::fs::remove_dir_all(dir).unwrap();
 }
+
+fn tracking_setup(dir: &Path) -> (Hass, Arc<Components>) {
+    write(
+        dir,
+        PERSON_KEY,
+        2,
+        json!({"items": [{"id": "adam", "name": "adam",
+                          "user_id": "00112233445566778899aabbccddeeff",
+                          "device_trackers": ["device_tracker.phone"]}]}),
+    );
+    let hass = Hass::new();
+    hass.set_config(ha_core::config::CoreConfig {
+        latitude: 0.5,
+        longitude: 0.5,
+        radius: 100,
+        location_name: "Home".into(),
+        ..Default::default()
+    });
+    hass.set_restore(ha_core::restore::RestoreState::load(dir));
+    let components = Arc::new(Components::load_strict(dir).unwrap());
+    components.setup(&hass, &Registries::default());
+    components.track(&hass);
+    (hass, components)
+}
+
+/// Let the tracking task catch up.
+async fn settle() {
+    for _ in 0..20 {
+        tokio::task::yield_now().await;
+    }
+}
+
+fn state_of(hass: &Hass, id: &str) -> Value {
+    let s = hass.states().get(&EntityId::parse(id).unwrap()).unwrap();
+    json!({"state": s.state.as_str(), "attributes": s.attributes})
+}
+
+/// HA 2026.6.1's `location.json`: the phone's tracker state after each
+/// `update_location`, and the person and home zone HA computed from it.
+#[tokio::test]
+async fn people_and_zones_follow_trackers_as_ha() {
+    let dir = std::env::temp_dir().join(format!("hars-tracking-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let (hass, components) = tracking_setup(&dir);
+    let v: Value = serde_json::from_str(include_str!("vectors/location.json")).unwrap();
+    let steps = v["exchanges"].as_array().unwrap();
+    let initial = &steps[0]["initial"];
+    let set = |s: &Value| {
+        hass.set_state(
+            EntityId::parse("device_tracker.phone").unwrap(),
+            s["state"].as_str().unwrap(),
+            s["attributes"].as_object().unwrap().clone(),
+        );
+    };
+    set(&initial["device_tracker.phone"]);
+    hass.begin_start();
+    components.start(&hass);
+    settle().await;
+    for id in ["person.adam", "zone.home"] {
+        assert_eq!(state_of(&hass, id), initial[id], "initial {id}");
+    }
+    let mut n = 0;
+    for step in &steps[1..] {
+        let Some(after) = step.get("after") else {
+            continue;
+        };
+        set(&after["device_tracker.phone"]);
+        settle().await;
+        for id in ["person.adam", "zone.home"] {
+            assert_eq!(state_of(&hass, id), after[id], "step {n} {id}");
+        }
+        n += 1;
+    }
+    assert_eq!(n, 20);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// Before start, a person is their restored state, as its own source;
+/// trackers are read only from `homeassistant_start`.
+#[tokio::test]
+async fn people_restore_then_follow_from_start() {
+    let dir = std::env::temp_dir().join(format!("hars-person-restore-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    write(
+        &dir,
+        ha_core::restore::KEY,
+        1,
+        json!([{
+            "state": {"entity_id": "person.adam", "state": "home",
+                      "attributes": {"in_zones": ["zone.home"], "latitude": 0.5,
+                                     "longitude": 0.5, "gps_accuracy": 5.0,
+                                     "source": "device_tracker.phone"},
+                      "last_changed": "2026-11-14T08:00:00+00:00",
+                      "last_reported": "2026-11-14T08:00:00+00:00",
+                      "last_updated": "2026-11-14T08:00:00+00:00",
+                      "context": {"id": "01JFAKECONTEXT000000000000", "parent_id": null, "user_id": null}},
+            "extra_data": null,
+            "last_seen": "2026-11-14T08:00:00+00:00"
+        }]),
+    );
+    let (hass, components) = tracking_setup(&dir);
+    let person = state_of(&hass, "person.adam");
+    assert_eq!(person["state"], "home");
+    assert_eq!(person["attributes"]["source"], "person.adam");
+    assert_eq!(person["attributes"]["gps_accuracy"], 5.0);
+    // The home zone counts the restored person.
+    assert_eq!(state_of(&hass, "zone.home")["state"], "1");
+
+    // A tracker change before start is ignored.
+    hass.set_state(
+        EntityId::parse("device_tracker.phone").unwrap(),
+        "not_home",
+        json!({"source_type": "gps"}).as_object().unwrap().clone(),
+    );
+    settle().await;
+    assert_eq!(state_of(&hass, "person.adam")["state"], "home");
+    components.start(&hass);
+    settle().await;
+    assert_eq!(state_of(&hass, "person.adam")["state"], "not_home");
+    assert_eq!(state_of(&hass, "zone.home")["state"], "0");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// A router (non-GPS) tracker at home wins over GPS, with the home zone's
+/// coordinates; unknown trackers don't count.
+#[tokio::test]
+async fn a_non_gps_home_tracker_wins() {
+    let dir = std::env::temp_dir().join(format!("hars-person-nongps-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    write(
+        &dir,
+        PERSON_KEY,
+        2,
+        json!({"items": [{"id": "p", "name": "P", "user_id": null,
+                          "device_trackers": ["device_tracker.gps", "device_tracker.router", "device_tracker.off"]}]}),
+    );
+    let hass = Hass::new();
+    hass.set_config(ha_core::config::CoreConfig {
+        latitude: 1.0,
+        longitude: 2.0,
+        ..Default::default()
+    });
+    let components = Arc::new(Components::load_strict(&dir).unwrap());
+    components.setup(&hass, &Registries::default());
+    components.track(&hass);
+    let set = |id: &str, state: &str, attrs: Value| {
+        hass.set_state(
+            EntityId::parse(id).unwrap(),
+            state,
+            attrs.as_object().unwrap().clone(),
+        );
+    };
+    set(
+        "device_tracker.off",
+        "unknown",
+        json!({"source_type": "router"}),
+    );
+    set(
+        "device_tracker.gps",
+        "not_home",
+        json!({"source_type": "gps", "latitude": 9.0, "longitude": 9.0, "gps_accuracy": 3}),
+    );
+    components.start(&hass);
+    settle().await;
+    let p = state_of(&hass, "person.p");
+    assert_eq!(p["state"], "not_home");
+    assert_eq!(p["attributes"]["source"], "device_tracker.gps");
+    assert!(p["attributes"].get("user_id").is_none());
+
+    set(
+        "device_tracker.router",
+        "home",
+        json!({"source_type": "router"}),
+    );
+    settle().await;
+    let p = state_of(&hass, "person.p");
+    assert_eq!(p["state"], "home");
+    assert_eq!(p["attributes"]["source"], "device_tracker.router");
+    assert_eq!(p["attributes"]["latitude"], 1.0);
+    assert_eq!(p["attributes"]["longitude"], 2.0);
+    assert_eq!(
+        state_of(&hass, "zone.home")["attributes"]["persons"],
+        json!(["person.p"])
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+}

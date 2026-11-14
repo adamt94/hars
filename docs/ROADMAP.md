@@ -145,7 +145,9 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
         unique ids, disabled/hidden flags, names), read by `ha-registry`
   - [x] `core.config` (location, elevation, units, time zone)
   - [x] `person`, zones (`.storage/person`, `.storage/zone`, `zone.home` from
-        `core.config`; states before any tracker reports; tracking comes in M5)
+        `core.config`); people restore their last state, then follow their
+        device trackers from `homeassistant_start`; zones count them. HA's
+        Vincenty `distance` and `async_in_zones`; 20 `location.json` steps match
   - [ ] Full Unicode transliteration in `slugify` (CJK, Cyrillic) for new
         entity ids; imported ones come from the registry
   - [x] Lovelace dashboards and the dashboards list (`url_path` identity),

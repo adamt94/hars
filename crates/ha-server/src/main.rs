@@ -97,24 +97,26 @@ async fn run(thp_disabled: std::io::Result<bool>) -> anyhow::Result<()> {
             tokio::task::spawn_blocking(move || ha_registry::Registries::load(&dir)).await??,
         )
     };
-    let components = {
-        let dir = config_dir.clone();
-        tokio::task::spawn_blocking(move || ha_components::Components::load(&dir)).await?
-    };
-    // Zone and person entities, before anything can read the states.
-    components.setup(&hass, &api_config.registries);
-    api_config.components = std::sync::Arc::new(components);
-    let entries = {
-        let dir = config_dir.clone();
-        tokio::task::spawn_blocking(move || ha_integrations::load_entries(&dir)).await?
-    };
-    ha_api::system_log::register(&hass);
     // Last states, before any entity that restores itself is made.
     let restore = {
         let dir = config_dir.clone();
         tokio::task::spawn_blocking(move || ha_core::restore::RestoreState::load(&dir)).await?
     };
     hass.set_restore(restore);
+    let components = {
+        let dir = config_dir.clone();
+        tokio::task::spawn_blocking(move || ha_components::Components::load(&dir)).await?
+    };
+    // Zone and person entities, before anything can read the states.
+    components.setup(&hass, &api_config.registries);
+    let components = std::sync::Arc::new(components);
+    components.track(&hass);
+    api_config.components = components;
+    let entries = {
+        let dir = config_dir.clone();
+        tokio::task::spawn_blocking(move || ha_integrations::load_entries(&dir)).await?
+    };
+    ha_api::system_log::register(&hass);
     let profiles = {
         let dir = config_dir.clone();
         tokio::task::spawn_blocking(move || ha_integrations::light::Profiles::load(&dir)).await?
@@ -248,6 +250,7 @@ async fn run(thp_disabled: std::io::Result<bool>) -> anyhow::Result<()> {
         None => {
             hass.begin_start();
             api_config.registries.write_unavailable_states(&hass);
+            api_config.components.start(&hass);
             hass.finish_start();
             if let Some(a) = &automations {
                 a.started();

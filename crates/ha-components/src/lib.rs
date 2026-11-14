@@ -1,10 +1,9 @@
 //! Home Assistant's built-in `zone` and `person` components, from HA's
 //! `.storage/zone` (1.1) and `.storage/person` (2.1).
 //!
-//! What's here is their state before any device tracker reports: zones
-//! (`zone.home` from the location settings, plus stored zones) with nobody
-//! in them, and people whose state is `unknown`. Tracking comes with the
-//! companion app.
+//! Zones (`zone.home` from the location settings, plus stored zones) count
+//! the people in them; a person follows their device trackers from
+//! `homeassistant_start` on, and restores their last state before that.
 
 use ha_core::storage::{Store, StoreError};
 use ha_core::{Attributes, EntityId, Hass};
@@ -13,6 +12,9 @@ use serde::Deserialize;
 use serde_json::{Map, Value, json};
 use std::collections::HashSet;
 use std::path::Path;
+use std::sync::Arc;
+
+pub mod zone;
 
 pub const ZONE_KEY: &str = "zone";
 pub const PERSON_KEY: &str = "person";
@@ -28,6 +30,136 @@ struct Collection {
 pub struct Components {
     pub zones: Vec<Map<String, Value>>,
     pub persons: Vec<Map<String, Value>>,
+    /// The entities [`Components::setup`] made, for tracking.
+    entities: parking_lot::Mutex<Tracked>,
+}
+
+#[derive(Debug, Default)]
+struct Tracked {
+    persons: Vec<Arc<Person>>,
+    zones: Vec<Zone>,
+    /// Set at `homeassistant_start`: people follow their trackers from then.
+    started: bool,
+}
+
+/// A person entity: what its state is made from.
+#[derive(Debug)]
+struct Person {
+    entity_id: EntityId,
+    /// The storage id (`attributes.id`).
+    id: String,
+    device_trackers: Vec<String>,
+    user_id: Option<String>,
+    /// `friendly_name`, `icon` and `entity_picture`.
+    base: Attributes,
+}
+
+/// A zone entity and who is in it.
+#[derive(Debug)]
+struct Zone {
+    entity_id: EntityId,
+    /// The configured name, case-folded, which a person's state matches.
+    name: String,
+    /// Everything but `persons`.
+    attributes: Attributes,
+    persons: std::collections::BTreeSet<String>,
+}
+
+impl Zone {
+    /// `_state_is_in_zone`.
+    fn holds(&self, state: Option<&ha_core::State>) -> bool {
+        let Some(s) = state else {
+            return false;
+        };
+        let s = s.state.as_str();
+        !matches!(s, "not_home" | "unknown" | "unavailable")
+            && (ha_core::casefold::casefold(s) == self.name
+                || (s == "home" && self.entity_id.as_str() == "zone.home"))
+    }
+
+    fn write(&self, hass: &Hass) {
+        let mut attrs = self.attributes.clone();
+        attrs.insert("persons".into(), json!(self.persons));
+        hass.set_state(
+            self.entity_id.clone(),
+            self.persons.len().to_string(),
+            attrs,
+        );
+    }
+}
+
+impl Person {
+    /// `_update_extra_state_attributes` and the write, from a source state
+    /// (or none: `unknown`).
+    fn write(&self, hass: &Hass, source: Option<(&ha_core::State, &ha_core::State)>) {
+        let mut a = self.base.clone();
+        a.insert("editable".into(), json!(true));
+        a.insert("id".into(), json!(self.id));
+        a.insert("device_trackers".into(), json!(self.device_trackers));
+        let mut state = "unknown".to_owned();
+        a.insert("in_zones".into(), json!([]));
+        if let Some((latest, coordinates)) = source {
+            state = latest.state.to_string();
+            let in_zones = latest
+                .attributes
+                .get("in_zones")
+                .cloned()
+                .unwrap_or(json!([]));
+            a.insert("in_zones".into(), in_zones);
+            for k in ["latitude", "longitude", "gps_accuracy"] {
+                if let Some(v) = coordinates.attributes.get(k).filter(|v| !v.is_null()) {
+                    a.insert(k.into(), v.clone());
+                }
+            }
+            a.insert("source".into(), json!(latest.entity_id));
+        }
+        if let Some(user) = &self.user_id {
+            a.insert("user_id".into(), json!(user));
+        }
+        hass.set_state(self.entity_id.clone(), state, a);
+    }
+
+    /// `_update_state`: the latest GPS tracker, unless a non-GPS tracker
+    /// says `home`; trackers in `unknown`/`unavailable` don't count.
+    fn update(&self, hass: &Hass) {
+        let latest = |prev: Option<Arc<ha_core::State>>, cur: Arc<ha_core::State>| match prev {
+            Some(p) if cur.last_updated <= p.last_updated => Some(p),
+            _ => Some(cur),
+        };
+        let (mut gps, mut non_gps_home, mut not_home) = (None, None, None);
+        for id in &self.device_trackers {
+            let Some(state) = EntityId::parse(id)
+                .ok()
+                .and_then(|id| hass.states().get(&id))
+            else {
+                continue;
+            };
+            if matches!(state.state.as_str(), "unknown" | "unavailable") {
+                continue;
+            }
+            if state.attributes.get("source_type").and_then(Value::as_str) == Some("gps") {
+                gps = latest(gps, state);
+            } else if state.state == "home" {
+                non_gps_home = latest(non_gps_home, state);
+            } else {
+                not_home = latest(not_home, state);
+            }
+        }
+        let home_zone = || hass.states().get(&EntityId::parse("zone.home").ok()?);
+        let chosen = match non_gps_home {
+            Some(home) => {
+                let no_coordinates = home.attributes.get("latitude").is_none_or(Value::is_null)
+                    && home.attributes.get("longitude").is_none_or(Value::is_null);
+                let coordinates = match home_zone().filter(|_| no_coordinates) {
+                    Some(zone) => zone,
+                    None => home.clone(),
+                };
+                Some((home, coordinates))
+            }
+            None => gps.or(not_home).map(|s| (s.clone(), s)),
+        };
+        self.write(hass, chosen.as_ref().map(|(l, c)| (&**l, &**c)));
+    }
 }
 
 impl Components {
@@ -47,6 +179,7 @@ impl Components {
         Self {
             zones: zones.unwrap_or_default().items,
             persons,
+            ..Default::default()
         }
     }
 
@@ -58,6 +191,7 @@ impl Components {
                 .unwrap_or_default()
                 .items,
             persons: load_persons(config_dir)?,
+            ..Default::default()
         })
     }
 
@@ -66,7 +200,8 @@ impl Components {
         key == ZONE_KEY || key == PERSON_KEY
     }
 
-    /// Create the zone and person entities, as HA does at start-up.
+    /// Create the zone and person entities, as HA does at start-up. People
+    /// restore their last state (`RestoreEntity`); zones count them.
     pub fn setup(&self, hass: &Hass, registries: &Registries) {
         let mut taken: HashSet<String> = hass
             .states()
@@ -78,32 +213,31 @@ impl Components {
         // out, as HA's `async_generate_entity_id` does.
         taken.extend(registries.entities.iter().map(|e| e.entity_id.clone()));
         let config = hass.config();
-        let zone_attrs =
-            |lat: &Value, lon: &Value, radius: &Value, passive: &Value, editable: bool| {
-                json!({
-                    "latitude": lat, "longitude": lon, "radius": radius, "passive": passive,
-                    "persons": [], "editable": editable,
-                })
-            };
+        let zone_attrs = |lat: &Value, lon: &Value, radius: &Value, passive: &Value| {
+            json!({
+                "latitude": lat, "longitude": lon, "radius": radius, "passive": passive,
+                "editable": true,
+            })
+        };
 
         // `zone.home`, from the location settings.
-        let home = Entity {
-            entity_id: "zone.home".into(),
-            name: config.location_name.clone(),
-            icon: Some("mdi:home".into()),
-            picture: None,
-            attributes: zone_attrs(
-                &json!(config.latitude),
-                &json!(config.longitude),
-                &json!(config.radius),
-                &json!(false),
-                true,
+        let mut zones = vec![(
+            "zone.home".to_owned(),
+            config.location_name.clone(),
+            standard_attributes(
+                zone_attrs(
+                    &json!(config.latitude),
+                    &json!(config.longitude),
+                    &json!(config.radius),
+                    &json!(false),
+                ),
+                &config.location_name,
+                Some("mdi:home"),
+                None,
+                None,
             ),
-            state: "0".into(),
-        };
-        home.write(hass, None);
-        taken.insert(home.entity_id);
-
+        )];
+        taken.insert("zone.home".into());
         for zone in &self.zones {
             let (Some(id), Some(name)) = (str_of(zone, "id"), str_of(zone, "name")) else {
                 continue;
@@ -113,23 +247,27 @@ impl Components {
                 continue;
             }
             let get = |k: &str| zone.get(k).cloned().unwrap_or(Value::Null);
-            let entity = Entity {
-                entity_id: entity_id("zone", name, entry, &mut taken),
-                name: name.to_owned(),
-                icon: str_of(zone, "icon").map(str::to_owned),
-                picture: None,
-                attributes: zone_attrs(
+            let attrs = standard_attributes(
+                zone_attrs(
                     &get("latitude"),
                     &get("longitude"),
                     &zone.get("radius").cloned().unwrap_or(json!(100)),
                     &zone.get("passive").cloned().unwrap_or(json!(false)),
-                    true,
                 ),
-                state: "0".into(),
-            };
-            entity.write(hass, entry);
+                name,
+                str_of(zone, "icon"),
+                None,
+                entry,
+            );
+            zones.push((
+                entity_id("zone", name, entry, &mut taken),
+                name.to_owned(),
+                attrs,
+            ));
         }
 
+        let restore = hass.restore();
+        let mut persons = Vec::new();
         for person in &self.persons {
             let (Some(id), Some(name)) = (str_of(person, "id"), str_of(person, "name")) else {
                 continue;
@@ -138,24 +276,136 @@ impl Components {
             if entry.is_some_and(|e| e.disabled_by.is_some()) {
                 continue;
             }
-            let mut attributes = json!({
-                "editable": true,
-                "id": id,
-                "device_trackers": person.get("device_trackers").cloned().unwrap_or(json!([])),
-                "in_zones": [],
-            });
-            if let Some(user) = str_of(person, "user_id") {
-                attributes["user_id"] = json!(user);
-            }
-            let entity = Entity {
-                entity_id: entity_id("person", name, entry, &mut taken),
-                name: name.to_owned(),
-                icon: None,
-                picture: str_of(person, "picture").map(str::to_owned),
-                attributes,
-                state: "unknown".into(),
+            let entity = entity_id("person", name, entry, &mut taken);
+            let Ok(entity_id) = EntityId::parse(&entity) else {
+                tracing::error!("not creating {entity}: not a valid entity id");
+                continue;
             };
-            entity.write(hass, entry);
+            let device_trackers = person
+                .get("device_trackers")
+                .and_then(Value::as_array)
+                .map(|a| {
+                    a.iter()
+                        .filter_map(Value::as_str)
+                        .map(str::to_owned)
+                        .collect()
+                })
+                .unwrap_or_default();
+            let p = Person {
+                entity_id,
+                id: id.to_owned(),
+                device_trackers,
+                user_id: str_of(person, "user_id").map(str::to_owned),
+                base: standard_attributes(json!({}), name, None, str_of(person, "picture"), entry),
+            };
+            // `_parse_source_state(last, last)`: the restored person is its
+            // own source until the trackers are read at start.
+            restore.register(p.entity_id.as_str(), None);
+            let last = restore
+                .last_state(p.entity_id.as_str())
+                .and_then(|v| serde_json::from_value::<RestoredState>(v).ok());
+            match last {
+                Some(last) => p.write_restored(hass, &last),
+                None => p.write(hass, None),
+            }
+            persons.push(Arc::new(p));
+        }
+
+        let mut tracked = Vec::new();
+        for (entity, name, attributes) in zones {
+            let Ok(entity_id) = EntityId::parse(&entity) else {
+                tracing::error!("not creating {entity}: not a valid entity id");
+                continue;
+            };
+            let mut zone = Zone {
+                entity_id,
+                name: ha_core::casefold::casefold(&name),
+                attributes,
+                persons: Default::default(),
+            };
+            for p in &persons {
+                if zone.holds(hass.states().get(&p.entity_id).as_deref()) {
+                    zone.persons.insert(p.entity_id.to_string());
+                }
+            }
+            zone.write(hass);
+            tracked.push(zone);
+        }
+        let mut t = self.entities.lock();
+        t.persons = persons;
+        t.zones = tracked;
+    }
+
+    /// `homeassistant_start`: people read their trackers, and follow them
+    /// from now on.
+    pub fn start(&self, hass: &Hass) {
+        let persons = {
+            let mut t = self.entities.lock();
+            t.started = true;
+            t.persons.clone()
+        };
+        for p in persons {
+            p.update(hass);
+        }
+    }
+
+    /// Follow tracker and person changes (one task; it sleeps until a
+    /// state changes).
+    pub fn track(self: &Arc<Self>, hass: &Hass) -> tokio::task::JoinHandle<()> {
+        let mut feed = hass.subscribe_state_changes();
+        feed.snapshot.clear();
+        let (this, hass) = (self.clone(), hass.clone());
+        tokio::spawn(async move {
+            while let Some(event) = feed.recv().await {
+                let ha_core::EventKind::StateChanged {
+                    entity_id,
+                    new_state,
+                    ..
+                } = &event.kind
+                else {
+                    continue;
+                };
+                this.changed(&hass, entity_id, new_state.as_deref());
+            }
+        })
+    }
+
+    fn changed(&self, hass: &Hass, entity_id: &EntityId, new_state: Option<&ha_core::State>) {
+        if entity_id.domain() == "person" {
+            // `_person_state_change_listener`: write only when the count changes.
+            let mut t = self.entities.lock();
+            let changed: Vec<usize> = t
+                .zones
+                .iter_mut()
+                .enumerate()
+                .filter_map(|(i, zone)| {
+                    let before = zone.persons.len();
+                    if zone.holds(new_state) {
+                        zone.persons.insert(entity_id.to_string());
+                    } else {
+                        zone.persons.remove(entity_id.as_str());
+                    }
+                    (zone.persons.len() != before).then_some(i)
+                })
+                .collect();
+            for i in changed {
+                t.zones[i].write(hass);
+            }
+            return;
+        }
+        let persons: Vec<Arc<Person>> = {
+            let t = self.entities.lock();
+            if !t.started {
+                return;
+            }
+            t.persons
+                .iter()
+                .filter(|p| p.device_trackers.iter().any(|d| d == entity_id.as_str()))
+                .cloned()
+                .collect()
+        };
+        for p in persons {
+            p.update(hass);
         }
     }
 
@@ -173,43 +423,56 @@ impl Components {
     }
 }
 
-struct Entity {
-    entity_id: String,
-    name: String,
-    icon: Option<String>,
-    picture: Option<String>,
-    attributes: Value,
+/// A last state, as the restore store keeps it.
+#[derive(Debug, Deserialize)]
+struct RestoredState {
     state: String,
+    #[serde(default)]
+    attributes: Attributes,
 }
 
-impl Entity {
-    /// Write the state with HA's standard attributes; the entity registry's
-    /// name and icon override the entity's own.
-    fn write(&self, hass: &Hass, entry: Option<&ha_registry::Entity>) {
-        let Value::Object(mut attrs) = self.attributes.clone() else {
-            return;
+impl Person {
+    fn write_restored(&self, hass: &Hass, last: &RestoredState) {
+        let state = ha_core::State {
+            entity_id: self.entity_id.clone(),
+            state: last.state.as_str().into(),
+            attributes: last.attributes.clone(),
+            last_changed: hass.clock().now(),
+            last_reported: ha_core::Reported::new(hass.clock().now()),
+            last_updated: hass.clock().now(),
+            context: ha_core::Context::at(hass.clock().now()),
         };
-        let attrs_ref: &mut Attributes = &mut attrs;
-        if let Some(picture) = &self.picture {
-            attrs_ref.insert("entity_picture".into(), json!(picture));
-        }
-        let icon = entry
-            .and_then(|e| e.icon.clone())
-            .or_else(|| self.icon.clone());
-        if let Some(icon) = icon {
-            attrs_ref.insert("icon".into(), json!(icon));
-        }
-        let name = entry
-            .and_then(|e| e.name.clone())
-            .unwrap_or_else(|| self.name.clone());
-        attrs_ref.insert("friendly_name".into(), json!(name));
-        match EntityId::parse(&self.entity_id) {
-            Ok(id) => {
-                hass.set_state(id, self.state.as_str(), attrs);
-            }
-            Err(e) => tracing::error!("not creating {}: {e}", self.entity_id),
-        }
+        self.write(hass, Some((&state, &state)));
     }
+}
+
+/// An entity's attributes plus HA's standard ones: `entity_picture`,
+/// `icon` and `friendly_name`, the registry's name and icon overriding the
+/// entity's own.
+fn standard_attributes(
+    base: Value,
+    name: &str,
+    icon: Option<&str>,
+    picture: Option<&str>,
+    entry: Option<&ha_registry::Entity>,
+) -> Attributes {
+    let Value::Object(mut attrs) = base else {
+        return Attributes::new();
+    };
+    if let Some(picture) = picture {
+        attrs.insert("entity_picture".into(), json!(picture));
+    }
+    let icon = entry
+        .and_then(|e| e.icon.clone())
+        .or_else(|| icon.map(str::to_owned));
+    if let Some(icon) = icon {
+        attrs.insert("icon".into(), json!(icon));
+    }
+    let name = entry
+        .and_then(|e| e.name.clone())
+        .unwrap_or_else(|| name.to_owned());
+    attrs.insert("friendly_name".into(), json!(name));
+    attrs
 }
 
 fn str_of<'a>(item: &'a Map<String, Value>, key: &str) -> Option<&'a str> {
