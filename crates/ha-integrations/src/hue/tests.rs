@@ -481,3 +481,152 @@ async fn odd_bridge_answers_are_not_a_crash() {
     let api = Api::at(&base, "key");
     assert!(api.fetch_all().await.unwrap().is_empty());
 }
+
+/// A second bridge, sharing the first's hass and services.
+fn second_bridge(first: &Arc<Bridge>, api: Api) -> Arc<Bridge> {
+    let resources = fixture("resource")["data"].as_array().unwrap().clone();
+    let b = Arc::new(Bridge {
+        hass: first.hass.clone(),
+        registries: first.registries.clone(),
+        api,
+        store: RwLock::new(Store::new(resources)),
+        ignore_availability: Vec::new(),
+        lights: RwLock::default(),
+        groups: RwLock::default(),
+        others: RwLock::default(),
+        platforms: first.platforms.clone(),
+    });
+    first.platforms.bridges.write().push(Arc::downgrade(&b));
+    b
+}
+
+const MOTION_DEVICE_ZIGBEE: &str = "0a8892fe-e99f-4e3c-aad8-1db9a952ff97";
+
+/// A device's connectivity change writes its entities in HA's creation
+/// order: binary sensors, then sensors in controller order (temperature,
+/// illuminance, battery), then switches.
+#[tokio::test]
+async fn a_connectivity_change_writes_in_has_order() {
+    let b = bridge(offline());
+    let mut rx = b.hass.bus().subscribe();
+    b.handle(
+        "update",
+        &json!({"id": MOTION_DEVICE_ZIGBEE, "type": "zigbee_connectivity", "status": "connectivity_issue"}),
+    );
+    let mut order = Vec::new();
+    while let Ok(e) = rx.try_recv() {
+        if let ha_core::EventKind::StateChanged {
+            entity_id,
+            new_state: Some(s),
+            ..
+        } = &e.kind
+        {
+            assert_eq!(s.state, "unavailable", "{entity_id}");
+            order.push(entity_id.to_string());
+        }
+    }
+    assert_eq!(
+        order,
+        [
+            "binary_sensor.hallway_motion",
+            "sensor.hallway_temperature",
+            "sensor.hallway_illuminance",
+            "sensor.hallway_motion_battery",
+            "switch.hallway_motion_sensor_enabled",
+            "switch.hallway_light_sensor_enabled",
+        ]
+    );
+}
+
+/// New sensors on same-named devices get their own ids; a new zigbee
+/// connectivity sensor is disabled by default (no state); numbers in
+/// strings parse as aiohue parses them, and an unknown battery state is
+/// none.
+#[tokio::test]
+async fn new_sensors_like_ha() {
+    let b = bridge(offline());
+    let mut fresh = fixture("resource")["data"].as_array().unwrap().clone();
+    for n in 1..=2 {
+        let dev = format!("sdev-{n}");
+        fresh.push(
+            json!({"id": dev, "type": "device", "metadata": {"name": "Desk"},
+            "services": [{"rid": format!("t-{n}"), "rtype": "temperature"},
+                         {"rid": format!("z-{n}"), "rtype": "zigbee_connectivity"},
+                         {"rid": format!("p-{n}"), "rtype": "device_power"},
+                         {"rid": format!("l-{n}"), "rtype": "light_level"}]}),
+        );
+        fresh.push(json!({"id": format!("t-{n}"), "type": "temperature", "owner": {"rid": dev, "rtype": "device"},
+            "enabled": true, "temperature": {"temperature_report": {"temperature": "21.25"}}}));
+        fresh.push(json!({"id": format!("z-{n}"), "type": "zigbee_connectivity", "owner": {"rid": dev, "rtype": "device"},
+            "status": "connected", "mac_address": "00:00"}));
+        fresh.push(json!({"id": format!("p-{n}"), "type": "device_power", "owner": {"rid": dev, "rtype": "device"},
+            "power_state": {"battery_level": "85", "battery_state": "weird"}}));
+        fresh.push(json!({"id": format!("l-{n}"), "type": "light_level", "owner": {"rid": dev, "rtype": "device"},
+            "enabled": true, "light": {"light_level": "10001"}}));
+    }
+    b.apply_snapshot(fresh);
+    let (t1, t2) = (
+        state_json(&b.hass, "sensor.desk_temperature"),
+        state_json(&b.hass, "sensor.desk_temperature_2"),
+    );
+    assert_eq!(t1.unwrap().0, "21.2");
+    assert_eq!(t2.unwrap().0, "21.2");
+    assert!(state_json(&b.hass, "sensor.desk_zigbee_connectivity").is_none());
+    let (battery, attrs) = state_json(&b.hass, "sensor.desk_battery").unwrap();
+    assert_eq!(battery, "85");
+    assert!(attrs.get("battery_state").is_none(), "{attrs}");
+    assert_eq!(
+        state_json(&b.hass, "sensor.desk_illuminance").unwrap().0,
+        "10"
+    );
+}
+
+/// A legacy-named entity whose name starts with its device's name isn't
+/// prefixed twice.
+#[tokio::test]
+async fn legacy_names_strip_the_device_prefix() {
+    let b = bridge(offline());
+    b.handle(
+        "add",
+        &json!({"id": "ent-1", "type": "entertainment_configuration", "metadata": {"name": "Hue Bridge Cinema"},
+            "status": "inactive"}),
+    );
+    let names: Vec<String> = b
+        .hass
+        .states()
+        .all()
+        .iter()
+        .filter(|s| s.entity_id.as_str().starts_with("binary_sensor."))
+        .filter_map(|s| {
+            s.attributes
+                .get("friendly_name")
+                .and_then(Value::as_str)
+                .map(str::to_owned)
+        })
+        .collect();
+    assert!(names.iter().any(|n| n == "Hue Bridge Cinema"), "{names:?}");
+}
+
+/// `hue.hue_activate_scene` recalls the scene on every bridge that has it,
+/// and a huge transition saturates rather than wrapping.
+#[tokio::test]
+async fn legacy_activation_reaches_every_bridge() {
+    let (base1, seen1) = fake_bridge().await;
+    let (base2, seen2) = fake_bridge().await;
+    let b1 = bridge(Api::at(&base1, "key"));
+    let _b2 = second_bridge(&b1, Api::at(&base2, "key"));
+    let data = json!({"group_name": "bedroom", "scene_name": "dimmed", "transition": 9_223_372_036_854_776_i64});
+    let Value::Object(data) = data else { panic!() };
+    b1.hass
+        .call_service("hue", "hue_activate_scene", data, None, false, None)
+        .await
+        .unwrap();
+    for seen in [seen1, seen2] {
+        let seen = seen.lock();
+        assert_eq!(seen.len(), 1);
+        assert_eq!(
+            seen[0].2,
+            json!({"recall": {"action": "active", "duration": i64::MAX}})
+        );
+    }
+}

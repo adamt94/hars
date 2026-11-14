@@ -135,6 +135,25 @@ impl Bridge {
         }
     }
 
+    /// `friendly_name` for legacy-named entities (`has_entity_name=False`):
+    /// the device name, then the name with that device name stripped from
+    /// its front (HA's `original_name_unprefixed`) or else as it is.
+    fn tail_legacy(
+        &self,
+        a: &mut Map<String, Value>,
+        id: &EntityId,
+        device: Option<&Value>,
+        name: Option<&str>,
+    ) {
+        let device_name = device.and_then(|d| self.device_name(d));
+        let unprefixed = match (name, device_name) {
+            (Some(n), Some(d)) => ha_registry::strip_prefix(n, d),
+            _ => None,
+        };
+        let name = unprefixed.as_deref().or(name);
+        self.tail(a, id, device, name);
+    }
+
     /// An entity's id: the registry's, else HA's rule for a new one
     /// (`slugify(area device name)`, made unique). `None` if disabled.
     fn entity_id_for(
@@ -143,12 +162,17 @@ impl Bridge {
         unique_id: &str,
         device: Option<&Value>,
         name: Option<&str>,
+        enabled_default: bool,
     ) -> Option<EntityId> {
         if let Some(e) = self.registry_entity(domain, unique_id) {
             if e.disabled_by.is_some() {
                 return None;
             }
             return EntityId::parse(&e.entity_id).ok();
+        }
+        // A new entity HA disables by default gets no state.
+        if !enabled_default {
+            return None;
         }
         let area = device
             .and_then(|d| d["id"].as_str())
@@ -176,6 +200,11 @@ impl Bridge {
                     .read()
                     .iter()
                     .any(|g| g.entity_id.as_str() == id)
+                || self
+                    .others
+                    .read()
+                    .iter()
+                    .any(|e| e.entity_id.as_str() == id)
         };
         let mut id = base.clone();
         let mut n = 2;
@@ -195,7 +224,8 @@ impl Bridge {
             if self.lights.read().iter().any(|l| l.rid == rid) {
                 continue;
             }
-            let Some(id) = self.entity_id_for("light", rid, store.device_of(rid), None) else {
+            let Some(id) = self.entity_id_for("light", rid, store.device_of(rid), None, true)
+            else {
                 continue;
             };
             let l = Arc::new(HueLight::new(Arc::downgrade(self), r, id));
@@ -215,7 +245,7 @@ impl Bridge {
                 continue;
             };
             let gid = group["id"].as_str().unwrap_or_default();
-            let Some(id) = self.entity_id_for("light", rid, Some(group), None) else {
+            let Some(id) = self.entity_id_for("light", rid, Some(group), None, true) else {
                 continue;
             };
             let g = Arc::new(GroupLight::new(Arc::downgrade(self), rid, gid, id, &store));
@@ -238,16 +268,20 @@ impl Bridge {
                     continue;
                 }
                 let device = HueEntity::device(kind, rid, r, &store);
-                let Some(id) =
-                    self.entity_id_for(kind.domain(), rid, device, kind.name(r).as_deref())
-                else {
+                let Some(id) = self.entity_id_for(
+                    kind.domain(),
+                    rid,
+                    device,
+                    kind.name(r).as_deref(),
+                    kind.enabled_default(),
+                ) else {
                     continue;
                 };
-                let e = Arc::new(HueEntity::new(Arc::downgrade(self), kind, rid, id));
+                let e = Arc::new(HueEntity::new(Arc::downgrade(self), kind, ty, rid, id));
                 made.push(e.clone());
                 let mut others = self.others.write();
                 others.push(e);
-                others.sort_by_key(|e| e.kind.rank());
+                others.sort_by_key(|e| e.order);
             }
         }
         drop(store);
@@ -306,13 +340,13 @@ impl Bridge {
     /// then scenes, sensors and switches.
     fn write_device(&self, device: &str) {
         let Gone { lights, others } = self.on_device(device);
-        for e in others.iter().filter(|e| e.kind.rank() < 2) {
+        for e in others.iter().filter(|e| e.order < 20) {
             self.write_entity(e);
         }
         for l in &lights {
             self.write_light(l);
         }
-        for e in others.iter().filter(|e| e.kind.rank() > 2) {
+        for e in others.iter().filter(|e| e.order > 20) {
             self.write_entity(e);
         }
     }
@@ -359,7 +393,7 @@ impl Bridge {
     /// Write every entity (at start), in HA's platform order.
     fn write_all(&self) {
         let others = self.others.read().clone();
-        for e in others.iter().filter(|e| e.kind.rank() < 2) {
+        for e in others.iter().filter(|e| e.order < 20) {
             self.write_entity(e);
         }
         let lights = self.lights.read().clone();
@@ -370,7 +404,7 @@ impl Bridge {
         for g in &groups {
             self.write_group(g);
         }
-        for e in others.iter().filter(|e| e.kind.rank() > 2) {
+        for e in others.iter().filter(|e| e.order > 20) {
             self.write_entity(e);
         }
     }
@@ -405,7 +439,7 @@ impl Bridge {
                 // A room or zone can arrive after its `grouped_light` (the
                 // race HA's `group.py` retries for): it makes that group.
                 self.add_entities();
-                for e in self.others_of(id).iter().filter(|e| e.kind.rank() < 2) {
+                for e in self.others_of(id).iter().filter(|e| e.order < 20) {
                     self.write_entity(e);
                 }
                 let lights = self.lights.read().clone();
@@ -416,7 +450,7 @@ impl Bridge {
                 for g in groups.iter().filter(|g| g.rid == id || g.group == id) {
                     self.write_group(g);
                 }
-                for e in self.others_of(id).iter().filter(|e| e.kind.rank() > 2) {
+                for e in self.others_of(id).iter().filter(|e| e.order > 20) {
                     self.write_entity(e);
                 }
             }
@@ -503,10 +537,9 @@ impl Bridge {
                         .read()
                         .get(id)
                         .and_then(|z| z["owner"]["rid"].as_str().map(str::to_owned));
-                    // Its own sensor, then everything on its device.
-                    for e in self.others_of(id) {
-                        self.write_entity(&e);
-                    }
+                    // Everything on its device in creation order, its own
+                    // sensor among them (HA writes that one twice; the
+                    // second write changes nothing).
                     if let Some(device) = owner {
                         self.write_device(&device);
                     }
@@ -768,38 +801,54 @@ impl Platforms {
                     let (group, scene) = (text("group_name"), text("scene_name"));
                     let transition = d.get("transition").and_then(Value::as_i64).filter(|t| *t != 0);
                     let dynamic = d.get("dynamic").and_then(Value::as_bool).unwrap_or(false);
-                    for bridge in p.bridges() {
-                        // Regular scenes first, then smart ones; names match
-                        // case-insensitively.
-                        let found = {
-                            let store = bridge.store.read();
-                            ["scene", "smart_scene"].into_iter().find_map(|ty| {
-                                store.of_type(ty).find_map(|s| {
-                                    let name = s["metadata"]["name"].as_str()?.to_lowercase();
-                                    let g = store.get(s["group"]["rid"].as_str()?)?;
-                                    let gname = g["metadata"]["name"].as_str()?.to_lowercase();
-                                    (name == scene && gname == group)
-                                        .then(|| (ty, s["id"].as_str().unwrap_or_default().to_owned()))
+                    // Every bridge at once, as HA gathers them; the first
+                    // error is the call's.
+                    let bridges = p.bridges();
+                    let calls = bridges.iter().map(|bridge| {
+                        let (group, scene) = (&group, &scene);
+                        async move {
+                            // Regular scenes first, then smart ones; names
+                            // match case-insensitively.
+                            let found = {
+                                let store = bridge.store.read();
+                                ["scene", "smart_scene"].into_iter().find_map(|ty| {
+                                    store.of_type(ty).find_map(|s| {
+                                        let name = s["metadata"]["name"].as_str()?.to_lowercase();
+                                        let g = store.get(s["group"]["rid"].as_str()?)?;
+                                        let gname = g["metadata"]["name"].as_str()?.to_lowercase();
+                                        (name == *scene && gname == *group).then(|| {
+                                            (ty, s["id"].as_str().unwrap_or_default().to_owned())
+                                        })
+                                    })
                                 })
-                            })
-                        };
-                        let Some((ty, id)) = found else {
-                            continue;
-                        };
-                        if ty == "smart_scene" {
-                            // HA hands a smart scene arguments it doesn't take.
-                            return Err(ServiceError::Failed(
-                                "SmartScenesController.recall() got an unexpected keyword argument 'dynamic'".into(),
-                            ));
+                            };
+                            let Some((ty, id)) = found else {
+                                return Ok(false);
+                            };
+                            if ty == "smart_scene" {
+                                // HA hands a smart scene arguments it doesn't take.
+                                return Err(ServiceError::Failed(
+                                    "SmartScenesController.recall() got an unexpected keyword argument 'dynamic'".into(),
+                                ));
+                            }
+                            let mut recall = json!({"action": if dynamic { "dynamic_palette" } else { "active" }});
+                            if let Some(t) = transition {
+                                // Python's ints don't overflow; a duration
+                                // beyond i64 is one the bridge refuses anyway.
+                                recall["duration"] = json!(t.saturating_mul(1000));
+                            }
+                            light::result(bridge.api.put("scene", &id, &json!({"recall": recall})).await)?;
+                            Ok(true)
                         }
-                        let mut recall = json!({"action": if dynamic { "dynamic_palette" } else { "active" }});
-                        if let Some(t) = transition {
-                            recall["duration"] = json!(t * 1000);
-                        }
-                        light::result(bridge.api.put("scene", &id, &json!({"recall": recall})).await)?;
-                        return Ok(None);
+                    });
+                    let results = crate::light::join_all(calls).await;
+                    let mut found = false;
+                    for r in results {
+                        found |= r?;
                     }
-                    tracing::warn!("No bridge was able to activate scene {scene} in group {group}");
+                    if !found {
+                        tracing::warn!("No bridge was able to activate scene {scene} in group {group}");
+                    }
                     Ok(None)
                 }
             },

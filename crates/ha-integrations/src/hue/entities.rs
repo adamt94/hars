@@ -56,15 +56,40 @@ impl Kind {
         }
     }
 
-    /// HA's platform order (binary_sensor, event, light, scene, sensor,
-    /// switch): entities hear events in the order they were made.
-    pub fn rank(self) -> u8 {
-        match self.domain() {
-            "binary_sensor" => 0,
-            "scene" => 3,
-            "sensor" => 4,
-            _ => 5,
+    /// When HA makes this entity relative to the others (and so when it
+    /// hears an event): platforms in order (binary_sensor, event, light,
+    /// scene, sensor, switch), then each platform's controllers in the
+    /// order it registers them. Lights are 20.
+    pub fn order(self, ty: &str) -> u8 {
+        match self {
+            Self::Motion if ty == "camera_motion" => 0,
+            Self::Motion => 1,
+            Self::Entertainment => 2,
+            Self::Contact => 3,
+            Self::Tamper => 4,
+            Self::GroupedMotion => 5,
+            Self::Scene => 30,
+            Self::SmartScene => 31,
+            Self::Temperature => 40,
+            Self::LightLevel => 41,
+            Self::Battery => 42,
+            Self::Zigbee => 43,
+            Self::GroupedLightLevel => 44,
+            Self::MotionEnabled => 50,
+            Self::LightLevelEnabled => 51,
+            Self::Behavior => 52,
         }
+    }
+
+    /// Named the legacy way (`has_entity_name=False`): the device name is
+    /// stripped from the front of the name, then put back.
+    pub fn legacy(self) -> bool {
+        matches!(self, Self::Behavior | Self::Entertainment)
+    }
+
+    /// HA's `entity_registry_enabled_default`.
+    pub fn enabled_default(self) -> bool {
+        self != Self::Zigbee
     }
 
     /// The entities a resource type gets, in platform order.
@@ -132,6 +157,24 @@ impl Kind {
 }
 
 /// The value of a sensor-like resource: its `*_report`, else the flat field.
+/// A number as aiohue parses one: a JSON number, or a string Python's
+/// `float()` / `int()` takes.
+fn number(v: &Value) -> Option<f64> {
+    match v {
+        Value::Number(n) => n.as_f64(),
+        Value::String(s) => s.trim().parse().ok(),
+        _ => None,
+    }
+}
+
+fn integer(v: &Value) -> Option<i64> {
+    match v {
+        Value::Number(n) => n.as_i64(),
+        Value::String(s) => s.trim().parse().ok(),
+        _ => None,
+    }
+}
+
 fn reading<'a>(r: &'a Value, feature: &str, field: &str) -> Option<&'a Value> {
     let f = &r[feature];
     f[format!("{field}_report")]
@@ -156,6 +199,8 @@ fn lux(level: f64) -> i64 {
 pub struct HueEntity {
     pub(super) bridge: Weak<Bridge>,
     pub(super) kind: Kind,
+    /// [`Kind::order`].
+    pub(super) order: u8,
     pub(super) rid: String,
     pub(super) entity_id: EntityId,
     /// A scene's last activation by HA (its state).
@@ -163,10 +208,11 @@ pub struct HueEntity {
 }
 
 impl HueEntity {
-    pub fn new(bridge: Weak<Bridge>, kind: Kind, rid: &str, entity_id: EntityId) -> Self {
+    pub fn new(bridge: Weak<Bridge>, kind: Kind, ty: &str, rid: &str, entity_id: EntityId) -> Self {
         Self {
             bridge,
             kind,
+            order: kind.order(ty),
             rid: rid.to_owned(),
             entity_id,
             activated: Mutex::new(None),
@@ -228,7 +274,7 @@ impl HueEntity {
             }
             Kind::Temperature => {
                 measurement(&mut a);
-                let t = reading(r, "temperature", "temperature").and_then(Value::as_f64);
+                let t = reading(r, "temperature", "temperature").and_then(number);
                 let s = t.map_or("unknown".into(), |t| {
                     crate::sun::py_float(crate::num::round(t, 1))
                 });
@@ -236,7 +282,7 @@ impl HueEntity {
             }
             Kind::LightLevel | Kind::GroupedLightLevel => {
                 measurement(&mut a);
-                let level = reading(r, "light", "light_level").and_then(Value::as_f64);
+                let level = reading(r, "light", "light_level").and_then(number);
                 if available && let Some(l) = level {
                     a.insert("light_level".into(), json!(l as i64));
                 }
@@ -249,10 +295,15 @@ impl HueEntity {
             Kind::Battery => {
                 measurement(&mut a);
                 let p = &r["power_state"];
-                if available && let Some(s) = p["battery_state"].as_str() {
+                // An unknown state is no state, as aiohue's enum makes it.
+                if available
+                    && let Some(s) = p["battery_state"]
+                        .as_str()
+                        .filter(|s| matches!(*s, "normal" | "low" | "critical"))
+                {
                     a.insert("battery_state".into(), json!(s));
                 }
-                let level = p["battery_level"].as_i64();
+                let level = integer(&p["battery_level"]);
                 (
                     level.map_or("unknown".into(), |l| l.to_string()),
                     Some("%"),
@@ -303,12 +354,12 @@ impl HueEntity {
         }
         a.insert("device_class".into(), json!(device_class));
         let device = Self::device(self.kind, &self.rid, r, store);
-        bridge.tail(
-            &mut a,
-            &self.entity_id,
-            device,
-            self.kind.name(r).as_deref(),
-        );
+        let name = self.kind.name(r);
+        if self.kind.legacy() {
+            bridge.tail_legacy(&mut a, &self.entity_id, device, name.as_deref());
+        } else {
+            bridge.tail(&mut a, &self.entity_id, device, name.as_deref());
+        }
         let state = if available {
             state
         } else {

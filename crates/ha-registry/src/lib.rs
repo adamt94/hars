@@ -351,7 +351,7 @@ impl Entity {
 /// `_async_strip_prefix_from_entity_name`: "Kitchen Light Power" with the
 /// device "Kitchen Light" becomes "Power". `None` if the prefix doesn't
 /// meaningfully match.
-fn strip_prefix(entity_name: &str, prefix: &str) -> Option<String> {
+pub fn strip_prefix(entity_name: &str, prefix: &str) -> Option<String> {
     use ha_core::casefold::casefold;
     if entity_name.is_empty() || prefix.is_empty() {
         return None;
