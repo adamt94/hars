@@ -33,15 +33,8 @@ pub(super) fn dispatch(
             conn,
             json!({"themes": {}, "default_theme": "default", "default_dark_theme": null}),
         ),
-        // No translations bundled yet: the frontend shows raw states.
-        "frontend/get_translations" => {
-            only_keys(msg, &["language", "category", "integration", "config_flow"]).map(|()| {
-                conn.out.result(id, json!({"resources": {}}));
-            })
-        }
-        "frontend/get_icons" => only_keys(msg, &["category", "integration"]).map(|()| {
-            conn.out.result(id, json!({"resources": {}}));
-        }),
+        "frontend/get_translations" => get_translations(conn, id, msg),
+        "frontend/get_icons" => get_icons(conn, id, msg),
         "config/entity_registry/list_for_display"
         | "config/device_registry/list"
         | "config/area_registry/list"
@@ -87,6 +80,94 @@ pub(super) fn dispatch(
         }),
         _ => return None,
     })
+}
+
+/// `vol.Required(key): str`.
+fn required_str<'a>(msg: &'a Map<String, Value>, key: &str) -> Result<&'a str, Invalid> {
+    match msg.get(key) {
+        Some(Value::String(s)) => Ok(s),
+        Some(_) => Err(format!("expected str for dictionary value @ data['{key}']")),
+        None => Err(format!("required key not provided @ data['{key}']")),
+    }
+}
+
+/// `vol.Optional("integration"): vol.All(cv.ensure_list, [str])`.
+fn integrations(msg: &Map<String, Value>) -> Result<Option<Vec<&str>>, Invalid> {
+    match msg.get("integration") {
+        None => Ok(None),
+        Some(Value::String(s)) => Ok(Some(vec![s.as_str()])),
+        Some(Value::Null) => Ok(Some(Vec::new())),
+        Some(Value::Array(items)) => items
+            .iter()
+            .enumerate()
+            .map(|(i, v)| {
+                v.as_str()
+                    .ok_or_else(|| format!("expected str @ data['integration'][{i}]"))
+            })
+            .collect::<Result<_, _>>()
+            .map(Some),
+        Some(_) => Err("expected str @ data['integration'][0]".into()),
+    }
+}
+
+/// `frontend/get_translations`: English (HA's fallback language) for the
+/// integrations asked for, else for those loaded. `config_flow` alone asks
+/// for integrations with a config flow that aren't loaded: none in `hars`.
+fn get_translations(conn: &mut Conn, id: u64, msg: &Map<String, Value>) -> Result<(), Invalid> {
+    only_keys(msg, &["language", "category", "integration", "config_flow"])?;
+    required_str(msg, "language")?;
+    let category = required_str(msg, "category")?;
+    let integrations = integrations(msg)?;
+    let config_flow = match msg.get("config_flow") {
+        None => false,
+        Some(Value::Bool(b)) => *b,
+        Some(_) => return Err("expected bool for dictionary value @ data['config_flow']".into()),
+    };
+    let loaded;
+    let domains: &[&str] = match &integrations {
+        Some(list) => list,
+        None if config_flow => &[],
+        None => {
+            loaded = crate::components(&conn.shared.config);
+            &loaded
+        }
+    };
+    conn.out
+        .result_raw(id, &crate::i18n::translations(category, domains));
+    Ok(())
+}
+
+/// `frontend/get_icons`, for the integrations asked for, else those loaded.
+fn get_icons(conn: &mut Conn, id: u64, msg: &Map<String, Value>) -> Result<(), Invalid> {
+    only_keys(msg, &["category", "integration"])?;
+    const CATEGORIES: [&str; 5] = [
+        "conditions",
+        "entity",
+        "entity_component",
+        "services",
+        "triggers",
+    ];
+    let category = match msg.get("category") {
+        None => return Err("required key not provided @ data['category']".into()),
+        Some(Value::String(c)) if CATEGORIES.contains(&c.as_str()) => c.as_str(),
+        Some(_) => {
+            return Err("value must be one of ['conditions', 'entity', 'entity_component', 'services', 'triggers'] for dictionary value @ data['category']".into());
+        }
+    };
+    let loaded;
+    let domains: &[&str] = match integrations(msg)? {
+        Some(list) if !list.is_empty() => {
+            loaded = list;
+            &loaded
+        }
+        _ => {
+            loaded = crate::components(&conn.shared.config);
+            &loaded
+        }
+    };
+    conn.out
+        .result_raw(id, &crate::i18n::icons(category, domains));
+    Ok(())
 }
 
 fn user(conn: &Conn) -> Scope {

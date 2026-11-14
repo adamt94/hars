@@ -4,6 +4,9 @@
 mod auth;
 mod frontend;
 mod frontend_data;
+mod i18n;
+#[rustfmt::skip]
+mod i18n_data;
 mod lovelace;
 mod rest;
 mod ws;
@@ -57,7 +60,7 @@ pub(crate) struct Shared {
 /// The integrations `hars` implements, by HA domain: `get_config`'s
 /// `components`. The frontend gates features on this list, so it only names
 /// what really works.
-fn components(config: &ApiConfig) -> Vec<&'static str> {
+pub(crate) fn components(config: &ApiConfig) -> Vec<&'static str> {
     let mut c = vec![
         "api",
         "auth",

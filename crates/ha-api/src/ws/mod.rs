@@ -103,6 +103,13 @@ impl Outbox {
         )
     }
 
+    /// A result whose JSON is already written.
+    pub(crate) fn result_raw(&self, id: u64, result: &str) -> bool {
+        self.send(format!(
+            r#"{{"id":{id},"type":"result","success":true,"result":{result}}}"#
+        ))
+    }
+
     pub(crate) fn error(&self, id: Value, code: &str, message: &str) -> bool {
         self.error_with(id, json!({"code": code, "message": message}))
     }

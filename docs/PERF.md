@@ -153,3 +153,15 @@ What was tried:
 Refreshes are one timer every 55–64 minutes, as HA, so none falls in the
 window.
 
+
+### Translations and icons, 2026-11-14
+
+| binary | start→/api/ | idle RSS | idle PSS | idle CPU | wakeups/s | threads | run |
+|---|---|---|---|---|---|---|---|
+| 5.46 MiB | 11 ms | 7.5 MiB | 6.5 MiB | 0.000 % | 0.00 | 3 | 15s warm-up, 60s quiet |
+
+The binary grew 320 KiB (5,393,024 → 5,720,704 bytes), mostly the 214 KB
+of English strings and icons compiled in. Idle RSS barely moved (7.4 → 7.5
+MiB): the strings are file-backed pages, read only while a request is
+answered. Nothing is parsed or cached; an answer is the stored JSON
+pieces joined.

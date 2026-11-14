@@ -1155,3 +1155,53 @@ async fn weather_forecasts_are_served_and_pushed() {
     let r = c.call(json!({"id": 32, "type": "ping"})).await;
     assert_eq!(r["type"], "pong");
 }
+
+#[tokio::test]
+async fn translations_and_icons_come_from_has_files() {
+    let s = server().await;
+    let mut c = Client::authed(&s, &token(&s.auth).0).await;
+    // Loaded components by default: `person` is one, `weather` isn't.
+    let r = c
+        .call(json!({"id": 2, "type": "frontend/get_translations", "language": "en", "category": "entity_component"}))
+        .await;
+    let res = &r["result"]["resources"];
+    assert_eq!(
+        res["component.person.entity_component._.state.home"],
+        "Home"
+    );
+    assert!(
+        res.get("component.weather.entity_component._.name")
+            .is_none()
+    );
+    // Asked for by name (a string or a list); other languages get English.
+    let r = c
+        .call(json!({"id": 3, "type": "frontend/get_translations", "language": "de", "category": "entity_component", "integration": "weather"}))
+        .await;
+    assert_eq!(
+        r["result"]["resources"]["component.weather.entity_component._.state.clear-night"],
+        "Clear, night"
+    );
+    let r = c
+        .call(json!({"id": 4, "type": "frontend/get_translations", "language": "en", "category": "config", "config_flow": true}))
+        .await;
+    assert_eq!(r["result"], json!({"resources": {}}));
+    let r = c
+        .call(json!({"id": 5, "type": "frontend/get_translations", "language": "en"}))
+        .await;
+    assert_eq!(
+        r["error"]["message"],
+        "required key not provided @ data['category']"
+    );
+
+    let r = c
+        .call(json!({"id": 6, "type": "frontend/get_icons", "category": "entity_component", "integration": ["weather", "sun"]}))
+        .await;
+    let res = &r["result"]["resources"];
+    assert_eq!(res["weather"]["_"]["state"]["sunny"], "mdi:weather-sunny");
+    // `sun` has only `entity` icons.
+    assert!(res.get("sun").is_none());
+    let r = c
+        .call(json!({"id": 7, "type": "frontend/get_icons", "category": "state"}))
+        .await;
+    assert_eq!(r["error"]["code"], "invalid_format");
+}

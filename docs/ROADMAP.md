@@ -203,8 +203,13 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
       translations and icons are bundled), `persistent_notification/subscribe`,
       `repairs/list_issues`; the frontend's cold load gets every answer it
       waits for (test replays it)
-- [ ] Bundle translations and icons (`frontend/get_translations`,
-      `frontend/get_icons`), `manifest/list`, `brands/access_token`
+- [x] Bundle translations and icons (`frontend/get_translations`,
+      `frontend/get_icons`): HA 2026.6.1's generated English strings and
+      `icons.json` for the 37 integrations `hars` runs or will run
+      (`scripts/gen-i18n.py` from HA's wheel), compiled in as ready-made JSON
+      pieces, so an answer is joined, not parsed. Other languages get
+      English, HA's fallback
+- [ ] `manifest/list`, `brands/access_token`, other languages
 - [x] WS registries: `config/entity_registry/list_for_display` (HA's display
       keys, legacy device-name prefix stripping),
       `config/{device,area,floor,label}_registry/list`
@@ -300,8 +305,9 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
       service dispatch suppressed and logs the calls it *would* make, and a
       diff tool compares them with HA's `call_service` events. The phone stays
       on HA. One week clean.
-- [x] Packaging: static musl binary in a `FROM scratch` image with CA roots,
-      tzdata, a persistent volume and SIGTERM handling
+- [x] Packaging: static musl binary in a `FROM scratch` image with tzdata
+      (CA roots are compiled into the binary), a persistent volume and SIGTERM
+      handling
 - [ ] Promote: stop HA, run the importer on a fresh copy, start `hars` on :8123.
       Rollback = start the untouched HA snapshot again.
 - [ ] Publish the RSS / CPU / startup / wakeup numbers against the HA instance
