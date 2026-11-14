@@ -42,8 +42,10 @@ docker build -t hars .
 docker run --rm -p 8123:8123 -v hars-config:/config hars
 ```
 
-The image is `FROM scratch`: a static musl binary, CA roots and tzdata, about
-5 MB. `docker stop` sends SIGTERM, which hars handles by draining HTTP for up to
+The image is `FROM scratch`: a static musl binary, CA roots, tzdata and the
+official frontend (`home-assistant-frontend` 20260527.4, fetched from PyPI and
+checked by sha256 at build time), about 176 MB. Outside Docker, point
+`HARS_FRONTEND` at an unpacked `hass_frontend` directory to serve the UI. `docker stop` sends SIGTERM, which hars handles by draining HTTP for up to
 5 s and exiting 0, well inside Docker's default 10 s grace period. For LAN integrations (LIFX broadcast, mDNS) use `--network host`.
 
 ## Development
