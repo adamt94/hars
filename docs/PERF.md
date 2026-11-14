@@ -23,7 +23,7 @@ quiet window:
 | Column | Source |
 |---|---|
 | binary | size of the stripped release binary |
-| start→/api/ | process spawn until the first `200` from `/api/` (2 ms polling, so ±2 ms) |
+| start→/api/ | process spawn until `/api/` first answers (2 ms polling, so ±2 ms). Since auth, that answer is a `401`; the warm-up then logs in |
 | idle RSS / PSS | `Rss` and `Pss` in `/proc/<pid>/smaps_rollup` (exact, unlike `VmRSS`) |
 | idle CPU | `utime + stime` delta over the quiet window, % of one core |
 | wakeups/s | voluntary context switches summed over all threads: a proxy, since each block is followed by a wakeup. Preemptions are excluded. It warns if threads came or went during the window |
@@ -75,3 +75,29 @@ silently drops it. The pid is kept across the exec, and
 | 2.02 MiB | 7 ms | 4.1 MiB | 3.1 MiB | 0.000 % | 0.00 | 3 | 5s warm-up, 30s quiet |
 
 Idle RSS went from 13.2 to 4.1 MiB (−69 %), and start-up did not get slower.
+
+### Auth, 2026-11-14
+
+`/api/*` now needs a token, so `perf.sh` creates a login (`hars auth add`) and
+the warm-up logs in first, as the frontend does: bcrypt at cost 12 on a
+blocking thread, then a `.storage/auth` write. The warm-up must be longer
+than tokio's 10 s blocking-thread keep-alive, or that thread exits during the
+quiet window and the wakeup count is wrong (`perf.sh` warns).
+
+| binary | start→/api/ | idle RSS | idle PSS | idle CPU | wakeups/s | threads | run |
+|---|---|---|---|---|---|---|---|
+| 2.70 MiB | 10 ms | 5.2 MiB | 4.3 MiB | 0.000 % | 0.00 | 3 | 15s warm-up, 30s quiet |
+
+Where the extra 1.1 MiB comes from, measured on the same binary (RSS /
+anonymous, 15 s after each step):
+
+| after | RSS | anonymous |
+|---|---|---|
+| start, no login | 4.5 MiB | 1.0 MiB |
+| 20 rejected `/api/` requests | 4.7 MiB | 1.0 MiB |
+| 1 login | 5.1 MiB | 1.2 MiB |
+| 6 logins | 5.2 MiB | 1.3 MiB |
+
+The baseline gained 0.5 MiB, mostly the larger binary's mapped pages. The
+first login adds 0.4 MiB: mimalloc keeps the heap the blocking thread used for
+bcrypt. Each further login costs about 20 KiB (a refresh token in memory).

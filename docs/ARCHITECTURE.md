@@ -16,8 +16,10 @@
 
 ```
 crates/
-  ha-core/     event bus, state machine, entity ids, (next) service registry
-  ha-server/   `hars` binary: HTTP/WebSocket API, wiring, allocator
+  ha-core/     event bus, state machine, services, clock, `.storage` files
+  ha-auth/     users, credentials, login flows, refresh/access tokens (HA's `homeassistant/auth`)
+  ha-api/      REST API, auth HTTP views, the official frontend
+  ha-server/   `hars` binary: wiring, signals, allocator, `hars auth add`
 ```
 
 Planned crates (create as they're needed, not before):
@@ -25,7 +27,6 @@ Planned crates (create as they're needed, not before):
 | crate | purpose |
 |---|---|
 | `ha-config` | `configuration.yaml` loading, `!include`/`!secret`, validation |
-| `ha-api` | REST + WebSocket API (HA-compatible), auth tokens |
 | `ha-recorder` | state history in SQLite, batched writes, compact encoding |
 | `ha-automation` | triggers / conditions / actions engine, templates |
 | `ha-integrations-*` | one crate per integration family (mqtt, zigbee, esphome, …) |

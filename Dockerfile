@@ -38,6 +38,7 @@ COPY --from=frontend /out/hass_frontend /frontend
 COPY --from=build /hars /hars
 ENV HARS_BIND=0.0.0.0:8123 \
     HARS_FRONTEND=/frontend \
+    HARS_CONFIG=/config \
     SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
 # Persistent state (config, .storage, recorder DB) lives here.
 VOLUME /config

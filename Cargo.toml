@@ -11,6 +11,7 @@ rust-version = "1.85"
 
 [workspace.dependencies]
 ha-api = { path = "crates/ha-api" }
+ha-auth = { path = "crates/ha-auth" }
 ha-core = { path = "crates/ha-core" }
 
 [workspace.lints.rust]

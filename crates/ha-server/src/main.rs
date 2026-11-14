@@ -16,6 +16,10 @@ const HTTP_DRAIN_TIMEOUT: Duration = Duration::from_secs(5);
 fn main() -> anyhow::Result<()> {
     // Before the runtime and its worker threads allocate anything.
     let thp_disabled = disable_transparent_huge_pages();
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    if !args.is_empty() {
+        return cli(&args);
+    }
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?
@@ -70,16 +74,31 @@ async fn run(thp_disabled: std::io::Result<bool>) -> anyhow::Result<()> {
     let hass = Hass::new();
     let addr = std::env::var("HARS_BIND").unwrap_or_else(|_| "0.0.0.0:8123".into());
     let api_config = api_config()?;
+    let config_dir = config_dir()?;
+    let auth = {
+        let (dir, clock) = (config_dir.clone(), hass.clock().clone());
+        tokio::task::spawn_blocking(move || ha_auth::Auth::load(&dir, clock)).await??
+    };
+    tracing::info!("config directory {}", config_dir.display());
+    if !auth.is_onboarded() {
+        tracing::warn!(
+            "no owner yet: create one with `hars auth add USERNAME PASSWORD` (same HARS_CONFIG)"
+        );
+    }
 
     let mut signals = StopSignals::install()?;
     let listener = tokio::net::TcpListener::bind(&addr).await?;
     let (stop_http, http_stopped) = tokio::sync::oneshot::channel::<()>();
     let mut server = tokio::spawn(
-        axum::serve(listener, ha_api::router(hass.clone(), &api_config))
-            .with_graceful_shutdown(async {
-                let _ = http_stopped.await;
-            })
-            .into_future(),
+        axum::serve(
+            listener,
+            ha_api::router(hass.clone(), auth.clone(), &api_config)
+                .into_make_service_with_connect_info::<std::net::SocketAddr>(),
+        )
+        .with_graceful_shutdown(async {
+            let _ = http_stopped.await;
+        })
+        .into_future(),
     );
     hass.start();
     tracing::info!("hars listening on http://{addr}");
@@ -101,6 +120,12 @@ async fn run(thp_disabled: std::io::Result<bool>) -> anyhow::Result<()> {
                 "HTTP connections still open after {HTTP_DRAIN_TIMEOUT:?}; closing them"
             );
             server.abort();
+        }
+    }
+    if auth.needs_save() {
+        let auth = auth.clone();
+        if let Err(e) = tokio::task::spawn_blocking(move || auth.save()).await? {
+            tracing::error!("saving auth state: {e}");
         }
     }
     hass.finish_stop();
@@ -161,4 +186,53 @@ fn api_config() -> anyhow::Result<ha_api::ApiConfig> {
     Ok(ha_api::ApiConfig {
         frontend: Some(std::sync::Arc::new(frontend)),
     })
+}
+
+/// `HARS_CONFIG`: HA's config directory (`/config` in the Docker image). Its
+/// `.storage` files are read and written in HA's formats.
+fn config_dir() -> anyhow::Result<std::path::PathBuf> {
+    let dir = std::path::PathBuf::from(
+        std::env::var_os("HARS_CONFIG").unwrap_or_else(|| "config".into()),
+    );
+    std::fs::create_dir_all(&dir)
+        .map_err(|e| anyhow::anyhow!("creating the config directory {}: {e}", dir.display()))?;
+    Ok(dir)
+}
+
+const USAGE: &str = "usage: hars                              run the server
+       hars auth add USERNAME PASSWORD  add a login (the first one becomes the owner)";
+
+/// Offline commands, like HA's `hass --script auth`. Run them with the
+/// server stopped: the server keeps its own copy of the auth state.
+fn cli(args: &[String]) -> anyhow::Result<()> {
+    match args
+        .iter()
+        .map(String::as_str)
+        .collect::<Vec<_>>()
+        .as_slice()
+    {
+        ["auth", "add", username, password] => {
+            let dir = config_dir()?;
+            let auth = ha_auth::Auth::load(&dir, ha_core::Clock::system())?;
+            let added = auth.add_user(username, password)?;
+            auth.save()?;
+            match added {
+                ha_auth::Added::Owner => {
+                    println!("created owner {username:?}; onboarding is complete")
+                }
+                ha_auth::Added::Credential => {
+                    println!("added login {username:?}; its user is created at first login")
+                }
+            }
+            Ok(())
+        }
+        ["--help" | "-h" | "help"] => {
+            println!("{USAGE}");
+            Ok(())
+        }
+        _ => {
+            eprintln!("{USAGE}");
+            std::process::exit(2);
+        }
+    }
 }

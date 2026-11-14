@@ -17,9 +17,15 @@ fn spawn_hars(port: u16) -> Child {
     spawn_hars_with(port, &[])
 }
 
+/// A config directory of its own for each test run.
+fn config_dir(port: u16) -> std::path::PathBuf {
+    std::env::temp_dir().join(format!("hars-test-config-{port}"))
+}
+
 fn spawn_hars_with(port: u16, env: &[(&str, &str)]) -> Child {
     let child = Command::new(env!("CARGO_BIN_EXE_hars"))
         .env_remove("MIMALLOC_ALLOW_THP")
+        .env("HARS_CONFIG", config_dir(port))
         .envs(env.iter().copied())
         .env("HARS_BIND", format!("127.0.0.1:{port}"))
         .env("RUST_LOG", "info")
@@ -79,9 +85,10 @@ fn sigterm_stops_cleanly_with_an_idle_keep_alive_connection() {
     let port = free_port();
     let child = spawn_hars(port);
 
-    // A browser-style keep-alive connection that has finished its request.
+    // A browser-style keep-alive connection that has finished its request
+    // (one that needs no login on a fresh install).
     let mut conn = TcpStream::connect(("127.0.0.1", port)).unwrap();
-    conn.write_all(b"GET /api/ HTTP/1.1\r\nHost: x\r\n\r\n")
+    conn.write_all(b"GET /api/onboarding HTTP/1.1\r\nHost: x\r\n\r\n")
         .unwrap();
     let mut buf = [0u8; 512];
     let n = conn.read(&mut buf).unwrap();
@@ -103,7 +110,8 @@ fn stuck_request_is_cut_off_within_dockers_grace_period() {
     let child = spawn_hars(port);
     let mut conn = TcpStream::connect(("127.0.0.1", port)).unwrap();
     conn.write_all(
-        b"POST /api/states/sensor.x HTTP/1.1\r\nHost: x\r\nContent-Type: application/json\r\nContent-Length: 100\r\n\r\n{",
+        // A view that reads its body without a login, as in HA.
+        b"POST /auth/login_flow HTTP/1.1\r\nHost: x\r\nContent-Type: application/json\r\nContent-Length: 100\r\n\r\n{",
     )
     .unwrap();
     std::thread::sleep(Duration::from_millis(100));

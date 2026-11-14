@@ -39,8 +39,14 @@ curl localhost:8123/api/states
 
 ```sh
 docker build -t hars .
+docker run --rm -v hars-config:/config hars auth add USERNAME PASSWORD   # once: creates the owner
 docker run --rm -p 8123:8123 -v hars-config:/config hars
 ```
+
+`/config` uses Home Assistant's own `.storage` file formats. Until `hars` has
+the onboarding screens, the first `auth add` creates the owner and marks
+onboarding complete; later ones add more logins. Run it while the server is
+stopped. Outside Docker, `HARS_CONFIG` sets the directory (default `./config`).
 
 The image is `FROM scratch`: a static musl binary, CA roots, tzdata and the
 official frontend (`home-assistant-frontend` 20260527.4, fetched from PyPI and

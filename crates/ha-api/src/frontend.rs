@@ -18,6 +18,7 @@ use axum::{
     response::{IntoResponse, Response},
     routing::get,
 };
+use ha_auth::Auth;
 use serde_json::{Value, json};
 use std::path::{Path as FsPath, PathBuf};
 use std::sync::Arc;
@@ -141,7 +142,7 @@ fn manifest() -> Value {
     })
 }
 
-pub(crate) fn routes(fe: Arc<Frontend>) -> Router {
+pub(crate) fn routes(fe: Arc<Frontend>, auth: Auth) -> Router {
     let root = fe.root.clone();
     let file = |name: &str| {
         ServeFile::new(root.join(name))
@@ -176,24 +177,30 @@ pub(crate) fn routes(fe: Arc<Frontend>) -> Router {
         .nest_service("/frontend_es5", dir("frontend_es5"))
         .layer(axum::middleware::map_response(cache_headers));
 
-    let index = {
+    // `IndexView.get`: until onboarding is done, everything goes there.
+    let page = {
         let fe = fe.clone();
         move || {
-            let fe = fe.clone();
-            async move { html(&fe.index_html) }
-        }
-    };
-    let panel = {
-        let fe = fe.clone();
-        move |Path(segments): Path<Vec<String>>| {
-            let fe = fe.clone();
-            async move {
-                match segments.first() {
-                    Some(first) if PANEL_PATHS.contains(&first.as_str()) => html(&fe.index_html),
-                    _ => StatusCode::NOT_FOUND.into_response(),
-                }
+            if auth.is_onboarded() {
+                html(&fe.index_html)
+            } else {
+                redirect(StatusCode::FOUND, "/onboarding.html")
             }
         }
+    };
+    let index = {
+        let page = page.clone();
+        move || {
+            let res = page();
+            async move { res }
+        }
+    };
+    let panel = move |Path(segments): Path<Vec<String>>| {
+        let res = match segments.first() {
+            Some(first) if PANEL_PATHS.contains(&first.as_str()) => page(),
+            _ => StatusCode::NOT_FOUND.into_response(),
+        };
+        async move { res }
     };
     let manifest = move || {
         let body = fe.manifest_json.clone();
@@ -343,6 +350,10 @@ mod tests {
     }
 
     async fn get(path: &str, accept_encoding: Option<&str>) -> Response {
+        get_with(crate::test_util::auth(true), path, accept_encoding).await
+    }
+
+    async fn get_with(auth: Auth, path: &str, accept_encoding: Option<&str>) -> Response {
         let config = crate::ApiConfig {
             frontend: Some(fake_frontend()),
         };
@@ -350,10 +361,29 @@ mod tests {
         if let Some(enc) = accept_encoding {
             req = req.header(header::ACCEPT_ENCODING, enc);
         }
-        crate::router(ha_core::Hass::new(), &config)
+        crate::router(ha_core::Hass::new(), auth, &config)
             .oneshot(req.body(Body::empty()).unwrap())
             .await
             .unwrap()
+    }
+
+    #[tokio::test]
+    async fn index_sends_a_fresh_install_to_onboarding() {
+        let auth = crate::test_util::auth(false);
+        for path in ["/", "/lovelace/0", "/config/"] {
+            let res = get_with(auth.clone(), path, None).await;
+            assert_eq!(res.status(), StatusCode::FOUND, "{path}");
+            assert_eq!(header_of(&res, header::LOCATION), Some("/onboarding.html"));
+        }
+        // Unknown paths are still 404, and the onboarding page itself loads.
+        assert_eq!(
+            get_with(auth.clone(), "/nope", None).await.status(),
+            StatusCode::NOT_FOUND
+        );
+        assert_eq!(
+            get_with(auth, "/onboarding.html", None).await.status(),
+            StatusCode::OK
+        );
     }
 
     fn header_of(res: &Response, name: header::HeaderName) -> Option<&str> {

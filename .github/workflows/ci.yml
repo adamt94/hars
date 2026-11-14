@@ -29,16 +29,19 @@ jobs:
       - run: docker build -t hars .
       - name: Smoke test the image
         run: |
-          docker run -d --name hars -p 8123:8123 hars
-          for i in $(seq 1 50); do curl -sf localhost:8123/api/ && break; sleep 0.1; done
-          curl -sf localhost:8123/api/ | grep -q "API running."
+          docker run --rm -v hars-ci:/config hars auth add ci ci-password
+          docker run -d --name hars -p 8123:8123 -v hars-ci:/config hars
+          for i in $(seq 1 50); do curl -s -o /dev/null localhost:8123/api/ && break; sleep 0.1; done
+          test "$(curl -s -o /dev/null -w '%{http_code}' localhost:8123/api/)" = 401
+          token=$(scripts/hars-token.sh http://localhost:8123 ci ci-password)
+          curl -sf -H "Authorization: Bearer $token" localhost:8123/api/ | grep -q "API running."
           # The bundled frontend: rendered index, and a precompressed asset it links.
           curl -sf localhost:8123/lovelace/0 | grep -q 'content="#2980b9"'
           js=$(curl -sf localhost:8123/ | grep -oE '/frontend_latest/core\.[0-9a-f]+\.js' | head -1)
           curl -sf -o /dev/null -D - -H 'Accept-Encoding: br' "localhost:8123$js" | grep -qi '^content-encoding: br'
           # A client stuck mid-request must not push shutdown past the grace period.
           exec 3<>/dev/tcp/127.0.0.1/8123
-          printf 'POST /api/states/sensor.x HTTP/1.1\r\nHost: x\r\nContent-Type: application/json\r\nContent-Length: 100\r\n\r\n{' >&3
+          printf 'POST /auth/login_flow HTTP/1.1\r\nHost: x\r\nContent-Type: application/json\r\nContent-Length: 100\r\n\r\n{' >&3
           docker stop -t 10 hars
           test "$(docker inspect hars --format '{{.State.ExitCode}}')" = 0
           docker logs hars 2>&1 | grep -q "hars stopped"

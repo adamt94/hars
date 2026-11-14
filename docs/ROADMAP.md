@@ -157,9 +157,18 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
       `immutable`), `/manifest.json`, `/auth/authorize`. The image ships the
       wheel's `hass_frontend` minus source maps (234 MB, ES5 build kept);
       the binary grew 2.08 → 2.33 MiB
-- [ ] Auth: `/auth/providers`, `/auth/login_flow` + `/auth/login_flow/{flow_id}`,
-      `/auth/token` (form-encoded `authorization_code` + `refresh_token`,
-      revoke), client id / redirect validation, JWT access tokens
+- [x] Auth: `/auth/providers`, `/auth/login_flow` + `/auth/login_flow/{flow_id}`,
+      `/auth/token` (`authorization_code` + `refresh_token` + revoke, as
+      urlencoded **or multipart**: the frontend sends `FormData`), client id /
+      redirect validation (no outbound `<link rel=redirect_uri>` fetch), HS256
+      JWT access tokens, `Bearer` on every `/api/*`. State lives in HA's own
+      `.storage/{auth, auth_provider.homeassistant, onboarding}` files.
+      `hars auth add` creates the owner until onboarding UI lands; binary
+      2.33 → 2.64 MiB
+- [ ] Onboarding UI: `/api/onboarding/users` and the `core_config`,
+      `analytics` and `integration` steps (needs WS); a fresh install
+      redirects to `/onboarding.html` until then
+- [ ] CORS for `/auth/token` and `/auth/revoke` (HA allows any origin)
 - [ ] REST `/api/config` (truthful `components` list, version, units, location)
 - [ ] WS core: `auth`, `ping`, `supported_features` (**coalescing only once it
       is negotiated**), `subscribe_events`/`unsubscribe_events`, `get_states`,

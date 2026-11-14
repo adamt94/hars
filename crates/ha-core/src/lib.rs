@@ -17,6 +17,7 @@ mod lifecycle;
 mod schema;
 mod service;
 mod state;
+pub mod storage;
 
 pub use clock::{Clock, SimulatedClock};
 pub use context::{Context, ContextId};

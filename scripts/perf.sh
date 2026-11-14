@@ -34,11 +34,16 @@ if curl -s --max-time 1 "$URL/api/" >/dev/null 2>&1; then
   echo "something is already listening on $URL; set PORT" >&2
   exit 1
 fi
+# A throwaway config with one login; /api/ needs a token, as in HA.
+export HARS_CONFIG
+HARS_CONFIG=$(mktemp -d)
+"$BIN" auth add perf perf-password >/dev/null
+answers() { [ "$(curl -s -o /dev/null -w '%{http_code}' --max-time 1 "$URL/api/")" != 000 ]; }
 t0=$(date +%s%N)
 HARS_BIND="127.0.0.1:$PORT" "$BIN" >/dev/null 2>&1 &
 pid=$!
-trap 'kill "$pid" 2>/dev/null || true' EXIT
-until curl -sf --max-time 1 "$URL/api/" >/dev/null 2>&1; do
+trap 'kill "$pid" 2>/dev/null || true; rm -rf "$HARS_CONFIG"' EXIT
+until answers; do
   kill -0 "$pid" 2>/dev/null || { echo "hars exited during start-up" >&2; exit 1; }
   if (( $(date +%s%N) - t0 > 10000000000 )); then
     echo "hars did not answer /api/ within 10 s" >&2; exit 1
@@ -49,13 +54,15 @@ start_ms=$(( ($(date +%s%N) - t0) / 1000000 ))
 # The answer must come from our child, not another process on the port.
 kill -0 "$pid" 2>/dev/null || { echo "hars exited during start-up" >&2; exit 1; }
 
-# Warm-up: a little traffic, so idle numbers include touched allocator pages.
+# Warm-up: a login and a little traffic, so idle numbers include touched
+# allocator pages.
+token=$("$(dirname "$0")/hars-token.sh" "$URL" perf perf-password)
 for i in $(seq 1 200); do
   curl -sf --max-time 5 -X POST "$URL/api/states/sensor.perf_$((i % 20))" \
-    -H 'content-type: application/json' \
+    -H "authorization: Bearer $token" -H 'content-type: application/json' \
     -d "{\"state\": \"$i\", \"attributes\": {\"unit_of_measurement\": \"W\"}}" >/dev/null
 done
-curl -sf --max-time 5 "$URL/api/states" >/dev/null
+curl -sf --max-time 5 -H "authorization: Bearer $token" "$URL/api/states" >/dev/null
 sleep "$WARMUP"
 
 hz=$(getconf CLK_TCK)
