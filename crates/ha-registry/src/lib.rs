@@ -677,6 +677,7 @@ impl Registries {
             if hass.states().get(&id).is_some() {
                 continue;
             }
+            // Written only if still absent (an integration may write first).
             let extra = |k: &str| e.extra.get(k).filter(|v| !v.is_null());
             let mut a = Map::new();
             a.insert("restored".into(), Value::Bool(true));
@@ -703,7 +704,7 @@ impl Registries {
             if let Some(u) = extra("unit_of_measurement") {
                 a.insert("unit_of_measurement".into(), u.clone());
             }
-            hass.set_state(id, "unavailable", a);
+            hass.set_state_if_absent(id, "unavailable", a);
         }
     }
 

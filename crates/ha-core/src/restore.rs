@@ -31,6 +31,9 @@ pub struct RestoreState {
     last: Mutex<HashMap<String, Value>>,
     /// Entities that restore themselves.
     entities: Mutex<HashMap<String, Option<ExtraData>>>,
+    /// Dumps write one at a time (HA's Store lock), each with its own
+    /// fresh snapshot, so the last one taken is the one left on disk.
+    save_turn: tokio::sync::Mutex<()>,
 }
 
 fn store(dir: &Path) -> Store {
@@ -61,6 +64,7 @@ impl RestoreState {
             dir: Some(config_dir.to_owned()),
             last: Mutex::new(last),
             entities: Mutex::default(),
+            save_turn: tokio::sync::Mutex::new(()),
         }
     }
 
@@ -83,23 +87,43 @@ impl RestoreState {
         self.entities.lock().insert(entity_id.to_owned(), extra);
     }
 
+    /// An entity going away (`async_restore_entity_removed`): its current
+    /// state and extra data are kept as an entry, so they survive it.
+    /// Call before its state is removed.
+    pub fn unregister(&self, hass: &Hass, entity_id: &str) {
+        let Some(extra) = self.entities.lock().remove(entity_id) else {
+            return;
+        };
+        let Some(state) = crate::EntityId::parse(entity_id)
+            .ok()
+            .and_then(|id| hass.states().get(&id))
+        else {
+            return;
+        };
+        let item = json!({
+            "state": &*state,
+            "extra_data": extra.as_ref().and_then(|f| f()),
+            "last_seen": isoformat(hass.clock().now()),
+        });
+        self.last.lock().insert(entity_id.to_owned(), item);
+    }
+
     /// HA's `async_get_stored_states`: each registered entity's current
     /// state (not a `restored` placeholder) seen now, then the previous
     /// run's entries no entity wrote this run, unless expired.
     pub fn stored(&self, hass: &Hass, now: Timestamp) -> Vec<Value> {
         let mut out = Vec::new();
-        let mut current = Vec::new();
+        // Every current state but a placeholder, restorable or not.
+        let current = |id: &str| {
+            crate::EntityId::parse(id)
+                .ok()
+                .and_then(|eid| hass.states().get(&eid))
+                .filter(|s| !s.attributes.get("restored").is_some_and(|r| r == true))
+        };
         for (id, extra) in self.entities.lock().iter() {
-            let Ok(eid) = crate::EntityId::parse(id) else {
+            let Some(state) = current(id) else {
                 continue;
             };
-            let Some(state) = hass.states().get(&eid) else {
-                continue;
-            };
-            if state.attributes.get("restored").is_some_and(|r| r == true) {
-                continue;
-            }
-            current.push(id.clone());
             out.push(json!({
                 "state": &*state,
                 "extra_data": extra.as_ref().and_then(|f| f()),
@@ -108,7 +132,7 @@ impl RestoreState {
         }
         let expired = now - EXPIRATION;
         for (id, item) in self.last.lock().iter() {
-            if current.contains(id) {
+            if current(id).is_some() {
                 continue;
             }
             let seen: Option<Timestamp> = item["last_seen"].as_str().and_then(|s| s.parse().ok());
@@ -125,6 +149,7 @@ impl RestoreState {
         let Some(dir) = self.dir.clone() else {
             return;
         };
+        let _turn = self.save_turn.lock().await;
         let items = self.stored(hass, hass.clock().now());
         let saved = tokio::task::spawn_blocking(move || store(&dir).save(&items)).await;
         match saved {
@@ -190,6 +215,65 @@ mod tests {
             again.last_state("scene.live").unwrap()["state"],
             "2026-11-14T14:00:00+00:00"
         );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// An old entry is dropped once its entity has a real state, even one
+    /// that doesn't restore; an entity that goes keeps its last state.
+    #[tokio::test]
+    async fn current_states_replace_entries_and_removal_keeps_one() {
+        let hass = Hass::new();
+        let r = RestoreState::default();
+        r.last.lock().insert(
+            "light.kitchen".into(),
+            json!({"state": {"entity_id": "light.kitchen", "state": "on"}, "extra_data": null,
+                "last_seen": "2099-01-01T00:00:00+00:00"}),
+        );
+        hass.set_state(
+            EntityId::parse("light.kitchen").unwrap(),
+            "off",
+            Attributes::new(),
+        );
+        let now = hass.clock().now();
+        assert!(r.stored(&hass, now).is_empty());
+
+        let id = EntityId::parse("scene.gone").unwrap();
+        hass.set_state(id.clone(), "2026-11-14T10:00:00+00:00", Attributes::new());
+        r.register("scene.gone", None);
+        r.unregister(&hass, "scene.gone");
+        hass.remove_state(&id);
+        let stored = r.stored(&hass, now);
+        assert_eq!(stored.len(), 1);
+        assert_eq!(stored[0]["state"]["state"], "2026-11-14T10:00:00+00:00");
+    }
+
+    /// Dumps at once write one after the other, so the file stays whole.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn concurrent_dumps_leave_valid_json() {
+        let dir = std::env::temp_dir().join(format!("hars-restore-race-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let r = Arc::new(RestoreState {
+            dir: Some(dir.clone()),
+            ..Default::default()
+        });
+        let hass = Hass::new();
+        for i in 0..200 {
+            let id = format!("scene.s{i}");
+            hass.set_state(EntityId::parse(&id).unwrap(), "x", Attributes::new());
+            r.register(&id, None);
+        }
+        let dumps: Vec<_> = (0..16)
+            .map(|_| {
+                let (r, hass) = (r.clone(), hass.clone());
+                tokio::spawn(async move { r.dump(&hass).await })
+            })
+            .collect();
+        for d in dumps {
+            d.await.unwrap();
+        }
+        let loaded = RestoreState::load(&dir);
+        assert_eq!(loaded.last.lock().len(), 200);
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

@@ -202,6 +202,9 @@ impl StateMachine {
     /// consumer sees one order. The timestamp is read under the lock for the
     /// same reason. An unchanged write returns the existing `Arc`, moves
     /// only its `last_reported`, and fires no `state_changed`.
+    // The state machine's one write path, crate-internal: the clock and bus
+    // are passed in rather than held.
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn set(
         &self,
         entity_id: EntityId,
@@ -210,9 +213,14 @@ impl StateMachine {
         context: Option<Context>,
         clock: &Clock,
         bus: &EventBus,
+        if_absent: bool,
     ) -> Arc<State> {
         let mut states = self.states.write();
         let old = states.get(&entity_id).cloned();
+        // Checked under the same lock as the write: nothing slips between.
+        if if_absent && let Some(o) = &old {
+            return o.clone();
+        }
 
         if let Some(o) = &old
             && o.state == state
@@ -607,5 +615,17 @@ mod tests {
             ("on", true)
         );
         assert!(!hass.remove_state(&id));
+    }
+
+    #[tokio::test]
+    async fn set_if_absent_never_overwrites() {
+        let hass = Hass::new();
+        let id = EntityId::parse("light.kitchen").unwrap();
+        hass.set_state(id.clone(), "on", Attributes::new());
+        hass.set_state_if_absent(id.clone(), "unavailable", Attributes::new());
+        assert_eq!(hass.states().get(&id).unwrap().state, "on");
+        let other = EntityId::parse("light.other").unwrap();
+        hass.set_state_if_absent(other.clone(), "unavailable", Attributes::new());
+        assert_eq!(hass.states().get(&other).unwrap().state, "unavailable");
     }
 }

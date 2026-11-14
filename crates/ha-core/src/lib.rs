@@ -210,7 +210,28 @@ impl Hass {
             context,
             &inner.clock,
             &inner.bus,
+            false,
         )
+    }
+
+    /// Write a state only if the entity has none, in one step (HA's
+    /// start-time placeholders can't overwrite a state written meanwhile).
+    pub fn set_state_if_absent(
+        &self,
+        entity_id: EntityId,
+        state: impl Into<smol_str::SmolStr>,
+        attributes: Attributes,
+    ) {
+        let inner = &*self.inner;
+        inner.states.set(
+            entity_id,
+            state.into(),
+            attributes,
+            None,
+            &inner.clock,
+            &inner.bus,
+            true,
+        );
     }
 
     /// Remove an entity's state (HA's `async_remove`): `state_changed`

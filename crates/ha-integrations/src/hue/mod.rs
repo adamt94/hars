@@ -368,6 +368,10 @@ impl Bridge {
             self.hass.remove_state(&l.entity_id);
         }
         for e in &gone.others {
+            // A scene's last activation outlives it, as in HA.
+            self.hass
+                .restore()
+                .unregister(&self.hass, e.entity_id.as_str());
             self.platforms.switches.remove(&e.entity_id);
             self.platforms.scenes.remove(&e.entity_id);
             self.hass.remove_state(&e.entity_id);
