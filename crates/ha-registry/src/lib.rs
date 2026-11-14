@@ -269,7 +269,8 @@ pub struct Entity {
     pub aliases_v2: Vec<Value>,
     #[serde(default)]
     pub area_id: Option<String>,
-    #[serde(default, deserialize_with = "null_as_default")]
+    /// Kept as written, `null` included (HA doesn't normalise it).
+    #[serde(default)]
     pub categories: RawJson,
     /// `{"state_class": …}` and the like, or `null`.
     #[serde(default)]
@@ -380,8 +381,7 @@ impl Entity {
         {
             m.insert("en".into(), json!(name));
         }
-        let options = (self.domain() == "sensor" && self.options.get().contains("sensor"))
-            .then(|| self.options.object());
+        let options = (self.domain() == "sensor").then(|| self.options.object());
         let sensor = options
             .as_ref()
             .and_then(|o| o.get("sensor"))
@@ -870,13 +870,17 @@ impl Registries {
             if let Some(caps) = &e.capabilities {
                 a.extend(caps.object());
             }
-            if let Some(dc) = e.device_class.as_ref().or(e.original_device_class.as_ref()) {
+            // Python's `or`: an empty override falls back too.
+            let or = |a: &Option<String>, b: &Option<String>| {
+                a.clone().filter(|s| !s.is_empty()).or_else(|| b.clone())
+            };
+            if let Some(dc) = or(&e.device_class, &e.original_device_class) {
                 a.insert("device_class".into(), json!(dc));
             }
-            if let Some(icon) = e.icon.as_ref().or(e.original_icon.as_ref()) {
+            if let Some(icon) = or(&e.icon, &e.original_icon) {
                 a.insert("icon".into(), json!(icon));
             }
-            if let Some(name) = e.name.clone().or_else(|| e.original_name.clone()) {
+            if let Some(name) = or(&e.name, &e.original_name) {
                 a.insert("friendly_name".into(), Value::String(name));
             }
             // `is not None`: 0 is written too.

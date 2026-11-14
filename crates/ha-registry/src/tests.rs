@@ -513,3 +513,54 @@ fn real_files_round_trip() {
     }
     let _ = std::fs::remove_dir_all(&tmp);
 }
+
+/// Review regressions: options are read as parsed JSON (an escaped key
+/// still counts), and `categories: null` survives a write while `options:
+/// null` becomes `{}`, as HA's loader protects only options.
+#[test]
+fn raw_json_fields_read_and_write_as_ha() {
+    let e: Entity = serde_json::from_str(
+        r#"{"entity_id":"sensor.test","platform":"test","options":{"sensor":{"display_precision":2}}}"#,
+    )
+    .unwrap();
+    assert_eq!(e.display_json(None)["dp"], 2);
+
+    let e: Entity = serde_json::from_str(
+        r#"{"entity_id":"sensor.test","platform":"test","categories":null,"options":null}"#,
+    )
+    .unwrap();
+    let out = serde_json::to_value(&e).unwrap();
+    assert_eq!(out["categories"], Value::Null);
+    assert_eq!(out["options"], json!({}));
+    let missing: Entity =
+        serde_json::from_str(r#"{"entity_id":"sensor.test","platform":"test"}"#).unwrap();
+    assert_eq!(
+        serde_json::to_value(&missing).unwrap()["categories"],
+        json!({})
+    );
+}
+
+/// Python's `or`: empty overrides fall back to the integration's values.
+#[test]
+fn empty_overrides_fall_back() {
+    let hass = ha_core::Hass::new();
+    let r = Registries {
+        entities: crate::rows![Entity {
+            entity_id: "sensor.x".into(),
+            platform: "p".into(),
+            name: Some(String::new()),
+            original_name: Some("Original".into()),
+            icon: Some(String::new()),
+            original_icon: Some("mdi:a".into()),
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+    r.write_unavailable_states(&hass);
+    let s = hass
+        .states()
+        .get(&ha_core::EntityId::parse("sensor.x").unwrap())
+        .unwrap();
+    assert_eq!(s.attributes["friendly_name"], "Original");
+    assert_eq!(s.attributes["icon"], "mdi:a");
+}
