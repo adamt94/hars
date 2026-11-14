@@ -185,11 +185,17 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
       removals, context; subscribe and snapshot taken atomically. A client
       that falls behind is disconnected, as in HA, and gets a fresh snapshot
       when the frontend reconnects
-- [ ] WS frontend: `frontend/get_themes`, `frontend/get_translations`,
-      `frontend/subscribe_user_data`, `frontend/subscribe_system_data`,
-      `frontend/set_user_data`, `manifest/list`, `brands/access_token`
+- [x] WS frontend: `frontend/{get,set,subscribe}_{user,system}_data` in HA's
+      `.storage/frontend.*` files, `frontend/get_themes`,
+      `frontend/get_translations` and `frontend/get_icons` (empty until
+      translations and icons are bundled), `persistent_notification/subscribe`,
+      `repairs/list_issues`; the frontend's cold load gets every answer it
+      waits for (test replays it)
+- [ ] Bundle translations and icons (`frontend/get_translations`,
+      `frontend/get_icons`), `manifest/list`, `brands/access_token`
 - [ ] WS registries: `config/entity_registry/list_for_display`,
-      `config/{device,area,floor,label}_registry/list`, and their `*_updated` events
+      `config/{device,area,floor,label}_registry/list`, and their `*_updated`
+      events (answered empty until M1's registries exist)
 - [ ] WS lovelace: `lovelace/info`, `lovelace/dashboards/list`,
       `lovelace/config` (`config_not_found` for Overview),
       `lovelace/config/save`, `lovelace/resources`

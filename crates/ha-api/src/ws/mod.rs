@@ -9,6 +9,7 @@
 
 mod commands;
 mod entities;
+mod frontend;
 
 use crate::Shared;
 use crate::auth::RemoteIp;
@@ -132,6 +133,9 @@ pub(crate) enum Subscription {
     /// Served by the connection's shared bus listener.
     Events,
     Task(TaskSub),
+    /// Registered so it can be unsubscribed, but nothing ever fires it
+    /// (`persistent_notification/subscribe` while there are none).
+    Idle,
 }
 
 /// `subscribe_events` ids by event type. The bus listener holds the lock
@@ -478,6 +482,7 @@ impl Conn {
                     }
                 }
             }
+            Some(Subscription::Idle) => reply(&self.out),
             None => return false,
         }
         true

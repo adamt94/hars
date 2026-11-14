@@ -3,10 +3,12 @@
 
 mod auth;
 mod frontend;
+mod frontend_data;
 mod rest;
 mod ws;
 
 pub use frontend::Frontend;
+pub use frontend_data::FrontendData;
 
 use axum::{
     Router,
@@ -28,6 +30,8 @@ pub struct ApiConfig {
     pub config_dir: String,
     /// Whether `.storage/core.config` existed (`config_source`).
     pub config_source: ConfigSource,
+    /// The frontend's per-user and system settings.
+    pub frontend_data: Arc<FrontendData>,
 }
 
 /// What the WebSocket and `/api/config` need.
@@ -42,7 +46,16 @@ pub(crate) struct Shared {
 /// `components`. The frontend gates features on this list, so it only names
 /// what really works.
 fn components(config: &ApiConfig) -> Vec<&'static str> {
-    let mut c = vec!["api", "auth", "http", "onboarding", "websocket_api"];
+    let mut c = vec![
+        "api",
+        "auth",
+        "http",
+        "lovelace",
+        "onboarding",
+        "persistent_notification",
+        "repairs",
+        "websocket_api",
+    ];
     if config.frontend.is_some() {
         c.push("frontend");
     }

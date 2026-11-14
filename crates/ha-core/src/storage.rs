@@ -10,6 +10,7 @@
 //! The API is blocking: call it at start-up or from `spawn_blocking`.
 
 use serde::{Serialize, de::DeserializeOwned};
+use std::borrow::Cow;
 use std::fs;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
@@ -18,7 +19,7 @@ use std::path::{Path, PathBuf};
 #[derive(Debug, Clone)]
 pub struct Store {
     path: PathBuf,
-    key: &'static str,
+    key: Cow<'static, str>,
     version: u32,
     minor_version: u32,
     private: bool,
@@ -71,13 +72,14 @@ impl Store {
     /// the rest `0644`, as HA does.
     pub fn new(
         config_dir: &Path,
-        key: &'static str,
+        key: impl Into<Cow<'static, str>>,
         version: u32,
         minor_version: u32,
         private: bool,
     ) -> Self {
+        let key = key.into();
         Self {
-            path: config_dir.join(".storage").join(key),
+            path: config_dir.join(".storage").join(key.as_ref()),
             key,
             version,
             minor_version,
@@ -130,7 +132,7 @@ impl Store {
         let json = serde_json::to_vec_pretty(&EnvelopeRef {
             version: self.version,
             minor_version: self.minor_version,
-            key: self.key,
+            key: &self.key,
             data,
         })?;
         let dir = self.path.parent().expect("store path has a parent");

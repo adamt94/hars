@@ -664,3 +664,152 @@ async fn overflowed_clients_get_a_close_frame() {
     assert!(saw_close, "expected a Close frame");
     assert!(start.elapsed() < Duration::from_secs(5));
 }
+
+/// The frontend's cold load on "/" (20260527.4, admin user), in its order.
+/// The splash screen goes away only if `subscribe_entities`, `get_config`
+/// and `get_services` succeed, `recorder/info` succeeds or is
+/// `unknown_command`, and `frontend/subscribe_{user,system}_data` send their
+/// event; the panel needs `home` in `get_panels`.
+#[tokio::test]
+async fn the_frontends_cold_load_gets_every_answer_it_waits_for() {
+    let s = server().await;
+    let mut c = Client::authed(&s, &token(&s.auth).0).await;
+    let commands: Vec<Value> = vec![
+        json!({"type": "supported_features", "features": {"coalesce_messages": 1}}),
+        json!({"type": "subscribe_entities"}),
+        json!({"type": "subscribe_events", "event_type": "entity_registry_updated"}),
+        json!({"type": "config/entity_registry/list_for_display"}),
+        json!({"type": "subscribe_events", "event_type": "device_registry_updated"}),
+        json!({"type": "config/device_registry/list"}),
+        json!({"type": "subscribe_events", "event_type": "area_registry_updated"}),
+        json!({"type": "config/area_registry/list"}),
+        json!({"type": "subscribe_events", "event_type": "floor_registry_updated"}),
+        json!({"type": "config/floor_registry/list"}),
+        json!({"type": "subscribe_events", "event_type": "component_loaded"}),
+        json!({"type": "subscribe_events", "event_type": "core_config_updated"}),
+        json!({"type": "get_config"}),
+        json!({"type": "subscribe_events", "event_type": "service_registered"}),
+        json!({"type": "subscribe_events", "event_type": "service_removed"}),
+        json!({"type": "get_services"}),
+        json!({"type": "subscribe_events", "event_type": "panels_updated"}),
+        json!({"type": "get_panels"}),
+        json!({"type": "subscribe_events", "event_type": "themes_updated"}),
+        json!({"type": "frontend/get_themes"}),
+        json!({"type": "auth/current_user"}),
+        json!({"type": "frontend/subscribe_user_data", "key": "core"}),
+        json!({"type": "subscribe_events", "event_type": "repairs_issue_registry_updated"}),
+        json!({"type": "repairs/list_issues"}),
+        json!({"type": "recorder/info"}),
+        json!({"type": "lovelace/config", "url_path": null, "force": false}),
+        json!({"type": "lovelace/resources"}),
+        json!({"type": "frontend/subscribe_user_data", "key": "core"}),
+        json!({"type": "frontend/subscribe_system_data", "key": "core"}),
+        json!({"type": "frontend/subscribe_user_data", "key": "language"}),
+        json!({"type": "frontend/subscribe_user_data", "key": "theme"}),
+        json!({"type": "frontend/get_translations", "language": "en", "category": "entity_component"}),
+        json!({"type": "frontend/get_translations", "language": "en", "category": "entity"}),
+        json!({"type": "frontend/subscribe_user_data", "key": "sidebar"}),
+        json!({"type": "persistent_notification/subscribe"}),
+        json!({"type": "frontend/get_system_data", "key": "home"}),
+        json!({"type": "lovelace/info"}),
+        json!({"type": "frontend/get_icons", "category": "entity_component"}),
+        json!({"type": "ping"}),
+    ];
+    // The frontend's ids: 1, then 3 onwards.
+    let ids: Vec<u64> = std::iter::once(1).chain(3..).take(commands.len()).collect();
+    let batch: Vec<Value> = commands
+        .iter()
+        .zip(&ids)
+        .map(|(cmd, id)| {
+            let mut m = cmd.clone();
+            m["id"] = json!(id);
+            m
+        })
+        .collect();
+    c.ws.send(Message::Text(Value::Array(batch).to_string().into()))
+        .await
+        .unwrap();
+
+    // Every message, by id, in arrival order.
+    let mut by_id: std::collections::HashMap<u64, Vec<Value>> = Default::default();
+    let mut answered = 0;
+    while answered < ids.len() {
+        let m = c.recv().await;
+        let id = m["id"].as_u64().unwrap();
+        if m["type"] == "result" || m["type"] == "pong" {
+            answered += 1;
+        }
+        by_id.entry(id).or_default().push(m);
+    }
+    let reply = |i: usize| -> &Value {
+        by_id[&ids[i]]
+            .iter()
+            .find(|m| m["type"] == "result" || m["type"] == "pong")
+            .unwrap()
+    };
+    let events = |i: usize| -> Vec<&Value> {
+        by_id[&ids[i]]
+            .iter()
+            .filter(|m| m["type"] == "event")
+            .collect()
+    };
+
+    for (i, cmd) in commands.iter().enumerate() {
+        let r = reply(i);
+        match cmd["type"].as_str().unwrap() {
+            "recorder/info" => assert_eq!(r["error"]["code"], "unknown_command"),
+            "lovelace/config" => assert_eq!(r["error"]["code"], "config_not_found"),
+            "ping" => assert_eq!(r["type"], "pong"),
+            t => assert_eq!(r["success"], true, "{t}: {r}"),
+        }
+    }
+    assert_eq!(reply(12)["result"]["state"], "RUNNING");
+    assert!(reply(17)["result"].get("home").is_some());
+    assert_eq!(events(1)[0]["event"], json!({"a": {}}));
+    // User and system data: the event comes before the result.
+    for i in [21, 27, 28, 29, 30, 33] {
+        let msgs = &by_id[&ids[i]];
+        assert_eq!(msgs[0]["type"], "event", "{:?}", commands[i]);
+        assert_eq!(msgs[0]["event"], json!({"value": null}));
+        assert_eq!(msgs[1]["type"], "result");
+    }
+    // Notifications: result first, then the (empty) current set.
+    let msgs = &by_id[&ids[34]];
+    assert_eq!(msgs[0]["type"], "result");
+    assert_eq!(
+        msgs[1]["event"],
+        json!({"type": "current", "notifications": {}})
+    );
+    assert_eq!(reply(35)["result"], json!({"value": null}));
+}
+
+#[tokio::test]
+async fn user_data_is_shared_between_a_users_connections() {
+    let s = server().await;
+    let (access, _) = token(&s.auth);
+    let mut tab1 = Client::authed(&s, &access).await;
+    let mut tab2 = Client::authed(&s, &access).await;
+    let sub = json!({"id": 2, "type": "frontend/subscribe_user_data", "key": "sidebar"});
+    tab2.send(sub).await;
+    assert_eq!(tab2.recv().await["event"], json!({"value": null}));
+    tab2.recv().await;
+
+    let set = json!({"id": 2, "type": "frontend/set_user_data", "key": "sidebar", "value": {"panelOrder": ["home"]}});
+    assert_eq!(tab1.call(set).await["success"], true);
+    assert_eq!(
+        tab2.recv().await["event"],
+        json!({"value": {"panelOrder": ["home"]}})
+    );
+    let get = json!({"id": 3, "type": "frontend/get_user_data"});
+    assert_eq!(
+        tab1.call(get).await["result"],
+        json!({"value": {"sidebar": {"panelOrder": ["home"]}}})
+    );
+    // Another key doesn't notify a keyed subscription.
+    let set = json!({"id": 4, "type": "frontend/set_user_data", "key": "theme", "value": "dark"});
+    tab1.call(set).await;
+    assert_eq!(
+        tab2.call(json!({"id": 3, "type": "ping"})).await["type"],
+        "pong"
+    );
+}
