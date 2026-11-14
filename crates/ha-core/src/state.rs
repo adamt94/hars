@@ -107,7 +107,7 @@ pub(crate) enum WriteMode {
     /// Only if there is no state yet.
     IfAbsent,
     /// HA's `force_update`: a new state and `state_changed` even when
-    /// nothing changed (`last_changed` kept).
+    /// nothing changed; every timestamp moves.
     Force,
 }
 
@@ -268,8 +268,9 @@ impl StateMachine {
         }
 
         let now = clock.now();
+        // `same_state = old.state == new_state and not force_update`.
         let last_changed = match &old {
-            Some(o) if o.state == state => o.last_changed,
+            Some(o) if o.state == state && mode != WriteMode::Force => o.last_changed,
             _ => now,
         };
         let context = context.unwrap_or_else(|| Context::at(now));
@@ -308,20 +309,24 @@ mod tests {
 
     use super::*;
 
-    /// HA's `force_update`: an unchanged write still fires, with a new
-    /// `last_updated` and the old `last_changed`.
+    /// HA's `force_update`: an unchanged write still fires, and all three
+    /// timestamps move (HA's `same_state` is false when forced).
     #[tokio::test]
     async fn forced_writes_fire_when_unchanged() {
-        let hass = Hass::new();
+        let sim = crate::SimulatedClock::new("2026-01-01T00:00:00Z".parse().unwrap());
+        let hass = Hass::with_clock(sim.clock());
         let id = EntityId::parse("device_tracker.phone").unwrap();
         let first = hass.set_state(id.clone(), "home", Attributes::new());
         let mut rx = hass.bus().subscribe();
         let same = hass.set_state(id.clone(), "home", Attributes::new());
         assert!(Arc::ptr_eq(&first, &same));
         assert!(rx.try_recv().is_err());
+        sim.jump_to("2026-01-01T00:01:40Z".parse().unwrap());
         let forced = hass.set_state_forced(id.clone(), "home", Attributes::new());
         assert!(!Arc::ptr_eq(&first, &forced));
-        assert_eq!(forced.last_changed, first.last_changed);
+        assert!(forced.last_changed > first.last_changed);
+        assert_eq!(forced.last_updated, forced.last_changed);
+        assert_eq!(forced.last_reported.get(), forced.last_changed);
         assert!(matches!(
             rx.try_recv().unwrap().kind,
             EventKind::StateChanged { .. }

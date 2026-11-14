@@ -791,3 +791,22 @@ async fn tracker_and_notify_restore_as_ha() {
         );
     }
 }
+
+/// HA's `supports_push`: cloud push or the local push channel makes the
+/// notify entity; neither, none.
+#[tokio::test]
+async fn notify_needs_some_push() {
+    for (app_data, exists) in [
+        (json!({"push_websocket_channel": true}), true),
+        (json!({}), false),
+    ] {
+        let mut e = entry();
+        e["data"]["app_data"] = app_data.clone();
+        let app = app_with(&[e]);
+        assert_eq!(
+            state_json(&app.hass, "notify.phone") != Value::Null,
+            exists,
+            "{app_data}"
+        );
+    }
+}

@@ -54,7 +54,7 @@ pub fn location_schema(v: &Value) -> Option<Map<String, Value>> {
             }
             "gps_accuracy" => json!(coerce_float(v).filter(|f| *f >= 0.0)?),
             "battery" | "speed" | "course" | "vertical_accuracy" => {
-                json!(coerce_int(v).filter(|i| *i >= 0)?)
+                coerce_int(v).filter(|i| *i >= 0).map(int_json)?
             }
             "altitude" => json!(coerce_float(v)?),
             "in_zones" => {
@@ -80,30 +80,41 @@ fn cv_string(v: &Value) -> Option<String> {
     }
 }
 
-/// `vol.Coerce(float)`: numbers, bools and numeric strings; finite only.
+/// `vol.Coerce(float)`: numbers, bools and numeric strings (Python's
+/// `float()`); finite only.
 fn coerce_float(v: &Value) -> Option<f64> {
     let f = match v {
         Value::Number(n) => n.as_f64()?,
         Value::Bool(b) => f64::from(u8::from(*b)),
-        Value::String(s) => s.trim().parse().ok()?,
+        Value::String(s) => crate::num::py_float_str(s)?,
         _ => return None,
     };
     f.is_finite().then_some(f)
 }
 
 /// `vol.Coerce(int)`: Python's `int()`: floats truncate toward zero;
-/// strings must be integers.
-fn coerce_int(v: &Value) -> Option<i64> {
+/// strings must be integers. Exact up to `i128`.
+fn coerce_int(v: &Value) -> Option<i128> {
     match v {
-        Value::Number(n) => n.as_i64().or_else(|| {
-            n.as_f64()
-                .filter(|f| f.is_finite())
-                .map(|f| f.trunc() as i64)
+        Value::Number(n) => n.as_i64().map(i128::from).or_else(|| {
+            n.as_u64().map(i128::from).or_else(|| {
+                n.as_f64()
+                    .filter(|f| f.is_finite() && f.abs() < 1.7e38)
+                    .map(|f| f.trunc() as i128)
+            })
         }),
-        Value::Bool(b) => Some(i64::from(*b)),
-        Value::String(s) => s.trim().parse().ok(),
+        Value::Bool(b) => Some(i128::from(*b)),
+        Value::String(s) => crate::num::py_int_str(s),
         _ => None,
     }
+}
+
+/// An integer as JSON: exact within 64 bits, else the nearest float.
+fn int_json(i: i128) -> Value {
+    i64::try_from(i)
+        .map(Value::from)
+        .or_else(|_| u64::try_from(i).map(Value::from))
+        .unwrap_or_else(|_| json!(i as f64))
 }
 
 /// `cv.entity_ids`: a comma-separated string or a list, lowercased.
@@ -111,6 +122,8 @@ fn entity_ids(v: &Value) -> Option<Vec<String>> {
     let items: Vec<String> = match v {
         Value::String(s) => s.split(',').map(|x| x.trim().to_owned()).collect(),
         Value::Array(a) => a.iter().map(cv_string).collect::<Option<_>>()?,
+        // A dict iterates its keys.
+        Value::Object(m) => m.keys().cloned().collect(),
         _ => return None,
     };
     items
@@ -326,10 +339,14 @@ pub fn setup_notify(hass: &Hass, registry: &Registry, registrations: &[Arc<Regis
     let restore = hass.restore();
     for reg in registrations {
         let data = reg.data();
+        // `supports_push`: cloud push, or the local push channel.
         let push = data
             .get("app_data")
             .and_then(Value::as_object)
-            .is_some_and(|a| a.contains_key("push_token") && a.contains_key("push_url"));
+            .is_some_and(|a| {
+                (a.contains_key("push_token") && a.contains_key("push_url"))
+                    || a.contains_key("push_websocket_channel")
+            });
         let Some(device_id) = reg.device_id() else {
             continue;
         };

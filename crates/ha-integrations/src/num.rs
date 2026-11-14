@@ -90,6 +90,46 @@ pub fn py_format(x: f64, p: usize) -> String {
     format!("{sign}{int}.{frac}")
 }
 
+/// A string as Python's `int()`/`float()` read it: whitespace stripped,
+/// Unicode decimal digits as ASCII, `_` allowed only between digits.
+/// `None` for anything else non-ASCII or a misplaced `_`.
+pub fn py_numeric_ascii(s: &str) -> Option<String> {
+    let t = s.trim_matches(|c: char| c.is_whitespace() || ('\x1c'..='\x1f').contains(&c));
+    let chars: Vec<char> = t.chars().collect();
+    let mut ascii = String::with_capacity(chars.len());
+    for (i, &c) in chars.iter().enumerate() {
+        if c == '_' {
+            let digit = |c: Option<&char>| c.is_some_and(|c| ha_core::decimal_value(*c).is_some());
+            if !(i > 0 && digit(chars.get(i - 1)) && digit(chars.get(i + 1))) {
+                return None;
+            }
+            continue;
+        }
+        match ha_core::decimal_value(c) {
+            Some(d) => ascii.push(char::from_digit(d, 10)?),
+            None if c.is_ascii() => ascii.push(c),
+            None => return None,
+        }
+    }
+    Some(ascii)
+}
+
+/// Python's `int(s)` for a string (bounded to `i128`).
+pub fn py_int_str(s: &str) -> Option<i128> {
+    let a = py_numeric_ascii(s)?;
+    let digits = a.strip_prefix(['+', '-']).unwrap_or(&a);
+    if digits.is_empty() || !digits.bytes().all(|b| b.is_ascii_digit()) {
+        return None;
+    }
+    a.parse().ok()
+}
+
+/// Python's `float(s)` for a string (Rust's float grammar is Python's
+/// here: `inf`, `nan`, `1.`, `.5`, exponents).
+pub fn py_float_str(s: &str) -> Option<f64> {
+    py_numeric_ascii(s)?.parse().ok()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

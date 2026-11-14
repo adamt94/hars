@@ -220,7 +220,8 @@ impl Hass {
     }
 
     /// HA's `force_update` write: `state_changed` fires even when nothing
-    /// changed (trackers whose location is pushed).
+    /// changed, and every timestamp moves (trackers whose location is
+    /// pushed).
     pub fn set_state_forced(
         &self,
         entity_id: EntityId,

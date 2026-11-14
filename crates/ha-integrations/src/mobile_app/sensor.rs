@@ -987,34 +987,15 @@ fn sensor_state(config: &Map<String, Value>, system_temp: &str) -> Result<String
     Ok(stringify(&value))
 }
 
-/// Python's `int(s)` when there's no `.`/`e`, else `float(s)`: Unicode
-/// whitespace stripped, Unicode decimal digits, `_` only between digits.
+/// Python's `int(s)` when there's no `.`/`e`, else `float(s)`.
 fn py_number(s: &str) -> Option<f64> {
-    let t = s.trim_matches(|c: char| c.is_whitespace() || ('\x1c'..='\x1f').contains(&c));
-    let chars: Vec<char> = t.chars().collect();
-    let mut ascii = String::with_capacity(chars.len());
-    for (i, &c) in chars.iter().enumerate() {
-        if c == '_' {
-            let digit = |c: Option<&char>| c.is_some_and(|c| ha_core::decimal_value(*c).is_some());
-            if !(i > 0 && digit(chars.get(i - 1)) && digit(chars.get(i + 1))) {
-                return None;
-            }
-            continue;
-        }
-        match ha_core::decimal_value(c) {
-            Some(d) => ascii.push(char::from_digit(d, 10)?),
-            None if c.is_ascii() => ascii.push(c),
-            None => return None,
-        }
+    if !s.contains('.')
+        && !s.contains('e')
+        && let Some(i) = crate::num::py_int_str(s)
+    {
+        return Some(i as f64);
     }
-    if !s.contains('.') && !s.contains('e') {
-        let digits = ascii.strip_prefix(['+', '-']).unwrap_or(&ascii);
-        if !digits.is_empty() && digits.bytes().all(|b| b.is_ascii_digit()) {
-            return digits.parse::<f64>().ok();
-        }
-    }
-    // Rust's float grammar is Python's here (`inf`, `nan`, `1.`, `.5`).
-    ascii.parse::<f64>().ok()
+    crate::num::py_float_str(s)
 }
 
 /// `_stringify_state`: strings as they are, floats to 15 significant

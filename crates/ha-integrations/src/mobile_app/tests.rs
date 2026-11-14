@@ -171,3 +171,38 @@ fn concurrent_updates_stay_consistent() {
         .expect("registered");
     assert_eq!(dumped["native_value"].to_string(), state);
 }
+
+/// Review regressions: voluptuous's coercions as Python does them.
+#[test]
+fn location_schema_coerces_as_voluptuous() {
+    use tracker::location_schema;
+    let one = |v: Value| location_schema(&v);
+    assert_eq!(one(json!({"battery": "1_0"})).unwrap()["battery"], 10);
+    assert_eq!(
+        one(json!({"battery": "\u{661}\u{662}"})).unwrap()["battery"],
+        12
+    );
+    assert_eq!(
+        one(json!({"altitude": "1_000.5"})).unwrap()["altitude"],
+        1000.5
+    );
+    assert_eq!(one(json!({"speed": 1.9})).unwrap()["speed"], 1);
+    assert_eq!(one(json!({"speed": -0.5})).unwrap()["speed"], 0);
+    assert!(one(json!({"speed": -1.5})).is_none());
+    assert_eq!(
+        one(json!({"battery": 1e30})).unwrap()["battery"],
+        json!(1e30),
+        "beyond 64 bits: the nearest float, not a saturated i64"
+    );
+    assert_eq!(
+        one(json!({"in_zones": {"zone.home": true}})).unwrap()["in_zones"],
+        json!(["zone.home"])
+    );
+    assert_eq!(one(json!({"in_zones": {}})).unwrap()["in_zones"], json!([]));
+    assert!(one(json!({"in_zones": ["light.x"]})).is_none());
+    assert!(
+        one(json!({"gps": [1, 2]})).is_none(),
+        "gps needs gps_accuracy"
+    );
+    assert!(one(json!({"battery": "1__0"})).is_none());
+}
