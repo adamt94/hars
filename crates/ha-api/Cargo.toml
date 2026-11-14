@@ -24,5 +24,6 @@ tower-http = { version = "0.6", default-features = false, features = ["fs"] }
 tracing = "0.1.44"
 
 [dev-dependencies]
+tokio = { version = "1.54.1", features = ["rt-multi-thread"] }
 tokio-tungstenite = "0.29"
 tower = { version = "0.5.3", features = ["util"] }

@@ -114,7 +114,11 @@ impl FrontendData {
 
     /// Set a key and tell subscribers. Call [`FrontendData::save`] after.
     pub(crate) fn set(&self, scope: &Scope, key: &str, value: Value) {
-        self.versions.lock().entry(scope.clone()).or_default().0 += 1;
+        // The version and the value change together, under the versions lock
+        // `save` reads them under (same lock order): a save can't snapshot
+        // the new version with the old value and make this one skip.
+        let mut versions = self.versions.lock();
+        versions.entry(scope.clone()).or_default().0 += 1;
         match scope {
             Scope::User(id) => {
                 self.users
@@ -127,6 +131,7 @@ impl FrontendData {
                 self.system.lock().insert(key.to_owned(), value);
             }
         }
+        drop(versions);
         let _ = self.changes.send(Change {
             scope: scope.clone(),
             key: key.to_owned(),
@@ -323,6 +328,38 @@ mod tests {
             data.writes.load(std::sync::atomic::Ordering::Relaxed),
             writes
         );
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// Setters and savers racing on the multi-threaded runtime: every value
+    /// a set reported saved is on disk at the end. (A stress check: the
+    /// version/value race it guards against is too narrow to hit reliably.)
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn racing_sets_are_never_lost() {
+        let dir = std::env::temp_dir().join(format!("hars-frontend-race-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let data = Arc::new(FrontendData::load(&dir));
+        let mut tasks = Vec::new();
+        for writer in 0..8 {
+            let data = data.clone();
+            tasks.push(tokio::spawn(async move {
+                let scope = Scope::System;
+                for i in 0..20 {
+                    data.set(&scope, &format!("w{writer}"), json!(i));
+                    data.save(&scope).await.unwrap();
+                }
+            }));
+        }
+        for t in tasks {
+            t.await.unwrap();
+        }
+        let again = FrontendData::load(&dir);
+        for writer in 0..8 {
+            assert_eq!(
+                again.get(&Scope::System, Some(&format!("w{writer}"))),
+                json!(19)
+            );
+        }
         std::fs::remove_dir_all(dir).unwrap();
     }
 }
