@@ -16,6 +16,7 @@ mod context;
 mod entity_id;
 mod event;
 mod lifecycle;
+pub mod restore;
 mod schema;
 mod service;
 mod state;
@@ -52,6 +53,7 @@ struct HassInner {
     services: ServiceRegistry,
     core_state: AtomicU8,
     config: parking_lot::RwLock<Arc<config::CoreConfig>>,
+    restore: parking_lot::RwLock<Arc<restore::RestoreState>>,
 }
 
 impl Hass {
@@ -76,6 +78,15 @@ impl Hass {
     /// Location, units and locale (`hass.config`).
     pub fn config(&self) -> Arc<config::CoreConfig> {
         self.inner.config.read().clone()
+    }
+
+    /// Last states for entities that restore themselves.
+    pub fn restore(&self) -> Arc<restore::RestoreState> {
+        self.inner.restore.read().clone()
+    }
+
+    pub fn set_restore(&self, restore: restore::RestoreState) {
+        *self.inner.restore.write() = Arc::new(restore);
     }
 
     pub fn set_config(&self, config: config::CoreConfig) {

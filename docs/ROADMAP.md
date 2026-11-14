@@ -160,8 +160,14 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
         as those integrations land
 - [ ] `configuration.yaml`: `!include`, `!secret`, `!include_dir_merge_named`;
       unknown keys log a warning, while unsupported **automation** syntax fails validation
-- [ ] Restore state on restart: automation on/off + `last_triggered`, IR climate
-      target temperature/mode/fan (`assumed_state`). Pending waits are not restored.
+- [x] Restore state: `core.restore_state` (imported) loaded at start and
+      dumped as HA dumps it (at start, every 15 min, at stop; 7-day expiry);
+      entities register as restorable (hue scenes restore their last
+      activation); registered entities nobody provides are `unavailable`
+      with `restored: true`, as HA writes them at start
+- [ ] Restore for automations (on/off, `last_triggered`) and the IR climate
+      (target temperature/mode/fan, `assumed_state`), as those land. Pending
+      waits are not restored.
 
 ### M2: Auth + HTTP/WebSocket API for the official frontend
 - [x] Bootstrap HTML + static frontend 20260527.4 from disk (precompressed
@@ -290,7 +296,7 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
       across platforms. Matched against HA's code on the real bridge: all 28
       entities (19 with a state), 14 event-stream scenarios, 59 service calls
 - [ ] `hue`: button/rotary/bell events and `hue_event`, the motion-aware
-      sensor; scene state restored from `core.restore_state`; mDNS
+      sensor; mDNS
       rediscovery if the imported host moves; user-initiated re-pairing if
       the key is rejected
 - [ ] `lifx`: imported host + broadcast rediscovery, source/sequence matching,

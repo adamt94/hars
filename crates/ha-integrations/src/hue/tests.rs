@@ -630,3 +630,52 @@ async fn legacy_activation_reaches_every_bridge() {
         );
     }
 }
+
+/// A scene comes back with its last activation, and is dumped from then on.
+#[tokio::test]
+async fn scenes_restore_their_last_activation() {
+    let dir = std::env::temp_dir().join(format!("hars-hue-restore-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    ha_core::storage::Store::new(&dir, "core.restore_state", 1, 1, false)
+        .save(&json!([
+            {"state": {"entity_id": "scene.bedroom_bedroom_dimmed", "state": "2026-11-13T20:00:00.123456+00:00", "attributes": {}},
+             "extra_data": null, "last_seen": "2099-01-01T00:00:00+00:00"},
+            {"state": {"entity_id": "scene.bedroom_bedroom_bright", "state": "unavailable", "attributes": {}},
+             "extra_data": null, "last_seen": "2099-01-01T00:00:00+00:00"}
+        ]))
+        .unwrap();
+    let hass = Hass::new();
+    hass.set_restore(ha_core::restore::RestoreState::load(&dir));
+    let registries = Arc::new(registries());
+    let platforms = Platforms::new(&hass, registries.clone(), Profiles::default());
+    let b = Arc::new(Bridge {
+        hass: hass.clone(),
+        registries,
+        api: offline(),
+        store: RwLock::new(Store::new(
+            fixture("resource")["data"].as_array().unwrap().clone(),
+        )),
+        ignore_availability: Vec::new(),
+        lights: RwLock::default(),
+        groups: RwLock::default(),
+        others: RwLock::default(),
+        platforms,
+    });
+    b.add_entities();
+    b.write_all();
+    assert_eq!(
+        state_json(&hass, "scene.bedroom_bedroom_dimmed").unwrap().0,
+        "2026-11-13T20:00:00.123456+00:00"
+    );
+    assert_eq!(
+        state_json(&hass, "scene.bedroom_bedroom_bright").unwrap().0,
+        "unknown"
+    );
+    let stored = hass.restore().stored(&hass, hass.clock().now());
+    assert!(
+        stored
+            .iter()
+            .any(|i| i["state"]["entity_id"] == "scene.hallway_hallway_nightlight")
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+}

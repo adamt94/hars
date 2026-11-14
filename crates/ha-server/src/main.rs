@@ -100,6 +100,12 @@ async fn run(thp_disabled: std::io::Result<bool>) -> anyhow::Result<()> {
         tokio::task::spawn_blocking(move || ha_integrations::load_entries(&dir)).await?
     };
     ha_api::system_log::register(&hass);
+    // Last states, before any entity that restores itself is made.
+    let restore = {
+        let dir = config_dir.clone();
+        tokio::task::spawn_blocking(move || ha_core::restore::RestoreState::load(&dir)).await?
+    };
+    hass.set_restore(restore);
     let profiles = {
         let dir = config_dir.clone();
         tokio::task::spawn_blocking(move || ha_integrations::light::Profiles::load(&dir)).await?
@@ -156,6 +162,23 @@ async fn run(thp_disabled: std::io::Result<bool>) -> anyhow::Result<()> {
         .into_future(),
     );
     hass.start();
+    // HA at `homeassistant_start`: registered entities nobody provides are
+    // `unavailable`, then the last states are dumped, and every 15 minutes.
+    {
+        let (hass, registries) = (hass.clone(), api_config.registries.clone());
+        tokio::spawn(async move {
+            // Let the integrations make their first writes.
+            for _ in 0..8 {
+                tokio::task::yield_now().await;
+            }
+            registries.write_unavailable_states(&hass);
+            let restore = hass.restore();
+            loop {
+                restore.dump(&hass).await;
+                tokio::time::sleep(ha_core::restore::DUMP_INTERVAL).await;
+            }
+        });
+    }
     tracing::info!("hars listening on http://{addr}");
 
     tokio::select! {
@@ -183,6 +206,7 @@ async fn run(thp_disabled: std::io::Result<bool>) -> anyhow::Result<()> {
             tracing::error!("saving auth state: {e}");
         }
     }
+    hass.restore().dump(&hass).await;
     hass.finish_stop();
     tracing::info!("hars stopped");
     Ok(())

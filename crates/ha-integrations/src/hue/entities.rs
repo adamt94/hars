@@ -219,6 +219,23 @@ impl HueEntity {
         }
     }
 
+    /// A scene restores its last activation (`BaseScene`, a RestoreEntity):
+    /// any stored state but `unavailable`, and it's dumped from now on.
+    pub(super) fn restore(&self, hass: &ha_core::Hass) {
+        if !matches!(self.kind, Kind::Scene | Kind::SmartScene) {
+            return;
+        }
+        let restore = hass.restore();
+        if let Some(state) = restore
+            .last_state(self.entity_id.as_str())
+            .and_then(|s| s["state"].as_str().map(str::to_owned))
+            .filter(|s| s != "unavailable")
+        {
+            *self.activated.lock() = Some(state);
+        }
+        restore.register(self.entity_id.as_str(), None);
+    }
+
     /// The Hue resource naming the entity's device: its own device, the
     /// owning room/zone/service group, the scene's group, or the bridge.
     pub fn device<'a>(kind: Kind, rid: &str, r: &'a Value, store: &'a Store) -> Option<&'a Value> {

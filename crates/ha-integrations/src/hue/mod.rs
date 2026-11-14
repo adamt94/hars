@@ -278,6 +278,7 @@ impl Bridge {
                     continue;
                 };
                 let e = Arc::new(HueEntity::new(Arc::downgrade(self), kind, ty, rid, id));
+                e.restore(&self.hass);
                 made.push(e.clone());
                 let mut others = self.others.write();
                 others.push(e);

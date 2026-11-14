@@ -666,6 +666,47 @@ impl Registries {
         out.into_iter().map(str::to_owned).collect()
     }
 
+    /// HA's `_write_unavailable_states` at start: every enabled entity with
+    /// no state yet gets `unavailable`, marked `restored`, with what the
+    /// registry knows of it (`RegistryEntry.write_unavailable_state`).
+    pub fn write_unavailable_states(&self, hass: &ha_core::Hass) {
+        for e in self.entities.iter().filter(|e| e.disabled_by.is_none()) {
+            let Ok(id) = ha_core::EntityId::parse(&e.entity_id) else {
+                continue;
+            };
+            if hass.states().get(&id).is_some() {
+                continue;
+            }
+            let extra = |k: &str| e.extra.get(k).filter(|v| !v.is_null());
+            let mut a = Map::new();
+            a.insert("restored".into(), Value::Bool(true));
+            if let Some(Value::Object(caps)) = extra("capabilities") {
+                a.extend(caps.clone());
+            }
+            if let Some(dc) = extra("device_class").or_else(|| extra("original_device_class")) {
+                a.insert("device_class".into(), dc.clone());
+            }
+            if let Some(icon) = e
+                .icon
+                .clone()
+                .map(Value::String)
+                .or_else(|| extra("original_icon").cloned())
+            {
+                a.insert("icon".into(), icon);
+            }
+            if let Some(name) = e.name.clone().or_else(|| e.original_name.clone()) {
+                a.insert("friendly_name".into(), Value::String(name));
+            }
+            if let Some(f) = extra("supported_features") {
+                a.insert("supported_features".into(), f.clone());
+            }
+            if let Some(u) = extra("unit_of_measurement") {
+                a.insert("unit_of_measurement".into(), u.clone());
+            }
+            hass.set_state(id, "unavailable", a);
+        }
+    }
+
     /// `config/entity_registry/list_for_display`: enabled entities only.
     pub fn entities_for_display(&self) -> Value {
         // Indexed once per call: linear in entities + devices.

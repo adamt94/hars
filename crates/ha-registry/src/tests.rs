@@ -381,3 +381,48 @@ fn targets_expand_like_ha() {
     assert_eq!(t(json!({"label_id": "outside"})), ["weather.c"]);
     assert!(t(json!({"device_id": "none", "entity_id": "weather.a"})).is_empty());
 }
+
+#[test]
+fn registered_entities_without_a_state_are_unavailable() {
+    let hass = ha_core::Hass::new();
+    let entity = |id: &str, extra: Value| Entity {
+        entity_id: id.into(),
+        platform: "lifx".into(),
+        original_name: Some("Kitchen Light".into()),
+        extra: extra.as_object().unwrap().clone(),
+        ..Default::default()
+    };
+    let r = Registries {
+        entities: vec![
+            entity(
+                "light.kitchen_light",
+                json!({"capabilities": {"supported_color_modes": ["color_temp", "hs"]}, "supported_features": 44,
+                    "original_device_class": null, "unit_of_measurement": null}),
+            ),
+            Entity {
+                disabled_by: Some("user".into()),
+                ..entity("light.off", json!({}))
+            },
+            entity("sensor.has_state", json!({})),
+        ],
+        ..Default::default()
+    };
+    let has = ha_core::EntityId::parse("sensor.has_state").unwrap();
+    hass.set_state(has.clone(), "1", Default::default());
+    r.write_unavailable_states(&hass);
+    let s = hass
+        .states()
+        .get(&ha_core::EntityId::parse("light.kitchen_light").unwrap())
+        .unwrap();
+    assert_eq!(s.state, "unavailable");
+    assert_eq!(
+        Value::Object(s.attributes.clone()),
+        json!({"restored": true, "supported_color_modes": ["color_temp", "hs"], "friendly_name": "Kitchen Light", "supported_features": 44})
+    );
+    assert!(
+        hass.states()
+            .get(&ha_core::EntityId::parse("light.off").unwrap())
+            .is_none()
+    );
+    assert_eq!(hass.states().get(&has).unwrap().state, "1");
+}
