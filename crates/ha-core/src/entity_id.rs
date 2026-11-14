@@ -31,7 +31,8 @@ impl EntityId {
                 && p.bytes()
                     .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_')
         };
-        if !valid(domain) || !valid(object_id) || dot > u8::MAX as usize {
+        // `(?!.+__)`: no double underscore anywhere (HA's `VALID_ENTITY_ID`).
+        if !valid(domain) || !valid(object_id) || s.contains("__") || dot > u8::MAX as usize {
             return Err(err());
         }
         Ok(Self {
@@ -91,7 +92,17 @@ mod tests {
 
     #[test]
     fn rejects_invalid_ids() {
-        for bad in ["light", ".x", "light.", "Light.x", "light.a-b", "_light.x"] {
+        for bad in [
+            "light",
+            ".x",
+            "light.",
+            "Light.x",
+            "light.a-b",
+            "_light.x",
+            "light.a__b",
+            "li__ght.a",
+            "light.a.b",
+        ] {
             assert!(EntityId::parse(bad).is_err(), "{bad} should be rejected");
         }
     }

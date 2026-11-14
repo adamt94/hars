@@ -14,6 +14,7 @@ mod clock;
 pub mod config;
 mod context;
 mod entity_id;
+pub mod entityfilter;
 mod event;
 mod lifecycle;
 pub mod restore;

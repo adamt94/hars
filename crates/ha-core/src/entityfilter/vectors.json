@@ -1,0 +1,810 @@
+{
+ "ids": [
+  "sensor.phone_battery_level",
+  "sensor.x",
+  "light.kitchen_main",
+  "a",
+  "b",
+  "c",
+  "d",
+  "e",
+  "-",
+  "]",
+  "^",
+  "!",
+  "\\",
+  "x[",
+  "[",
+  "",
+  "sensor.1abc",
+  "sensor.a1",
+  "zone.home",
+  "person.adam",
+  "abc",
+  "acb",
+  "ab",
+  "light.kitchen",
+  "ébc",
+  "a\nb",
+  "sensor.phone_x_level",
+  "bx",
+  "-x",
+  "]x"
+ ],
+ "globs": [
+  {
+   "pattern": "sensor.*",
+   "matches": [
+    "sensor.phone_battery_level",
+    "sensor.x",
+    "sensor.1abc",
+    "sensor.a1",
+    "sensor.phone_x_level"
+   ]
+  },
+  {
+   "pattern": "*",
+   "matches": [
+    "sensor.phone_battery_level",
+    "sensor.x",
+    "light.kitchen_main",
+    "a",
+    "b",
+    "c",
+    "d",
+    "e",
+    "-",
+    "]",
+    "^",
+    "!",
+    "\\",
+    "x[",
+    "[",
+    "",
+    "sensor.1abc",
+    "sensor.a1",
+    "zone.home",
+    "person.adam",
+    "abc",
+    "acb",
+    "ab",
+    "light.kitchen",
+    "ébc",
+    "a\nb",
+    "sensor.phone_x_level",
+    "bx",
+    "-x",
+    "]x"
+   ]
+  },
+  {
+   "pattern": "?",
+   "matches": [
+    "a",
+    "b",
+    "c",
+    "d",
+    "e",
+    "-",
+    "]",
+    "^",
+    "!",
+    "\\",
+    "["
+   ]
+  },
+  {
+   "pattern": "sensor.?",
+   "matches": [
+    "sensor.x"
+   ]
+  },
+  {
+   "pattern": "*_battery*",
+   "matches": [
+    "sensor.phone_battery_level"
+   ]
+  },
+  {
+   "pattern": "sensor.phone_*_level",
+   "matches": [
+    "sensor.phone_battery_level",
+    "sensor.phone_x_level"
+   ]
+  },
+  {
+   "pattern": "[ab]*",
+   "matches": [
+    "a",
+    "b",
+    "abc",
+    "acb",
+    "ab",
+    "a\nb",
+    "bx"
+   ]
+  },
+  {
+   "pattern": "[!ab]*",
+   "matches": [
+    "sensor.phone_battery_level",
+    "sensor.x",
+    "light.kitchen_main",
+    "c",
+    "d",
+    "e",
+    "-",
+    "]",
+    "^",
+    "!",
+    "\\",
+    "x[",
+    "[",
+    "sensor.1abc",
+    "sensor.a1",
+    "zone.home",
+    "person.adam",
+    "light.kitchen",
+    "ébc",
+    "sensor.phone_x_level",
+    "-x",
+    "]x"
+   ]
+  },
+  {
+   "pattern": "[a-c]*",
+   "matches": [
+    "a",
+    "b",
+    "c",
+    "abc",
+    "acb",
+    "ab",
+    "a\nb",
+    "bx"
+   ]
+  },
+  {
+   "pattern": "[!a-c]*",
+   "matches": [
+    "sensor.phone_battery_level",
+    "sensor.x",
+    "light.kitchen_main",
+    "d",
+    "e",
+    "-",
+    "]",
+    "^",
+    "!",
+    "\\",
+    "x[",
+    "[",
+    "sensor.1abc",
+    "sensor.a1",
+    "zone.home",
+    "person.adam",
+    "light.kitchen",
+    "ébc",
+    "sensor.phone_x_level",
+    "-x",
+    "]x"
+   ]
+  },
+  {
+   "pattern": "[]a]*",
+   "matches": [
+    "a",
+    "]",
+    "abc",
+    "acb",
+    "ab",
+    "a\nb",
+    "]x"
+   ]
+  },
+  {
+   "pattern": "[!]a]*",
+   "matches": [
+    "sensor.phone_battery_level",
+    "sensor.x",
+    "light.kitchen_main",
+    "b",
+    "c",
+    "d",
+    "e",
+    "-",
+    "^",
+    "!",
+    "\\",
+    "x[",
+    "[",
+    "sensor.1abc",
+    "sensor.a1",
+    "zone.home",
+    "person.adam",
+    "light.kitchen",
+    "ébc",
+    "sensor.phone_x_level",
+    "bx",
+    "-x"
+   ]
+  },
+  {
+   "pattern": "[a-]*",
+   "matches": [
+    "a",
+    "-",
+    "abc",
+    "acb",
+    "ab",
+    "a\nb",
+    "-x"
+   ]
+  },
+  {
+   "pattern": "[-a]*",
+   "matches": [
+    "a",
+    "-",
+    "abc",
+    "acb",
+    "ab",
+    "a\nb",
+    "-x"
+   ]
+  },
+  {
+   "pattern": "[c-a]*",
+   "matches": []
+  },
+  {
+   "pattern": "[!c-a]*",
+   "matches": [
+    "sensor.phone_battery_level",
+    "sensor.x",
+    "light.kitchen_main",
+    "a",
+    "b",
+    "c",
+    "d",
+    "e",
+    "-",
+    "]",
+    "^",
+    "!",
+    "\\",
+    "x[",
+    "[",
+    "sensor.1abc",
+    "sensor.a1",
+    "zone.home",
+    "person.adam",
+    "abc",
+    "acb",
+    "ab",
+    "light.kitchen",
+    "ébc",
+    "a\nb",
+    "sensor.phone_x_level",
+    "bx",
+    "-x",
+    "]x"
+   ]
+  },
+  {
+   "pattern": "[a-c-e]*",
+   "matches": [
+    "a",
+    "b",
+    "c",
+    "e",
+    "-",
+    "abc",
+    "acb",
+    "ab",
+    "a\nb",
+    "bx",
+    "-x"
+   ]
+  },
+  {
+   "pattern": "[c-b-a]*",
+   "matches": [
+    "a",
+    "-",
+    "abc",
+    "acb",
+    "ab",
+    "a\nb",
+    "-x"
+   ]
+  },
+  {
+   "pattern": "[a-c-b]*",
+   "matches": [
+    "a",
+    "b",
+    "c",
+    "-",
+    "abc",
+    "acb",
+    "ab",
+    "a\nb",
+    "bx",
+    "-x"
+   ]
+  },
+  {
+   "pattern": "[z-a-c]*",
+   "matches": [
+    "c",
+    "-",
+    "-x"
+   ]
+  },
+  {
+   "pattern": "x[",
+   "matches": [
+    "x["
+   ]
+  },
+  {
+   "pattern": "[",
+   "matches": [
+    "["
+   ]
+  },
+  {
+   "pattern": "[!]",
+   "matches": []
+  },
+  {
+   "pattern": "sensor.[0-9]*",
+   "matches": [
+    "sensor.1abc"
+   ]
+  },
+  {
+   "pattern": "*.*_[!0-9]",
+   "matches": []
+  },
+  {
+   "pattern": "light.*kitchen*",
+   "matches": [
+    "light.kitchen_main",
+    "light.kitchen"
+   ]
+  },
+  {
+   "pattern": "**a**",
+   "matches": [
+    "sensor.phone_battery_level",
+    "light.kitchen_main",
+    "a",
+    "sensor.1abc",
+    "sensor.a1",
+    "person.adam",
+    "abc",
+    "acb",
+    "ab",
+    "a\nb"
+   ]
+  },
+  {
+   "pattern": "a*b*c",
+   "matches": [
+    "abc"
+   ]
+  },
+  {
+   "pattern": "[\\]*",
+   "matches": [
+    "\\"
+   ]
+  },
+  {
+   "pattern": "[^a]*",
+   "matches": [
+    "a",
+    "^",
+    "abc",
+    "acb",
+    "ab",
+    "a\nb"
+   ]
+  },
+  {
+   "pattern": "[!^]*",
+   "matches": [
+    "sensor.phone_battery_level",
+    "sensor.x",
+    "light.kitchen_main",
+    "a",
+    "b",
+    "c",
+    "d",
+    "e",
+    "-",
+    "]",
+    "!",
+    "\\",
+    "x[",
+    "[",
+    "sensor.1abc",
+    "sensor.a1",
+    "zone.home",
+    "person.adam",
+    "abc",
+    "acb",
+    "ab",
+    "light.kitchen",
+    "ébc",
+    "a\nb",
+    "sensor.phone_x_level",
+    "bx",
+    "-x",
+    "]x"
+   ]
+  },
+  {
+   "pattern": "[--a]*",
+   "matches": [
+    "a",
+    "-",
+    "]",
+    "^",
+    "\\",
+    "[",
+    "abc",
+    "acb",
+    "ab",
+    "a\nb",
+    "-x",
+    "]x"
+   ]
+  },
+  {
+   "pattern": "[a--]*",
+   "matches": []
+  },
+  {
+   "pattern": "[!-]*",
+   "matches": [
+    "sensor.phone_battery_level",
+    "sensor.x",
+    "light.kitchen_main",
+    "a",
+    "b",
+    "c",
+    "d",
+    "e",
+    "]",
+    "^",
+    "!",
+    "\\",
+    "x[",
+    "[",
+    "sensor.1abc",
+    "sensor.a1",
+    "zone.home",
+    "person.adam",
+    "abc",
+    "acb",
+    "ab",
+    "light.kitchen",
+    "ébc",
+    "a\nb",
+    "sensor.phone_x_level",
+    "bx",
+    "]x"
+   ]
+  },
+  {
+   "pattern": "*?",
+   "matches": [
+    "sensor.phone_battery_level",
+    "sensor.x",
+    "light.kitchen_main",
+    "a",
+    "b",
+    "c",
+    "d",
+    "e",
+    "-",
+    "]",
+    "^",
+    "!",
+    "\\",
+    "x[",
+    "[",
+    "sensor.1abc",
+    "sensor.a1",
+    "zone.home",
+    "person.adam",
+    "abc",
+    "acb",
+    "ab",
+    "light.kitchen",
+    "ébc",
+    "a\nb",
+    "sensor.phone_x_level",
+    "bx",
+    "-x",
+    "]x"
+   ]
+  },
+  {
+   "pattern": "?*?",
+   "matches": [
+    "sensor.phone_battery_level",
+    "sensor.x",
+    "light.kitchen_main",
+    "x[",
+    "sensor.1abc",
+    "sensor.a1",
+    "zone.home",
+    "person.adam",
+    "abc",
+    "acb",
+    "ab",
+    "light.kitchen",
+    "ébc",
+    "a\nb",
+    "sensor.phone_x_level",
+    "bx",
+    "-x",
+    "]x"
+   ]
+  },
+  {
+   "pattern": "sensor.phone_battery_level",
+   "matches": [
+    "sensor.phone_battery_level"
+   ]
+  },
+  {
+   "pattern": "[a-z][a-z]*.*",
+   "matches": [
+    "sensor.phone_battery_level",
+    "sensor.x",
+    "light.kitchen_main",
+    "sensor.1abc",
+    "sensor.a1",
+    "zone.home",
+    "person.adam",
+    "light.kitchen",
+    "sensor.phone_x_level"
+   ]
+  },
+  {
+   "pattern": "[é-ü]*",
+   "matches": [
+    "ébc"
+   ]
+  },
+  {
+   "pattern": "*\n*",
+   "matches": [
+    "a\nb"
+   ]
+  }
+ ],
+ "filters": [
+  {
+   "include": {},
+   "exclude": {},
+   "empty": true,
+   "pass": [
+    "sensor.phone_battery_level",
+    "sensor.x",
+    "light.kitchen_main",
+    "sensor.1abc",
+    "sensor.a1",
+    "zone.home",
+    "person.adam",
+    "light.kitchen",
+    "sensor.phone_x_level"
+   ]
+  },
+  {
+   "include": {
+    "domains": [
+     "zone",
+     "person"
+    ]
+   },
+   "exclude": {},
+   "empty": false,
+   "pass": [
+    "zone.home",
+    "person.adam"
+   ]
+  },
+  {
+   "include": {
+    "entities": [
+     "sensor.phone_battery_level"
+    ]
+   },
+   "exclude": {
+    "entity_globs": [
+     "sensor.*"
+    ]
+   },
+   "empty": false,
+   "pass": [
+    "sensor.phone_battery_level",
+    "light.kitchen_main",
+    "zone.home",
+    "person.adam",
+    "light.kitchen"
+   ]
+  },
+  {
+   "include": {
+    "entities": [
+     "light.kitchen_main"
+    ]
+   },
+   "exclude": {},
+   "empty": false,
+   "pass": [
+    "light.kitchen_main"
+   ]
+  },
+  {
+   "include": {},
+   "exclude": {
+    "domains": [
+     "sensor"
+    ]
+   },
+   "empty": false,
+   "pass": [
+    "light.kitchen_main",
+    "zone.home",
+    "person.adam",
+    "light.kitchen"
+   ]
+  },
+  {
+   "include": {},
+   "exclude": {
+    "entities": [
+     "zone.home"
+    ]
+   },
+   "empty": false,
+   "pass": [
+    "sensor.phone_battery_level",
+    "sensor.x",
+    "light.kitchen_main",
+    "sensor.1abc",
+    "sensor.a1",
+    "person.adam",
+    "light.kitchen",
+    "sensor.phone_x_level"
+   ]
+  },
+  {
+   "include": {},
+   "exclude": {
+    "entity_globs": [
+     "*.*_level"
+    ]
+   },
+   "empty": false,
+   "pass": [
+    "sensor.x",
+    "light.kitchen_main",
+    "sensor.1abc",
+    "sensor.a1",
+    "zone.home",
+    "person.adam",
+    "light.kitchen"
+   ]
+  },
+  {
+   "include": {
+    "domains": [
+     "sensor"
+    ],
+    "entities": [
+     "light.kitchen"
+    ]
+   },
+   "exclude": {
+    "entities": [
+     "sensor.x"
+    ],
+    "entity_globs": [
+     "*battery*"
+    ]
+   },
+   "empty": false,
+   "pass": [
+    "sensor.1abc",
+    "sensor.a1",
+    "light.kitchen",
+    "sensor.phone_x_level"
+   ]
+  },
+  {
+   "include": {
+    "entity_globs": [
+     "sensor.phone_*"
+    ]
+   },
+   "exclude": {
+    "domains": [
+     "sensor"
+    ],
+    "entities": [
+     "sensor.phone_x_level"
+    ]
+   },
+   "empty": false,
+   "pass": [
+    "sensor.phone_battery_level"
+   ]
+  },
+  {
+   "include": {
+    "entities": [
+     "zone.home",
+     "sensor.x"
+    ]
+   },
+   "exclude": {
+    "entities": [
+     "sensor.x"
+    ]
+   },
+   "empty": false,
+   "pass": [
+    "sensor.x",
+    "zone.home"
+   ]
+  },
+  {
+   "include": {
+    "entities": [
+     "sensor.x"
+    ]
+   },
+   "exclude": {
+    "domains": [
+     "sensor",
+     "zone"
+    ]
+   },
+   "empty": false,
+   "pass": [
+    "sensor.x",
+    "light.kitchen_main",
+    "person.adam",
+    "light.kitchen"
+   ]
+  },
+  {
+   "include": {
+    "domains": [
+     "light"
+    ],
+    "entity_globs": [
+     "zone.*"
+    ]
+   },
+   "exclude": {
+    "entity_globs": [
+     "light.kitchen*"
+    ],
+    "entities": [
+     "zone.home"
+    ]
+   },
+   "empty": false,
+   "pass": []
+  }
+ ]
+}

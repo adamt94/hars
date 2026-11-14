@@ -53,7 +53,7 @@ ids are kept as they are, and the importer carries them over.
 | `switchbot_cloud` | Bot (`button.towel_switch` + battery), DIY IR air conditioner (`climate` + `switch`, assumed state), Hub 2 temp/humidity | Cloud HTTPS v1.1, **polling-only** (600 s, as HA) | token + secret imported |
 | `met` | `weather.forecast_home` | HTTPS api.met.no | home location |
 | `sun` | `sun.sun` + 6 `sensor.sun_next_*` | Local calculation | home location |
-| `mobile_app` | iPhone `device_tracker.phone`, ~15 sensors, 3 kiosk binary sensors | App → `hars` webhooks, **encrypted** (`supports_encryption`) | registration imported |
+| `mobile_app` | iPhone `device_tracker.phone`, 15 sensors (+1 disabled), 2 kiosk binary sensors (+1 disabled camera sensor), `notify.phone` | App → `hars` webhooks, **encrypted** (`supports_encryption`) | registration imported |
 | `person` / `zone` | `person.*`, `zone.home` | Built-in | imported |
 
 ### Dashboards ("widgets")
@@ -367,6 +367,9 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
       `update_location`, `get_config` (entity enabled-state sync), `get_zones`,
       `update_registration`, `call_service`, `fire_event`
 - [ ] `/api/mobile_app/registrations` for fresh registrations (re-pair fallback)
+- [x] WS `subscribe_entities` `include`/`exclude` filters (HA's `entityfilter`
+      cases 1-6, `fnmatch` globs, `cv.entity_ids`): the app subscribes to
+      zones and persons only
 - [ ] `device_tracker.phone` → `person` → Map dashboard updates live
 - [ ] Acceptance: the existing app session keeps working after cutover without
       logging in again; sensors and location update over LAN; dashboards and

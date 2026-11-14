@@ -4,6 +4,7 @@
 use super::{Conn, Invalid, MAX_PENDING, Subscription, TaskSub, entities, only_keys};
 use crate::rest::service_description;
 use ha_auth::Permission;
+use ha_core::entityfilter::{EntityFilter, FilterLists};
 use ha_core::{Context, Event, EventKind, ServiceData, ServiceError};
 use serde_json::{Map, Value, json};
 use std::sync::Arc;
@@ -385,22 +386,18 @@ fn unsubscribe_events(conn: &mut Conn, id: u64, msg: &Map<String, Value>) -> Res
 /// atomically; the result goes out, then the snapshot, then one event per
 /// change, in order.
 fn subscribe_entities(conn: &mut Conn, id: u64, msg: &Map<String, Value>) -> Result<(), Invalid> {
-    only_keys(msg, &["entity_ids"])?;
-    let wanted: Option<Vec<String>> = match field(msg, "entity_ids") {
-        None => None,
-        Some(Value::String(s)) => Some(vec![s.clone()]),
-        Some(Value::Array(a)) if a.iter().all(Value::is_string) => Some(
-            a.iter()
-                .filter_map(|v| v.as_str().map(str::to_owned))
-                .collect(),
-        ),
-        Some(_) => return Err("expected a list for dictionary value @ data['entity_ids']".into()),
+    let (wanted, filter) = match entities_filter(msg) {
+        Ok(parsed) => parsed,
+        Err(Bad::Invalid(errors)) => return Err(errors.join("\n")),
+        // A `TypeError` in the schema: HA's catch-all.
+        Err(Bad::TypeError) => {
+            conn.out.error(json!(id), "unknown_error", "Unknown error");
+            return Ok(());
+        }
     };
-    let wanted = wanted.filter(|w| !w.is_empty());
     let keep = move |entity_id: &str| {
-        wanted
-            .as_ref()
-            .is_none_or(|w| w.iter().any(|e| e == entity_id))
+        (wanted.is_empty() || wanted.iter().any(|e| e == entity_id))
+            && filter.as_ref().is_none_or(|f| f.matches(entity_id))
     };
 
     let mut feed = conn.shared.hass.subscribe_state_changes();
@@ -446,6 +443,154 @@ fn subscribe_entities(conn: &mut Conn, id: u64, msg: &Map<String, Value>) -> Res
         }),
     );
     Ok(())
+}
+
+/// Why a schema rejected a message: voluptuous's errors, or a `TypeError`
+/// from a validator, which HA answers with `unknown_error`.
+enum Bad {
+    Invalid(Vec<String>),
+    TypeError,
+}
+
+/// `subscribe_entities`'s schema: `entity_ids` (`cv.entity_ids`) and HA's
+/// `INCLUDE_EXCLUDE_BASE_FILTER_SCHEMA`. Every error is collected, as
+/// voluptuous does; a `TypeError` anywhere wins.
+fn entities_filter(msg: &Map<String, Value>) -> Result<(Vec<String>, Option<EntityFilter>), Bad> {
+    let mut errors = Vec::new();
+    let mut type_error = false;
+    let mut wanted = Vec::new();
+    let mut sides = [FilterLists::default(), FilterLists::default()];
+    for (key, value) in msg {
+        let side = match key.as_str() {
+            "id" | "type" => continue,
+            "entity_ids" => {
+                match cv_entity_ids(value, &format!("['{key}']")) {
+                    Ok(ids) => wanted = ids,
+                    Err(Bad::Invalid(e)) => errors.extend(e),
+                    Err(Bad::TypeError) => type_error = true,
+                }
+                continue;
+            }
+            "include" => 0,
+            "exclude" => 1,
+            _ => {
+                errors.push(format!("extra keys not allowed @ data['{key}']"));
+                continue;
+            }
+        };
+        match filter_lists(value, key) {
+            Ok(lists) => sides[side] = lists,
+            Err(Bad::Invalid(e)) => errors.extend(e),
+            Err(Bad::TypeError) => type_error = true,
+        }
+    }
+    if type_error {
+        return Err(Bad::TypeError);
+    }
+    if !errors.is_empty() {
+        return Err(Bad::Invalid(errors));
+    }
+    let [include, exclude] = sides;
+    let filter = EntityFilter::new(include, exclude);
+    Ok((wanted, (!filter.is_empty()).then_some(filter)))
+}
+
+/// `INCLUDE_EXCLUDE_FILTER_SCHEMA_INNER` for `data[key]`.
+fn filter_lists(value: &Value, key: &str) -> Result<FilterLists, Bad> {
+    let Value::Object(m) = value else {
+        return Err(Bad::Invalid(vec![format!(
+            "expected a dictionary for dictionary value @ data['{key}']"
+        )]));
+    };
+    let mut errors = Vec::new();
+    let mut type_error = false;
+    let mut lists = FilterLists::default();
+    for (inner, v) in m {
+        let path = format!("['{key}']['{inner}']");
+        match inner.as_str() {
+            "domains" | "entity_globs" => {
+                // `vol.All(cv.ensure_list, [cv.string])`.
+                let items = match v {
+                    Value::Null => Vec::new(),
+                    Value::Array(a) => a.iter().collect(),
+                    v => vec![v],
+                };
+                let mut out = Vec::with_capacity(items.len());
+                for (i, item) in items.into_iter().enumerate() {
+                    match cv_string(item) {
+                        Ok(s) => out.push(s),
+                        Err(why) => errors.push(format!("{why} @ data{path}[{i}]")),
+                    }
+                }
+                if inner == "domains" {
+                    lists.domains = out;
+                } else {
+                    lists.entity_globs = out;
+                }
+            }
+            "entities" => match cv_entity_ids(v, &path) {
+                Ok(ids) => lists.entities = ids,
+                Err(Bad::Invalid(e)) => errors.extend(e),
+                Err(Bad::TypeError) => type_error = true,
+            },
+            _ => errors.push(format!("extra keys not allowed @ data{path}")),
+        }
+    }
+    if type_error {
+        return Err(Bad::TypeError);
+    }
+    if errors.is_empty() {
+        Ok(lists)
+    } else {
+        Err(Bad::Invalid(errors))
+    }
+}
+
+/// `cv.string`: anything but `None`, a list or a dict, as Python's `str`.
+fn cv_string(v: &Value) -> Result<String, &'static str> {
+    match v {
+        Value::Null => Err("string value is None"),
+        Value::String(s) => Ok(s.clone()),
+        Value::Array(_) | Value::Object(_) => Err("value should be a string"),
+        Value::Bool(b) => Ok(if *b { "True" } else { "False" }.into()),
+        Value::Number(n) => Ok(match n.as_f64().filter(|_| n.is_f64()) {
+            Some(f) => ha_integrations::sun::py_float(f),
+            None => n.to_string(),
+        }),
+    }
+}
+
+/// `cv.entity_ids` at `data<path>`: a comma-separated string or a list
+/// (a dict gives its keys), each lowercased and checked. The first bad id
+/// is the error.
+fn cv_entity_ids(v: &Value, path: &str) -> Result<Vec<String>, Bad> {
+    let fail = |why: String| Bad::Invalid(vec![format!("{why} for dictionary value @ data{path}")]);
+    let items: Vec<Value> = match v {
+        Value::Null => return Err(fail("Entity IDs cannot be None".into())),
+        Value::String(s) => s
+            .split(',')
+            // `str.strip()`: Unicode whitespace and the separators U+1C–1F.
+            .map(|id| {
+                Value::String(
+                    id.trim_matches(|c: char| c.is_whitespace() || ('\x1c'..='\x1f').contains(&c))
+                        .to_owned(),
+                )
+            })
+            .collect(),
+        Value::Array(a) => a.clone(),
+        Value::Object(m) => m.keys().map(|k| Value::String(k.clone())).collect(),
+        Value::Bool(_) | Value::Number(_) => return Err(Bad::TypeError),
+    };
+    let mut ids = Vec::with_capacity(items.len());
+    for item in &items {
+        let s = cv_string(item).map_err(|why| fail(why.into()))?;
+        let lower = s.to_lowercase();
+        if ha_core::EntityId::parse(&lower).is_err() {
+            return Err(fail(format!("Entity ID {s} is an invalid entity ID")));
+        }
+        ids.push(lower);
+    }
+    Ok(ids)
 }
 
 /// HA's `event_type` string.

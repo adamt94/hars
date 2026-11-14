@@ -1521,3 +1521,230 @@ async fn automation_config_quirks() {
         json!({"code": "unknown_error", "message": "Invalid JSON in response"})
     );
 }
+
+/// HA's `INCLUDE_EXCLUDE_BASE_FILTER_SCHEMA` on `subscribe_entities`: the
+/// iOS app asks for zones and persons only. Cases from HA 2026.6.1's
+/// `ws.json` (mobile_app vectors) and its schema run on bad input.
+#[tokio::test]
+async fn subscribe_entities_include_exclude_filters() {
+    let s = server().await;
+    for id in [
+        "zone.home",
+        "person.adam",
+        "sensor.phone_battery_level",
+        "sensor.x",
+        "binary_sensor.phone_kiosk_mode",
+    ] {
+        s.hass
+            .set_state(EntityId::parse(id).unwrap(), "0", Attributes::new());
+    }
+    let mut c = Client::authed(&s, &token(&s.auth).0).await;
+    let keys = |v: &Value| {
+        let mut k: Vec<String> = v["event"]["a"]
+            .as_object()
+            .unwrap()
+            .keys()
+            .cloned()
+            .collect();
+        k.sort();
+        k
+    };
+
+    let r = c
+        .call(json!({"id": 6, "type": "subscribe_entities",
+                     "include": {"domains": ["zone", "person"]}}))
+        .await;
+    assert_eq!(r["success"], true);
+    assert_eq!(keys(&c.recv().await), ["person.adam", "zone.home"]);
+
+    let r = c
+        .call(json!({"id": 7, "type": "subscribe_entities", "include": {"domains": "zone"}}))
+        .await;
+    assert_eq!(r["success"], true);
+    assert_eq!(keys(&c.recv().await), ["zone.home"]);
+
+    // Case 5: excluded by glob unless included by id.
+    let r = c
+        .call(json!({"id": 8, "type": "subscribe_entities",
+                     "exclude": {"entity_globs": ["sensor.*"]},
+                     "include": {"entities": ["sensor.phone_battery_level"]}}))
+        .await;
+    assert_eq!(r["success"], true);
+    assert_eq!(
+        keys(&c.recv().await),
+        [
+            "binary_sensor.phone_kiosk_mode",
+            "person.adam",
+            "sensor.phone_battery_level",
+            "zone.home"
+        ]
+    );
+
+    // `entity_ids` as a comma-separated string, lowercased, AND the filter.
+    let r = c
+        .call(json!({"id": 9, "type": "subscribe_entities",
+                     "entity_ids": "Zone.Home, sensor.x",
+                     "include": {"domains": ["sensor"]}}))
+        .await;
+    assert_eq!(r["success"], true);
+    assert_eq!(keys(&c.recv().await), ["sensor.x"]);
+
+    // Changes are filtered the same way: only 8 sees the sensor, 7 and 6 the zone.
+    s.hass.set_state(
+        EntityId::parse("sensor.phone_battery_level").unwrap(),
+        "1",
+        Attributes::new(),
+    );
+    let ev = c.recv().await;
+    assert_eq!(ev["id"], 8);
+    assert!(ev["event"]["c"]["sensor.phone_battery_level"].is_object());
+    s.hass.set_state(
+        EntityId::parse("zone.home").unwrap(),
+        "1",
+        Attributes::new(),
+    );
+    let mut ids = vec![
+        c.recv().await["id"].clone(),
+        c.recv().await["id"].clone(),
+        c.recv().await["id"].clone(),
+    ];
+    ids.sort_by_key(|v| v.as_u64());
+    assert_eq!(ids, [json!(6), json!(7), json!(8)]);
+
+    let cases = [
+        (
+            json!({"entity_ids": "light.a,"}),
+            "invalid_format",
+            "Entity ID  is an invalid entity ID for dictionary value @ data['entity_ids']. Got 'light.a,'",
+        ),
+        (
+            json!({"entity_ids": ["nope"]}),
+            "invalid_format",
+            "Entity ID nope is an invalid entity ID for dictionary value @ data['entity_ids']. Got ['nope']",
+        ),
+        (
+            json!({"entity_ids": [1]}),
+            "invalid_format",
+            "Entity ID 1 is an invalid entity ID for dictionary value @ data['entity_ids']. Got [1]",
+        ),
+        (
+            json!({"entity_ids": null}),
+            "invalid_format",
+            "Entity IDs cannot be None for dictionary value @ data['entity_ids']. Got None",
+        ),
+        (json!({"entity_ids": 5}), "unknown_error", "Unknown error"),
+        (
+            json!({"entity_ids": {"a": 1}}),
+            "invalid_format",
+            "Entity ID a is an invalid entity ID for dictionary value @ data['entity_ids']. Got {'a': 1}",
+        ),
+        (
+            json!({"include": null}),
+            "invalid_format",
+            "expected a dictionary for dictionary value @ data['include']. Got None",
+        ),
+        (
+            json!({"include": "zone"}),
+            "invalid_format",
+            "expected a dictionary for dictionary value @ data['include']. Got 'zone'",
+        ),
+        (
+            json!({"include": []}),
+            "invalid_format",
+            "expected a dictionary for dictionary value @ data['include']. Got []",
+        ),
+        (
+            json!({"include": {"domains": [null]}}),
+            "invalid_format",
+            "string value is None @ data['include']['domains'][0]. Got None",
+        ),
+        (
+            json!({"include": {"domains": [[1]]}}),
+            "invalid_format",
+            "value should be a string @ data['include']['domains'][0]. Got [1]",
+        ),
+        (
+            json!({"include": {"domains": [{"a": 1}]}}),
+            "invalid_format",
+            "value should be a string @ data['include']['domains'][0]. Got {'a': 1}",
+        ),
+        (
+            json!({"include": {"entities": ["bad"]}}),
+            "invalid_format",
+            "Entity ID bad is an invalid entity ID for dictionary value @ data['include']['entities']. Got ['bad']",
+        ),
+        (
+            json!({"include": {"entities": null}}),
+            "invalid_format",
+            "Entity IDs cannot be None for dictionary value @ data['include']['entities']. Got None",
+        ),
+        (
+            json!({"include": {"foo": 1}}),
+            "invalid_format",
+            "extra keys not allowed @ data['include']['foo']. Got 1",
+        ),
+        (
+            json!({"exclude": {"domains": {"a": 1}}}),
+            "invalid_format",
+            "value should be a string @ data['exclude']['domains'][0]. Got None",
+        ),
+        (
+            json!({"include": {"domains": ["x"], "foo": 1}, "exclude": {"bar": 2}}),
+            "invalid_format",
+            "extra keys not allowed @ data['exclude']['bar']. Got 2\nextra keys not allowed @ data['include']['foo']. Got 1",
+        ),
+        (
+            json!({"foo": 1}),
+            "invalid_format",
+            "extra keys not allowed @ data['foo']. Got 1",
+        ),
+        (
+            json!({"entity_ids": true}),
+            "unknown_error",
+            "Unknown error",
+        ),
+        (json!({"entity_ids": 1.5}), "unknown_error", "Unknown error"),
+        (
+            json!({"entity_ids": ""}),
+            "invalid_format",
+            "Entity ID  is an invalid entity ID for dictionary value @ data['entity_ids']. Got ''",
+        ),
+        (
+            json!({"entity_ids": " , "}),
+            "invalid_format",
+            "Entity ID  is an invalid entity ID for dictionary value @ data['entity_ids']. Got ' , '",
+        ),
+        (
+            json!({"include": {"entities": 5}}),
+            "unknown_error",
+            "Unknown error",
+        ),
+        (
+            json!({"include": {"entities": [null]}}),
+            "invalid_format",
+            "string value is None for dictionary value @ data['include']['entities']. Got [None]",
+        ),
+        (
+            json!({"include": {"entities": [5]}}),
+            "invalid_format",
+            "Entity ID 5 is an invalid entity ID for dictionary value @ data['include']['entities']. Got [5]",
+        ),
+        (
+            json!({"include": {"entity_globs": [null]}}),
+            "invalid_format",
+            "string value is None @ data['include']['entity_globs'][0]. Got None",
+        ),
+    ];
+    for (n, (args, code, message)) in cases.into_iter().enumerate() {
+        let mut msg = json!({"id": 100 + n, "type": "subscribe_entities"});
+        msg.as_object_mut()
+            .unwrap()
+            .extend(args.as_object().unwrap().clone());
+        let r = c.call(msg).await;
+        assert_eq!(
+            r["error"],
+            json!({"code": code, "message": message}),
+            "{args}"
+        );
+    }
+}
