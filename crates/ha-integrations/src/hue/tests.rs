@@ -42,7 +42,11 @@ fn registries() -> Registries {
 fn bridge(api: Api) -> Arc<Bridge> {
     let hass = Hass::new();
     let registries = Arc::new(registries());
-    let platforms = Platforms::new(&hass, registries.clone(), Profiles::default());
+    let platforms = Platforms::new(&crate::components::Components::new(
+        &hass,
+        registries.clone(),
+        Profiles::default(),
+    ));
     let resources = fixture("resource")["data"].as_array().unwrap().clone();
     let bridge = Arc::new(Bridge {
         hass,
@@ -647,7 +651,11 @@ async fn scenes_restore_their_last_activation() {
     let hass = Hass::new();
     hass.set_restore(ha_core::restore::RestoreState::load(&dir));
     let registries = Arc::new(registries());
-    let platforms = Platforms::new(&hass, registries.clone(), Profiles::default());
+    let platforms = Platforms::new(&crate::components::Components::new(
+        &hass,
+        registries.clone(),
+        Profiles::default(),
+    ));
     let b = Arc::new(Bridge {
         hass: hass.clone(),
         registries,

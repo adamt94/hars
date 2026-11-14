@@ -35,7 +35,7 @@ pub enum SupportsResponse {
     Only,
 }
 
-#[derive(Debug, thiserror::Error, PartialEq, Eq)]
+#[derive(Debug, Clone, thiserror::Error, PartialEq, Eq)]
 pub enum ServiceError {
     #[error("service {domain}.{service} not found")]
     NotFound { domain: SmolStr, service: SmolStr },
@@ -49,6 +49,78 @@ pub enum ServiceError {
     /// The handler ran and failed (HA's `HomeAssistantError`).
     #[error("{0}")]
     Failed(String),
+    /// A `HomeAssistantError` with translation fields (WS
+    /// `home_assistant_error`, carrying them).
+    #[error("{}", .0.message)]
+    Translated(Box<Raised>),
+    /// HA's `ServiceValidationError` (WS `service_validation_error`).
+    #[error("{}", .0.message)]
+    Validation(Box<Raised>),
+    /// Any other exception escaping the handler (WS `unknown_error`).
+    #[error("{0}")]
+    Unknown(String),
+}
+
+/// A raised HA exception with its translation: the English message
+/// (formatted from the translation, its trailing `.` dropped, as HA's
+/// `HomeAssistantError.__str__` does) and the fields the frontend uses.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Raised {
+    pub message: String,
+    pub domain: SmolStr,
+    pub key: SmolStr,
+    pub placeholders: Option<serde_json::Map<String, Value>>,
+}
+
+impl ServiceError {
+    fn raised(
+        domain: &str,
+        key: &str,
+        placeholders: Option<serde_json::Map<String, Value>>,
+        message: String,
+    ) -> Box<Raised> {
+        Box::new(Raised {
+            message,
+            domain: domain.into(),
+            key: key.into(),
+            placeholders,
+        })
+    }
+
+    /// A `ServiceValidationError`.
+    pub fn validation(
+        domain: &str,
+        key: &str,
+        placeholders: Option<serde_json::Map<String, Value>>,
+        message: String,
+    ) -> Self {
+        Self::Validation(Self::raised(domain, key, placeholders, message))
+    }
+
+    /// A translated `HomeAssistantError`.
+    pub fn translated(
+        domain: &str,
+        key: &str,
+        placeholders: Option<serde_json::Map<String, Value>>,
+        message: String,
+    ) -> Self {
+        Self::Translated(Self::raised(domain, key, placeholders, message))
+    }
+
+    /// HA's `ServiceNotSupported`: an entity named directly lacks the
+    /// service's required features.
+    pub fn not_supported(domain: &str, service: &str, entity_id: &str) -> Self {
+        let mut p = serde_json::Map::new();
+        p.insert("domain".into(), domain.into());
+        p.insert("service".into(), service.into());
+        p.insert("entity_id".into(), entity_id.into());
+        Self::validation(
+            "homeassistant",
+            "service_not_supported",
+            Some(p),
+            format!("Entity {entity_id} does not support action {domain}.{service}"),
+        )
+    }
 }
 
 /// One invocation of a service, handed to its handler.

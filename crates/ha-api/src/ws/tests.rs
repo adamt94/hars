@@ -451,6 +451,55 @@ async fn call_service_runs_with_the_users_context() {
     assert_eq!(r["error"]["code"], "invalid_format");
 }
 
+/// HA's `ServiceValidationError`, translated `HomeAssistantError` and
+/// other exceptions, as `call_service` reports them.
+#[tokio::test]
+async fn call_service_error_shapes() {
+    let s = server().await;
+    for (name, err) in [
+        (
+            "validation",
+            ha_core::ServiceError::not_supported("climate", "set_preset_mode", "climate.ac"),
+        ),
+        (
+            "translated",
+            ha_core::ServiceError::translated(
+                "switchbot_cloud",
+                "device_offline",
+                None,
+                "SwitchBot Cloud device is offline".into(),
+            ),
+        ),
+        ("unknown", ha_core::ServiceError::Unknown(String::new())),
+    ] {
+        s.hass
+            .services()
+            .register("test", name, SupportsResponse::None, move |_| {
+                let err = err.clone();
+                async move { Err(err) }
+            });
+    }
+    let mut c = Client::authed(&s, &token(&s.auth).0).await;
+    let call = |id: u64, service: &str| json!({"id": id, "type": "call_service", "domain": "test", "service": service});
+    let r = c.call(call(2, "validation")).await;
+    assert_eq!(
+        r["error"],
+        json!({"code": "service_validation_error",
+            "message": "Validation error: Entity climate.ac does not support action climate.set_preset_mode",
+            "translation_key": "service_not_supported", "translation_domain": "homeassistant",
+            "translation_placeholders": {"domain": "climate", "service": "set_preset_mode", "entity_id": "climate.ac"}})
+    );
+    let r = c.call(call(3, "translated")).await;
+    assert_eq!(
+        r["error"],
+        json!({"code": "home_assistant_error", "message": "SwitchBot Cloud device is offline",
+            "translation_key": "device_offline", "translation_domain": "switchbot_cloud",
+            "translation_placeholders": null})
+    );
+    let r = c.call(call(4, "unknown")).await;
+    assert_eq!(r["error"], json!({"code": "unknown_error", "message": ""}));
+}
+
 #[tokio::test]
 async fn read_only_users_are_limited() {
     let s = server().await;

@@ -697,23 +697,16 @@ fn truthy(v: &Value) -> bool {
 }
 
 impl Platforms {
-    /// Register the services the hue platforms provide.
-    pub fn new(
-        hass: &Hass,
-        registries: Arc<Registries>,
-        profiles: crate::light::Profiles,
-    ) -> Arc<Self> {
+    /// The shared components hue feeds, and hue's own services.
+    pub fn new(components: &crate::components::Components) -> Arc<Self> {
         let p = Arc::new(Self {
-            hass: hass.clone(),
-            registries: registries.clone(),
-            lights: Arc::new(Lights::new(profiles)),
-            switches: Arc::new(Switches::default()),
-            scenes: Arc::new(Scenes::default()),
+            hass: components.hass().clone(),
+            registries: components.registries().clone(),
+            lights: components.lights(),
+            switches: components.switches(),
+            scenes: components.scenes(),
             bridges: RwLock::default(),
         });
-        p.lights.register_services(hass, registries.clone());
-        p.switches.register_services(hass, registries.clone());
-        p.scenes.register_services(hass, registries.clone());
         p.register_hue_services();
         p
     }

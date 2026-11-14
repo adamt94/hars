@@ -1,6 +1,9 @@
 //! Integrations: what turns devices and services into entities. Each one is
 //! started for its config entries (HA's `core.config_entries`).
 
+pub mod button;
+pub mod climate;
+pub mod components;
 pub mod hue;
 pub mod light;
 pub mod met;
@@ -99,9 +102,10 @@ pub fn start(
         weather.register_services(hass, registries.clone());
         running.extend(["met", "weather"]);
     }
+    let components = components::Components::new(hass, registries.clone(), profiles);
     let hue: Vec<Map<String, Value>> = enabled(hue::DOMAIN).cloned().collect();
     if !hue.is_empty() {
-        let platforms = hue::Platforms::new(hass, registries.clone(), profiles);
+        let platforms = hue::Platforms::new(&components);
         for entry in hue {
             tokio::spawn(hue::run(platforms.clone(), entry));
         }

@@ -29,7 +29,7 @@ pub use event::{Event, EventBus, EventKind};
 pub use lifecycle::CoreState;
 pub use schema::{Kind, Range, Schema};
 pub use service::{
-    EntityTarget, ServiceCall, ServiceData, ServiceError, ServiceRegistry, ServiceResponse,
+    EntityTarget, Raised, ServiceCall, ServiceData, ServiceError, ServiceRegistry, ServiceResponse,
     SupportsResponse,
 };
 pub use state::{Attributes, Reported, State, StateChanges, StateMachine};

@@ -294,6 +294,27 @@ fn call_service(conn: &mut Conn, id: u64, msg: &Map<String, Value>) -> Result<()
                 }),
             ),
             Err(ServiceError::Failed(why)) => out.error(json!(id), "home_assistant_error", &why),
+            Err(ServiceError::Translated(r)) => out.error_with(
+                json!(id),
+                json!({
+                    "code": "home_assistant_error",
+                    "message": r.message,
+                    "translation_key": r.key,
+                    "translation_placeholders": r.placeholders,
+                    "translation_domain": r.domain,
+                }),
+            ),
+            Err(ServiceError::Validation(r)) => out.error_with(
+                json!(id),
+                json!({
+                    "code": "service_validation_error",
+                    "message": format!("Validation error: {}", r.message),
+                    "translation_key": r.key,
+                    "translation_placeholders": r.placeholders,
+                    "translation_domain": r.domain,
+                }),
+            ),
+            Err(ServiceError::Unknown(why)) => out.error(json!(id), "unknown_error", &why),
         };
     });
     Ok(())

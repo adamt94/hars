@@ -40,6 +40,9 @@ pub enum Kind {
     Tuple(Vec<Kind>),
     /// `vol.Any(True, kind)`.
     TrueOr(Box<Kind>),
+    /// `vol.Coerce(SomeStrEnum)`: one of the enum's values (case-sensitive),
+    /// named in the error by the enum's class name, in definition order.
+    Enum(&'static str, &'static [&'static str]),
 }
 
 /// Inclusive bounds, as `vol.Range`.
@@ -77,6 +80,10 @@ pub struct Schema {
     fields: Vec<Field>,
     /// `vol.Exclusive` groups: (group name, keys).
     exclusive: Vec<(&'static str, &'static [&'static str])>,
+    /// `vol.Inclusive` groups: (group name, keys).
+    inclusive: Vec<(&'static str, &'static [&'static str])>,
+    /// `cv.has_at_least_one_key(...)`, checked before anything else.
+    at_least_one: Option<&'static [&'static str]>,
     allow_extra: bool,
     entity_service: bool,
 }
@@ -124,6 +131,19 @@ impl Schema {
         self
     }
 
+    /// `vol.Inclusive(key, group)` for each of `keys`: all or none of them.
+    /// The keys still need their own field.
+    pub fn inclusive(mut self, group: &'static str, keys: &'static [&'static str]) -> Self {
+        self.inclusive.push((group, keys));
+        self
+    }
+
+    /// `vol.All(cv.has_at_least_one_key(*keys), schema)`.
+    pub fn at_least_one(mut self, keys: &'static [&'static str]) -> Self {
+        self.at_least_one = Some(keys);
+        self
+    }
+
     /// Keep unknown keys instead of rejecting them (`extra=vol.ALLOW_EXTRA`).
     pub fn allow_extra(mut self) -> Self {
         self.allow_extra = true;
@@ -137,10 +157,23 @@ impl Schema {
         let invalid = |msg: String| Err(ServiceError::Invalid(msg));
         let mut coerced: Vec<(&str, Value)> = Vec::new();
         let mut drop_metadata = false;
+        if let Some(keys) = self.at_least_one
+            && !data.keys().any(|k| keys.contains(&k.as_str()))
+        {
+            return invalid(format!("must contain at least one of {}.", keys.join(", ")));
+        }
         for (group, keys) in &self.exclusive {
             if keys.iter().filter(|k| data.contains_key(**k)).count() > 1 {
                 return invalid(format!(
                     "two or more values in the same group of exclusion '{group}' @ data[<{group}>]"
+                ));
+            }
+        }
+        for (group, keys) in &self.inclusive {
+            let n = keys.iter().filter(|k| data.contains_key(**k)).count();
+            if n != 0 && n != keys.len() {
+                return invalid(format!(
+                    "some but not all values in the same group of inclusion '{group}' @ data[<{group}>]"
                 ));
             }
         }
@@ -286,6 +319,13 @@ fn check(kind: &Kind, value: &Value) -> Checked {
             }
         },
         Kind::EntityIds => check_target("entity_id", value),
+        Kind::Enum(name, values) => match value {
+            Value::String(v) if values.contains(&v.as_str()) => Ok(None),
+            _ => {
+                let list: Vec<String> = values.iter().map(|v| format!("'{v}'")).collect();
+                err(format!("expected {name} or one of {}", list.join(", ")))
+            }
+        },
         Kind::IntClamp(min, max) => {
             // Python's int() has no size limit, so any int (or float, or
             // int string) clamps; only what int() rejects is an error.
@@ -494,6 +534,62 @@ mod tests {
             Err(ServiceError::Invalid(msg)) => msg,
             other => panic!("expected Invalid, got {other:?}"),
         }
+    }
+
+    /// climate's `SET_TEMPERATURE_SCHEMA`, with HA's own messages for it.
+    #[test]
+    fn at_least_one_inclusive_and_enum_like_voluptuous() {
+        const MODES: &[&str] = &[
+            "off",
+            "heat",
+            "cool",
+            "heat_cool",
+            "auto",
+            "dry",
+            "fan_only",
+        ];
+        let schema = Schema::entity_service()
+            .at_least_one(&["temperature", "target_temp_high", "target_temp_low"])
+            .optional("temperature", Kind::Float(Range::ANY))
+            .optional("target_temp_high", Kind::Float(Range::ANY))
+            .optional("target_temp_low", Kind::Float(Range::ANY))
+            .optional("hvac_mode", Kind::Enum("HVACMode", MODES))
+            .inclusive("temperature", &["target_temp_high", "target_temp_low"]);
+        let id = "climate.air_conditioner";
+        let inclusion = "some but not all values in the same group of inclusion 'temperature' @ data[<temperature>]";
+        assert_eq!(
+            err(
+                &schema,
+                json!({"entity_id": id, "temperature": 21, "target_temp_low": 18})
+            ),
+            inclusion
+        );
+        assert_eq!(
+            err(&schema, json!({"entity_id": id, "target_temp_low": 18})),
+            inclusion
+        );
+        assert_eq!(
+            err(&schema, json!({"entity_id": id, "hvac_mode": "cool"})),
+            "must contain at least one of temperature, target_temp_high, target_temp_low."
+        );
+        // Checked before the target keys.
+        assert_eq!(
+            err(&schema, json!({})),
+            "must contain at least one of temperature, target_temp_high, target_temp_low."
+        );
+        assert_eq!(
+            err(
+                &schema,
+                json!({"entity_id": id, "temperature": 21, "hvac_mode": "COOL"})
+            ),
+            "expected HVACMode or one of 'off', 'heat', 'cool', 'heat_cool', 'auto', 'dry', 'fan_only' for dictionary value @ data['hvac_mode']"
+        );
+        assert_eq!(
+            err(&schema, json!({"entity_id": id, "temperature": "abc"})),
+            "expected float for dictionary value @ data['temperature']"
+        );
+        let ok = json!({"entity_id": id, "target_temp_low": 18, "target_temp_high": 24, "hvac_mode": "heat"});
+        assert_eq!(schema.validate(&data(ok)), Ok(None));
     }
 
     #[test]

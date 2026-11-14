@@ -192,7 +192,13 @@ async fn call_service(
         Err(e @ (ServiceError::NotFound { .. } | ServiceError::Invalid(_))) => {
             message(StatusCode::BAD_REQUEST, e)
         }
-        Err(e @ ServiceError::Failed(_)) => message(StatusCode::INTERNAL_SERVER_ERROR, e),
+        // HA's view lets these escape: aiohttp answers 500.
+        Err(
+            e @ (ServiceError::Failed(_)
+            | ServiceError::Translated(_)
+            | ServiceError::Validation(_)
+            | ServiceError::Unknown(_)),
+        ) => message(StatusCode::INTERNAL_SERVER_ERROR, e),
     }
 }
 

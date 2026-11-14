@@ -295,6 +295,12 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
       `hue.activate_scene`, `hue.hue_activate_scene`; HA's fan-out order
       across platforms. Matched against HA's code on the real bridge: all 28
       entities (19 with a state), 14 event-stream scenarios, 59 service calls
+- [x] Shared entity components (one per domain, services registered on
+      first use, so platforms don't replace each other's handlers); `button`
+      (press time written first, restore) and `climate` (HA's ten services,
+      schemas, required features and `service_not_supported`, mode and range
+      validation, `display_temp`); `service_validation_error`, translated
+      `home_assistant_error` and `unknown_error` replies
 - [ ] `hue`: button/rotary/bell events and `hue_event`, the motion-aware
       sensor; mDNS
       rediscovery if the imported host moves; user-initiated re-pairing if
