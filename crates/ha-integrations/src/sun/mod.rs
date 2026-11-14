@@ -197,6 +197,20 @@ pub fn iso(t: Timestamp) -> String {
     }
 }
 
+/// A timestamp sensor's state: `isoformat(timespec="seconds")` in UTC.
+pub fn iso_seconds(t: Timestamp) -> String {
+    t.strftime("%Y-%m-%dT%H:%M:%S+00:00").to_string()
+}
+
+/// Python's `str(float)`: `60.0`, not `60`.
+pub fn py_float(x: f64) -> String {
+    if x.is_finite() && x.fract() == 0.0 && x.abs() < 1e16 {
+        format!("{x:.1}")
+    } else {
+        x.to_string()
+    }
+}
+
 /// One sensor: its key (`<entry_id>-<key>` is its unique id), default
 /// entity id, name, and whether HA enables it by default.
 struct SensorDesc {
@@ -287,7 +301,11 @@ fn sensor_entity(r: &Registries, entry_id: &str, s: &SensorDesc) -> Option<(Enti
         .and_then(|id| r.devices.iter().find(|d| d.id == id))
         .and_then(|d| d.display_name())
         .unwrap_or("Sun");
-    let name = entry.and_then(|e| e.name.as_deref()).unwrap_or(s.name);
+    // A name set in the registry is used as is (`use_legacy_naming`).
+    if let Some(name) = entry.and_then(|e| e.name.clone()) {
+        return Some((EntityId::parse(&entity_id).ok()?, name));
+    }
+    let name = s.name;
     Some((
         EntityId::parse(&entity_id).ok()?,
         format!("{device} {name}"),
@@ -343,8 +361,8 @@ impl Entities {
 
         for (desc, id, name) in &self.sensors {
             let (state, attrs) = match desc.key {
-                "solar_elevation" => (elevation.to_string(), position_attrs(name)),
-                "solar_azimuth" => (azimuth.to_string(), position_attrs(name)),
+                "solar_elevation" => (py_float(elevation), position_attrs(name)),
+                "solar_azimuth" => (py_float(azimuth), position_attrs(name)),
                 _ if !events_changed => continue,
                 "solar_rising" => (
                     if ev.rising { "on" } else { "off" }.to_owned(),
@@ -360,7 +378,7 @@ impl Entities {
                         _ => ev.next_setting,
                     };
                     (
-                        iso(t),
+                        iso_seconds(t),
                         json!({ "device_class": "timestamp", "friendly_name": name }),
                     )
                 }
@@ -401,11 +419,21 @@ pub async fn run(hass: Hass, registries: std::sync::Arc<Registries>, entry_id: S
     });
     let entities = Entities::new(&registries, &entry_id);
     let clock = hass.clock().clone();
+    // Until the wall clock reads `at`: after each wake the remaining time is
+    // checked again, so a clock stepped back doesn't fire early (HA's
+    // `async_track_point_in_utc_time` does the same).
     let sleep_until = |at: Timestamp| {
-        let now = clock.now();
-        let wait = at.duration_since(now).max(SignedDuration::ZERO);
-        let instant = clock.instant() + std::time::Duration::try_from(wait).unwrap_or_default();
-        tokio::time::sleep_until(instant)
+        let clock = clock.clone();
+        async move {
+            loop {
+                let wait = at.duration_since(clock.now());
+                if wait <= SignedDuration::ZERO {
+                    return;
+                }
+                let wait = std::time::Duration::try_from(wait).unwrap_or_default();
+                tokio::time::sleep_until(clock.instant() + wait).await;
+            }
+        }
     };
     loop {
         let now = clock.now();

@@ -121,7 +121,8 @@ async fn runs_on_has_schedule() {
     assert_eq!(sun.attributes["rising"], true);
     assert_eq!(sun.attributes["friendly_name"], "Sun");
     let dawn = state(&hass, "sensor.sun_next_dawn").unwrap();
-    assert_eq!(dawn.state, "2026-06-22T02:27:14.306658+00:00");
+    // Timestamp sensors are to the second (`isoformat(timespec="seconds")`).
+    assert_eq!(dawn.state, "2026-06-22T02:27:14+00:00");
     assert_eq!(dawn.attributes["device_class"], "timestamp");
     assert_eq!(dawn.attributes["friendly_name"], "Sun Next dawn");
     // Disabled by default in HA.
@@ -174,16 +175,60 @@ async fn the_registry_enables_renames_and_disables_sensors() {
     assert_eq!(elevation.attributes["unit_of_measurement"], "°");
     assert_eq!(
         elevation.state,
-        state(&hass, "sun.sun").unwrap().attributes["elevation"].to_string()
+        py_float(
+            state(&hass, "sun.sun").unwrap().attributes["elevation"]
+                .as_f64()
+                .unwrap()
+        )
     );
     assert_eq!(
         state(&hass, "sensor.evening").unwrap().attributes["friendly_name"],
-        "Sun Evening"
+        "Evening",
+        "a registry name is used as is"
     );
     assert!(state(&hass, "sensor.sun_next_dusk").is_none());
     assert!(
         state(&hass, "sensor.sun_next_dawn").is_none(),
         "disabled in the registry"
+    );
+    task.abort();
+}
+
+#[test]
+fn states_print_like_python() {
+    assert_eq!(py_float(60.0), "60.0");
+    assert_eq!(py_float(-0.5), "-0.5");
+    assert_eq!(py_float(181.27), "181.27");
+    assert_eq!(
+        iso_seconds(ts("2026-06-22T02:27:14.306658Z")),
+        "2026-06-22T02:27:14+00:00"
+    );
+}
+
+/// The wall clock stepped back an hour (an NTP correction) must not make
+/// the next phase change run early: it waits for the wall-clock time.
+#[tokio::test(start_paused = true)]
+async fn a_clock_stepped_back_does_not_fire_early() {
+    // Phase small_day until 04:42:40.926698; position refreshes stop 2.5
+    // minutes before it, then one sleep until the phase change.
+    let (hass, sim) = hass_at("2026-06-21T03:30:17Z");
+    let task = tokio::spawn(run(hass.clone(), Default::default(), "entry1".into()));
+    tokio::task::yield_now().await;
+    // Into the final sleep.
+    tokio::time::sleep(std::time::Duration::from_secs(70 * 60)).await;
+    let before = state(&hass, "sun.sun").unwrap().last_updated;
+    sim.jump_to(ts("2026-06-21T03:41:00Z"));
+    // Past the old monotonic deadline, but an hour before 04:42 on the wall.
+    tokio::time::sleep(std::time::Duration::from_secs(10 * 60)).await;
+    assert_eq!(
+        state(&hass, "sun.sun").unwrap().last_updated,
+        before,
+        "nothing ran early"
+    );
+    tokio::time::sleep(std::time::Duration::from_secs(52 * 60)).await;
+    assert!(
+        state(&hass, "sun.sun").unwrap().last_updated > before,
+        "it ran at 04:42 on the wall clock"
     );
     task.abort();
 }
