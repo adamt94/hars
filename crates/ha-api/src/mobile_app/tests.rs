@@ -849,3 +849,23 @@ async fn notify_needs_some_push() {
         );
     }
 }
+
+/// Review regression: a first hex-key request whose payload is `null`
+/// still saves `no_legacy_encryption` (HA sets it before the `None` check).
+#[tokio::test]
+async fn a_sealed_null_still_saves_the_flag() {
+    let mut e = entry();
+    e["data"]
+        .as_object_mut()
+        .unwrap()
+        .remove("no_legacy_encryption");
+    let app = app_with(&[e]);
+    let sealed = Key::hex(SECRET).unwrap().seal(b"null");
+    let body = json!({"type": "get_config", "encrypted": true, "encrypted_data": sealed});
+    let got = send(&app, WEBHOOK, "POST", Some(&body.to_string()), None).await;
+    assert_eq!(got.body, "{}");
+    assert_eq!(
+        app.entries.list().unwrap()[0]["data"]["no_legacy_encryption"],
+        true
+    );
+}

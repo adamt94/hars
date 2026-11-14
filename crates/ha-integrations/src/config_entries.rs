@@ -170,6 +170,37 @@ mod tests {
         }
     }
 
+    /// Review regression: a save rewrites every entry, so other entries'
+    /// numbers must come back exactly (HA's orjson keeps them).
+    #[tokio::test]
+    async fn other_entries_keep_their_numbers() {
+        let dir = std::env::temp_dir().join(format!("hars-entries-float-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join(".storage")).unwrap();
+        let file = dir.join(".storage").join(KEY);
+        let text = r#"{
+  "version": 1,
+  "minor_version": 5,
+  "key": "core.config_entries",
+  "data": {
+    "entries": [
+      {"data":{"a":1},"entry_id":"one","options":{"x":25.096823722419074,"y":1e-7,"z":12345678901234567890}},
+      {"data":{"a":1},"entry_id":"two"}
+    ]
+  }
+}"#;
+        std::fs::write(&file, text).unwrap();
+        let entries = ConfigEntries::load(&Hass::new(), &dir);
+        let mut data = Map::new();
+        data.insert("a".into(), Value::from(2));
+        assert!(entries.update_data("two", data));
+        entries.flush().await;
+        let saved = std::fs::read_to_string(&file).unwrap();
+        assert!(saved.contains(r#""x":25.096823722419074"#), "{saved}");
+        assert!(saved.contains(r#""z":12345678901234567890"#), "{saved}");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
     #[tokio::test(start_paused = true)]
     async fn updates_save_a_second_later_and_no_ops_nothing() {
         let dir = std::env::temp_dir().join(format!("hars-entries-save-{}", std::process::id()));

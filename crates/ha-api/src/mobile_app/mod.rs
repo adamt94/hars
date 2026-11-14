@@ -228,14 +228,16 @@ pub(crate) async fn handle(shared: &Shared, reg: &Arc<Registration>, body: &[u8]
         Sent::Plain(data) => data,
         Sent::Encrypted(None) => return Reply::Bare(StatusCode::OK),
         Sent::Encrypted(Some(data)) => match reg.open(&data) {
-            // A sealed `null` is `webhook_payload is None` (the flag is still set).
-            (Opened::Json(Value::Null), _) | (Opened::Failed, _) => {
-                return empty_okay(StatusCode::OK);
-            }
+            (Opened::Failed, _) => return empty_okay(StatusCode::OK),
             (Opened::Json(v), newly_flagged) => {
-                // The first hex-key success records `no_legacy_encryption`.
+                // The first hex-key success records `no_legacy_encryption`
+                // (before HA checks for a `None` payload).
                 if newly_flagged && let Some(app) = &shared.config.mobile_app {
                     app.persist(reg);
+                }
+                // A sealed `null` is `webhook_payload is None`.
+                if v.is_null() {
+                    return empty_okay(StatusCode::OK);
                 }
                 v
             }
@@ -583,6 +585,7 @@ fn get_config(shared: &Shared, reg: &Registration) -> Value {
 
 /// `webhook_update_registration`. The merged data is kept for this run.
 fn update_registration(shared: &Shared, reg: &Registration, payload: &Value) -> Reply {
+    let _turn = reg.lock_ops();
     let ok = || empty_okay(StatusCode::OK);
     let Some(m) = object(
         payload,

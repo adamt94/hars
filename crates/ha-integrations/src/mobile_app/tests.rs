@@ -206,3 +206,33 @@ fn location_schema_coerces_as_voluptuous() {
     );
     assert!(one(json!({"battery": "1__0"})).is_none());
 }
+
+/// Review regression: concurrent changes save the newest data, never an
+/// older snapshot.
+#[test]
+fn concurrent_persists_save_the_newest_data() {
+    let hass = ha_core::Hass::new();
+    let entries = crate::config_entries::ConfigEntries::in_memory(&hass, vec![entry(true)]);
+    let app = MobileApp::new(&[entry(true)], Vec::new());
+    let registry = ha_registry::Registry::in_memory(&hass, Default::default());
+    app.setup(&hass, registry, entries.clone());
+    let Webhook::Registered(reg) = app.webhook(WEBHOOK) else {
+        panic!("registered");
+    };
+    std::thread::scope(|s| {
+        for t in 0..4 {
+            let (app, reg) = (&app, &reg);
+            s.spawn(move || {
+                for i in 0..100 {
+                    let _turn = reg.lock_ops();
+                    let mut update = Map::new();
+                    update.insert("app_version".into(), json!(format!("{t}.{i}")));
+                    reg.merge(update);
+                    app.persist(reg);
+                }
+            });
+        }
+    });
+    let saved = entries.list().unwrap()[0]["data"].clone();
+    assert_eq!(Value::Object(reg.data()), saved);
+}

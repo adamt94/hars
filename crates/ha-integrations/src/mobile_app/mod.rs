@@ -21,6 +21,8 @@ pub struct Registration {
     pub entry_id: String,
     pub webhook_id: Arc<str>,
     data: RwLock<Map<String, Value>>,
+    /// Multi-step changes (`update_registration`) run one at a time.
+    ops: parking_lot::Mutex<()>,
 }
 
 /// What opening a request's `encrypted_data` gave.
@@ -42,7 +44,19 @@ impl Registration {
             entry_id: entry.get("entry_id")?.as_str()?.to_owned(),
             webhook_id,
             data: RwLock::new(data),
+            ops: parking_lot::Mutex::new(()),
         })
+    }
+
+    /// Hold while a change spans several steps (the data, the device,
+    /// the saved entry), so concurrent requests apply in one order.
+    pub fn lock_ops(&self) -> parking_lot::MutexGuard<'_, ()> {
+        self.ops.lock()
+    }
+
+    /// Run `f` on the data with it locked against changes.
+    pub fn with_data<T>(&self, f: impl FnOnce(&Map<String, Value>) -> T) -> T {
+        f(&self.data.read())
     }
 
     /// A copy of the entry's `data`.
@@ -279,7 +293,9 @@ impl MobileApp {
     /// `async_update_entry`), if it changed.
     pub fn persist(&self, reg: &Registration) {
         if let Some(entries) = self.entries.get() {
-            entries.update_data(&reg.entry_id, reg.data());
+            // Read and saved under the data's lock: a newer change can't be
+            // overwritten by an older snapshot.
+            reg.with_data(|data| entries.update_data(&reg.entry_id, data.clone()));
         }
     }
 
