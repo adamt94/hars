@@ -1,7 +1,9 @@
 //! Integrations: what turns devices and services into entities. Each one is
 //! started for its config entries (HA's `core.config_entries`).
 
+pub mod met;
 pub mod sun;
+pub mod weather;
 
 use ha_core::Hass;
 use ha_registry::Registries;
@@ -29,31 +31,69 @@ pub fn load_entries(config_dir: &std::path::Path) -> Option<Vec<Map<String, Valu
 }
 
 /// The integrations `hars` can run, by HA domain.
-pub const SUPPORTED: &[&str] = &[sun::DOMAIN];
+pub const SUPPORTED: &[&str] = &[sun::DOMAIN, met::DOMAIN];
+
+/// Who `hars` says it is to the services it calls.
+pub const USER_AGENT: &str = concat!(
+    "hars/",
+    env!("CARGO_PKG_VERSION"),
+    " (+https://github.com/adamt94/homeassistant-rust)"
+);
+
+/// What [`start`] started.
+pub struct Started {
+    /// The domains running, for `get_config`'s `components`.
+    pub running: Vec<&'static str>,
+    /// The weather entities, for the forecast APIs.
+    pub weather: Arc<weather::Weather>,
+}
 
 /// Start the integrations for these config entries (each a
 /// `core.config_entries` item). With no config entries at all (a fresh
 /// install), `sun` is started as HA's default configuration does.
-/// Returns the domains running, for `get_config`'s `components`.
 pub fn start(
     hass: &Hass,
     registries: Arc<Registries>,
     entries: Option<&[Map<String, Value>]>,
-) -> Vec<&'static str> {
+) -> Started {
     let field =
         |e: &Map<String, Value>, k: &str| e.get(k).and_then(Value::as_str).map(str::to_owned);
+    let enabled = |domain: &'static str| {
+        entries
+            .unwrap_or_default()
+            .iter()
+            .filter(move |e| field(e, "domain").as_deref() == Some(domain))
+            .filter(|e| e.get("disabled_by").is_none_or(Value::is_null))
+    };
     let sun_entry = match entries {
         None => Some("hars-sun".to_owned()),
-        Some(entries) => entries
-            .iter()
-            .filter(|e| field(e, "domain").as_deref() == Some(sun::DOMAIN))
-            .find(|e| e.get("disabled_by").is_none_or(Value::is_null))
+        Some(_) => enabled(sun::DOMAIN)
+            .next()
             .and_then(|e| field(e, "entry_id")),
     };
     let mut running = Vec::new();
     if let Some(entry_id) = sun_entry {
-        tokio::spawn(sun::run(hass.clone(), registries, entry_id));
+        tokio::spawn(sun::run(hass.clone(), registries.clone(), entry_id));
         running.extend(["sun", "sensor", "binary_sensor"]);
     }
-    running
+
+    let weather = Arc::new(weather::Weather::default());
+    let met: Vec<Map<String, Value>> = enabled(met::DOMAIN)
+        .filter_map(|e| e.get("data").and_then(Value::as_object).cloned())
+        .collect();
+    if !met.is_empty() {
+        for data in met {
+            tokio::spawn(met::run(
+                hass.clone(),
+                registries.clone(),
+                weather.clone(),
+                USER_AGENT,
+                met::URL.to_owned(),
+                data,
+            ));
+        }
+        weather.register_services(hass);
+        running.extend(["met", "weather"]);
+    }
+    Started { running, weather }
 }

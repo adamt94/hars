@@ -120,3 +120,36 @@ as in HA, each a single timer; none fell in this 60 s window.
 | binary | start→/api/ | idle RSS | idle PSS | idle CPU | wakeups/s | threads | run |
 |---|---|---|---|---|---|---|---|
 | 3.70 MiB | 10 ms | 6.7 MiB | 5.8 MiB | 0.000 % | 0.00 | 3 | 15s warm-up, 60s quiet |
+
+### `met`, 2026-11-14
+
+`PERF_MET=1 scripts/perf-docker.sh 15 60`: a home in London with HA's
+onboarding `met` entry, so the run includes a real fetch from api.met.no
+(60 KB of JSON, 88 time steps) and holds its forecast.
+
+| binary | start→/api/ | idle RSS | idle PSS | idle CPU | wakeups/s | threads | run |
+|---|---|---|---|---|---|---|---|
+| 5.14 MiB | 13 ms | 8.7 MiB | 7.6 MiB | 0.000 % | 0.00 | 3 | 15s warm-up, 60s quiet, `met` running |
+| 5.14 MiB | 11 ms | 7.4 MiB | 6.5 MiB | 0.000 % | 0.00 | 3 | 15s warm-up, 60s quiet, no `met` entry |
+
+The binary grew 1.44 MiB (3,884,416 → 5,393,024 bytes), nearly all of it
+the HTTPS client: rustls with ring, and Mozilla's roots compiled in. A
+client that only did HTTP would not reach api.met.no. That size costs 0.7
+MiB of RSS even when `met` doesn't run (6.7 → 7.4 MiB), from mapped pages.
+
+Running `met` adds 1.3 MiB, split between 0.6 MiB of file-backed pages
+(the TLS code it touches) and 0.6 MiB of anonymous memory (`PERF_DETAIL=1`).
+What was tried:
+
+- Loading the system's CA file (`rustls-native-certs`) instead: anonymous
+  memory was 0.5 MiB higher (2668 vs 2184 kB), and it is blocking file
+  I/O. Before that I/O moved off the async threads, it also put 31 ms onto
+  start-up, because the client was built before the server bound its port.
+  Compiled-in roots are what HA does too: it ships `certifi`. The Docker
+  image now carries no CA bundle.
+- Making the client for each fetch and dropping it afterwards: an idle
+  `hars` holds no TLS state or socket between the hourly fetches.
+
+Refreshes are one timer every 55–64 minutes, as HA, so none falls in the
+window.
+

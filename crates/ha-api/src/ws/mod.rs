@@ -10,6 +10,7 @@
 mod commands;
 mod entities;
 mod frontend;
+mod weather;
 
 use crate::Shared;
 use crate::auth::RemoteIp;

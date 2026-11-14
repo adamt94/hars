@@ -12,6 +12,8 @@ exec docker run --rm \
   -v hars-perf-cargo:/usr/local/cargo/registry \
   -v hars-perf-target:/target \
   -e CARGO_TARGET_DIR=/target \
+  -e PERF_MET="${PERF_MET:-0}" \
+  -e PERF_DETAIL="${PERF_DETAIL:-0}" \
   -w /src \
   rust:1 \
   bash -c "cargo build --release --locked -q && scripts/perf.sh /target/release/hars ${1:-10} ${2:-60}"

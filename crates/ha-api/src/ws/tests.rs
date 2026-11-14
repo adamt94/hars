@@ -994,3 +994,120 @@ async fn zone_and_person_lists() {
         json!({"storage": [], "config": []})
     );
 }
+
+#[tokio::test]
+async fn weather_forecasts_are_served_and_pushed() {
+    use ha_integrations::weather::{Forecasts, Weather};
+    let hass = Hass::new();
+    hass.start();
+    let auth = crate::test_util::auth(true);
+    let weather = std::sync::Arc::new(Weather::default());
+    weather.register_services(&hass);
+    let id = EntityId::parse("weather.forecast_home").unwrap();
+    let daily = |t: f64| {
+        std::sync::Arc::new(json!([{"datetime": "2026-11-14T12:00:00+00:00", "temperature": t}]))
+    };
+    let publish = |t: f64| {
+        weather.publish(
+            &id,
+            3,
+            Forecasts {
+                daily: daily(t),
+                hourly: std::sync::Arc::new(json!([])),
+            },
+        )
+    };
+    publish(10.5);
+    let config = crate::ApiConfig {
+        weather: weather.clone(),
+        ..Default::default()
+    };
+    let app = crate::router(hass.clone(), auth.clone(), &config)
+        .into_make_service_with_connect_info::<std::net::SocketAddr>();
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let url = format!("ws://{}/api/websocket", listener.local_addr().unwrap());
+    tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+    let s = Server { url, hass, auth };
+    let mut c = Client::authed(&s, &token(&s.auth).0).await;
+
+    let units = c
+        .call(json!({"id": 2, "type": "weather/convertible_units"}))
+        .await;
+    assert_eq!(
+        units["result"],
+        json!({"units": {"pressure_unit": ["hPa", "inHg", "mbar", "mmHg"], "temperature_unit": ["°C", "°F"], "visibility_unit": ["km", "mi"], "precipitation_unit": ["in", "mm"], "wind_speed_unit": ["Beaufort", "ft/s", "km/h", "kn", "m/s", "mph"]}})
+    );
+
+    // Errors, as HA words them.
+    let sub = |id: u64, entity: &str, kind: &str| json!({"id": id, "type": "weather/subscribe_forecast", "entity_id": entity, "forecast_type": kind});
+    let e = c.call(sub(3, "weather.nope", "daily")).await;
+    assert_eq!(
+        e["error"],
+        json!({"code": "invalid_entity_id", "message": "Weather entity not found: weather.nope"})
+    );
+    let e = c.call(sub(4, "weather.forecast_home", "twice_daily")).await;
+    assert_eq!(e["error"]["code"], "forecast_not_supported");
+    assert_eq!(
+        e["error"]["message"],
+        "The weather entity does not support forecast type: twice_daily"
+    );
+    let e = c.call(sub(5, "light.x", "daily")).await;
+    assert_eq!(e["error"]["code"], "invalid_format");
+    assert_eq!(
+        e["error"]["message"],
+        "Entity ID 'light.x' does not belong to domain 'weather' for dictionary value @ data['entity_id']"
+    );
+    let e = c.call(sub(6, "weather.forecast_home", "weekly")).await;
+    assert_eq!(e["error"]["code"], "invalid_format");
+
+    // The result, the current forecast, then every publish.
+    let r = c.call(sub(7, "Weather.Forecast_Home", "daily")).await;
+    assert_eq!(
+        r,
+        json!({"id": 7, "type": "result", "success": true, "result": null})
+    );
+    let ev = c.recv().await;
+    assert_eq!(
+        ev,
+        json!({"id": 7, "type": "event", "event": {"type": "daily", "forecast": *daily(10.5)}})
+    );
+    publish(11.0);
+    assert_eq!(c.recv().await["event"]["forecast"][0]["temperature"], 11.0);
+
+    // `weather.get_forecasts`, keyed by entity.
+    let r = c
+        .call(json!({"id": 8, "type": "call_service", "domain": "weather", "service": "get_forecasts",
+            "service_data": {"type": "daily"}, "target": {"entity_id": "weather.forecast_home"}, "return_response": true}))
+        .await;
+    assert_eq!(
+        r["result"]["response"],
+        json!({"weather.forecast_home": {"forecast": *daily(11.0)}})
+    );
+    let r = c
+        .call(
+            json!({"id": 9, "type": "call_service", "domain": "weather", "service": "get_forecasts",
+            "service_data": {"type": "twice_daily", "entity_id": "all"}, "return_response": true}),
+        )
+        .await;
+    assert_eq!(
+        r["error"],
+        json!({"code": "home_assistant_error", "message": "Weather entity 'weather.forecast_home' does not support 'twice_daily' forecast"})
+    );
+    let r = c
+        .call(json!({"id": 10, "type": "call_service", "domain": "weather", "service": "get_forecasts",
+            "service_data": {"type": "daily", "entity_id": "weather.other"}, "return_response": true}))
+        .await;
+    assert_eq!(
+        r["error"]["message"],
+        "Service call requested response data but did not match any entities"
+    );
+
+    // Unsubscribed: no more pushes.
+    let r = c
+        .call(json!({"id": 11, "type": "unsubscribe_events", "subscription": 7}))
+        .await;
+    assert_eq!(r["success"], true);
+    publish(12.0);
+    let r = c.call(json!({"id": 12, "type": "ping"})).await;
+    assert_eq!(r["type"], "pong");
+}

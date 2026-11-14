@@ -240,9 +240,19 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
       a port of astral 2.2 that matches HA to the microsecond on 231 event
       times), `person`, `zone.home`; started from `core.config_entries`
       (imported) or by default on a fresh install
-- [ ] `met`: identifying User-Agent, ≤ 4-decimal coordinates, honour
-      `Expires`/`If-Modified-Since`, jitter, backoff, serve the stale cache on
-      failure; `weather/subscribe_forecast`; attribution
+- [x] `met`: a port of pyMetno 0.13.0 and HA's `met`/`weather` code that
+      matches HA value for value (Python rounding, summation order, int/float
+      kinds, wall-clock DST slots, days split in the process's zone as
+      pyMetno does) on 4 recorded scenarios; `weather.forecast_home` with HA's
+      attributes and unit options; `weather/subscribe_forecast`,
+      `weather/convertible_units`, `weather.get_forecasts`. HA's schedule
+      (55–64 min + jitter, setup retries 5 s→10 min, unavailable on failure
+      with the last forecast kept for readers). Deliberate differences: the
+      public api.met.no host with `hars`'s own User-Agent, and
+      `If-Modified-Since` (a `304` recomputes from the kept body, which is what
+      HA gets). `Expires` isn't used to fetch more often: HA's cadence is
+      observable. Not yet: options-flow edits, removing legacy `*-hourly`
+      registry entries, the restored `unavailable` state during setup retries
 - [ ] `hue` v2: full snapshot on connect, then SSE partial-resource merge;
       reconcile after reconnect; bounded 429/503 retry; mDNS rediscovery if the
       imported host moves; link-button re-pair only if the key is rejected.

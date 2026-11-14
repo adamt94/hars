@@ -163,7 +163,7 @@ fn imports_an_ha_install_and_keeps_its_sessions() {
     assert!(out.status.success(), "{out:?}");
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(
-        stdout.contains("integrations not in hars yet: hue (Hue Bridge), met (Home)"),
+        stdout.contains("integrations not in hars yet: hue (Hue Bridge)\n"),
         "{stdout}"
     );
 

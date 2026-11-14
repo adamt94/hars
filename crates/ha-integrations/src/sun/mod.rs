@@ -174,6 +174,11 @@ pub fn events(o: &Observer, tz: &TimeZone, now: Timestamp) -> Events {
     }
 }
 
+/// HA's `helpers.sun.is_up`: the next sunrise comes after the next sunset.
+pub fn is_up(o: &Observer, tz: &TimeZone, now: Timestamp) -> bool {
+    next(now, tz, |d| astral::sunrise(o, d)) > next(now, tz, |d| astral::sunset(o, d))
+}
+
 /// `round(x, 2)`.
 fn round2(x: f64) -> f64 {
     (x * 100.0).round() / 100.0

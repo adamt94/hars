@@ -42,6 +42,8 @@ pub struct ApiConfig {
     pub components: Arc<ha_components::Components>,
     /// Integrations running (`sun`, `sensor`, ...), for `components`.
     pub integrations: Vec<&'static str>,
+    /// Weather entities' forecasts.
+    pub weather: Arc<ha_integrations::weather::Weather>,
 }
 
 /// What the WebSocket and `/api/config` need.

@@ -32,14 +32,13 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
     cargo build --release --locked && cp target/release/hars /hars
 
 FROM scratch
-COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+# No CA bundle: the outbound client has Mozilla's roots compiled in.
 COPY --from=build /usr/share/zoneinfo /usr/share/zoneinfo
 COPY --from=frontend /out/hass_frontend /frontend
 COPY --from=build /hars /hars
 ENV HARS_BIND=0.0.0.0:8123 \
     HARS_FRONTEND=/frontend \
-    HARS_CONFIG=/config \
-    SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
+    HARS_CONFIG=/config
 # Persistent state (config, .storage, recorder DB) lives here.
 VOLUME /config
 EXPOSE 8123

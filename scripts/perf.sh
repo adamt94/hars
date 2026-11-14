@@ -38,6 +38,16 @@ fi
 export HARS_CONFIG
 HARS_CONFIG=$(mktemp -d)
 "$BIN" auth add perf perf-password >/dev/null
+# PERF_MET=1: a home in London with HA's onboarding `met` entry, so the
+# forecast is fetched (from api.met.no) and held during the run.
+if [ "${PERF_MET:-0}" = 1 ]; then
+  cat >"$HARS_CONFIG/.storage/core.config" <<'JSON'
+{"version": 1, "minor_version": 4, "key": "core.config", "data": {"latitude": 51.5072, "longitude": -0.1276, "elevation": 11, "unit_system_v2": "metric", "location_name": "Home", "time_zone": "Europe/London", "external_url": null, "internal_url": null, "currency": "GBP", "country": "GB", "language": "en", "radius": 100}}
+JSON
+  cat >"$HARS_CONFIG/.storage/core.config_entries" <<'JSON'
+{"version": 1, "minor_version": 5, "key": "core.config_entries", "data": {"entries": [{"entry_id": "perfmet", "domain": "met", "title": "Home", "data": {"track_home": true}, "options": {}, "source": "onboarding", "disabled_by": null}]}}
+JSON
+fi
 answers() { [ "$(curl -s -o /dev/null -w '%{http_code}' --max-time 1 "$URL/api/")" != 000 ]; }
 t0=$(date +%s%N)
 HARS_BIND="127.0.0.1:$PORT" "$BIN" >/dev/null 2>&1 &
@@ -64,6 +74,10 @@ for i in $(seq 1 200); do
 done
 curl -sf --max-time 5 -H "authorization: Bearer $token" "$URL/api/states" >/dev/null
 sleep "$WARMUP"
+if [ "${PERF_MET:-0}" = 1 ]; then
+  curl -sf --max-time 5 -H "authorization: Bearer $token" "$URL/api/states/weather.forecast_home" |
+    grep -q '"attribution"' || { echo "weather.forecast_home is missing" >&2; exit 1; }
+fi
 
 hz=$(getconf CLK_TCK)
 ticks0=$(cpu_ticks "$pid"); sw0=$(switches "$pid"); tasks0=$(tasks "$pid")
@@ -77,6 +91,10 @@ fi
 rss_kib=$(awk '/^Rss:/ { print $2 }' /proc/"$pid"/smaps_rollup)
 pss_kib=$(awk '/^Pss:/ { print $2 }' /proc/"$pid"/smaps_rollup)
 threads=$(ls /proc/"$pid"/task | wc -l)
+# PERF_DETAIL=1: where the RSS is (file-backed vs anonymous), on stderr.
+if [ "${PERF_DETAIL:-0}" = 1 ]; then
+  grep -E '^(Rss|Pss_Anon|Pss_File|Anonymous|AnonHugePages):' /proc/"$pid"/smaps_rollup >&2
+fi
 
 awk -v size="$size" -v start="$start_ms" -v rss="$rss_kib" -v pss="$pss_kib" \
     -v dt=$((ticks1 - ticks0)) -v hz="$hz" -v sw=$((sw1 - sw0)) -v q="$QUIET" \

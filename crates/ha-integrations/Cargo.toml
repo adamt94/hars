@@ -11,13 +11,17 @@ rust-version.workspace = true
 workspace = true
 
 [dependencies]
+ha-components.workspace = true
 ha-core.workspace = true
+ha-http.workspace = true
 ha-registry.workspace = true
-jiff = "0.2.43"
+jiff = { version = "0.2.43", features = ["serde"] }
+parking_lot = "0.12.5"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
-tokio = { version = "1.54.1", features = ["time", "rt"] }
+thiserror = "2.0.21"
+tokio = { version = "1.54.1", features = ["time", "rt", "sync"] }
 tracing = "0.1.44"
 
 [dev-dependencies]
-tokio = { version = "1.54.1", features = ["macros", "rt", "test-util"] }
+tokio = { version = "1.54.1", features = ["macros", "rt", "test-util", "net", "io-util"] }
