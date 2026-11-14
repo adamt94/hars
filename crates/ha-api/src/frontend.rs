@@ -205,6 +205,8 @@ pub(crate) fn routes(fe: Arc<Frontend>) -> Router {
         .layer(axum::middleware::map_response(vary_on_encoding))
         .route("/", get(index))
         .route("/{panel}", get(panel.clone()))
+        // `{*rest}` needs a non-empty tail; HA also serves `/lovelace/`.
+        .route("/{panel}/", get(panel.clone()))
         .route("/{panel}/{*rest}", get(panel))
         .route("/manifest.json", get(manifest))
         .route(
@@ -371,6 +373,8 @@ mod tests {
             "/",
             "/home",
             "/lovelace/0",
+            "/lovelace/",
+            "/config/",
             "/map",
             "/config/integrations/dashboard",
         ] {
@@ -383,7 +387,7 @@ mod tests {
             assert_eq!(header_of(&res, header::CACHE_CONTROL), None, "{path}");
             assert!(body(res).await.contains("#2980b9"));
         }
-        for path in ["/nope", "/index.html", "/nope/deeper"] {
+        for path in ["/nope", "/index.html", "/nope/deeper", "/nope/"] {
             assert_eq!(
                 get(path, None).await.status(),
                 StatusCode::NOT_FOUND,

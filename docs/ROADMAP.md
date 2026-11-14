@@ -155,7 +155,7 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
 - [x] Bootstrap HTML + static frontend 20260527.4 from disk (precompressed
       `.br`/`.gz`, HA's 31-day `public` cache headers; HA sends no
       `immutable`), `/manifest.json`, `/auth/authorize`. The image ships the
-      wheel's `hass_frontend` without `frontend_es5` and source maps (172 MB);
+      wheel's `hass_frontend` minus source maps (234 MB, ES5 build kept);
       the binary grew 2.08 → 2.33 MiB
 - [ ] Auth: `/auth/providers`, `/auth/login_flow` + `/auth/login_flow/{flow_id}`,
       `/auth/token` (form-encoded `authorization_code` + `refresh_token`,

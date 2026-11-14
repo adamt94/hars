@@ -6,8 +6,9 @@
 # For LAN integrations (LIFX broadcast, mDNS) run with --network host.
 
 # The official frontend, pinned to the release HA 2026.6.1 ships. It is served
-# from disk. Source maps and the ES5 build (for browsers without ES module
-# support, pre-2018) are dropped: about 150 MB.
+# from disk. Source maps are dropped. The ES5 build stays: the index loads it
+# for any browser older than its `isModern` cut-off (Safari < 26, iOS < 18.5,
+# Firefox < 140).
 FROM alpine:3 AS frontend
 ARG FRONTEND_VERSION=20260527.4
 ARG FRONTEND_SHA256=a85e6dbb007962a157bcd6b5c1ce98ed8872f966732773e4b6008444d1b10e18
@@ -16,7 +17,7 @@ RUN apk add --no-cache curl unzip && \
     curl -fsSL "$FRONTEND_URL" -o /frontend.whl && \
     echo "$FRONTEND_SHA256  /frontend.whl" | sha256sum -c - && \
     unzip -q /frontend.whl 'hass_frontend/*' -d /out && \
-    rm -rf /out/hass_frontend/frontend_es5 /out/hass_frontend/__init__.py /out/hass_frontend/py.typed && \
+    rm -rf /out/hass_frontend/__init__.py /out/hass_frontend/py.typed && \
     find /out/hass_frontend -name '*.map' -o -name '*.map.br' -o -name '*.map.gz' | xargs rm -f
 
 FROM rust:1-alpine AS build
