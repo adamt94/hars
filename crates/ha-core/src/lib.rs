@@ -21,6 +21,7 @@ mod schema;
 mod service;
 mod state;
 pub mod storage;
+pub mod yaml;
 
 pub use clock::{Clock, SimulatedClock, isoformat, serialize_iso};
 pub use context::{Context, ContextId};

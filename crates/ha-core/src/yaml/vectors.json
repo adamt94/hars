@@ -1,0 +1,9940 @@
+{
+ "loader": {
+  "annotatedyaml": "1.0.2",
+  "pyyaml": "6.0.3",
+  "libyaml_c_loader": true
+ },
+ "cases": [
+  {
+   "name": "bool true",
+   "yaml": "v: true\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "bool",
+       true
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "bool True",
+   "yaml": "v: True\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "bool",
+       true
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "bool TRUE",
+   "yaml": "v: TRUE\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "bool",
+       true
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "bool false",
+   "yaml": "v: false\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "bool",
+       false
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "bool False",
+   "yaml": "v: False\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "bool",
+       false
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "bool FALSE",
+   "yaml": "v: FALSE\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "bool",
+       false
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "bool yes",
+   "yaml": "v: yes\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "bool",
+       true
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "bool Yes",
+   "yaml": "v: Yes\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "bool",
+       true
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "bool YES",
+   "yaml": "v: YES\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "bool",
+       true
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "bool no",
+   "yaml": "v: no\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "bool",
+       false
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "bool No",
+   "yaml": "v: No\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "bool",
+       false
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "bool NO",
+   "yaml": "v: NO\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "bool",
+       false
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "bool on",
+   "yaml": "v: on\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "bool",
+       true
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "bool On",
+   "yaml": "v: On\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "bool",
+       true
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "bool ON",
+   "yaml": "v: ON\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "bool",
+       true
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "bool off",
+   "yaml": "v: off\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "bool",
+       false
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "bool Off",
+   "yaml": "v: Off\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "bool",
+       false
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "bool OFF",
+   "yaml": "v: OFF\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "bool",
+       false
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "bool y",
+   "yaml": "v: y\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "str",
+       "y"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "bool Y",
+   "yaml": "v: Y\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "str",
+       "Y"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "bool n",
+   "yaml": "v: n\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "str",
+       "n"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "bool N",
+   "yaml": "v: N\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "str",
+       "N"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "bool oN",
+   "yaml": "v: oN\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "str",
+       "oN"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "bool tRUE",
+   "yaml": "v: tRUE\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "str",
+       "tRUE"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "bool yEs",
+   "yaml": "v: yEs\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "str",
+       "yEs"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "bool 'on'",
+   "yaml": "v: 'on'\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "str",
+       "on"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "bool \"on\"",
+   "yaml": "v: \"on\"\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "str",
+       "on"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "bool !!str on",
+   "yaml": "v: !!str on\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "str",
+       "on"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "bool !!bool yes",
+   "yaml": "v: !!bool yes\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "bool",
+       true
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "null ''",
+   "yaml": "v: \n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "null",
+       null
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "null '~'",
+   "yaml": "v: ~\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "null",
+       null
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "null 'null'",
+   "yaml": "v: null\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "null",
+       null
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "null 'Null'",
+   "yaml": "v: Null\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "null",
+       null
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "null 'NULL'",
+   "yaml": "v: NULL\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "null",
+       null
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "null 'nUll'",
+   "yaml": "v: nUll\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "str",
+       "nUll"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "null \"'null'\"",
+   "yaml": "v: 'null'\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "str",
+       "null"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "null \"!!null ''\"",
+   "yaml": "v: !!null ''\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "null",
+       null
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "int 0",
+   "yaml": "v: 0\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "int",
+       "0"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "int -0",
+   "yaml": "v: -0\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "int",
+       "0"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "int +7",
+   "yaml": "v: +7\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "int",
+       "7"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "int 42",
+   "yaml": "v: 42\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "int",
+       "42"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "int 1_000",
+   "yaml": "v: 1_000\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "int",
+       "1000"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "int 0b1010",
+   "yaml": "v: 0b1010\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "int",
+       "10"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "int -0b11",
+   "yaml": "v: -0b11\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "int",
+       "-3"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "int 0x1F",
+   "yaml": "v: 0x1F\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "int",
+       "31"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "int 0x_ff",
+   "yaml": "v: 0x_ff\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "int",
+       "255"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "int 017",
+   "yaml": "v: 017\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "int",
+       "15"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "int -017",
+   "yaml": "v: -017\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "int",
+       "-15"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "int 08",
+   "yaml": "v: 08\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "str",
+       "08"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "int 09",
+   "yaml": "v: 09\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "str",
+       "09"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "int 0o17",
+   "yaml": "v: 0o17\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "str",
+       "0o17"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "int 007",
+   "yaml": "v: 007\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "int",
+       "7"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "int 0_7",
+   "yaml": "v: 0_7\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "int",
+       "7"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "int 9223372036854775807",
+   "yaml": "v: 9223372036854775807\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "int",
+       "9223372036854775807"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "int 9223372036854775808",
+   "yaml": "v: 9223372036854775808\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "int",
+       "9223372036854775808"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "int -9223372036854775809",
+   "yaml": "v: -9223372036854775809\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "int",
+       "-9223372036854775809"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "int 18446744073709551616",
+   "yaml": "v: 18446744073709551616\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "int",
+       "18446744073709551616"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "int 1:30",
+   "yaml": "v: 1:30\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "int",
+       "90"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "int 9:30",
+   "yaml": "v: 9:30\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "int",
+       "570"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "int 23:00:00",
+   "yaml": "v: 23:00:00\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "int",
+       "82800"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "int 10:00:00",
+   "yaml": "v: 10:00:00\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "int",
+       "36000"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "int 23:30:00",
+   "yaml": "v: 23:30:00\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "int",
+       "84600"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "int 06:30:00",
+   "yaml": "v: 06:30:00\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "str",
+       "06:30:00"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "int 09:30:00",
+   "yaml": "v: 09:30:00\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "str",
+       "09:30:00"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "int 00:05:00",
+   "yaml": "v: 00:05:00\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "str",
+       "00:05:00"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "int 0:30",
+   "yaml": "v: 0:30\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "str",
+       "0:30"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "int 1:60",
+   "yaml": "v: 1:60\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "str",
+       "1:60"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "int 1:5",
+   "yaml": "v: 1:5\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "int",
+       "65"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "int -1:30",
+   "yaml": "v: -1:30\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "int",
+       "-90"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "int 1:30:15:20",
+   "yaml": "v: 1:30:15:20\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "int",
+       "324920"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "int 190:20:30",
+   "yaml": "v: 190:20:30\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "int",
+       "685230"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "int 12:00",
+   "yaml": "v: 12:00\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "int",
+       "720"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "int 24:00:00",
+   "yaml": "v: 24:00:00\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "int",
+       "86400"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "float 1.5",
+   "yaml": "v: 1.5\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "float",
+       "1.5"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "float -1.5",
+   "yaml": "v: -1.5\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "float",
+       "-1.5"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "float +1.5",
+   "yaml": "v: +1.5\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "float",
+       "1.5"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "float 1.",
+   "yaml": "v: 1.\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "float",
+       "1.0"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "float .5",
+   "yaml": "v: .5\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "float",
+       "0.5"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "float 1.0e+3",
+   "yaml": "v: 1.0e+3\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "float",
+       "1000.0"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "float 1.0E-3",
+   "yaml": "v: 1.0E-3\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "float",
+       "0.001"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "float 1e3",
+   "yaml": "v: 1e3\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "str",
+       "1e3"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "float 1.0e3",
+   "yaml": "v: 1.0e3\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "str",
+       "1.0e3"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "float 1e+3",
+   "yaml": "v: 1e+3\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "str",
+       "1e+3"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "float 6.02e+23",
+   "yaml": "v: 6.02e+23\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "float",
+       "6.02e+23"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "float 1_000.5",
+   "yaml": "v: 1_000.5\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "float",
+       "1000.5"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "float .inf",
+   "yaml": "v: .inf\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "float",
+       "inf"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "float -.Inf",
+   "yaml": "v: -.Inf\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "float",
+       "-inf"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "float +.INF",
+   "yaml": "v: +.INF\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "float",
+       "inf"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "float .nan",
+   "yaml": "v: .nan\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "float",
+       "nan"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "float .NaN",
+   "yaml": "v: .NaN\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "float",
+       "nan"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "float NaN",
+   "yaml": "v: NaN\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "str",
+       "NaN"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "float inf",
+   "yaml": "v: inf\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "str",
+       "inf"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "float 1:30.5",
+   "yaml": "v: 1:30.5\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "float",
+       "90.5"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "float 0.1",
+   "yaml": "v: 0.1\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "float",
+       "0.1"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "float 100.0",
+   "yaml": "v: 100.0\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "float",
+       "100.0"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "float 1.23456789012345678",
+   "yaml": "v: 1.23456789012345678\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "float",
+       "1.2345678901234567"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "float 3.0000000000000004",
+   "yaml": "v: 3.0000000000000004\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "float",
+       "3.0000000000000004"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "float 1e-7",
+   "yaml": "v: 1e-7\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "str",
+       "1e-7"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "float 0.0000001",
+   "yaml": "v: 0.0000001\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "float",
+       "1e-07"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "float .",
+   "yaml": "v: .\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "str",
+       "."
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "timestamp 2002-12-14",
+   "yaml": "v: 2002-12-14\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "date",
+       "2002-12-14"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "timestamp 2001-12-14t21:59:43.10-05:00",
+   "yaml": "v: 2001-12-14t21:59:43.10-05:00\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "datetime",
+       "2001-12-14T21:59:43.100000-05:00"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "timestamp 2001-12-14 21:59:43.10 -5",
+   "yaml": "v: 2001-12-14 21:59:43.10 -5\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "datetime",
+       "2001-12-14T21:59:43.100000-05:00"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "timestamp 2001-12-14T21:59:43Z",
+   "yaml": "v: 2001-12-14T21:59:43Z\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "datetime",
+       "2001-12-14T21:59:43+00:00"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "timestamp 2001-12-15 2:59:43.10",
+   "yaml": "v: 2001-12-15 2:59:43.10\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "datetime",
+       "2001-12-15T02:59:43.100000"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "timestamp 2026-11-14T17:42:05.863280+00:00",
+   "yaml": "v: 2026-11-14T17:42:05.863280+00:00\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "datetime",
+       "2026-11-14T17:42:05.863280+00:00"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "timestamp 2026-6-6",
+   "yaml": "v: 2026-6-6\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "str",
+       "2026-6-6"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "timestamp 2026-06-06T19:42:30.014344+00:00",
+   "yaml": "v: 2026-06-06T19:42:30.014344+00:00\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "datetime",
+       "2026-06-06T19:42:30.014344+00:00"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "timestamp '2002-12-14'",
+   "yaml": "v: '2002-12-14'\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "str",
+       "2002-12-14"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "timestamp 2002-13-45",
+   "yaml": "v: 2002-13-45\n",
+   "error": {
+    "type": "ValueError",
+    "message": "month must be in 1..12, not 13"
+   },
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "str hello world",
+   "yaml": "v: hello world\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "str",
+       "hello world"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "str 'single ''quoted'''",
+   "yaml": "v: 'single ''quoted'''\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "str",
+       "single 'quoted'"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "str \"double \\\"quoted\\\"\"",
+   "yaml": "v: \"double \\\"quoted\\\"\"\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "str",
+       "double \"quoted\""
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "str \"tab\\there\"",
+   "yaml": "v: \"tab\\there\"\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "str",
+       "tab\there"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "str \"\\u00e9\\U0001F600\"",
+   "yaml": "v: \"\\u00e9\\U0001F600\"\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "str",
+       "é😀"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "str '\\n stays'",
+   "yaml": "v: '\\n stays'\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "str",
+       "\\n stays"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "str \"a\\\nb\"",
+   "yaml": "v: \"a\\\nb\"\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "str",
+       "ab"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "str light.turn_on",
+   "yaml": "v: light.turn_on\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "str",
+       "light.turn_on"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "str binary_sensor.hallway_motion",
+   "yaml": "v: binary_sensor.hallway_motion\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "str",
+       "binary_sensor.hallway_motion"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "str mdi:lightbulb",
+   "yaml": "v: mdi:lightbulb\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "str",
+       "mdi:lightbulb"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "str a: b",
+   "yaml": "v: a: b\n",
+   "error": {
+    "type": "HomeAssistantError",
+    "message": "mapping values are not allowed here\n  in \"<unicode string>\", line 1, column 5:\n    v: a: b\n        ^"
+   },
+   "c_and_python_agree": true,
+   "logs": [
+    "ERROR annotatedyaml.loader: mapping values are not allowed here\n  in \"<unicode string>\", line 1, column 5:\n    v: a: b\n        ^"
+   ]
+  },
+  {
+   "name": "str 'a: b'",
+   "yaml": "v: 'a: b'\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "str",
+       "a: b"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "str -1-",
+   "yaml": "v: -1-\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "str",
+       "-1-"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "str - not a list",
+   "yaml": "v: - not a list\n",
+   "error": {
+    "type": "HomeAssistantError",
+    "message": "sequence entries are not allowed here\n  in \"<unicode string>\", line 1, column 4:\n    v: - not a list\n       ^"
+   },
+   "c_and_python_agree": true,
+   "logs": [
+    "ERROR annotatedyaml.loader: sequence entries are not allowed here\n  in \"<unicode string>\", line 1, column 4:\n    v: - not a list\n       ^"
+   ]
+  },
+  {
+   "name": "str #notcomment",
+   "yaml": "v: #notcomment\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "null",
+       null
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "str x #comment",
+   "yaml": "v: x #comment\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "str",
+       "x"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "str x#nocomment",
+   "yaml": "v: x#nocomment\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "str",
+       "x#nocomment"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "str @reserved",
+   "yaml": "v: @reserved\n",
+   "error": {
+    "type": "HomeAssistantError",
+    "message": "while scanning for the next token\nfound character '@' that cannot start any token\n  in \"<unicode string>\", line 1, column 4:\n    v: @reserved\n       ^"
+   },
+   "c_and_python_agree": true,
+   "logs": [
+    "ERROR annotatedyaml.loader: while scanning for the next token\nfound character '@' that cannot start any token\n  in \"<unicode string>\", line 1, column 4:\n    v: @reserved\n       ^"
+   ]
+  },
+  {
+   "name": "str `reserved",
+   "yaml": "v: `reserved\n",
+   "error": {
+    "type": "HomeAssistantError",
+    "message": "while scanning for the next token\nfound character '`' that cannot start any token\n  in \"<unicode string>\", line 1, column 4:\n    v: `reserved\n       ^"
+   },
+   "c_and_python_agree": true,
+   "logs": [
+    "ERROR annotatedyaml.loader: while scanning for the next token\nfound character '`' that cannot start any token\n  in \"<unicode string>\", line 1, column 4:\n    v: `reserved\n       ^"
+   ]
+  },
+  {
+   "name": "str %",
+   "yaml": "v: %\n",
+   "error": {
+    "type": "HomeAssistantError",
+    "message": "while scanning for the next token\nfound character '%' that cannot start any token\n  in \"<unicode string>\", line 1, column 4:\n    v: %\n       ^"
+   },
+   "c_and_python_agree": true,
+   "logs": [
+    "ERROR annotatedyaml.loader: while scanning for the next token\nfound character '%' that cannot start any token\n  in \"<unicode string>\", line 1, column 4:\n    v: %\n       ^"
+   ]
+  },
+  {
+   "name": "str !!str 123",
+   "yaml": "v: !!str 123\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "str",
+       "123"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "str !!str",
+   "yaml": "v: !!str\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "str",
+       ""
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "str Ünïcödé ✓",
+   "yaml": "v: Ünïcödé ✓\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "str",
+       "Ünïcödé ✓"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "str '😀'",
+   "yaml": "v: '😀'\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "str",
+       "😀"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "str <<",
+   "yaml": "v: <<\n",
+   "error": {
+    "type": "HomeAssistantError",
+    "message": "could not determine a constructor for the tag 'tag:yaml.org,2002:merge'\n  in \"<unicode string>\", line 1, column 4:\n    v: <<\n       ^"
+   },
+   "c_and_python_agree": true,
+   "logs": [
+    "ERROR annotatedyaml.loader: could not determine a constructor for the tag 'tag:yaml.org,2002:merge'\n  in \"<unicode string>\", line 1, column 4:\n    v: <<\n       ^"
+   ]
+  },
+  {
+   "name": "str =",
+   "yaml": "v: =\n",
+   "error": {
+    "type": "HomeAssistantError",
+    "message": "could not determine a constructor for the tag 'tag:yaml.org,2002:value'\n  in \"<unicode string>\", line 1, column 4:\n    v: =\n       ^"
+   },
+   "c_and_python_agree": true,
+   "logs": [
+    "ERROR annotatedyaml.loader: could not determine a constructor for the tag 'tag:yaml.org,2002:value'\n  in \"<unicode string>\", line 1, column 4:\n    v: =\n       ^"
+   ]
+  },
+  {
+   "name": "str ''",
+   "yaml": "v: ''\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "str",
+       ""
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "str \"\"",
+   "yaml": "v: \"\"\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "str",
+       ""
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "block literal |",
+   "yaml": "v: |\n  line one\n  line two\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "str",
+       "line one\nline two\n"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "block literal |-",
+   "yaml": "v: |-\n  line one\n  line two\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "str",
+       "line one\nline two"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "block literal |+",
+   "yaml": "v: |+\n  line one\n  line two\n\n\nw: 1\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "str",
+       "line one\nline two\n\n\n"
+      ]
+     ],
+     [
+      [
+       "str",
+       "w"
+      ],
+      [
+       "int",
+       "1"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "block folded >",
+   "yaml": "v: >\n  folded line\n  continues here\n\n  new para\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "str",
+       "folded line continues here\nnew para\n"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "block folded >-",
+   "yaml": "v: >-\n  a\n  b\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "str",
+       "a b"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "block literal indent indicator",
+   "yaml": "v: |2\n    indented\n  base\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "str",
+       "  indented\nbase\n"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "plain multi-line folding (HA's description wrap)",
+   "yaml": "description: Turn on hallway lights when motion is detected below 30 lux, using dim\n  overnight and gentle morning levels, then turn them off after 5 minutes with no\n  motion.\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "description"
+      ],
+      [
+       "str",
+       "Turn on hallway lights when motion is detected below 30 lux, using dim overnight and gentle morning levels, then turn them off after 5 minutes with no motion."
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "single-quoted multi-line",
+   "yaml": "v: 'one\n  two\n\n  three'\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "str",
+       "one two\nthree"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "double-quoted multi-line with escaped newline",
+   "yaml": "v: \"one\\n\n  two\"\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "str",
+       "one\n two"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "key on (bool key)",
+   "yaml": "on: x\nyes: y\nnull: z\n1: one\n1.5: f\n2002-12-14: d\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "bool",
+       true
+      ],
+      [
+       "str",
+       "one"
+      ]
+     ],
+     [
+      [
+       "null",
+       null
+      ],
+      [
+       "str",
+       "z"
+      ]
+     ],
+     [
+      [
+       "float",
+       "1.5"
+      ],
+      [
+       "str",
+       "f"
+      ]
+     ],
+     [
+      [
+       "date",
+       "2002-12-14"
+      ],
+      [
+       "str",
+       "d"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": [
+    "WARNING annotatedyaml.constructors: YAML file  contains duplicate key \"True\". Check lines 0 and 1",
+    "WARNING annotatedyaml.constructors: YAML file  contains duplicate key \"1\". Check lines 1 and 3",
+    "WARNING annotatedyaml.constructors: YAML file  contains duplicate key \"True\". Check lines 0 and 1",
+    "WARNING annotatedyaml.constructors: YAML file  contains duplicate key \"1\". Check lines 1 and 3"
+   ]
+  },
+  {
+   "name": "key quoted 'on'",
+   "yaml": "'on': x\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "on"
+      ],
+      [
+       "str",
+       "x"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "key duplicate (last wins, warning)",
+   "yaml": "a: 1\nb: 2\na: 3\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "a"
+      ],
+      [
+       "int",
+       "3"
+      ]
+     ],
+     [
+      [
+       "str",
+       "b"
+      ],
+      [
+       "int",
+       "2"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": [
+    "WARNING annotatedyaml.constructors: YAML file  contains duplicate key \"a\". Check lines 0 and 2",
+    "WARNING annotatedyaml.constructors: YAML file  contains duplicate key \"a\". Check lines 0 and 2"
+   ]
+  },
+  {
+   "name": "key complex ? seq (unhashable)",
+   "yaml": "? [a, b]\n: v\n",
+   "error": {
+    "type": "HomeAssistantError",
+    "message": "invalid key: \"['a', 'b']\"\n  in \"\", line 1, column 0"
+   },
+   "c_and_python_agree": true,
+   "logs": [
+    "ERROR annotatedyaml.loader: invalid key: \"['a', 'b']\"\n  in \"\", line 1, column 0"
+   ]
+  },
+  {
+   "name": "key empty",
+   "yaml": ": v\n",
+   "error": {
+    "type": "HomeAssistantError",
+    "message": "while parsing a block mapping\nexpected <block end>, but found ':'\n  in \"<unicode string>\", line 1, column 1:\n    : v\n    ^"
+   },
+   "c_and_python_agree": true,
+   "logs": [
+    "ERROR annotatedyaml.loader: while parsing a block mapping\nexpected <block end>, but found ':'\n  in \"<unicode string>\", line 1, column 1:\n    : v\n    ^"
+   ]
+  },
+  {
+   "name": "key 'to' with on value",
+   "yaml": "to: on\nfrom: off\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "to"
+      ],
+      [
+       "bool",
+       true
+      ]
+     ],
+     [
+      [
+       "str",
+       "from"
+      ],
+      [
+       "bool",
+       false
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "flow seq",
+   "yaml": "v: [1, 'a', on, ~, 1.5]\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "seq",
+       [
+        [
+         "int",
+         "1"
+        ],
+        [
+         "str",
+         "a"
+        ],
+        [
+         "bool",
+         true
+        ],
+        [
+         "null",
+         null
+        ],
+        [
+         "float",
+         "1.5"
+        ]
+       ]
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "flow map",
+   "yaml": "v: {a: 1, b: [x, y]}\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "map",
+       [
+        [
+         [
+          "str",
+          "a"
+         ],
+         [
+          "int",
+          "1"
+         ]
+        ],
+        [
+         [
+          "str",
+          "b"
+         ],
+         [
+          "seq",
+          [
+           [
+            "str",
+            "x"
+           ],
+           [
+            "str",
+            "y"
+           ]
+          ]
+         ]
+        ]
+       ]
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "block seq not indented",
+   "yaml": "v:\n- a\n- b\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "seq",
+       [
+        [
+         "str",
+         "a"
+        ],
+        [
+         "str",
+         "b"
+        ]
+       ]
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "block seq indented",
+   "yaml": "v:\n  - a\n  - b\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "seq",
+       [
+        [
+         "str",
+         "a"
+        ],
+        [
+         "str",
+         "b"
+        ]
+       ]
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "empty flow",
+   "yaml": "a: []\nb: {}\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "a"
+      ],
+      [
+       "seq",
+       []
+      ]
+     ],
+     [
+      [
+       "str",
+       "b"
+      ],
+      [
+       "map",
+       []
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "nested seq of seq",
+   "yaml": "- - a\n  - b\n- - c\n",
+   "value": [
+    "seq",
+    [
+     [
+      "seq",
+      [
+       [
+        "str",
+        "a"
+       ],
+       [
+        "str",
+        "b"
+       ]
+      ]
+     ],
+     [
+      "seq",
+      [
+       [
+        "str",
+        "c"
+       ]
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeListClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "anchor + alias",
+   "yaml": "base: &b {x: 1}\nother: *b\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "base"
+      ],
+      [
+       "map",
+       [
+        [
+         [
+          "str",
+          "x"
+         ],
+         [
+          "int",
+          "1"
+         ]
+        ]
+       ]
+      ]
+     ],
+     [
+      [
+       "str",
+       "other"
+      ],
+      [
+       "map",
+       [
+        [
+         [
+          "str",
+          "x"
+         ],
+         [
+          "int",
+          "1"
+         ]
+        ]
+       ]
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "merge key <<",
+   "yaml": "base: &b {x: 1, y: 2}\nother:\n  <<: *b\n  y: 3\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "base"
+      ],
+      [
+       "map",
+       [
+        [
+         [
+          "str",
+          "x"
+         ],
+         [
+          "int",
+          "1"
+         ]
+        ],
+        [
+         [
+          "str",
+          "y"
+         ],
+         [
+          "int",
+          "2"
+         ]
+        ]
+       ]
+      ]
+     ],
+     [
+      [
+       "str",
+       "other"
+      ],
+      [
+       "map",
+       [
+        [
+         [
+          "str",
+          "x"
+         ],
+         [
+          "int",
+          "1"
+         ]
+        ],
+        [
+         [
+          "str",
+          "y"
+         ],
+         [
+          "int",
+          "3"
+         ]
+        ]
+       ]
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": [
+    "WARNING annotatedyaml.constructors: YAML file  contains duplicate key \"y\". Check lines 0 and 3",
+    "WARNING annotatedyaml.constructors: YAML file  contains duplicate key \"y\". Check lines 0 and 3"
+   ]
+  },
+  {
+   "name": "merge key list",
+   "yaml": "a: &a {x: 1}\nb: &b {y: 2}\nc:\n  <<: [*a, *b]\n  z: 3\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "a"
+      ],
+      [
+       "map",
+       [
+        [
+         [
+          "str",
+          "x"
+         ],
+         [
+          "int",
+          "1"
+         ]
+        ]
+       ]
+      ]
+     ],
+     [
+      [
+       "str",
+       "b"
+      ],
+      [
+       "map",
+       [
+        [
+         [
+          "str",
+          "y"
+         ],
+         [
+          "int",
+          "2"
+         ]
+        ]
+       ]
+      ]
+     ],
+     [
+      [
+       "str",
+       "c"
+      ],
+      [
+       "map",
+       [
+        [
+         [
+          "str",
+          "y"
+         ],
+         [
+          "int",
+          "2"
+         ]
+        ],
+        [
+         [
+          "str",
+          "x"
+         ],
+         [
+          "int",
+          "1"
+         ]
+        ],
+        [
+         [
+          "str",
+          "z"
+         ],
+         [
+          "int",
+          "3"
+         ]
+        ]
+       ]
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "explicit !!set",
+   "yaml": "v: !!set {a, b}\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "set",
+       [
+        [
+         "str",
+         "a"
+        ],
+        [
+         "str",
+         "b"
+        ]
+       ]
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "explicit !!omap",
+   "yaml": "v: !!omap [a: 1, b: 2]\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "seq",
+       [
+        [
+         "tuple",
+         [
+          [
+           "str",
+           "a"
+          ],
+          [
+           "int",
+           "1"
+          ]
+         ]
+        ],
+        [
+         "tuple",
+         [
+          [
+           "str",
+           "b"
+          ],
+          [
+           "int",
+           "2"
+          ]
+         ]
+        ]
+       ]
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "explicit !!pairs",
+   "yaml": "v: !!pairs [a: 1, a: 2]\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "seq",
+       [
+        [
+         "tuple",
+         [
+          [
+           "str",
+           "a"
+          ],
+          [
+           "int",
+           "1"
+          ]
+         ]
+        ],
+        [
+         "tuple",
+         [
+          [
+           "str",
+           "a"
+          ],
+          [
+           "int",
+           "2"
+          ]
+         ]
+        ]
+       ]
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "explicit !!binary",
+   "yaml": "v: !!binary aGVsbG8=\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "bytes",
+       "aGVsbG8="
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "explicit !!int on quoted",
+   "yaml": "v: !!int \"12\"\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "int",
+       "12"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "explicit !!float on int",
+   "yaml": "v: !!float 1\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "float",
+       "1.0"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "explicit !!timestamp",
+   "yaml": "v: !!timestamp 2002-12-14\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "date",
+       "2002-12-14"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "explicit !!map",
+   "yaml": "v: !!map {a: 1}\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "map",
+       [
+        [
+         [
+          "str",
+          "a"
+         ],
+         [
+          "int",
+          "1"
+         ]
+        ]
+       ]
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "explicit !!seq",
+   "yaml": "v: !!seq [a]\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "seq",
+       [
+        [
+         "str",
+         "a"
+        ]
+       ]
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "empty document",
+   "yaml": "",
+   "value": [
+    "null",
+    null
+   ],
+   "pyclass": "NoneType",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "only comment",
+   "yaml": "# nothing\n",
+   "value": [
+    "null",
+    null
+   ],
+   "pyclass": "NoneType",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "explicit start ---",
+   "yaml": "---\na: 1\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "a"
+      ],
+      [
+       "int",
+       "1"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "explicit end ...",
+   "yaml": "a: 1\n...\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "a"
+      ],
+      [
+       "int",
+       "1"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "top-level scalar",
+   "yaml": "hello\n",
+   "value": [
+    "str",
+    "hello"
+   ],
+   "pyclass": "NodeStrClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "top-level seq",
+   "yaml": "- 1\n- 2\n",
+   "value": [
+    "seq",
+    [
+     [
+      "int",
+      "1"
+     ],
+     [
+      "int",
+      "2"
+     ]
+    ]
+   ],
+   "pyclass": "NodeListClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "two documents (error)",
+   "yaml": "a: 1\n---\nb: 2\n",
+   "error": {
+    "type": "HomeAssistantError",
+    "message": "expected a single document in the stream\n  in \"<unicode string>\", line 1, column 1:\n    a: 1\n    ^\nbut found another document\n  in \"<unicode string>\", line 2, column 1:\n    ---\n    ^"
+   },
+   "c_and_python_agree": true,
+   "logs": [
+    "ERROR annotatedyaml.loader: expected a single document in the stream\n  in \"<unicode string>\", line 1, column 1:\n    a: 1\n    ^\nbut found another document\n  in \"<unicode string>\", line 2, column 1:\n    ---\n    ^"
+   ]
+  },
+  {
+   "name": "BOM",
+   "yaml": "﻿a: 1\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "a"
+      ],
+      [
+       "int",
+       "1"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "CRLF line endings",
+   "yaml": "a: 1\r\nb: two\r\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "a"
+      ],
+      [
+       "int",
+       "1"
+      ]
+     ],
+     [
+      [
+       "str",
+       "b"
+      ],
+      [
+       "str",
+       "two"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "tab indentation (error)",
+   "yaml": "a:\n\tb: 1\n",
+   "error": {
+    "type": "HomeAssistantError",
+    "message": "while scanning for the next token\nfound character '\\t' that cannot start any token\n  in \"<unicode string>\", line 2, column 1:\n    \tb: 1\n    ^"
+   },
+   "c_and_python_agree": true,
+   "logs": [
+    "ERROR annotatedyaml.loader: while scanning for the next token\nfound character '\\t' that cannot start any token\n  in \"<unicode string>\", line 2, column 1:\n    \tb: 1\n    ^"
+   ]
+  },
+  {
+   "name": "tab in value",
+   "yaml": "a: x\ty\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "a"
+      ],
+      [
+       "str",
+       "x\ty"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": false,
+   "logs": [],
+   "python_loader": {
+    "error": {
+     "type": "ScannerError",
+     "message": "while scanning for the next token\nfound character '\\t' that cannot start any token\n  in \"<file>\", line 1, column 5"
+    }
+   }
+  },
+  {
+   "name": "bad indentation (error)",
+   "yaml": "a:\n  b: 1\n c: 2\n",
+   "error": {
+    "type": "HomeAssistantError",
+    "message": "while parsing a block mapping\n  in \"<unicode string>\", line 1, column 1:\n    a:\n    ^\nexpected <block end>, but found '<block mapping start>'\n  in \"<unicode string>\", line 3, column 2:\n     c: 2\n     ^"
+   },
+   "c_and_python_agree": true,
+   "logs": [
+    "ERROR annotatedyaml.loader: while parsing a block mapping\n  in \"<unicode string>\", line 1, column 1:\n    a:\n    ^\nexpected <block end>, but found '<block mapping start>'\n  in \"<unicode string>\", line 3, column 2:\n     c: 2\n     ^"
+   ]
+  },
+  {
+   "name": "unclosed quote (error)",
+   "yaml": "a: 'x\n",
+   "error": {
+    "type": "HomeAssistantError",
+    "message": "while scanning a quoted scalar\n  in \"<unicode string>\", line 1, column 4:\n    a: 'x\n       ^\nfound unexpected end of stream\n  in \"<unicode string>\", line 2, column 1:\n    \n    ^"
+   },
+   "c_and_python_agree": true,
+   "logs": [
+    "ERROR annotatedyaml.loader: while scanning a quoted scalar\n  in \"<unicode string>\", line 1, column 4:\n    a: 'x\n       ^\nfound unexpected end of stream\n  in \"<unicode string>\", line 2, column 1:\n    \n    ^"
+   ]
+  },
+  {
+   "name": "unknown tag !foo (error)",
+   "yaml": "a: !foo bar\n",
+   "error": {
+    "type": "HomeAssistantError",
+    "message": "could not determine a constructor for the tag '!foo'\n  in \"<unicode string>\", line 1, column 4:\n    a: !foo bar\n       ^"
+   },
+   "c_and_python_agree": true,
+   "logs": [
+    "ERROR annotatedyaml.loader: could not determine a constructor for the tag '!foo'\n  in \"<unicode string>\", line 1, column 4:\n    a: !foo bar\n       ^"
+   ]
+  },
+  {
+   "name": "python tag (error under SafeLoader)",
+   "yaml": "a: !!python/name:os.system\n",
+   "error": {
+    "type": "HomeAssistantError",
+    "message": "could not determine a constructor for the tag 'tag:yaml.org,2002:python/name:os.system'\n  in \"<unicode string>\", line 1, column 4:\n    a: !!python/name:os.system\n       ^"
+   },
+   "c_and_python_agree": true,
+   "logs": [
+    "ERROR annotatedyaml.loader: could not determine a constructor for the tag 'tag:yaml.org,2002:python/name:os.system'\n  in \"<unicode string>\", line 1, column 4:\n    a: !!python/name:os.system\n       ^"
+   ]
+  },
+  {
+   "name": "trailing spaces",
+   "yaml": "a: x   \n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "a"
+      ],
+      [
+       "str",
+       "x"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "very long line",
+   "yaml": "a: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "a"
+      ],
+      [
+       "str",
+       "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "!input",
+   "yaml": "v: !input motion_entity\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "input",
+       "motion_entity"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "!include no argument (error)",
+   "yaml": "v: !include\n",
+   "error": {
+    "type": "HomeAssistantError",
+    "message": "  in \"<unicode string>\", line 1, column 4: !include needs an argument."
+   },
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "!secret without secrets (parse_yaml has none: error)",
+   "yaml": "v: !secret some_password\n",
+   "error": {
+    "type": "HomeAssistantError",
+    "message": "Secrets not supported in this YAML file"
+   },
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "!env_var set",
+   "yaml": "v: !env_var HARS_TEST_ENV\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "str",
+       "from env"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "!env_var unset with default",
+   "yaml": "v: !env_var HARS_TEST_UNSET default value here\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "str",
+       "default value here"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "!env_var unset no default (error)",
+   "yaml": "v: !env_var HARS_TEST_UNSET\n",
+   "error": {
+    "type": "HomeAssistantError",
+    "message": "HARS_TEST_UNSET"
+   },
+   "c_and_python_agree": true,
+   "logs": [
+    "ERROR annotatedyaml.loader: Environment variable HARS_TEST_UNSET not defined",
+    "ERROR annotatedyaml.loader: Environment variable HARS_TEST_UNSET not defined"
+   ]
+  },
+  {
+   "name": "!env_var value looks like int (stays str)",
+   "yaml": "v: !env_var HARS_TEST_ENV_INT\n",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "v"
+      ],
+      [
+       "str",
+       "8123"
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeDictClass",
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "!env_var on a mapping node (error)",
+   "yaml": "v: !env_var {a: 1}\n",
+   "error": {
+    "type": "AttributeError",
+    "message": "'list' object has no attribute 'split'"
+   },
+   "c_and_python_agree": true,
+   "logs": []
+  },
+  {
+   "name": "!include list file",
+   "files": {
+    "configuration.yaml": "automation: !include automations.yaml\n",
+    "automations.yaml": "- id: a\n  alias: A\n"
+   },
+   "entry": "configuration.yaml",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "automation"
+      ],
+      [
+       "seq",
+       [
+        [
+         "map",
+         [
+          [
+           [
+            "str",
+            "id"
+           ],
+           [
+            "str",
+            "a"
+           ]
+          ],
+          [
+           [
+            "str",
+            "alias"
+           ],
+           [
+            "str",
+            "A"
+           ]
+          ]
+         ]
+        ]
+       ]
+      ]
+     ]
+    ]
+   ],
+   "logs": []
+  },
+  {
+   "name": "!include empty file -> {}",
+   "files": {
+    "configuration.yaml": "scene: !include scenes.yaml\n",
+    "scenes.yaml": ""
+   },
+   "entry": "configuration.yaml",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "scene"
+      ],
+      [
+       "map",
+       []
+      ]
+     ]
+    ]
+   ],
+   "logs": []
+  },
+  {
+   "name": "!include file containing []",
+   "files": {
+    "configuration.yaml": "automation: !include a.yaml\n",
+    "a.yaml": "[]\n"
+   },
+   "entry": "configuration.yaml",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "automation"
+      ],
+      [
+       "seq",
+       []
+      ]
+     ]
+    ]
+   ],
+   "logs": []
+  },
+  {
+   "name": "!include missing file (error)",
+   "files": {
+    "configuration.yaml": "x: !include nope.yaml\n"
+   },
+   "entry": "configuration.yaml",
+   "error": {
+    "type": "HomeAssistantError",
+    "message": "  in \"<cfg>/configuration.yaml\", line 1, column 4: Unable to read file <cfg>/nope.yaml"
+   },
+   "logs": []
+  },
+  {
+   "name": "!include relative to including file",
+   "files": {
+    "configuration.yaml": "x: !include sub/a.yaml\n",
+    "sub/a.yaml": "y: !include b.yaml\n",
+    "sub/b.yaml": "z: 1\n"
+   },
+   "entry": "configuration.yaml",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "x"
+      ],
+      [
+       "map",
+       [
+        [
+         [
+          "str",
+          "y"
+         ],
+         [
+          "map",
+          [
+           [
+            [
+             "str",
+             "z"
+            ],
+            [
+             "int",
+             "1"
+            ]
+           ]
+          ]
+         ]
+        ]
+       ]
+      ]
+     ]
+    ]
+   ],
+   "logs": []
+  },
+  {
+   "name": "!include scalar file",
+   "files": {
+    "configuration.yaml": "x: !include s.yaml\n",
+    "s.yaml": "on\n"
+   },
+   "entry": "configuration.yaml",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "x"
+      ],
+      [
+       "bool",
+       true
+      ]
+     ]
+    ]
+   ],
+   "logs": []
+  },
+  {
+   "name": "!include_dir_merge_named missing dir -> {}",
+   "files": {
+    "configuration.yaml": "frontend:\n  themes: !include_dir_merge_named themes\n"
+   },
+   "entry": "configuration.yaml",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "frontend"
+      ],
+      [
+       "map",
+       [
+        [
+         [
+          "str",
+          "themes"
+         ],
+         [
+          "map",
+          []
+         ]
+        ]
+       ]
+      ]
+     ]
+    ]
+   ],
+   "logs": []
+  },
+  {
+   "name": "!include_dir_merge_named",
+   "files": {
+    "configuration.yaml": "t: !include_dir_merge_named themes\n",
+    "themes/b.yaml": "dark: {primary-color: black}\n",
+    "themes/a.yaml": "light: {primary-color: white}\n",
+    "themes/sub/c.yaml": "blue: {x: 1}\nlight: {overridden: true}\n",
+    "themes/.hidden.yaml": "hidden: 1\n",
+    "themes/notyaml.yml": "yml: 1\n",
+    "themes/list.yaml": "- ignored\n",
+    "themes/secrets.yaml": "s: 1\n"
+   },
+   "entry": "configuration.yaml",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "t"
+      ],
+      [
+       "map",
+       [
+        [
+         [
+          "str",
+          "light"
+         ],
+         [
+          "map",
+          [
+           [
+            [
+             "str",
+             "overridden"
+            ],
+            [
+             "bool",
+             true
+            ]
+           ]
+          ]
+         ]
+        ],
+        [
+         [
+          "str",
+          "dark"
+         ],
+         [
+          "map",
+          [
+           [
+            [
+             "str",
+             "primary-color"
+            ],
+            [
+             "str",
+             "black"
+            ]
+           ]
+          ]
+         ]
+        ],
+        [
+         [
+          "str",
+          "blue"
+         ],
+         [
+          "map",
+          [
+           [
+            [
+             "str",
+             "x"
+            ],
+            [
+             "int",
+             "1"
+            ]
+           ]
+          ]
+         ]
+        ]
+       ]
+      ]
+     ]
+    ]
+   ],
+   "logs": []
+  },
+  {
+   "name": "!include_dir_named",
+   "files": {
+    "configuration.yaml": "t: !include_dir_named d\n",
+    "d/one.yaml": "a: 1\n",
+    "d/two.yaml": "",
+    "d/three.yaml": "- x\n"
+   },
+   "entry": "configuration.yaml",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "t"
+      ],
+      [
+       "map",
+       [
+        [
+         [
+          "str",
+          "one"
+         ],
+         [
+          "map",
+          [
+           [
+            [
+             "str",
+             "a"
+            ],
+            [
+             "int",
+             "1"
+            ]
+           ]
+          ]
+         ]
+        ],
+        [
+         [
+          "str",
+          "three"
+         ],
+         [
+          "seq",
+          [
+           [
+            "str",
+            "x"
+           ]
+          ]
+         ]
+        ],
+        [
+         [
+          "str",
+          "two"
+         ],
+         [
+          "map",
+          []
+         ]
+        ]
+       ]
+      ]
+     ]
+    ]
+   ],
+   "logs": []
+  },
+  {
+   "name": "!include_dir_list",
+   "files": {
+    "configuration.yaml": "t: !include_dir_list d\n",
+    "d/b.yaml": "id: b\n",
+    "d/a.yaml": "id: a\n",
+    "d/empty.yaml": "",
+    "d/sub/c.yaml": "id: c\n"
+   },
+   "entry": "configuration.yaml",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "t"
+      ],
+      [
+       "seq",
+       [
+        [
+         "map",
+         [
+          [
+           [
+            "str",
+            "id"
+           ],
+           [
+            "str",
+            "a"
+           ]
+          ]
+         ]
+        ],
+        [
+         "map",
+         [
+          [
+           [
+            "str",
+            "id"
+           ],
+           [
+            "str",
+            "b"
+           ]
+          ]
+         ]
+        ],
+        [
+         "map",
+         [
+          [
+           [
+            "str",
+            "id"
+           ],
+           [
+            "str",
+            "c"
+           ]
+          ]
+         ]
+        ]
+       ]
+      ]
+     ]
+    ]
+   ],
+   "logs": []
+  },
+  {
+   "name": "!include_dir_merge_list",
+   "files": {
+    "configuration.yaml": "automation: !include_dir_merge_list d\n",
+    "d/b.yaml": "- id: b\n",
+    "d/a.yaml": "- id: a\n- id: a2\n",
+    "d/map.yaml": "id: ignored\n"
+   },
+   "entry": "configuration.yaml",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "automation"
+      ],
+      [
+       "seq",
+       [
+        [
+         "map",
+         [
+          [
+           [
+            "str",
+            "id"
+           ],
+           [
+            "str",
+            "a"
+           ]
+          ]
+         ]
+        ],
+        [
+         "map",
+         [
+          [
+           [
+            "str",
+            "id"
+           ],
+           [
+            "str",
+            "a2"
+           ]
+          ]
+         ]
+        ],
+        [
+         "map",
+         [
+          [
+           [
+            "str",
+            "id"
+           ],
+           [
+            "str",
+            "b"
+           ]
+          ]
+         ]
+        ]
+       ]
+      ]
+     ]
+    ]
+   ],
+   "logs": []
+  },
+  {
+   "name": "!secret from secrets.yaml",
+   "files": {
+    "configuration.yaml": "p: !secret some_password\n",
+    "secrets.yaml": "some_password: not-a-real-secret\n"
+   },
+   "entry": "configuration.yaml",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "p"
+      ],
+      [
+       "str",
+       "not-a-real-secret"
+      ]
+     ]
+    ]
+   ],
+   "logs": []
+  },
+  {
+   "name": "!secret int value keeps type",
+   "files": {
+    "configuration.yaml": "p: !secret port\n",
+    "secrets.yaml": "port: 8123\n"
+   },
+   "entry": "configuration.yaml",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "p"
+      ],
+      [
+       "int",
+       "8123"
+      ]
+     ]
+    ]
+   ],
+   "logs": []
+  },
+  {
+   "name": "!secret missing (error)",
+   "files": {
+    "configuration.yaml": "p: !secret nope\n",
+    "secrets.yaml": "a: b\n"
+   },
+   "entry": "configuration.yaml",
+   "error": {
+    "type": "HomeAssistantError",
+    "message": "Secret nope not defined"
+   },
+   "logs": []
+  },
+  {
+   "name": "!secret in included subdir file looks upward",
+   "files": {
+    "configuration.yaml": "x: !include pkg/a.yaml\n",
+    "pkg/a.yaml": "p: !secret top\n",
+    "secrets.yaml": "top: from-root\n"
+   },
+   "entry": "configuration.yaml",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "x"
+      ],
+      [
+       "map",
+       [
+        [
+         [
+          "str",
+          "p"
+         ],
+         [
+          "str",
+          "from-root"
+         ]
+        ]
+       ]
+      ]
+     ]
+    ]
+   ],
+   "logs": []
+  },
+  {
+   "name": "!secret subdir secrets.yaml wins",
+   "files": {
+    "configuration.yaml": "x: !include pkg/a.yaml\n",
+    "pkg/a.yaml": "p: !secret top\n",
+    "pkg/secrets.yaml": "top: from-pkg\n",
+    "secrets.yaml": "top: from-root\n"
+   },
+   "entry": "configuration.yaml",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "x"
+      ],
+      [
+       "map",
+       [
+        [
+         [
+          "str",
+          "p"
+         ],
+         [
+          "str",
+          "from-pkg"
+         ]
+        ]
+       ]
+      ]
+     ]
+    ]
+   ],
+   "logs": []
+  },
+  {
+   "name": "!secret in secrets.yaml itself (error)",
+   "files": {
+    "configuration.yaml": "p: !secret a\n",
+    "secrets.yaml": "a: !secret b\nb: c\n"
+   },
+   "entry": "configuration.yaml",
+   "error": {
+    "type": "HomeAssistantError",
+    "message": "Secrets not supported in this YAML file"
+   },
+   "logs": []
+  },
+  {
+   "name": "user automations.yaml",
+   "file": "input/automations.yaml",
+   "value": [
+    "seq",
+    [
+     [
+      "map",
+      [
+       [
+        [
+         "str",
+         "id"
+        ],
+        [
+         "str",
+         "hallway_motion_lights_on_when_dark"
+        ]
+       ],
+       [
+        [
+         "str",
+         "alias"
+        ],
+        [
+         "str",
+         "Hallway lights - motion on when dark"
+        ]
+       ],
+       [
+        [
+         "str",
+         "description"
+        ],
+        [
+         "str",
+         "Turn on hallway lights when motion is detected below 30 lux, using dim overnight and gentle morning levels, then turn them off after 5 minutes with no motion."
+        ]
+       ],
+       [
+        [
+         "str",
+         "mode"
+        ],
+        [
+         "str",
+         "restart"
+        ]
+       ],
+       [
+        [
+         "str",
+         "triggers"
+        ],
+        [
+         "seq",
+         [
+          [
+           "map",
+           [
+            [
+             [
+              "str",
+              "trigger"
+             ],
+             [
+              "str",
+              "state"
+             ]
+            ],
+            [
+             [
+              "str",
+              "entity_id"
+             ],
+             [
+              "str",
+              "binary_sensor.hallway_motion"
+             ]
+            ],
+            [
+             [
+              "str",
+              "to"
+             ],
+             [
+              "str",
+              "on"
+             ]
+            ],
+            [
+             [
+              "str",
+              "id"
+             ],
+             [
+              "str",
+              "motion"
+             ]
+            ]
+           ]
+          ],
+          [
+           "map",
+           [
+            [
+             [
+              "str",
+              "trigger"
+             ],
+             [
+              "str",
+              "numeric_state"
+             ]
+            ],
+            [
+             [
+              "str",
+              "entity_id"
+             ],
+             [
+              "str",
+              "sensor.hallway_illuminance"
+             ]
+            ],
+            [
+             [
+              "str",
+              "below"
+             ],
+             [
+              "int",
+              "30"
+             ]
+            ],
+            [
+             [
+              "str",
+              "id"
+             ],
+             [
+              "str",
+              "became_dark"
+             ]
+            ]
+           ]
+          ]
+         ]
+        ]
+       ],
+       [
+        [
+         "str",
+         "conditions"
+        ],
+        [
+         "seq",
+         [
+          [
+           "map",
+           [
+            [
+             [
+              "str",
+              "condition"
+             ],
+             [
+              "str",
+              "numeric_state"
+             ]
+            ],
+            [
+             [
+              "str",
+              "entity_id"
+             ],
+             [
+              "str",
+              "sensor.hallway_illuminance"
+             ]
+            ],
+            [
+             [
+              "str",
+              "below"
+             ],
+             [
+              "int",
+              "30"
+             ]
+            ]
+           ]
+          ],
+          [
+           "map",
+           [
+            [
+             [
+              "str",
+              "condition"
+             ],
+             [
+              "str",
+              "state"
+             ]
+            ],
+            [
+             [
+              "str",
+              "entity_id"
+             ],
+             [
+              "str",
+              "binary_sensor.hallway_motion"
+             ]
+            ],
+            [
+             [
+              "str",
+              "state"
+             ],
+             [
+              "str",
+              "on"
+             ]
+            ]
+           ]
+          ]
+         ]
+        ]
+       ],
+       [
+        [
+         "str",
+         "actions"
+        ],
+        [
+         "seq",
+         [
+          [
+           "map",
+           [
+            [
+             [
+              "str",
+              "choose"
+             ],
+             [
+              "seq",
+              [
+               [
+                "map",
+                [
+                 [
+                  [
+                   "str",
+                   "conditions"
+                  ],
+                  [
+                   "seq",
+                   [
+                    [
+                     "map",
+                     [
+                      [
+                       [
+                        "str",
+                        "condition"
+                       ],
+                       [
+                        "str",
+                        "time"
+                       ]
+                      ],
+                      [
+                       [
+                        "str",
+                        "after"
+                       ],
+                       [
+                        "str",
+                        "23:00:00"
+                       ]
+                      ],
+                      [
+                       [
+                        "str",
+                        "before"
+                       ],
+                       [
+                        "str",
+                        "06:30:00"
+                       ]
+                      ]
+                     ]
+                    ]
+                   ]
+                  ]
+                 ],
+                 [
+                  [
+                   "str",
+                   "sequence"
+                  ],
+                  [
+                   "seq",
+                   [
+                    [
+                     "map",
+                     [
+                      [
+                       [
+                        "str",
+                        "action"
+                       ],
+                       [
+                        "str",
+                        "light.turn_on"
+                       ]
+                      ],
+                      [
+                       [
+                        "str",
+                        "target"
+                       ],
+                       [
+                        "map",
+                        [
+                         [
+                          [
+                           "str",
+                           "entity_id"
+                          ],
+                          [
+                           "str",
+                           "light.hallway_hallway"
+                          ]
+                         ]
+                        ]
+                       ]
+                      ],
+                      [
+                       [
+                        "str",
+                        "data"
+                       ],
+                       [
+                        "map",
+                        [
+                         [
+                          [
+                           "str",
+                           "brightness_pct"
+                          ],
+                          [
+                           "int",
+                           "12"
+                          ]
+                         ],
+                         [
+                          [
+                           "str",
+                           "color_temp_kelvin"
+                          ],
+                          [
+                           "int",
+                           "2202"
+                          ]
+                         ],
+                         [
+                          [
+                           "str",
+                           "transition"
+                          ],
+                          [
+                           "int",
+                           "1"
+                          ]
+                         ]
+                        ]
+                       ]
+                      ]
+                     ]
+                    ]
+                   ]
+                  ]
+                 ]
+                ]
+               ],
+               [
+                "map",
+                [
+                 [
+                  [
+                   "str",
+                   "conditions"
+                  ],
+                  [
+                   "seq",
+                   [
+                    [
+                     "map",
+                     [
+                      [
+                       [
+                        "str",
+                        "condition"
+                       ],
+                       [
+                        "str",
+                        "time"
+                       ]
+                      ],
+                      [
+                       [
+                        "str",
+                        "after"
+                       ],
+                       [
+                        "str",
+                        "06:30:00"
+                       ]
+                      ],
+                      [
+                       [
+                        "str",
+                        "before"
+                       ],
+                       [
+                        "str",
+                        "09:30:00"
+                       ]
+                      ]
+                     ]
+                    ]
+                   ]
+                  ]
+                 ],
+                 [
+                  [
+                   "str",
+                   "sequence"
+                  ],
+                  [
+                   "seq",
+                   [
+                    [
+                     "map",
+                     [
+                      [
+                       [
+                        "str",
+                        "action"
+                       ],
+                       [
+                        "str",
+                        "light.turn_on"
+                       ]
+                      ],
+                      [
+                       [
+                        "str",
+                        "target"
+                       ],
+                       [
+                        "map",
+                        [
+                         [
+                          [
+                           "str",
+                           "entity_id"
+                          ],
+                          [
+                           "str",
+                           "light.hallway_hallway"
+                          ]
+                         ]
+                        ]
+                       ]
+                      ],
+                      [
+                       [
+                        "str",
+                        "data"
+                       ],
+                       [
+                        "map",
+                        [
+                         [
+                          [
+                           "str",
+                           "brightness_pct"
+                          ],
+                          [
+                           "int",
+                           "30"
+                          ]
+                         ],
+                         [
+                          [
+                           "str",
+                           "color_temp_kelvin"
+                          ],
+                          [
+                           "int",
+                           "2400"
+                          ]
+                         ],
+                         [
+                          [
+                           "str",
+                           "transition"
+                          ],
+                          [
+                           "int",
+                           "2"
+                          ]
+                         ]
+                        ]
+                       ]
+                      ]
+                     ]
+                    ]
+                   ]
+                  ]
+                 ]
+                ]
+               ]
+              ]
+             ]
+            ],
+            [
+             [
+              "str",
+              "default"
+             ],
+             [
+              "seq",
+              [
+               [
+                "map",
+                [
+                 [
+                  [
+                   "str",
+                   "action"
+                  ],
+                  [
+                   "str",
+                   "light.turn_on"
+                  ]
+                 ],
+                 [
+                  [
+                   "str",
+                   "target"
+                  ],
+                  [
+                   "map",
+                   [
+                    [
+                     [
+                      "str",
+                      "entity_id"
+                     ],
+                     [
+                      "str",
+                      "light.hallway_hallway"
+                     ]
+                    ]
+                   ]
+                  ]
+                 ],
+                 [
+                  [
+                   "str",
+                   "data"
+                  ],
+                  [
+                   "map",
+                   [
+                    [
+                     [
+                      "str",
+                      "brightness_pct"
+                     ],
+                     [
+                      "int",
+                      "35"
+                     ]
+                    ],
+                    [
+                     [
+                      "str",
+                      "color_temp_kelvin"
+                     ],
+                     [
+                      "int",
+                      "2700"
+                     ]
+                    ],
+                    [
+                     [
+                      "str",
+                      "transition"
+                     ],
+                     [
+                      "int",
+                      "2"
+                     ]
+                    ]
+                   ]
+                  ]
+                 ]
+                ]
+               ]
+              ]
+             ]
+            ]
+           ]
+          ],
+          [
+           "map",
+           [
+            [
+             [
+              "str",
+              "wait_for_trigger"
+             ],
+             [
+              "seq",
+              [
+               [
+                "map",
+                [
+                 [
+                  [
+                   "str",
+                   "trigger"
+                  ],
+                  [
+                   "str",
+                   "state"
+                  ]
+                 ],
+                 [
+                  [
+                   "str",
+                   "entity_id"
+                  ],
+                  [
+                   "str",
+                   "binary_sensor.hallway_motion"
+                  ]
+                 ],
+                 [
+                  [
+                   "str",
+                   "to"
+                  ],
+                  [
+                   "str",
+                   "off"
+                  ]
+                 ],
+                 [
+                  [
+                   "str",
+                   "for"
+                  ],
+                  [
+                   "map",
+                   [
+                    [
+                     [
+                      "str",
+                      "minutes"
+                     ],
+                     [
+                      "int",
+                      "5"
+                     ]
+                    ]
+                   ]
+                  ]
+                 ]
+                ]
+               ]
+              ]
+             ]
+            ]
+           ]
+          ],
+          [
+           "map",
+           [
+            [
+             [
+              "str",
+              "action"
+             ],
+             [
+              "str",
+              "light.turn_off"
+             ]
+            ],
+            [
+             [
+              "str",
+              "target"
+             ],
+             [
+              "map",
+              [
+               [
+                [
+                 "str",
+                 "entity_id"
+                ],
+                [
+                 "str",
+                 "light.hallway_hallway"
+                ]
+               ]
+              ]
+             ]
+            ],
+            [
+             [
+              "str",
+              "data"
+             ],
+             [
+              "map",
+              [
+               [
+                [
+                 "str",
+                 "transition"
+                ],
+                [
+                 "int",
+                 "10"
+                ]
+               ]
+              ]
+             ]
+            ]
+           ]
+          ]
+         ]
+        ]
+       ]
+      ]
+     ],
+     [
+      "map",
+      [
+       [
+        [
+         "str",
+         "id"
+        ],
+        [
+         "str",
+         "hallway_lights_adjust_brightness_for_time"
+        ]
+       ],
+       [
+        [
+         "str",
+         "alias"
+        ],
+        [
+         "str",
+         "Hallway lights - adjust brightness for time"
+        ]
+       ],
+       [
+        [
+         "str",
+         "description"
+        ],
+        [
+         "str",
+         "Adjust hallway light brightness at time-band boundaries if the lights are already on."
+        ]
+       ],
+       [
+        [
+         "str",
+         "mode"
+        ],
+        [
+         "str",
+         "single"
+        ]
+       ],
+       [
+        [
+         "str",
+         "triggers"
+        ],
+        [
+         "seq",
+         [
+          [
+           "map",
+           [
+            [
+             [
+              "str",
+              "trigger"
+             ],
+             [
+              "str",
+              "time"
+             ]
+            ],
+            [
+             [
+              "str",
+              "at"
+             ],
+             [
+              "str",
+              "23:00:00"
+             ]
+            ],
+            [
+             [
+              "str",
+              "id"
+             ],
+             [
+              "str",
+              "overnight"
+             ]
+            ]
+           ]
+          ],
+          [
+           "map",
+           [
+            [
+             [
+              "str",
+              "trigger"
+             ],
+             [
+              "str",
+              "time"
+             ]
+            ],
+            [
+             [
+              "str",
+              "at"
+             ],
+             [
+              "str",
+              "06:30:00"
+             ]
+            ],
+            [
+             [
+              "str",
+              "id"
+             ],
+             [
+              "str",
+              "morning"
+             ]
+            ]
+           ]
+          ],
+          [
+           "map",
+           [
+            [
+             [
+              "str",
+              "trigger"
+             ],
+             [
+              "str",
+              "time"
+             ]
+            ],
+            [
+             [
+              "str",
+              "at"
+             ],
+             [
+              "str",
+              "09:30:00"
+             ]
+            ],
+            [
+             [
+              "str",
+              "id"
+             ],
+             [
+              "str",
+              "normal"
+             ]
+            ]
+           ]
+          ]
+         ]
+        ]
+       ],
+       [
+        [
+         "str",
+         "conditions"
+        ],
+        [
+         "seq",
+         [
+          [
+           "map",
+           [
+            [
+             [
+              "str",
+              "condition"
+             ],
+             [
+              "str",
+              "state"
+             ]
+            ],
+            [
+             [
+              "str",
+              "entity_id"
+             ],
+             [
+              "str",
+              "light.hallway_hallway"
+             ]
+            ],
+            [
+             [
+              "str",
+              "state"
+             ],
+             [
+              "str",
+              "on"
+             ]
+            ]
+           ]
+          ]
+         ]
+        ]
+       ],
+       [
+        [
+         "str",
+         "actions"
+        ],
+        [
+         "seq",
+         [
+          [
+           "map",
+           [
+            [
+             [
+              "str",
+              "choose"
+             ],
+             [
+              "seq",
+              [
+               [
+                "map",
+                [
+                 [
+                  [
+                   "str",
+                   "conditions"
+                  ],
+                  [
+                   "seq",
+                   [
+                    [
+                     "map",
+                     [
+                      [
+                       [
+                        "str",
+                        "condition"
+                       ],
+                       [
+                        "str",
+                        "trigger"
+                       ]
+                      ],
+                      [
+                       [
+                        "str",
+                        "id"
+                       ],
+                       [
+                        "str",
+                        "overnight"
+                       ]
+                      ]
+                     ]
+                    ]
+                   ]
+                  ]
+                 ],
+                 [
+                  [
+                   "str",
+                   "sequence"
+                  ],
+                  [
+                   "seq",
+                   [
+                    [
+                     "map",
+                     [
+                      [
+                       [
+                        "str",
+                        "action"
+                       ],
+                       [
+                        "str",
+                        "light.turn_on"
+                       ]
+                      ],
+                      [
+                       [
+                        "str",
+                        "target"
+                       ],
+                       [
+                        "map",
+                        [
+                         [
+                          [
+                           "str",
+                           "entity_id"
+                          ],
+                          [
+                           "str",
+                           "light.hallway_hallway"
+                          ]
+                         ]
+                        ]
+                       ]
+                      ],
+                      [
+                       [
+                        "str",
+                        "data"
+                       ],
+                       [
+                        "map",
+                        [
+                         [
+                          [
+                           "str",
+                           "brightness_pct"
+                          ],
+                          [
+                           "int",
+                           "12"
+                          ]
+                         ],
+                         [
+                          [
+                           "str",
+                           "color_temp_kelvin"
+                          ],
+                          [
+                           "int",
+                           "2202"
+                          ]
+                         ],
+                         [
+                          [
+                           "str",
+                           "transition"
+                          ],
+                          [
+                           "int",
+                           "10"
+                          ]
+                         ]
+                        ]
+                       ]
+                      ]
+                     ]
+                    ]
+                   ]
+                  ]
+                 ]
+                ]
+               ],
+               [
+                "map",
+                [
+                 [
+                  [
+                   "str",
+                   "conditions"
+                  ],
+                  [
+                   "seq",
+                   [
+                    [
+                     "map",
+                     [
+                      [
+                       [
+                        "str",
+                        "condition"
+                       ],
+                       [
+                        "str",
+                        "trigger"
+                       ]
+                      ],
+                      [
+                       [
+                        "str",
+                        "id"
+                       ],
+                       [
+                        "str",
+                        "morning"
+                       ]
+                      ]
+                     ]
+                    ]
+                   ]
+                  ]
+                 ],
+                 [
+                  [
+                   "str",
+                   "sequence"
+                  ],
+                  [
+                   "seq",
+                   [
+                    [
+                     "map",
+                     [
+                      [
+                       [
+                        "str",
+                        "action"
+                       ],
+                       [
+                        "str",
+                        "light.turn_on"
+                       ]
+                      ],
+                      [
+                       [
+                        "str",
+                        "target"
+                       ],
+                       [
+                        "map",
+                        [
+                         [
+                          [
+                           "str",
+                           "entity_id"
+                          ],
+                          [
+                           "str",
+                           "light.hallway_hallway"
+                          ]
+                         ]
+                        ]
+                       ]
+                      ],
+                      [
+                       [
+                        "str",
+                        "data"
+                       ],
+                       [
+                        "map",
+                        [
+                         [
+                          [
+                           "str",
+                           "brightness_pct"
+                          ],
+                          [
+                           "int",
+                           "30"
+                          ]
+                         ],
+                         [
+                          [
+                           "str",
+                           "color_temp_kelvin"
+                          ],
+                          [
+                           "int",
+                           "2400"
+                          ]
+                         ],
+                         [
+                          [
+                           "str",
+                           "transition"
+                          ],
+                          [
+                           "int",
+                           "10"
+                          ]
+                         ]
+                        ]
+                       ]
+                      ]
+                     ]
+                    ]
+                   ]
+                  ]
+                 ]
+                ]
+               ],
+               [
+                "map",
+                [
+                 [
+                  [
+                   "str",
+                   "conditions"
+                  ],
+                  [
+                   "seq",
+                   [
+                    [
+                     "map",
+                     [
+                      [
+                       [
+                        "str",
+                        "condition"
+                       ],
+                       [
+                        "str",
+                        "trigger"
+                       ]
+                      ],
+                      [
+                       [
+                        "str",
+                        "id"
+                       ],
+                       [
+                        "str",
+                        "normal"
+                       ]
+                      ]
+                     ]
+                    ]
+                   ]
+                  ]
+                 ],
+                 [
+                  [
+                   "str",
+                   "sequence"
+                  ],
+                  [
+                   "seq",
+                   [
+                    [
+                     "map",
+                     [
+                      [
+                       [
+                        "str",
+                        "action"
+                       ],
+                       [
+                        "str",
+                        "light.turn_on"
+                       ]
+                      ],
+                      [
+                       [
+                        "str",
+                        "target"
+                       ],
+                       [
+                        "map",
+                        [
+                         [
+                          [
+                           "str",
+                           "entity_id"
+                          ],
+                          [
+                           "str",
+                           "light.hallway_hallway"
+                          ]
+                         ]
+                        ]
+                       ]
+                      ],
+                      [
+                       [
+                        "str",
+                        "data"
+                       ],
+                       [
+                        "map",
+                        [
+                         [
+                          [
+                           "str",
+                           "brightness_pct"
+                          ],
+                          [
+                           "int",
+                           "35"
+                          ]
+                         ],
+                         [
+                          [
+                           "str",
+                           "color_temp_kelvin"
+                          ],
+                          [
+                           "int",
+                           "2700"
+                          ]
+                         ],
+                         [
+                          [
+                           "str",
+                           "transition"
+                          ],
+                          [
+                           "int",
+                           "10"
+                          ]
+                         ]
+                        ]
+                       ]
+                      ]
+                     ]
+                    ]
+                   ]
+                  ]
+                 ]
+                ]
+               ]
+              ]
+             ]
+            ]
+           ]
+          ]
+         ]
+        ]
+       ]
+      ]
+     ],
+     [
+      "map",
+      [
+       [
+        [
+         "str",
+         "id"
+        ],
+        [
+         "str",
+         "living_room_lifx_on_when_dark_after_10"
+        ]
+       ],
+       [
+        [
+         "str",
+         "alias"
+        ],
+        [
+         "str",
+         "Kitchen lights - on when dark after 10am"
+        ]
+       ],
+       [
+        [
+         "str",
+         "description"
+        ],
+        [
+         "str",
+         "Turn on the kitchen light and softer lamp when it becomes dark after 10am and before the 11:30pm shutoff."
+        ]
+       ],
+       [
+        [
+         "str",
+         "mode"
+        ],
+        [
+         "str",
+         "single"
+        ]
+       ],
+       [
+        [
+         "str",
+         "triggers"
+        ],
+        [
+         "seq",
+         [
+          [
+           "map",
+           [
+            [
+             [
+              "str",
+              "trigger"
+             ],
+             [
+              "str",
+              "state"
+             ]
+            ],
+            [
+             [
+              "str",
+              "entity_id"
+             ],
+             [
+              "str",
+              "sun.sun"
+             ]
+            ],
+            [
+             [
+              "str",
+              "to"
+             ],
+             [
+              "str",
+              "below_horizon"
+             ]
+            ]
+           ]
+          ],
+          [
+           "map",
+           [
+            [
+             [
+              "str",
+              "trigger"
+             ],
+             [
+              "str",
+              "time"
+             ]
+            ],
+            [
+             [
+              "str",
+              "at"
+             ],
+             [
+              "str",
+              "10:00:00"
+             ]
+            ]
+           ]
+          ]
+         ]
+        ]
+       ],
+       [
+        [
+         "str",
+         "conditions"
+        ],
+        [
+         "seq",
+         [
+          [
+           "map",
+           [
+            [
+             [
+              "str",
+              "condition"
+             ],
+             [
+              "str",
+              "time"
+             ]
+            ],
+            [
+             [
+              "str",
+              "after"
+             ],
+             [
+              "str",
+              "10:00:00"
+             ]
+            ],
+            [
+             [
+              "str",
+              "before"
+             ],
+             [
+              "str",
+              "23:30:00"
+             ]
+            ]
+           ]
+          ],
+          [
+           "map",
+           [
+            [
+             [
+              "str",
+              "condition"
+             ],
+             [
+              "str",
+              "state"
+             ]
+            ],
+            [
+             [
+              "str",
+              "entity_id"
+             ],
+             [
+              "str",
+              "sun.sun"
+             ]
+            ],
+            [
+             [
+              "str",
+              "state"
+             ],
+             [
+              "str",
+              "below_horizon"
+             ]
+            ]
+           ]
+          ]
+         ]
+        ]
+       ],
+       [
+        [
+         "str",
+         "actions"
+        ],
+        [
+         "seq",
+         [
+          [
+           "map",
+           [
+            [
+             [
+              "str",
+              "action"
+             ],
+             [
+              "str",
+              "light.turn_on"
+             ]
+            ],
+            [
+             [
+              "str",
+              "target"
+             ],
+             [
+              "map",
+              [
+               [
+                [
+                 "str",
+                 "entity_id"
+                ],
+                [
+                 "str",
+                 "light.kitchen_kitchen_light"
+                ]
+               ]
+              ]
+             ]
+            ],
+            [
+             [
+              "str",
+              "data"
+             ],
+             [
+              "map",
+              [
+               [
+                [
+                 "str",
+                 "brightness_pct"
+                ],
+                [
+                 "int",
+                 "60"
+                ]
+               ],
+               [
+                [
+                 "str",
+                 "color_temp_kelvin"
+                ],
+                [
+                 "int",
+                 "2700"
+                ]
+               ],
+               [
+                [
+                 "str",
+                 "transition"
+                ],
+                [
+                 "int",
+                 "5"
+                ]
+               ]
+              ]
+             ]
+            ]
+           ]
+          ],
+          [
+           "map",
+           [
+            [
+             [
+              "str",
+              "action"
+             ],
+             [
+              "str",
+              "light.turn_on"
+             ]
+            ],
+            [
+             [
+              "str",
+              "target"
+             ],
+             [
+              "map",
+              [
+               [
+                [
+                 "str",
+                 "entity_id"
+                ],
+                [
+                 "str",
+                 "light.bedroom_lamp"
+                ]
+               ]
+              ]
+             ]
+            ],
+            [
+             [
+              "str",
+              "data"
+             ],
+             [
+              "map",
+              [
+               [
+                [
+                 "str",
+                 "brightness_pct"
+                ],
+                [
+                 "int",
+                 "30"
+                ]
+               ],
+               [
+                [
+                 "str",
+                 "color_temp_kelvin"
+                ],
+                [
+                 "int",
+                 "2400"
+                ]
+               ],
+               [
+                [
+                 "str",
+                 "transition"
+                ],
+                [
+                 "int",
+                 "5"
+                ]
+               ]
+              ]
+             ]
+            ]
+           ]
+          ]
+         ]
+        ]
+       ]
+      ]
+     ],
+     [
+      "map",
+      [
+       [
+        [
+         "str",
+         "id"
+        ],
+        [
+         "str",
+         "living_room_lifx_off_at_2330"
+        ]
+       ],
+       [
+        [
+         "str",
+         "alias"
+        ],
+        [
+         "str",
+         "Kitchen lights - off at 11:30pm"
+        ]
+       ],
+       [
+        [
+         "str",
+         "description"
+        ],
+        [
+         "str",
+         "Turn off the kitchen light and lamp every night at 11:30pm."
+        ]
+       ],
+       [
+        [
+         "str",
+         "mode"
+        ],
+        [
+         "str",
+         "single"
+        ]
+       ],
+       [
+        [
+         "str",
+         "triggers"
+        ],
+        [
+         "seq",
+         [
+          [
+           "map",
+           [
+            [
+             [
+              "str",
+              "trigger"
+             ],
+             [
+              "str",
+              "time"
+             ]
+            ],
+            [
+             [
+              "str",
+              "at"
+             ],
+             [
+              "str",
+              "23:30:00"
+             ]
+            ]
+           ]
+          ]
+         ]
+        ]
+       ],
+       [
+        [
+         "str",
+         "actions"
+        ],
+        [
+         "seq",
+         [
+          [
+           "map",
+           [
+            [
+             [
+              "str",
+              "action"
+             ],
+             [
+              "str",
+              "light.turn_off"
+             ]
+            ],
+            [
+             [
+              "str",
+              "target"
+             ],
+             [
+              "map",
+              [
+               [
+                [
+                 "str",
+                 "entity_id"
+                ],
+                [
+                 "seq",
+                 [
+                  [
+                   "str",
+                   "light.kitchen_kitchen_light"
+                  ],
+                  [
+                   "str",
+                   "light.bedroom_lamp"
+                  ]
+                 ]
+                ]
+               ]
+              ]
+             ]
+            ],
+            [
+             [
+              "str",
+              "data"
+             ],
+             [
+              "map",
+              [
+               [
+                [
+                 "str",
+                 "transition"
+                ],
+                [
+                 "int",
+                 "10"
+                ]
+               ]
+              ]
+             ]
+            ]
+           ]
+          ]
+         ]
+        ]
+       ]
+      ]
+     ]
+    ]
+   ],
+   "pyclass": "NodeListClass",
+   "lines": [
+    [
+     "",
+     "NodeListClass",
+     1
+    ],
+    [
+     "/0",
+     "NodeDictClass",
+     1
+    ],
+    [
+     "/0/id",
+     "NodeStrClass",
+     1
+    ],
+    [
+     "/0/alias",
+     "NodeStrClass",
+     2
+    ],
+    [
+     "/0/description",
+     "NodeStrClass",
+     3
+    ],
+    [
+     "/0/mode",
+     "NodeStrClass",
+     6
+    ],
+    [
+     "/0/triggers",
+     "NodeListClass",
+     8
+    ],
+    [
+     "/0/triggers/0",
+     "NodeDictClass",
+     8
+    ],
+    [
+     "/0/triggers/0/trigger",
+     "NodeStrClass",
+     8
+    ],
+    [
+     "/0/triggers/0/entity_id",
+     "NodeStrClass",
+     9
+    ],
+    [
+     "/0/triggers/0/to",
+     "NodeStrClass",
+     10
+    ],
+    [
+     "/0/triggers/0/id",
+     "NodeStrClass",
+     11
+    ],
+    [
+     "/0/triggers/1",
+     "NodeDictClass",
+     12
+    ],
+    [
+     "/0/triggers/1/trigger",
+     "NodeStrClass",
+     12
+    ],
+    [
+     "/0/triggers/1/entity_id",
+     "NodeStrClass",
+     13
+    ],
+    [
+     "/0/triggers/1/id",
+     "NodeStrClass",
+     15
+    ],
+    [
+     "/0/conditions",
+     "NodeListClass",
+     17
+    ],
+    [
+     "/0/conditions/0",
+     "NodeDictClass",
+     17
+    ],
+    [
+     "/0/conditions/0/condition",
+     "NodeStrClass",
+     17
+    ],
+    [
+     "/0/conditions/0/entity_id",
+     "NodeStrClass",
+     18
+    ],
+    [
+     "/0/conditions/1",
+     "NodeDictClass",
+     20
+    ],
+    [
+     "/0/conditions/1/condition",
+     "NodeStrClass",
+     20
+    ],
+    [
+     "/0/conditions/1/entity_id",
+     "NodeStrClass",
+     21
+    ],
+    [
+     "/0/conditions/1/state",
+     "NodeStrClass",
+     22
+    ],
+    [
+     "/0/actions",
+     "NodeListClass",
+     24
+    ],
+    [
+     "/0/actions/0",
+     "NodeDictClass",
+     24
+    ],
+    [
+     "/0/actions/0/choose",
+     "NodeListClass",
+     25
+    ],
+    [
+     "/0/actions/0/choose/0",
+     "NodeDictClass",
+     25
+    ],
+    [
+     "/0/actions/0/choose/0/conditions",
+     "NodeListClass",
+     26
+    ],
+    [
+     "/0/actions/0/choose/0/conditions/0",
+     "NodeDictClass",
+     26
+    ],
+    [
+     "/0/actions/0/choose/0/conditions/0/condition",
+     "NodeStrClass",
+     26
+    ],
+    [
+     "/0/actions/0/choose/0/conditions/0/after",
+     "NodeStrClass",
+     27
+    ],
+    [
+     "/0/actions/0/choose/0/conditions/0/before",
+     "NodeStrClass",
+     28
+    ],
+    [
+     "/0/actions/0/choose/0/sequence",
+     "NodeListClass",
+     30
+    ],
+    [
+     "/0/actions/0/choose/0/sequence/0",
+     "NodeDictClass",
+     30
+    ],
+    [
+     "/0/actions/0/choose/0/sequence/0/action",
+     "NodeStrClass",
+     30
+    ],
+    [
+     "/0/actions/0/choose/0/sequence/0/target",
+     "NodeDictClass",
+     32
+    ],
+    [
+     "/0/actions/0/choose/0/sequence/0/target/entity_id",
+     "NodeStrClass",
+     32
+    ],
+    [
+     "/0/actions/0/choose/0/sequence/0/data",
+     "NodeDictClass",
+     34
+    ],
+    [
+     "/0/actions/0/choose/1",
+     "NodeDictClass",
+     37
+    ],
+    [
+     "/0/actions/0/choose/1/conditions",
+     "NodeListClass",
+     38
+    ],
+    [
+     "/0/actions/0/choose/1/conditions/0",
+     "NodeDictClass",
+     38
+    ],
+    [
+     "/0/actions/0/choose/1/conditions/0/condition",
+     "NodeStrClass",
+     38
+    ],
+    [
+     "/0/actions/0/choose/1/conditions/0/after",
+     "NodeStrClass",
+     39
+    ],
+    [
+     "/0/actions/0/choose/1/conditions/0/before",
+     "NodeStrClass",
+     40
+    ],
+    [
+     "/0/actions/0/choose/1/sequence",
+     "NodeListClass",
+     42
+    ],
+    [
+     "/0/actions/0/choose/1/sequence/0",
+     "NodeDictClass",
+     42
+    ],
+    [
+     "/0/actions/0/choose/1/sequence/0/action",
+     "NodeStrClass",
+     42
+    ],
+    [
+     "/0/actions/0/choose/1/sequence/0/target",
+     "NodeDictClass",
+     44
+    ],
+    [
+     "/0/actions/0/choose/1/sequence/0/target/entity_id",
+     "NodeStrClass",
+     44
+    ],
+    [
+     "/0/actions/0/choose/1/sequence/0/data",
+     "NodeDictClass",
+     46
+    ],
+    [
+     "/0/actions/0/default",
+     "NodeListClass",
+     50
+    ],
+    [
+     "/0/actions/0/default/0",
+     "NodeDictClass",
+     50
+    ],
+    [
+     "/0/actions/0/default/0/action",
+     "NodeStrClass",
+     50
+    ],
+    [
+     "/0/actions/0/default/0/target",
+     "NodeDictClass",
+     52
+    ],
+    [
+     "/0/actions/0/default/0/target/entity_id",
+     "NodeStrClass",
+     52
+    ],
+    [
+     "/0/actions/0/default/0/data",
+     "NodeDictClass",
+     54
+    ],
+    [
+     "/0/actions/1",
+     "NodeDictClass",
+     57
+    ],
+    [
+     "/0/actions/1/wait_for_trigger",
+     "NodeListClass",
+     58
+    ],
+    [
+     "/0/actions/1/wait_for_trigger/0",
+     "NodeDictClass",
+     58
+    ],
+    [
+     "/0/actions/1/wait_for_trigger/0/trigger",
+     "NodeStrClass",
+     58
+    ],
+    [
+     "/0/actions/1/wait_for_trigger/0/entity_id",
+     "NodeStrClass",
+     59
+    ],
+    [
+     "/0/actions/1/wait_for_trigger/0/to",
+     "NodeStrClass",
+     60
+    ],
+    [
+     "/0/actions/1/wait_for_trigger/0/for",
+     "NodeDictClass",
+     62
+    ],
+    [
+     "/0/actions/2",
+     "NodeDictClass",
+     63
+    ],
+    [
+     "/0/actions/2/action",
+     "NodeStrClass",
+     63
+    ],
+    [
+     "/0/actions/2/target",
+     "NodeDictClass",
+     65
+    ],
+    [
+     "/0/actions/2/target/entity_id",
+     "NodeStrClass",
+     65
+    ],
+    [
+     "/0/actions/2/data",
+     "NodeDictClass",
+     67
+    ],
+    [
+     "/1",
+     "NodeDictClass",
+     68
+    ],
+    [
+     "/1/id",
+     "NodeStrClass",
+     68
+    ],
+    [
+     "/1/alias",
+     "NodeStrClass",
+     69
+    ],
+    [
+     "/1/description",
+     "NodeStrClass",
+     70
+    ],
+    [
+     "/1/mode",
+     "NodeStrClass",
+     72
+    ],
+    [
+     "/1/triggers",
+     "NodeListClass",
+     74
+    ],
+    [
+     "/1/triggers/0",
+     "NodeDictClass",
+     74
+    ],
+    [
+     "/1/triggers/0/trigger",
+     "NodeStrClass",
+     74
+    ],
+    [
+     "/1/triggers/0/at",
+     "NodeStrClass",
+     75
+    ],
+    [
+     "/1/triggers/0/id",
+     "NodeStrClass",
+     76
+    ],
+    [
+     "/1/triggers/1",
+     "NodeDictClass",
+     77
+    ],
+    [
+     "/1/triggers/1/trigger",
+     "NodeStrClass",
+     77
+    ],
+    [
+     "/1/triggers/1/at",
+     "NodeStrClass",
+     78
+    ],
+    [
+     "/1/triggers/1/id",
+     "NodeStrClass",
+     79
+    ],
+    [
+     "/1/triggers/2",
+     "NodeDictClass",
+     80
+    ],
+    [
+     "/1/triggers/2/trigger",
+     "NodeStrClass",
+     80
+    ],
+    [
+     "/1/triggers/2/at",
+     "NodeStrClass",
+     81
+    ],
+    [
+     "/1/triggers/2/id",
+     "NodeStrClass",
+     82
+    ],
+    [
+     "/1/conditions",
+     "NodeListClass",
+     84
+    ],
+    [
+     "/1/conditions/0",
+     "NodeDictClass",
+     84
+    ],
+    [
+     "/1/conditions/0/condition",
+     "NodeStrClass",
+     84
+    ],
+    [
+     "/1/conditions/0/entity_id",
+     "NodeStrClass",
+     85
+    ],
+    [
+     "/1/conditions/0/state",
+     "NodeStrClass",
+     86
+    ],
+    [
+     "/1/actions",
+     "NodeListClass",
+     88
+    ],
+    [
+     "/1/actions/0",
+     "NodeDictClass",
+     88
+    ],
+    [
+     "/1/actions/0/choose",
+     "NodeListClass",
+     89
+    ],
+    [
+     "/1/actions/0/choose/0",
+     "NodeDictClass",
+     89
+    ],
+    [
+     "/1/actions/0/choose/0/conditions",
+     "NodeListClass",
+     90
+    ],
+    [
+     "/1/actions/0/choose/0/conditions/0",
+     "NodeDictClass",
+     90
+    ],
+    [
+     "/1/actions/0/choose/0/conditions/0/condition",
+     "NodeStrClass",
+     90
+    ],
+    [
+     "/1/actions/0/choose/0/conditions/0/id",
+     "NodeStrClass",
+     91
+    ],
+    [
+     "/1/actions/0/choose/0/sequence",
+     "NodeListClass",
+     93
+    ],
+    [
+     "/1/actions/0/choose/0/sequence/0",
+     "NodeDictClass",
+     93
+    ],
+    [
+     "/1/actions/0/choose/0/sequence/0/action",
+     "NodeStrClass",
+     93
+    ],
+    [
+     "/1/actions/0/choose/0/sequence/0/target",
+     "NodeDictClass",
+     95
+    ],
+    [
+     "/1/actions/0/choose/0/sequence/0/target/entity_id",
+     "NodeStrClass",
+     95
+    ],
+    [
+     "/1/actions/0/choose/0/sequence/0/data",
+     "NodeDictClass",
+     97
+    ],
+    [
+     "/1/actions/0/choose/1",
+     "NodeDictClass",
+     100
+    ],
+    [
+     "/1/actions/0/choose/1/conditions",
+     "NodeListClass",
+     101
+    ],
+    [
+     "/1/actions/0/choose/1/conditions/0",
+     "NodeDictClass",
+     101
+    ],
+    [
+     "/1/actions/0/choose/1/conditions/0/condition",
+     "NodeStrClass",
+     101
+    ],
+    [
+     "/1/actions/0/choose/1/conditions/0/id",
+     "NodeStrClass",
+     102
+    ],
+    [
+     "/1/actions/0/choose/1/sequence",
+     "NodeListClass",
+     104
+    ],
+    [
+     "/1/actions/0/choose/1/sequence/0",
+     "NodeDictClass",
+     104
+    ],
+    [
+     "/1/actions/0/choose/1/sequence/0/action",
+     "NodeStrClass",
+     104
+    ],
+    [
+     "/1/actions/0/choose/1/sequence/0/target",
+     "NodeDictClass",
+     106
+    ],
+    [
+     "/1/actions/0/choose/1/sequence/0/target/entity_id",
+     "NodeStrClass",
+     106
+    ],
+    [
+     "/1/actions/0/choose/1/sequence/0/data",
+     "NodeDictClass",
+     108
+    ],
+    [
+     "/1/actions/0/choose/2",
+     "NodeDictClass",
+     111
+    ],
+    [
+     "/1/actions/0/choose/2/conditions",
+     "NodeListClass",
+     112
+    ],
+    [
+     "/1/actions/0/choose/2/conditions/0",
+     "NodeDictClass",
+     112
+    ],
+    [
+     "/1/actions/0/choose/2/conditions/0/condition",
+     "NodeStrClass",
+     112
+    ],
+    [
+     "/1/actions/0/choose/2/conditions/0/id",
+     "NodeStrClass",
+     113
+    ],
+    [
+     "/1/actions/0/choose/2/sequence",
+     "NodeListClass",
+     115
+    ],
+    [
+     "/1/actions/0/choose/2/sequence/0",
+     "NodeDictClass",
+     115
+    ],
+    [
+     "/1/actions/0/choose/2/sequence/0/action",
+     "NodeStrClass",
+     115
+    ],
+    [
+     "/1/actions/0/choose/2/sequence/0/target",
+     "NodeDictClass",
+     117
+    ],
+    [
+     "/1/actions/0/choose/2/sequence/0/target/entity_id",
+     "NodeStrClass",
+     117
+    ],
+    [
+     "/1/actions/0/choose/2/sequence/0/data",
+     "NodeDictClass",
+     119
+    ],
+    [
+     "/2",
+     "NodeDictClass",
+     122
+    ],
+    [
+     "/2/id",
+     "NodeStrClass",
+     122
+    ],
+    [
+     "/2/alias",
+     "NodeStrClass",
+     123
+    ],
+    [
+     "/2/description",
+     "NodeStrClass",
+     124
+    ],
+    [
+     "/2/mode",
+     "NodeStrClass",
+     126
+    ],
+    [
+     "/2/triggers",
+     "NodeListClass",
+     128
+    ],
+    [
+     "/2/triggers/0",
+     "NodeDictClass",
+     128
+    ],
+    [
+     "/2/triggers/0/trigger",
+     "NodeStrClass",
+     128
+    ],
+    [
+     "/2/triggers/0/entity_id",
+     "NodeStrClass",
+     129
+    ],
+    [
+     "/2/triggers/0/to",
+     "NodeStrClass",
+     130
+    ],
+    [
+     "/2/triggers/1",
+     "NodeDictClass",
+     131
+    ],
+    [
+     "/2/triggers/1/trigger",
+     "NodeStrClass",
+     131
+    ],
+    [
+     "/2/triggers/1/at",
+     "NodeStrClass",
+     132
+    ],
+    [
+     "/2/conditions",
+     "NodeListClass",
+     134
+    ],
+    [
+     "/2/conditions/0",
+     "NodeDictClass",
+     134
+    ],
+    [
+     "/2/conditions/0/condition",
+     "NodeStrClass",
+     134
+    ],
+    [
+     "/2/conditions/0/after",
+     "NodeStrClass",
+     135
+    ],
+    [
+     "/2/conditions/0/before",
+     "NodeStrClass",
+     136
+    ],
+    [
+     "/2/conditions/1",
+     "NodeDictClass",
+     137
+    ],
+    [
+     "/2/conditions/1/condition",
+     "NodeStrClass",
+     137
+    ],
+    [
+     "/2/conditions/1/entity_id",
+     "NodeStrClass",
+     138
+    ],
+    [
+     "/2/conditions/1/state",
+     "NodeStrClass",
+     139
+    ],
+    [
+     "/2/actions",
+     "NodeListClass",
+     141
+    ],
+    [
+     "/2/actions/0",
+     "NodeDictClass",
+     141
+    ],
+    [
+     "/2/actions/0/action",
+     "NodeStrClass",
+     141
+    ],
+    [
+     "/2/actions/0/target",
+     "NodeDictClass",
+     143
+    ],
+    [
+     "/2/actions/0/target/entity_id",
+     "NodeStrClass",
+     143
+    ],
+    [
+     "/2/actions/0/data",
+     "NodeDictClass",
+     145
+    ],
+    [
+     "/2/actions/1",
+     "NodeDictClass",
+     148
+    ],
+    [
+     "/2/actions/1/action",
+     "NodeStrClass",
+     148
+    ],
+    [
+     "/2/actions/1/target",
+     "NodeDictClass",
+     150
+    ],
+    [
+     "/2/actions/1/target/entity_id",
+     "NodeStrClass",
+     150
+    ],
+    [
+     "/2/actions/1/data",
+     "NodeDictClass",
+     152
+    ],
+    [
+     "/3",
+     "NodeDictClass",
+     155
+    ],
+    [
+     "/3/id",
+     "NodeStrClass",
+     155
+    ],
+    [
+     "/3/alias",
+     "NodeStrClass",
+     156
+    ],
+    [
+     "/3/description",
+     "NodeStrClass",
+     157
+    ],
+    [
+     "/3/mode",
+     "NodeStrClass",
+     158
+    ],
+    [
+     "/3/triggers",
+     "NodeListClass",
+     160
+    ],
+    [
+     "/3/triggers/0",
+     "NodeDictClass",
+     160
+    ],
+    [
+     "/3/triggers/0/trigger",
+     "NodeStrClass",
+     160
+    ],
+    [
+     "/3/triggers/0/at",
+     "NodeStrClass",
+     161
+    ],
+    [
+     "/3/actions",
+     "NodeListClass",
+     163
+    ],
+    [
+     "/3/actions/0",
+     "NodeDictClass",
+     163
+    ],
+    [
+     "/3/actions/0/action",
+     "NodeStrClass",
+     163
+    ],
+    [
+     "/3/actions/0/target",
+     "NodeDictClass",
+     165
+    ],
+    [
+     "/3/actions/0/target/entity_id",
+     "NodeListClass",
+     166
+    ],
+    [
+     "/3/actions/0/target/entity_id/0",
+     "NodeStrClass",
+     166
+    ],
+    [
+     "/3/actions/0/target/entity_id/1",
+     "NodeStrClass",
+     167
+    ],
+    [
+     "/3/actions/0/data",
+     "NodeDictClass",
+     169
+    ]
+   ]
+  },
+  {
+   "name": "user configuration.yaml (load_yaml, includes resolved)",
+   "file": "input/configuration.yaml",
+   "value": [
+    "map",
+    [
+     [
+      [
+       "str",
+       "default_config"
+      ],
+      [
+       "null",
+       null
+      ]
+     ],
+     [
+      [
+       "str",
+       "frontend"
+      ],
+      [
+       "map",
+       [
+        [
+         [
+          "str",
+          "themes"
+         ],
+         [
+          "map",
+          []
+         ]
+        ]
+       ]
+      ]
+     ],
+     [
+      [
+       "str",
+       "automation"
+      ],
+      [
+       "seq",
+       [
+        [
+         "map",
+         [
+          [
+           [
+            "str",
+            "id"
+           ],
+           [
+            "str",
+            "hallway_motion_lights_on_when_dark"
+           ]
+          ],
+          [
+           [
+            "str",
+            "alias"
+           ],
+           [
+            "str",
+            "Hallway lights - motion on when dark"
+           ]
+          ],
+          [
+           [
+            "str",
+            "description"
+           ],
+           [
+            "str",
+            "Turn on hallway lights when motion is detected below 30 lux, using dim overnight and gentle morning levels, then turn them off after 5 minutes with no motion."
+           ]
+          ],
+          [
+           [
+            "str",
+            "mode"
+           ],
+           [
+            "str",
+            "restart"
+           ]
+          ],
+          [
+           [
+            "str",
+            "triggers"
+           ],
+           [
+            "seq",
+            [
+             [
+              "map",
+              [
+               [
+                [
+                 "str",
+                 "trigger"
+                ],
+                [
+                 "str",
+                 "state"
+                ]
+               ],
+               [
+                [
+                 "str",
+                 "entity_id"
+                ],
+                [
+                 "str",
+                 "binary_sensor.hallway_motion"
+                ]
+               ],
+               [
+                [
+                 "str",
+                 "to"
+                ],
+                [
+                 "str",
+                 "on"
+                ]
+               ],
+               [
+                [
+                 "str",
+                 "id"
+                ],
+                [
+                 "str",
+                 "motion"
+                ]
+               ]
+              ]
+             ],
+             [
+              "map",
+              [
+               [
+                [
+                 "str",
+                 "trigger"
+                ],
+                [
+                 "str",
+                 "numeric_state"
+                ]
+               ],
+               [
+                [
+                 "str",
+                 "entity_id"
+                ],
+                [
+                 "str",
+                 "sensor.hallway_illuminance"
+                ]
+               ],
+               [
+                [
+                 "str",
+                 "below"
+                ],
+                [
+                 "int",
+                 "30"
+                ]
+               ],
+               [
+                [
+                 "str",
+                 "id"
+                ],
+                [
+                 "str",
+                 "became_dark"
+                ]
+               ]
+              ]
+             ]
+            ]
+           ]
+          ],
+          [
+           [
+            "str",
+            "conditions"
+           ],
+           [
+            "seq",
+            [
+             [
+              "map",
+              [
+               [
+                [
+                 "str",
+                 "condition"
+                ],
+                [
+                 "str",
+                 "numeric_state"
+                ]
+               ],
+               [
+                [
+                 "str",
+                 "entity_id"
+                ],
+                [
+                 "str",
+                 "sensor.hallway_illuminance"
+                ]
+               ],
+               [
+                [
+                 "str",
+                 "below"
+                ],
+                [
+                 "int",
+                 "30"
+                ]
+               ]
+              ]
+             ],
+             [
+              "map",
+              [
+               [
+                [
+                 "str",
+                 "condition"
+                ],
+                [
+                 "str",
+                 "state"
+                ]
+               ],
+               [
+                [
+                 "str",
+                 "entity_id"
+                ],
+                [
+                 "str",
+                 "binary_sensor.hallway_motion"
+                ]
+               ],
+               [
+                [
+                 "str",
+                 "state"
+                ],
+                [
+                 "str",
+                 "on"
+                ]
+               ]
+              ]
+             ]
+            ]
+           ]
+          ],
+          [
+           [
+            "str",
+            "actions"
+           ],
+           [
+            "seq",
+            [
+             [
+              "map",
+              [
+               [
+                [
+                 "str",
+                 "choose"
+                ],
+                [
+                 "seq",
+                 [
+                  [
+                   "map",
+                   [
+                    [
+                     [
+                      "str",
+                      "conditions"
+                     ],
+                     [
+                      "seq",
+                      [
+                       [
+                        "map",
+                        [
+                         [
+                          [
+                           "str",
+                           "condition"
+                          ],
+                          [
+                           "str",
+                           "time"
+                          ]
+                         ],
+                         [
+                          [
+                           "str",
+                           "after"
+                          ],
+                          [
+                           "str",
+                           "23:00:00"
+                          ]
+                         ],
+                         [
+                          [
+                           "str",
+                           "before"
+                          ],
+                          [
+                           "str",
+                           "06:30:00"
+                          ]
+                         ]
+                        ]
+                       ]
+                      ]
+                     ]
+                    ],
+                    [
+                     [
+                      "str",
+                      "sequence"
+                     ],
+                     [
+                      "seq",
+                      [
+                       [
+                        "map",
+                        [
+                         [
+                          [
+                           "str",
+                           "action"
+                          ],
+                          [
+                           "str",
+                           "light.turn_on"
+                          ]
+                         ],
+                         [
+                          [
+                           "str",
+                           "target"
+                          ],
+                          [
+                           "map",
+                           [
+                            [
+                             [
+                              "str",
+                              "entity_id"
+                             ],
+                             [
+                              "str",
+                              "light.hallway_hallway"
+                             ]
+                            ]
+                           ]
+                          ]
+                         ],
+                         [
+                          [
+                           "str",
+                           "data"
+                          ],
+                          [
+                           "map",
+                           [
+                            [
+                             [
+                              "str",
+                              "brightness_pct"
+                             ],
+                             [
+                              "int",
+                              "12"
+                             ]
+                            ],
+                            [
+                             [
+                              "str",
+                              "color_temp_kelvin"
+                             ],
+                             [
+                              "int",
+                              "2202"
+                             ]
+                            ],
+                            [
+                             [
+                              "str",
+                              "transition"
+                             ],
+                             [
+                              "int",
+                              "1"
+                             ]
+                            ]
+                           ]
+                          ]
+                         ]
+                        ]
+                       ]
+                      ]
+                     ]
+                    ]
+                   ]
+                  ],
+                  [
+                   "map",
+                   [
+                    [
+                     [
+                      "str",
+                      "conditions"
+                     ],
+                     [
+                      "seq",
+                      [
+                       [
+                        "map",
+                        [
+                         [
+                          [
+                           "str",
+                           "condition"
+                          ],
+                          [
+                           "str",
+                           "time"
+                          ]
+                         ],
+                         [
+                          [
+                           "str",
+                           "after"
+                          ],
+                          [
+                           "str",
+                           "06:30:00"
+                          ]
+                         ],
+                         [
+                          [
+                           "str",
+                           "before"
+                          ],
+                          [
+                           "str",
+                           "09:30:00"
+                          ]
+                         ]
+                        ]
+                       ]
+                      ]
+                     ]
+                    ],
+                    [
+                     [
+                      "str",
+                      "sequence"
+                     ],
+                     [
+                      "seq",
+                      [
+                       [
+                        "map",
+                        [
+                         [
+                          [
+                           "str",
+                           "action"
+                          ],
+                          [
+                           "str",
+                           "light.turn_on"
+                          ]
+                         ],
+                         [
+                          [
+                           "str",
+                           "target"
+                          ],
+                          [
+                           "map",
+                           [
+                            [
+                             [
+                              "str",
+                              "entity_id"
+                             ],
+                             [
+                              "str",
+                              "light.hallway_hallway"
+                             ]
+                            ]
+                           ]
+                          ]
+                         ],
+                         [
+                          [
+                           "str",
+                           "data"
+                          ],
+                          [
+                           "map",
+                           [
+                            [
+                             [
+                              "str",
+                              "brightness_pct"
+                             ],
+                             [
+                              "int",
+                              "30"
+                             ]
+                            ],
+                            [
+                             [
+                              "str",
+                              "color_temp_kelvin"
+                             ],
+                             [
+                              "int",
+                              "2400"
+                             ]
+                            ],
+                            [
+                             [
+                              "str",
+                              "transition"
+                             ],
+                             [
+                              "int",
+                              "2"
+                             ]
+                            ]
+                           ]
+                          ]
+                         ]
+                        ]
+                       ]
+                      ]
+                     ]
+                    ]
+                   ]
+                  ]
+                 ]
+                ]
+               ],
+               [
+                [
+                 "str",
+                 "default"
+                ],
+                [
+                 "seq",
+                 [
+                  [
+                   "map",
+                   [
+                    [
+                     [
+                      "str",
+                      "action"
+                     ],
+                     [
+                      "str",
+                      "light.turn_on"
+                     ]
+                    ],
+                    [
+                     [
+                      "str",
+                      "target"
+                     ],
+                     [
+                      "map",
+                      [
+                       [
+                        [
+                         "str",
+                         "entity_id"
+                        ],
+                        [
+                         "str",
+                         "light.hallway_hallway"
+                        ]
+                       ]
+                      ]
+                     ]
+                    ],
+                    [
+                     [
+                      "str",
+                      "data"
+                     ],
+                     [
+                      "map",
+                      [
+                       [
+                        [
+                         "str",
+                         "brightness_pct"
+                        ],
+                        [
+                         "int",
+                         "35"
+                        ]
+                       ],
+                       [
+                        [
+                         "str",
+                         "color_temp_kelvin"
+                        ],
+                        [
+                         "int",
+                         "2700"
+                        ]
+                       ],
+                       [
+                        [
+                         "str",
+                         "transition"
+                        ],
+                        [
+                         "int",
+                         "2"
+                        ]
+                       ]
+                      ]
+                     ]
+                    ]
+                   ]
+                  ]
+                 ]
+                ]
+               ]
+              ]
+             ],
+             [
+              "map",
+              [
+               [
+                [
+                 "str",
+                 "wait_for_trigger"
+                ],
+                [
+                 "seq",
+                 [
+                  [
+                   "map",
+                   [
+                    [
+                     [
+                      "str",
+                      "trigger"
+                     ],
+                     [
+                      "str",
+                      "state"
+                     ]
+                    ],
+                    [
+                     [
+                      "str",
+                      "entity_id"
+                     ],
+                     [
+                      "str",
+                      "binary_sensor.hallway_motion"
+                     ]
+                    ],
+                    [
+                     [
+                      "str",
+                      "to"
+                     ],
+                     [
+                      "str",
+                      "off"
+                     ]
+                    ],
+                    [
+                     [
+                      "str",
+                      "for"
+                     ],
+                     [
+                      "map",
+                      [
+                       [
+                        [
+                         "str",
+                         "minutes"
+                        ],
+                        [
+                         "int",
+                         "5"
+                        ]
+                       ]
+                      ]
+                     ]
+                    ]
+                   ]
+                  ]
+                 ]
+                ]
+               ]
+              ]
+             ],
+             [
+              "map",
+              [
+               [
+                [
+                 "str",
+                 "action"
+                ],
+                [
+                 "str",
+                 "light.turn_off"
+                ]
+               ],
+               [
+                [
+                 "str",
+                 "target"
+                ],
+                [
+                 "map",
+                 [
+                  [
+                   [
+                    "str",
+                    "entity_id"
+                   ],
+                   [
+                    "str",
+                    "light.hallway_hallway"
+                   ]
+                  ]
+                 ]
+                ]
+               ],
+               [
+                [
+                 "str",
+                 "data"
+                ],
+                [
+                 "map",
+                 [
+                  [
+                   [
+                    "str",
+                    "transition"
+                   ],
+                   [
+                    "int",
+                    "10"
+                   ]
+                  ]
+                 ]
+                ]
+               ]
+              ]
+             ]
+            ]
+           ]
+          ]
+         ]
+        ],
+        [
+         "map",
+         [
+          [
+           [
+            "str",
+            "id"
+           ],
+           [
+            "str",
+            "hallway_lights_adjust_brightness_for_time"
+           ]
+          ],
+          [
+           [
+            "str",
+            "alias"
+           ],
+           [
+            "str",
+            "Hallway lights - adjust brightness for time"
+           ]
+          ],
+          [
+           [
+            "str",
+            "description"
+           ],
+           [
+            "str",
+            "Adjust hallway light brightness at time-band boundaries if the lights are already on."
+           ]
+          ],
+          [
+           [
+            "str",
+            "mode"
+           ],
+           [
+            "str",
+            "single"
+           ]
+          ],
+          [
+           [
+            "str",
+            "triggers"
+           ],
+           [
+            "seq",
+            [
+             [
+              "map",
+              [
+               [
+                [
+                 "str",
+                 "trigger"
+                ],
+                [
+                 "str",
+                 "time"
+                ]
+               ],
+               [
+                [
+                 "str",
+                 "at"
+                ],
+                [
+                 "str",
+                 "23:00:00"
+                ]
+               ],
+               [
+                [
+                 "str",
+                 "id"
+                ],
+                [
+                 "str",
+                 "overnight"
+                ]
+               ]
+              ]
+             ],
+             [
+              "map",
+              [
+               [
+                [
+                 "str",
+                 "trigger"
+                ],
+                [
+                 "str",
+                 "time"
+                ]
+               ],
+               [
+                [
+                 "str",
+                 "at"
+                ],
+                [
+                 "str",
+                 "06:30:00"
+                ]
+               ],
+               [
+                [
+                 "str",
+                 "id"
+                ],
+                [
+                 "str",
+                 "morning"
+                ]
+               ]
+              ]
+             ],
+             [
+              "map",
+              [
+               [
+                [
+                 "str",
+                 "trigger"
+                ],
+                [
+                 "str",
+                 "time"
+                ]
+               ],
+               [
+                [
+                 "str",
+                 "at"
+                ],
+                [
+                 "str",
+                 "09:30:00"
+                ]
+               ],
+               [
+                [
+                 "str",
+                 "id"
+                ],
+                [
+                 "str",
+                 "normal"
+                ]
+               ]
+              ]
+             ]
+            ]
+           ]
+          ],
+          [
+           [
+            "str",
+            "conditions"
+           ],
+           [
+            "seq",
+            [
+             [
+              "map",
+              [
+               [
+                [
+                 "str",
+                 "condition"
+                ],
+                [
+                 "str",
+                 "state"
+                ]
+               ],
+               [
+                [
+                 "str",
+                 "entity_id"
+                ],
+                [
+                 "str",
+                 "light.hallway_hallway"
+                ]
+               ],
+               [
+                [
+                 "str",
+                 "state"
+                ],
+                [
+                 "str",
+                 "on"
+                ]
+               ]
+              ]
+             ]
+            ]
+           ]
+          ],
+          [
+           [
+            "str",
+            "actions"
+           ],
+           [
+            "seq",
+            [
+             [
+              "map",
+              [
+               [
+                [
+                 "str",
+                 "choose"
+                ],
+                [
+                 "seq",
+                 [
+                  [
+                   "map",
+                   [
+                    [
+                     [
+                      "str",
+                      "conditions"
+                     ],
+                     [
+                      "seq",
+                      [
+                       [
+                        "map",
+                        [
+                         [
+                          [
+                           "str",
+                           "condition"
+                          ],
+                          [
+                           "str",
+                           "trigger"
+                          ]
+                         ],
+                         [
+                          [
+                           "str",
+                           "id"
+                          ],
+                          [
+                           "str",
+                           "overnight"
+                          ]
+                         ]
+                        ]
+                       ]
+                      ]
+                     ]
+                    ],
+                    [
+                     [
+                      "str",
+                      "sequence"
+                     ],
+                     [
+                      "seq",
+                      [
+                       [
+                        "map",
+                        [
+                         [
+                          [
+                           "str",
+                           "action"
+                          ],
+                          [
+                           "str",
+                           "light.turn_on"
+                          ]
+                         ],
+                         [
+                          [
+                           "str",
+                           "target"
+                          ],
+                          [
+                           "map",
+                           [
+                            [
+                             [
+                              "str",
+                              "entity_id"
+                             ],
+                             [
+                              "str",
+                              "light.hallway_hallway"
+                             ]
+                            ]
+                           ]
+                          ]
+                         ],
+                         [
+                          [
+                           "str",
+                           "data"
+                          ],
+                          [
+                           "map",
+                           [
+                            [
+                             [
+                              "str",
+                              "brightness_pct"
+                             ],
+                             [
+                              "int",
+                              "12"
+                             ]
+                            ],
+                            [
+                             [
+                              "str",
+                              "color_temp_kelvin"
+                             ],
+                             [
+                              "int",
+                              "2202"
+                             ]
+                            ],
+                            [
+                             [
+                              "str",
+                              "transition"
+                             ],
+                             [
+                              "int",
+                              "10"
+                             ]
+                            ]
+                           ]
+                          ]
+                         ]
+                        ]
+                       ]
+                      ]
+                     ]
+                    ]
+                   ]
+                  ],
+                  [
+                   "map",
+                   [
+                    [
+                     [
+                      "str",
+                      "conditions"
+                     ],
+                     [
+                      "seq",
+                      [
+                       [
+                        "map",
+                        [
+                         [
+                          [
+                           "str",
+                           "condition"
+                          ],
+                          [
+                           "str",
+                           "trigger"
+                          ]
+                         ],
+                         [
+                          [
+                           "str",
+                           "id"
+                          ],
+                          [
+                           "str",
+                           "morning"
+                          ]
+                         ]
+                        ]
+                       ]
+                      ]
+                     ]
+                    ],
+                    [
+                     [
+                      "str",
+                      "sequence"
+                     ],
+                     [
+                      "seq",
+                      [
+                       [
+                        "map",
+                        [
+                         [
+                          [
+                           "str",
+                           "action"
+                          ],
+                          [
+                           "str",
+                           "light.turn_on"
+                          ]
+                         ],
+                         [
+                          [
+                           "str",
+                           "target"
+                          ],
+                          [
+                           "map",
+                           [
+                            [
+                             [
+                              "str",
+                              "entity_id"
+                             ],
+                             [
+                              "str",
+                              "light.hallway_hallway"
+                             ]
+                            ]
+                           ]
+                          ]
+                         ],
+                         [
+                          [
+                           "str",
+                           "data"
+                          ],
+                          [
+                           "map",
+                           [
+                            [
+                             [
+                              "str",
+                              "brightness_pct"
+                             ],
+                             [
+                              "int",
+                              "30"
+                             ]
+                            ],
+                            [
+                             [
+                              "str",
+                              "color_temp_kelvin"
+                             ],
+                             [
+                              "int",
+                              "2400"
+                             ]
+                            ],
+                            [
+                             [
+                              "str",
+                              "transition"
+                             ],
+                             [
+                              "int",
+                              "10"
+                             ]
+                            ]
+                           ]
+                          ]
+                         ]
+                        ]
+                       ]
+                      ]
+                     ]
+                    ]
+                   ]
+                  ],
+                  [
+                   "map",
+                   [
+                    [
+                     [
+                      "str",
+                      "conditions"
+                     ],
+                     [
+                      "seq",
+                      [
+                       [
+                        "map",
+                        [
+                         [
+                          [
+                           "str",
+                           "condition"
+                          ],
+                          [
+                           "str",
+                           "trigger"
+                          ]
+                         ],
+                         [
+                          [
+                           "str",
+                           "id"
+                          ],
+                          [
+                           "str",
+                           "normal"
+                          ]
+                         ]
+                        ]
+                       ]
+                      ]
+                     ]
+                    ],
+                    [
+                     [
+                      "str",
+                      "sequence"
+                     ],
+                     [
+                      "seq",
+                      [
+                       [
+                        "map",
+                        [
+                         [
+                          [
+                           "str",
+                           "action"
+                          ],
+                          [
+                           "str",
+                           "light.turn_on"
+                          ]
+                         ],
+                         [
+                          [
+                           "str",
+                           "target"
+                          ],
+                          [
+                           "map",
+                           [
+                            [
+                             [
+                              "str",
+                              "entity_id"
+                             ],
+                             [
+                              "str",
+                              "light.hallway_hallway"
+                             ]
+                            ]
+                           ]
+                          ]
+                         ],
+                         [
+                          [
+                           "str",
+                           "data"
+                          ],
+                          [
+                           "map",
+                           [
+                            [
+                             [
+                              "str",
+                              "brightness_pct"
+                             ],
+                             [
+                              "int",
+                              "35"
+                             ]
+                            ],
+                            [
+                             [
+                              "str",
+                              "color_temp_kelvin"
+                             ],
+                             [
+                              "int",
+                              "2700"
+                             ]
+                            ],
+                            [
+                             [
+                              "str",
+                              "transition"
+                             ],
+                             [
+                              "int",
+                              "10"
+                             ]
+                            ]
+                           ]
+                          ]
+                         ]
+                        ]
+                       ]
+                      ]
+                     ]
+                    ]
+                   ]
+                  ]
+                 ]
+                ]
+               ]
+              ]
+             ]
+            ]
+           ]
+          ]
+         ]
+        ],
+        [
+         "map",
+         [
+          [
+           [
+            "str",
+            "id"
+           ],
+           [
+            "str",
+            "living_room_lifx_on_when_dark_after_10"
+           ]
+          ],
+          [
+           [
+            "str",
+            "alias"
+           ],
+           [
+            "str",
+            "Kitchen lights - on when dark after 10am"
+           ]
+          ],
+          [
+           [
+            "str",
+            "description"
+           ],
+           [
+            "str",
+            "Turn on the kitchen light and softer lamp when it becomes dark after 10am and before the 11:30pm shutoff."
+           ]
+          ],
+          [
+           [
+            "str",
+            "mode"
+           ],
+           [
+            "str",
+            "single"
+           ]
+          ],
+          [
+           [
+            "str",
+            "triggers"
+           ],
+           [
+            "seq",
+            [
+             [
+              "map",
+              [
+               [
+                [
+                 "str",
+                 "trigger"
+                ],
+                [
+                 "str",
+                 "state"
+                ]
+               ],
+               [
+                [
+                 "str",
+                 "entity_id"
+                ],
+                [
+                 "str",
+                 "sun.sun"
+                ]
+               ],
+               [
+                [
+                 "str",
+                 "to"
+                ],
+                [
+                 "str",
+                 "below_horizon"
+                ]
+               ]
+              ]
+             ],
+             [
+              "map",
+              [
+               [
+                [
+                 "str",
+                 "trigger"
+                ],
+                [
+                 "str",
+                 "time"
+                ]
+               ],
+               [
+                [
+                 "str",
+                 "at"
+                ],
+                [
+                 "str",
+                 "10:00:00"
+                ]
+               ]
+              ]
+             ]
+            ]
+           ]
+          ],
+          [
+           [
+            "str",
+            "conditions"
+           ],
+           [
+            "seq",
+            [
+             [
+              "map",
+              [
+               [
+                [
+                 "str",
+                 "condition"
+                ],
+                [
+                 "str",
+                 "time"
+                ]
+               ],
+               [
+                [
+                 "str",
+                 "after"
+                ],
+                [
+                 "str",
+                 "10:00:00"
+                ]
+               ],
+               [
+                [
+                 "str",
+                 "before"
+                ],
+                [
+                 "str",
+                 "23:30:00"
+                ]
+               ]
+              ]
+             ],
+             [
+              "map",
+              [
+               [
+                [
+                 "str",
+                 "condition"
+                ],
+                [
+                 "str",
+                 "state"
+                ]
+               ],
+               [
+                [
+                 "str",
+                 "entity_id"
+                ],
+                [
+                 "str",
+                 "sun.sun"
+                ]
+               ],
+               [
+                [
+                 "str",
+                 "state"
+                ],
+                [
+                 "str",
+                 "below_horizon"
+                ]
+               ]
+              ]
+             ]
+            ]
+           ]
+          ],
+          [
+           [
+            "str",
+            "actions"
+           ],
+           [
+            "seq",
+            [
+             [
+              "map",
+              [
+               [
+                [
+                 "str",
+                 "action"
+                ],
+                [
+                 "str",
+                 "light.turn_on"
+                ]
+               ],
+               [
+                [
+                 "str",
+                 "target"
+                ],
+                [
+                 "map",
+                 [
+                  [
+                   [
+                    "str",
+                    "entity_id"
+                   ],
+                   [
+                    "str",
+                    "light.kitchen_kitchen_light"
+                   ]
+                  ]
+                 ]
+                ]
+               ],
+               [
+                [
+                 "str",
+                 "data"
+                ],
+                [
+                 "map",
+                 [
+                  [
+                   [
+                    "str",
+                    "brightness_pct"
+                   ],
+                   [
+                    "int",
+                    "60"
+                   ]
+                  ],
+                  [
+                   [
+                    "str",
+                    "color_temp_kelvin"
+                   ],
+                   [
+                    "int",
+                    "2700"
+                   ]
+                  ],
+                  [
+                   [
+                    "str",
+                    "transition"
+                   ],
+                   [
+                    "int",
+                    "5"
+                   ]
+                  ]
+                 ]
+                ]
+               ]
+              ]
+             ],
+             [
+              "map",
+              [
+               [
+                [
+                 "str",
+                 "action"
+                ],
+                [
+                 "str",
+                 "light.turn_on"
+                ]
+               ],
+               [
+                [
+                 "str",
+                 "target"
+                ],
+                [
+                 "map",
+                 [
+                  [
+                   [
+                    "str",
+                    "entity_id"
+                   ],
+                   [
+                    "str",
+                    "light.bedroom_lamp"
+                   ]
+                  ]
+                 ]
+                ]
+               ],
+               [
+                [
+                 "str",
+                 "data"
+                ],
+                [
+                 "map",
+                 [
+                  [
+                   [
+                    "str",
+                    "brightness_pct"
+                   ],
+                   [
+                    "int",
+                    "30"
+                   ]
+                  ],
+                  [
+                   [
+                    "str",
+                    "color_temp_kelvin"
+                   ],
+                   [
+                    "int",
+                    "2400"
+                   ]
+                  ],
+                  [
+                   [
+                    "str",
+                    "transition"
+                   ],
+                   [
+                    "int",
+                    "5"
+                   ]
+                  ]
+                 ]
+                ]
+               ]
+              ]
+             ]
+            ]
+           ]
+          ]
+         ]
+        ],
+        [
+         "map",
+         [
+          [
+           [
+            "str",
+            "id"
+           ],
+           [
+            "str",
+            "living_room_lifx_off_at_2330"
+           ]
+          ],
+          [
+           [
+            "str",
+            "alias"
+           ],
+           [
+            "str",
+            "Kitchen lights - off at 11:30pm"
+           ]
+          ],
+          [
+           [
+            "str",
+            "description"
+           ],
+           [
+            "str",
+            "Turn off the kitchen light and lamp every night at 11:30pm."
+           ]
+          ],
+          [
+           [
+            "str",
+            "mode"
+           ],
+           [
+            "str",
+            "single"
+           ]
+          ],
+          [
+           [
+            "str",
+            "triggers"
+           ],
+           [
+            "seq",
+            [
+             [
+              "map",
+              [
+               [
+                [
+                 "str",
+                 "trigger"
+                ],
+                [
+                 "str",
+                 "time"
+                ]
+               ],
+               [
+                [
+                 "str",
+                 "at"
+                ],
+                [
+                 "str",
+                 "23:30:00"
+                ]
+               ]
+              ]
+             ]
+            ]
+           ]
+          ],
+          [
+           [
+            "str",
+            "actions"
+           ],
+           [
+            "seq",
+            [
+             [
+              "map",
+              [
+               [
+                [
+                 "str",
+                 "action"
+                ],
+                [
+                 "str",
+                 "light.turn_off"
+                ]
+               ],
+               [
+                [
+                 "str",
+                 "target"
+                ],
+                [
+                 "map",
+                 [
+                  [
+                   [
+                    "str",
+                    "entity_id"
+                   ],
+                   [
+                    "seq",
+                    [
+                     [
+                      "str",
+                      "light.kitchen_kitchen_light"
+                     ],
+                     [
+                      "str",
+                      "light.bedroom_lamp"
+                     ]
+                    ]
+                   ]
+                  ]
+                 ]
+                ]
+               ],
+               [
+                [
+                 "str",
+                 "data"
+                ],
+                [
+                 "map",
+                 [
+                  [
+                   [
+                    "str",
+                    "transition"
+                   ],
+                   [
+                    "int",
+                    "10"
+                   ]
+                  ]
+                 ]
+                ]
+               ]
+              ]
+             ]
+            ]
+           ]
+          ]
+         ]
+        ]
+       ]
+      ]
+     ],
+     [
+      [
+       "str",
+       "script"
+      ],
+      [
+       "map",
+       []
+      ]
+     ],
+     [
+      [
+       "str",
+       "scene"
+      ],
+      [
+       "map",
+       []
+      ]
+     ]
+    ]
+   ]
+  },
+  {
+   "name": "user scripts.yaml",
+   "file": "input/scripts.yaml",
+   "value": [
+    "null",
+    null
+   ],
+   "pyclass": "NoneType",
+   "lines": null
+  },
+  {
+   "name": "user scenes.yaml",
+   "file": "input/scenes.yaml",
+   "value": [
+    "null",
+    null
+   ],
+   "pyclass": "NoneType",
+   "lines": null
+  }
+ ]
+}

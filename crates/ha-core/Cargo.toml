@@ -12,6 +12,7 @@ workspace = true
 
 [dependencies]
 rand = "0.9.5"
+base64 = "0.22.1"
 jiff = { version = "0.2.43", features = ["serde"] }
 parking_lot = "0.12.5"
 serde = { version = "1.0.229", features = ["derive", "rc"] }
@@ -20,6 +21,7 @@ smol_str = { version = "0.3.2", features = ["serde"] }
 thiserror = "2.0.21"
 tracing = "0.1.44"
 tokio = { version = "1.54.1", features = ["sync", "time", "rt"] }
+libyaml-safer = "0.3.0"
 
 [dev-dependencies]
 criterion = { version = "0.7.0", default-features = false }

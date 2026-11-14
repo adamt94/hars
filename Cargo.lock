@@ -489,8 +489,10 @@ dependencies = [
 name = "ha-core"
 version = "0.1.0"
 dependencies = [
+ "base64",
  "criterion",
  "jiff",
+ "libyaml-safer",
  "parking_lot",
  "rand",
  "serde",
@@ -797,6 +799,12 @@ checksum = "6a45a52f43e1c16f667ccfe4dd8c85b7f7c204fd5e3bf46c5b0db9a5c3c0b8e9"
 dependencies = [
  "cc",
 ]
+
+[[package]]
+name = "libyaml-safer"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d325b93a27b93b93b7cf4a57d681c5b6a4d8f910e695db989c055eb1e4f657df"
 
 [[package]]
 name = "linux-raw-sys"
