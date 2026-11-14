@@ -37,13 +37,19 @@ pub struct Response {
 pub struct Client {
     inner: Hyper<hyper_rustls::HttpsConnector<HttpConnector>, Empty<Bytes>>,
     user_agent: header::HeaderValue,
-    timeout: Duration,
+    headers_timeout: Duration,
+    total_timeout: Duration,
     max_body: usize,
 }
 
+/// aiohttp's `max_redirects`.
+const MAX_REDIRECTS: usize = 10;
+
 impl Client {
     /// `user_agent` identifies `hars` to the services it calls (api.met.no
-    /// requires one).
+    /// requires one). Timeouts are HA's: 30 s until the response headers
+    /// (pyMetno's own timeout, redirects included), 300 s for everything
+    /// (aiohttp's session default).
     pub fn new(user_agent: &str) -> Result<Self, Error> {
         let https = hyper_rustls::HttpsConnectorBuilder::new()
             .with_webpki_roots()
@@ -59,63 +65,115 @@ impl Client {
             inner,
             user_agent: header::HeaderValue::from_str(user_agent)
                 .map_err(|e| Error::Request(e.to_string()))?,
-            timeout: Duration::from_secs(30),
+            headers_timeout: Duration::from_secs(30),
+            total_timeout: Duration::from_secs(300),
             max_body: 4 * 1024 * 1024,
         })
     }
 
-    pub fn with_timeout(mut self, timeout: Duration) -> Self {
-        self.timeout = timeout;
+    /// How long to wait for the response headers, and for the whole
+    /// exchange.
+    pub fn with_timeouts(mut self, headers: Duration, total: Duration) -> Self {
+        self.headers_timeout = headers;
+        self.total_timeout = total;
         self
     }
 
-    /// `GET url` with extra headers; the whole exchange is bounded by the
-    /// timeout, and the body by the size cap.
+    /// `GET url` with extra headers, following redirects as aiohttp does
+    /// (up to 10, never from a public host to a loopback one, as HA's
+    /// guard). The body is capped in size.
     pub async fn get(
         &self,
         url: &str,
         headers: &[(header::HeaderName, String)],
     ) -> Result<Response, Error> {
-        let uri: Uri = url.parse().map_err(|_| Error::Url(url.to_owned()))?;
-        let mut req = Request::get(uri)
-            .header(header::USER_AGENT, self.user_agent.clone())
-            .body(Empty::<Bytes>::new())
-            .map_err(|e| Error::Request(e.to_string()))?;
-        for (name, value) in headers {
-            let value =
-                header::HeaderValue::from_str(value).map_err(|e| Error::Request(e.to_string()))?;
-            req.headers_mut().insert(name.clone(), value);
-        }
-        let exchange = async {
-            let res = self
-                .inner
-                .request(req)
-                .await
+        let start = tokio::time::Instant::now();
+        let headers_by = start + self.headers_timeout;
+        let total_by = start + self.total_timeout;
+        let mut uri: Uri = url.parse().map_err(|_| Error::Url(url.to_owned()))?;
+        let loopback = is_loopback(&uri);
+        let mut redirects = 0;
+        let res = loop {
+            let mut req = Request::get(uri.clone())
+                .header(header::USER_AGENT, self.user_agent.clone())
+                .body(Empty::<Bytes>::new())
                 .map_err(|e| Error::Request(e.to_string()))?;
-            let (parts, body) = res.into_parts();
-            let body = Limited::new(body, self.max_body)
-                .collect()
+            for (name, value) in headers {
+                let value = header::HeaderValue::from_str(value)
+                    .map_err(|e| Error::Request(e.to_string()))?;
+                req.headers_mut().insert(name.clone(), value);
+            }
+            let res = tokio::time::timeout_at(headers_by.min(total_by), self.inner.request(req))
                 .await
-                .map_err(|e| {
-                    if e.downcast_ref::<http_body_util::LengthLimitError>()
-                        .is_some()
-                    {
-                        Error::TooLarge(self.max_body)
-                    } else {
-                        Error::Request(e.to_string())
-                    }
-                })?
-                .to_bytes();
-            Ok(Response {
-                status: parts.status,
-                headers: parts.headers,
-                body,
-            })
+                .map_err(|_| Error::Timeout(self.headers_timeout))?
+                .map_err(|e| Error::Request(e.to_string()))?;
+            let location = res
+                .headers()
+                .get(header::LOCATION)
+                .and_then(|l| l.to_str().ok());
+            let redirect = matches!(res.status().as_u16(), 301 | 302 | 303 | 307 | 308);
+            let Some(location) = location.filter(|_| redirect) else {
+                break res;
+            };
+            redirects += 1;
+            if redirects > MAX_REDIRECTS {
+                return Err(Error::Request(format!(
+                    "more than {MAX_REDIRECTS} redirects"
+                )));
+            }
+            let next = resolve(&uri, location).ok_or_else(|| Error::Url(location.to_owned()))?;
+            if !loopback && is_loopback(&next) {
+                return Err(Error::Request(format!("redirect to loopback {next}")));
+            }
+            uri = next;
         };
-        tokio::time::timeout(self.timeout, exchange)
+        let (parts, body) = res.into_parts();
+        let body = tokio::time::timeout_at(total_by, Limited::new(body, self.max_body).collect())
             .await
-            .map_err(|_| Error::Timeout(self.timeout))?
+            .map_err(|_| Error::Timeout(self.total_timeout))?
+            .map_err(|e| {
+                if e.downcast_ref::<http_body_util::LengthLimitError>()
+                    .is_some()
+                {
+                    Error::TooLarge(self.max_body)
+                } else {
+                    Error::Request(e.to_string())
+                }
+            })?
+            .to_bytes();
+        Ok(Response {
+            status: parts.status,
+            headers: parts.headers,
+            body,
+        })
     }
+}
+
+/// A redirect's `Location`, against the URL that answered with it.
+fn resolve(base: &Uri, location: &str) -> Option<Uri> {
+    if location.starts_with("http://") || location.starts_with("https://") {
+        return location.parse().ok();
+    }
+    let scheme = base.scheme_str()?;
+    if let Some(rest) = location.strip_prefix("//") {
+        return format!("{scheme}://{rest}").parse().ok();
+    }
+    let authority = base.authority()?;
+    let path = if location.starts_with('/') {
+        location.to_owned()
+    } else {
+        let dir = base.path().rsplit_once('/').map_or("", |(d, _)| d);
+        format!("{dir}/{location}")
+    };
+    format!("{scheme}://{authority}{path}").parse().ok()
+}
+
+fn is_loopback(uri: &Uri) -> bool {
+    let host = uri.host().unwrap_or_default().trim_matches(['[', ']']);
+    host.eq_ignore_ascii_case("localhost")
+        || host
+            .parse::<std::net::IpAddr>()
+            .is_ok_and(|ip| ip.is_loopback())
 }
 
 #[cfg(test)]
@@ -176,7 +234,7 @@ mod tests {
         });
         let client = Client::new("t")
             .unwrap()
-            .with_timeout(Duration::from_millis(200));
+            .with_timeouts(Duration::from_millis(200), Duration::from_secs(5));
         assert!(matches!(
             client.get(&url, &[]).await,
             Err(Error::Timeout(_))
@@ -190,5 +248,109 @@ mod tests {
             client.get(&url, &[]).await,
             Err(Error::TooLarge(4))
         ));
+    }
+
+    /// Headers in time, then the body slower than the headers timeout but
+    /// within the total: that works (as in HA); past the total it doesn't.
+    #[tokio::test]
+    async fn the_body_has_the_total_timeout() {
+        async fn slow(delay: Duration) -> String {
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let url = format!("http://{}/", listener.local_addr().unwrap());
+            tokio::spawn(async move {
+                let (mut s, _) = listener.accept().await.unwrap();
+                let mut buf = vec![0u8; 4096];
+                let _ = s.read(&mut buf).await.unwrap();
+                s.write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\nab")
+                    .await
+                    .unwrap();
+                tokio::time::sleep(delay).await;
+                let _ = s.write_all(b"cd").await;
+            });
+            url
+        }
+        let client = Client::new("t")
+            .unwrap()
+            .with_timeouts(Duration::from_millis(100), Duration::from_millis(1500));
+        let res = client
+            .get(&slow(Duration::from_millis(400)).await, &[])
+            .await
+            .unwrap();
+        assert_eq!(&res.body[..], b"abcd");
+        let client = client.with_timeouts(Duration::from_millis(100), Duration::from_millis(300));
+        assert!(matches!(
+            client.get(&slow(Duration::from_secs(5)).await, &[]).await,
+            Err(Error::Timeout(_))
+        ));
+    }
+
+    /// A server answering each request from `replies` in turn; returns the
+    /// request lines it saw.
+    async fn serve(replies: Vec<String>) -> (String, tokio::task::JoinHandle<Vec<String>>) {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let base = format!("http://{}", listener.local_addr().unwrap());
+        let task = tokio::spawn(async move {
+            let mut seen = Vec::new();
+            for reply in replies {
+                let (mut s, _) = listener.accept().await.unwrap();
+                let mut buf = vec![0u8; 4096];
+                let n = s.read(&mut buf).await.unwrap();
+                let req = String::from_utf8_lossy(&buf[..n]).into_owned();
+                seen.push(req.lines().next().unwrap_or_default().to_owned());
+                s.write_all(reply.as_bytes()).await.unwrap();
+            }
+            seen
+        });
+        (base, task)
+    }
+
+    #[tokio::test]
+    async fn follows_redirects() {
+        let moved = |to: &str| {
+            format!(
+                "HTTP/1.1 302 Found\r\nLocation: {to}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+            )
+        };
+        let ok = "HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\nok".to_owned();
+        let (base, server) = serve(vec![moved("/b/c?x=1"), moved("d"), ok]).await;
+        let client = Client::new("t").unwrap();
+        let res = client.get(&format!("{base}/a"), &[]).await.unwrap();
+        assert_eq!((res.status, &res.body[..]), (StatusCode::OK, &b"ok"[..]));
+        assert_eq!(
+            server.await.unwrap(),
+            [
+                "GET /a HTTP/1.1",
+                "GET /b/c?x=1 HTTP/1.1",
+                "GET /b/d HTTP/1.1"
+            ]
+        );
+
+        // More than 10 is an error.
+        let (base, _server) = serve((0..11).map(|_| moved("/again")).collect()).await;
+        assert!(matches!(
+            client.get(&format!("{base}/a"), &[]).await,
+            Err(Error::Request(e)) if e.contains("redirects")
+        ));
+    }
+
+    #[test]
+    fn redirects_resolve_and_loopback_is_spotted() {
+        let base: Uri = "https://api.met.no/weatherapi/x/complete?lat=1"
+            .parse()
+            .unwrap();
+        let r = |l: &str| resolve(&base, l).unwrap().to_string();
+        assert_eq!(r("https://other.example/y"), "https://other.example/y");
+        assert_eq!(r("//cdn.example/z"), "https://cdn.example/z");
+        assert_eq!(r("/abs?q=2"), "https://api.met.no/abs?q=2");
+        assert_eq!(r("rel"), "https://api.met.no/weatherapi/x/rel");
+        for (u, lo) in [
+            ("http://localhost:8123/", true),
+            ("http://127.0.0.2/", true),
+            ("http://[::1]/", true),
+            ("https://api.met.no/", false),
+            ("http://10.0.0.2/", false),
+        ] {
+            assert_eq!(is_loopback(&u.parse().unwrap()), lo, "{u}");
+        }
     }
 }

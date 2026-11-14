@@ -327,3 +327,57 @@ fn display_list_scales_linearly() {
     assert_eq!(v["entities"][0]["en"], "Power");
     assert!(took < std::time::Duration::from_millis(500), "{took:?}");
 }
+
+#[test]
+fn targets_expand_like_ha() {
+    let entity = |id: &str, device: Option<&str>, area: Option<&str>| Entity {
+        entity_id: id.into(),
+        platform: "met".into(),
+        device_id: device.map(Into::into),
+        area_id: area.map(Into::into),
+        ..Default::default()
+    };
+    let r = Registries {
+        entities: vec![
+            entity("weather.a", Some("d1"), None),
+            // Its own area wins over its device's.
+            entity("weather.b", Some("d1"), Some("garden")),
+            Entity {
+                entity_category: Some("diagnostic".into()),
+                ..entity("sensor.diag", Some("d1"), None)
+            },
+            Entity {
+                hidden_by: Some("user".into()),
+                ..entity("sensor.hidden", Some("d1"), None)
+            },
+            Entity {
+                labels: vec!["outside".into()],
+                ..entity("weather.c", None, None)
+            },
+        ],
+        devices: vec![Device {
+            id: "d1".into(),
+            area_id: Some("roof".into()),
+            ..Default::default()
+        }],
+        areas: vec![
+            Area {
+                id: "roof".into(),
+                floor_id: Some("top".into()),
+                ..Default::default()
+            },
+            Area {
+                id: "garden".into(),
+                ..Default::default()
+            },
+        ],
+        ..Default::default()
+    };
+    let t = |v: Value| r.target_entities(v.as_object().unwrap());
+    assert_eq!(t(json!({"device_id": "d1"})), ["weather.a", "weather.b"]);
+    assert_eq!(t(json!({"area_id": "roof"})), ["weather.a"]);
+    assert_eq!(t(json!({"floor_id": ["top"]})), ["weather.a"]);
+    assert_eq!(t(json!({"area_id": "garden"})), ["weather.b"]);
+    assert_eq!(t(json!({"label_id": "outside"})), ["weather.c"]);
+    assert!(t(json!({"device_id": "none", "entity_id": "weather.a"})).is_empty());
+}

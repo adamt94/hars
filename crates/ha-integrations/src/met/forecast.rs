@@ -39,16 +39,39 @@ impl Num {
             (a, b) => a.f64() < b.f64(),
         }
     }
+}
 
-    /// Python's `+`: int + int stays an int.
-    fn add(self, other: Self) -> Self {
-        match (self, other) {
-            (Self::Int(a), Self::Int(b)) => a
-                .checked_add(b)
-                .map_or(Self::Float(a as f64 + b as f64), Self::Int),
-            (a, b) => Self::Float(a.f64() + b.f64()),
+/// Python 3.14's `sum()` from int 0: ints add exactly until the first
+/// float, which is added plainly; everything after it is added with
+/// Neumaier's compensation, and the compensation is applied at the end.
+pub fn py_sum(values: &[Num]) -> Num {
+    let mut it = values.iter();
+    let mut int: i64 = 0;
+    let mut f = loop {
+        match it.next() {
+            None => return Num::Int(int),
+            Some(Num::Int(v)) => match int.checked_add(*v) {
+                Some(n) => int = n,
+                None => break int as f64 + *v as f64,
+            },
+            Some(Num::Float(x)) => break int as f64 + x,
         }
+    };
+    let mut c = 0.0;
+    for v in it {
+        let x = v.f64();
+        let t = f + x;
+        if f.abs() >= x.abs() {
+            c += (f - t) + x;
+        } else {
+            c += (x - t) + f;
+        }
+        f = t;
     }
+    if c != 0.0 && c.is_finite() {
+        f += c;
+    }
+    Num::Float(f)
 }
 
 /// Python's `round(x, n)` for a float: correctly rounded from the exact
@@ -453,12 +476,10 @@ impl Forecast {
         } else {
             item.temperature = max(&temps);
             item.templow = extreme(&temps, false);
-            // `round(sum(...), 1)`: a left fold from int 0.
-            item.precipitation = (!precips.is_empty()).then(|| {
-                match precips.iter().fold(Num::Int(0), |a, &b| a.add(b)) {
-                    Num::Int(i) => Num::Int(i),
-                    Num::Float(f) => Num::Float(round(f, 1)),
-                }
+            // `round(sum(...), 1)`.
+            item.precipitation = (!precips.is_empty()).then(|| match py_sum(&precips) {
+                Num::Int(i) => Num::Int(i),
+                Num::Float(f) => Num::Float(round(f, 1)),
             });
             item.precipitation_probability = max(&probs);
             item.wind_speed = max(&winds);

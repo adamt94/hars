@@ -78,21 +78,19 @@ pub fn start(
     }
 
     let weather = Arc::new(weather::Weather::default());
-    let met: Vec<Map<String, Value>> = enabled(met::DOMAIN)
-        .filter_map(|e| e.get("data").and_then(Value::as_object).cloned())
-        .collect();
+    let met: Vec<Map<String, Value>> = enabled(met::DOMAIN).cloned().collect();
     if !met.is_empty() {
-        for data in met {
+        for entry in met {
             tokio::spawn(met::run(
                 hass.clone(),
                 registries.clone(),
                 weather.clone(),
                 USER_AGENT,
                 met::URL.to_owned(),
-                data,
+                entry,
             ));
         }
-        weather.register_services(hass);
+        weather.register_services(hass, registries.clone());
         running.extend(["met", "weather"]);
     }
     Started { running, weather }

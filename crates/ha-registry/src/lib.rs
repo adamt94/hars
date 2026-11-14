@@ -586,6 +586,86 @@ impl Registries {
         }
     }
 
+    /// The entities a service target's `device_id`, `area_id`, `floor_id`
+    /// and `label_id` reach, as HA's `async_extract_referenced_entity_ids`
+    /// (primary entities only): hidden entities and config/diagnostic ones
+    /// are left out of device and area expansion, and an entity reached
+    /// through its device's area only when it has no area of its own.
+    /// `entity_id` itself is not resolved here.
+    pub fn target_entities(&self, target: &Map<String, Value>) -> Vec<String> {
+        use std::collections::BTreeSet;
+        let ids = |key: &str| -> BTreeSet<&str> {
+            match target.get(key) {
+                Some(Value::String(s)) if s != "none" => BTreeSet::from([s.as_str()]),
+                Some(Value::Array(a)) => a.iter().filter_map(Value::as_str).collect(),
+                _ => BTreeSet::new(),
+            }
+        };
+        let (floors, labels) = (ids("floor_id"), ids("label_id"));
+        let mut areas = ids("area_id");
+        let mut devices = ids("device_id");
+        let mut out = BTreeSet::new();
+        let enabled = |e: &&Entity| e.disabled_by.is_none();
+        let primary = |e: &Entity| e.hidden_by.is_none() && e.entity_category.is_none();
+        for label in &labels {
+            let has = |l: &Vec<String>| l.iter().any(|x| x == label);
+            out.extend(
+                self.entities
+                    .iter()
+                    .filter(|e| has(&e.labels) && e.hidden_by.is_none())
+                    .map(|e| e.entity_id.as_str()),
+            );
+            devices.extend(
+                self.devices
+                    .iter()
+                    .filter(|d| has(&d.labels))
+                    .map(|d| d.id.as_str()),
+            );
+            areas.extend(
+                self.areas
+                    .iter()
+                    .filter(|a| has(&a.labels))
+                    .map(|a| a.id.as_str()),
+            );
+        }
+        areas.extend(
+            self.areas
+                .iter()
+                .filter(|a| a.floor_id.as_deref().is_some_and(|f| floors.contains(f)))
+                .map(|a| a.id.as_str()),
+        );
+        out.extend(
+            self.entities
+                .iter()
+                .filter(enabled)
+                .filter(|e| e.device_id.as_deref().is_some_and(|d| devices.contains(d)))
+                .filter(|e| primary(e))
+                .map(|e| e.entity_id.as_str()),
+        );
+        let area_devices: BTreeSet<&str> = self
+            .devices
+            .iter()
+            .filter(|d| d.area_id.as_deref().is_some_and(|a| areas.contains(a)))
+            .map(|d| d.id.as_str())
+            .collect();
+        out.extend(
+            self.entities
+                .iter()
+                .filter(|e| primary(e))
+                .filter(|e| match e.area_id.as_deref() {
+                    Some(a) => areas.contains(a),
+                    None => {
+                        enabled(e)
+                            && e.device_id
+                                .as_deref()
+                                .is_some_and(|d| area_devices.contains(d))
+                    }
+                })
+                .map(|e| e.entity_id.as_str()),
+        );
+        out.into_iter().map(str::to_owned).collect()
+    }
+
     /// `config/entity_registry/list_for_display`: enabled entities only.
     pub fn entities_for_display(&self) -> Value {
         // Indexed once per call: linear in entities + devices.

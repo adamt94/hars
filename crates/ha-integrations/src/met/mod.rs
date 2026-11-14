@@ -289,17 +289,24 @@ fn zones(config: &CoreConfig) -> (TimeZone, TimeZone) {
 /// Setup retries on HA's ladder (5 s doubling to 10 min); after that a
 /// refresh every 55–64 minutes (drawn once) plus jitter, re-armed after
 /// each one finishes. A failed refresh makes the entity unavailable until
-/// the next success; forecast readers keep the last good forecast.
+/// the next success; forecast readers keep the last good forecast. An
+/// entry with `pref_disable_polling` is fetched once, at setup, as HA.
 pub async fn run(
     hass: Hass,
     registries: Arc<Registries>,
     weather: Arc<Weather>,
     user_agent: &'static str,
     base_url: String,
-    data: Map<String, Value>,
+    entry: Map<String, Value>,
 ) {
+    let empty = Map::new();
+    let data = entry
+        .get("data")
+        .and_then(Value::as_object)
+        .unwrap_or(&empty);
+    let polling = entry.get("pref_disable_polling").and_then(Value::as_bool) != Some(true);
     let config = hass.config();
-    let Some(loc) = Location::new(&data, &config) else {
+    let Some(loc) = Location::new(data, &config) else {
         tracing::warn!("Skip setting up met.no integration; No Home location has been set");
         return;
     };
@@ -310,7 +317,7 @@ pub async fn run(
         "{base_url}?{}",
         forecast::query(loc.latitude, loc.longitude, loc.elevation)
     );
-    schedule(&hass, &weather, &entity, |prev| {
+    schedule(&hass, &weather, &entity, polling, |prev| {
         fetch_once(user_agent, &url, prev)
     })
     .await;
@@ -318,8 +325,13 @@ pub async fn run(
 
 /// HA's coordinator schedule around `fetch`, which is handed the last good
 /// fetch (for `If-Modified-Since`) and gives it back on failure.
-async fn schedule<F, Fut>(hass: &Hass, weather: &Weather, entity: &Entity, mut fetch: F)
-where
+async fn schedule<F, Fut>(
+    hass: &Hass,
+    weather: &Weather,
+    entity: &Entity,
+    polling: bool,
+    mut fetch: F,
+) where
     F: FnMut(Option<Fetched>) -> Fut,
     Fut: Future<Output = Result<Fetched, (FetchError, Option<Fetched>)>>,
 {
@@ -347,7 +359,15 @@ where
         let (tz, bucket) = zones(&hass.config());
         let computed = last.forecast.compute(now, &tz, &bucket);
         entity.write(hass, &computed, true, now);
-        weather.publish(&entity.id, features, entity.forecasts(hass, &computed));
+        weather.publish(
+            &entity.id,
+            features,
+            true,
+            entity.forecasts(hass, &computed),
+        );
+        if !polling {
+            return std::future::pending().await;
+        }
         if !available {
             tracing::info!("Fetching met data recovered");
         }
@@ -365,7 +385,8 @@ where
                         available = false;
                         entity.write(hass, &computed, false, clock.now());
                         // Subscribers hear of it, with the old forecast.
-                        weather.publish(&entity.id, features, entity.forecasts(hass, &computed));
+                        let forecasts = entity.forecasts(hass, &computed);
+                        weather.publish(&entity.id, features, false, forecasts);
                     }
                 }
             }

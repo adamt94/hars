@@ -1002,21 +1002,32 @@ async fn weather_forecasts_are_served_and_pushed() {
     hass.start();
     let auth = crate::test_util::auth(true);
     let weather = std::sync::Arc::new(Weather::default());
-    weather.register_services(&hass);
+    let registries = ha_registry::Registries {
+        entities: vec![ha_registry::Entity {
+            entity_id: "weather.forecast_home".into(),
+            platform: "met".into(),
+            device_id: Some("dev1".into()),
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+    weather.register_services(&hass, std::sync::Arc::new(registries));
     let id = EntityId::parse("weather.forecast_home").unwrap();
     let daily = |t: f64| {
         std::sync::Arc::new(json!([{"datetime": "2026-11-14T12:00:00+00:00", "temperature": t}]))
     };
-    let publish = |t: f64| {
+    let publish_as = |t: f64, available: bool| {
         weather.publish(
             &id,
             3,
+            available,
             Forecasts {
                 daily: daily(t),
                 hourly: std::sync::Arc::new(json!([])),
             },
         )
     };
+    let publish = |t: f64| publish_as(t, true);
     publish(10.5);
     let config = crate::ApiConfig {
         weather: weather.clone(),
@@ -1101,13 +1112,31 @@ async fn weather_forecasts_are_served_and_pushed() {
         r["error"]["message"],
         "Service call requested response data but did not match any entities"
     );
+    // A device target reaches its weather entity.
+    let by_device = |id: u64| {
+        json!({"id": id, "type": "call_service", "domain": "weather", "service": "get_forecasts",
+            "service_data": {"type": "daily"}, "target": {"device_id": "dev1"}, "return_response": true})
+    };
+    let r = c.call(by_device(20)).await;
+    assert_eq!(
+        r["result"]["response"]["weather.forecast_home"]["forecast"][0]["temperature"],
+        11.0
+    );
+    // Unavailable: the service skips it; subscribers still get the forecast.
+    publish_as(11.0, false);
+    assert_eq!(c.recv().await["event"]["forecast"][0]["temperature"], 11.0);
+    let r = c.call(by_device(21)).await;
+    assert_eq!(
+        r["error"]["message"],
+        "Service call requested response data but did not match any entities"
+    );
 
     // Unsubscribed: no more pushes.
     let r = c
-        .call(json!({"id": 11, "type": "unsubscribe_events", "subscription": 7}))
+        .call(json!({"id": 31, "type": "unsubscribe_events", "subscription": 7}))
         .await;
-    assert_eq!(r["success"], true);
+    assert_eq!(r["success"], true, "{r}");
     publish(12.0);
-    let r = c.call(json!({"id": 12, "type": "ping"})).await;
+    let r = c.call(json!({"id": 32, "type": "ping"})).await;
     assert_eq!(r["type"], "pong");
 }

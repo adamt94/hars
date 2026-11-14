@@ -4,6 +4,7 @@
 
 use crate::met::forecast::{Item, Num, round, round_int};
 use ha_core::{EntityId, EntityTarget, Hass, Schema, ServiceError, SupportsResponse};
+use ha_registry::Registries;
 use parking_lot::RwLock;
 use serde_json::{Map, Value, json};
 use std::sync::Arc;
@@ -313,6 +314,9 @@ impl Forecasts {
 
 struct Entity {
     supported_features: u32,
+    /// Whether the last refresh worked. Forecast subscribers are served
+    /// either way; `weather.get_forecasts` skips unavailable entities.
+    available: bool,
     forecasts: watch::Sender<Forecasts>,
 }
 
@@ -332,17 +336,26 @@ pub struct Weather {
 }
 
 impl Weather {
-    /// Publish `entity_id`'s forecasts (adding the entity on first use).
-    pub fn publish(&self, entity_id: &EntityId, supported_features: u32, forecasts: Forecasts) {
+    /// Publish `entity_id`'s forecasts and availability (adding the entity
+    /// on first use).
+    pub fn publish(
+        &self,
+        entity_id: &EntityId,
+        supported_features: u32,
+        available: bool,
+        forecasts: Forecasts,
+    ) {
         let mut entities = self.entities.write();
-        match entities.iter().find(|(id, _)| id == entity_id) {
+        match entities.iter_mut().find(|(id, _)| id == entity_id) {
             Some((_, e)) => {
+                e.available = available;
                 e.forecasts.send_replace(forecasts);
             }
             None => entities.push((
                 entity_id.clone(),
                 Entity {
                     supported_features,
+                    available,
                     forecasts: watch::channel(forecasts).0,
                 },
             )),
@@ -367,22 +380,25 @@ impl Weather {
         Ok(e.forecasts.subscribe())
     }
 
-    /// `weather.get_forecasts` for these targets.
-    fn get_forecasts(
+    /// `weather.get_forecasts` for these targets: `entity_id`s plus the
+    /// entities `indirect` (devices, areas, floors, labels) reach. Only
+    /// available entities answer, as HA's entity services.
+    pub(crate) fn get_forecasts(
         &self,
         target: &EntityTarget,
+        indirect: &[String],
         kind: Kind,
     ) -> Result<Map<String, Value>, ServiceError> {
         let entities = self.entities.read();
         let selected: Vec<&(EntityId, Entity)> = match target {
             EntityTarget::All => entities.iter().collect(),
-            EntityTarget::Ids(ids) => ids
+            EntityTarget::Ids(ids) => entities
                 .iter()
-                .filter_map(|id| entities.iter().find(|(e, _)| e == id))
+                .filter(|(e, _)| ids.contains(e) || indirect.iter().any(|i| i == e.as_str()))
                 .collect(),
         };
         let mut response = Map::new();
-        for (id, e) in &selected {
+        for (id, e) in selected.iter().filter(|(_, e)| e.available) {
             let forecasts = e.forecasts.borrow();
             let Some(list) = forecasts
                 .get(kind)
@@ -403,8 +419,9 @@ impl Weather {
         Ok(response)
     }
 
-    /// Register `weather.get_forecasts` (response only).
-    pub fn register_services(self: &Arc<Self>, hass: &Hass) {
+    /// Register `weather.get_forecasts` (response only). `registries`
+    /// resolve device, area, floor and label targets.
+    pub fn register_services(self: &Arc<Self>, hass: &Hass, registries: Arc<Registries>) {
         let schema = Schema::entity_service().required(
             "type",
             ha_core::Kind::OneOf(&["daily", "hourly", "twice_daily"]),
@@ -417,6 +434,7 @@ impl Weather {
             SupportsResponse::Only,
             move |call| {
                 let weather = weather.clone();
+                let registries = registries.clone();
                 async move {
                     let kind = call
                         .data
@@ -427,7 +445,8 @@ impl Weather {
                             ServiceError::Invalid("required key not provided @ data['type']".into())
                         })?;
                     let target = call.entity_ids()?;
-                    weather.get_forecasts(&target, kind).map(Some)
+                    let indirect = registries.target_entities(&call.data);
+                    weather.get_forecasts(&target, &indirect, kind).map(Some)
                 }
             },
         );

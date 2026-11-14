@@ -1,4 +1,4 @@
-use super::forecast::{Computed, Forecast, Num, query, round, round_int};
+use super::forecast::{Computed, Forecast, Num, py_sum, query, round, round_int};
 use super::*;
 use serde_json::json;
 
@@ -415,7 +415,7 @@ async fn refreshes_on_has_schedule_and_goes_unavailable_on_failure() {
         std::future::ready(res)
     };
     let (h, w) = (hass.clone(), weather.clone());
-    let task = tokio::spawn(async move { schedule(&h, &w, &entity, fetch).await });
+    let task = tokio::spawn(async move { schedule(&h, &w, &entity, true, fetch).await });
     let id = EntityId::parse("weather.forecast_home").unwrap();
 
     tokio::time::sleep(Duration::from_secs(20)).await;
@@ -456,6 +456,16 @@ async fn refreshes_on_has_schedule_and_goes_unavailable_on_failure() {
     let s = hass.states().get(&id).unwrap();
     assert_eq!(s.state, "unavailable");
     assert_eq!(s.attributes.len(), 3);
+    // `weather.get_forecasts` skips it while it's unavailable.
+    let all = ha_core::EntityTarget::All;
+    assert_eq!(
+        weather
+            .get_forecasts(&all, &[], weather::Kind::Daily)
+            .unwrap_err(),
+        ha_core::ServiceError::Failed(
+            "Service call requested response data but did not match any entities".into()
+        )
+    );
     // Subscribers got the old forecast once, at the failure.
     assert!(sub.has_changed().unwrap());
     assert_eq!(sub.borrow_and_update().daily.as_array().unwrap().len(), 3);
@@ -472,6 +482,11 @@ async fn refreshes_on_has_schedule_and_goes_unavailable_on_failure() {
     assert_eq!(calls.lock().len(), 7);
     assert!(sub.has_changed().unwrap());
     assert_eq!(hass.states().get(&id).unwrap().state, "partlycloudy");
+    assert!(
+        weather
+            .get_forecasts(&all, &[], weather::Kind::Daily)
+            .is_ok()
+    );
     task.abort();
 }
 
@@ -533,4 +548,55 @@ async fn fetch_sends_if_modified_since_and_keeps_the_forecast_on_304() {
     assert!(!requests[0].contains("if-modified-since"));
     assert!(requests[1].contains("if-modified-since: sat, 14 nov 2026 10:00:00 gmt"));
     assert!(requests[1].contains("user-agent: hars-test"));
+}
+
+#[test]
+fn sums_like_python() {
+    use Num::{Float as F, Int as I};
+    // Each checked against CPython 3.14's `sum()`.
+    for (xs, want) in [
+        (vec![F(0.52), F(0.91), F(0.62)], F(2.05)),
+        (vec![F(0.0), F(0.0), F(0.3), F(0.9), F(2.25)], F(3.45)),
+        (
+            vec![F(0.1), I(1), F(0.2), F(1e16), F(0.3), F(-1e16)],
+            F(1.6),
+        ),
+        (vec![F(1e16), F(1.0), F(-1e16)], F(1.0)),
+        // The first float joins the int prefix plainly.
+        (vec![I(10_000_000_000_000_000), F(1.0), F(-1e16)], F(0.0)),
+        (vec![I(3), F(1e16), F(1.0), F(-1e16)], F(5.0)),
+        (vec![I(1), I(2)], I(3)),
+    ] {
+        assert_eq!(py_sum(&xs), want, "sum({xs:?})");
+    }
+    // pyMetno rounds that first sum to 2.0; a plain left fold gives 2.1.
+    assert_eq!(round(0.52 + 0.91 + 0.62, 1), 2.1);
+    let Num::Float(s) = py_sum(&[F(0.52), F(0.91), F(0.62)]) else {
+        unreachable!()
+    };
+    assert_eq!(round(s, 1), 2.0);
+}
+
+#[tokio::test(start_paused = true)]
+async fn polling_disabled_fetches_only_at_setup() {
+    let hass = Hass::new();
+    let weather = Arc::new(Weather::default());
+    let entity = Entity {
+        id: EntityId::parse("weather.forecast_home").unwrap(),
+        name: "Forecast Home".into(),
+        options: None,
+    };
+    let calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let n = calls.clone();
+    let fetch = move |_| {
+        n.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        std::future::ready(Ok(fixture_a()))
+    };
+    let (h, w) = (hass.clone(), weather.clone());
+    let task = tokio::spawn(async move { schedule(&h, &w, &entity, false, fetch).await });
+    tokio::time::sleep(Duration::from_secs(5 * 3600)).await;
+    assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 1);
+    let id = EntityId::parse("weather.forecast_home").unwrap();
+    assert_eq!(hass.states().get(&id).unwrap().state, "partlycloudy");
+    task.abort();
 }
