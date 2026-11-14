@@ -195,11 +195,7 @@ pub fn position(o: &Observer, now: Timestamp) -> (f64, f64) {
 /// Python's `datetime.isoformat()` of a UTC time: microseconds only when
 /// there are any.
 pub fn iso(t: Timestamp) -> String {
-    if t.subsec_microsecond() == 0 {
-        t.strftime("%Y-%m-%dT%H:%M:%S+00:00").to_string()
-    } else {
-        t.strftime("%Y-%m-%dT%H:%M:%S%.6f+00:00").to_string()
-    }
+    ha_core::isoformat(t)
 }
 
 /// A timestamp sensor's state: `isoformat(timespec="seconds")` in UTC.

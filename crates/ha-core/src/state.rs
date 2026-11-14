@@ -5,20 +5,64 @@ use serde::Serialize;
 use smol_str::SmolStr;
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicI64, Ordering};
 use tokio::sync::mpsc;
 
 pub type Attributes = serde_json::Map<String, serde_json::Value>;
 
-/// Immutable snapshot of one entity. Shared via `Arc` between the state
-/// machine, events, and API responses so it is never deep-copied.
+/// Immutable snapshot of one entity (but for `last_reported`). Shared via
+/// `Arc` between the state machine, events, and API responses so it is
+/// never deep-copied. Serializes as HA's `State.as_dict`.
 #[derive(Debug, Clone, Serialize, PartialEq)]
 pub struct State {
     pub entity_id: EntityId,
     pub state: SmolStr,
     pub attributes: Attributes,
+    #[serde(serialize_with = "crate::clock::serialize_iso")]
     pub last_changed: Timestamp,
+    pub last_reported: Reported,
+    #[serde(serialize_with = "crate::clock::serialize_iso")]
     pub last_updated: Timestamp,
     pub context: Context,
+}
+
+/// `last_reported`: when the state was last written, changed or not. A
+/// write that changes nothing moves it on the existing state, as HA
+/// mutates its `State` in place, so it is atomic (microseconds since the
+/// epoch) and needs no copy of the attributes.
+#[derive(Debug, Default)]
+pub struct Reported(AtomicI64);
+
+impl Reported {
+    pub fn new(t: Timestamp) -> Self {
+        Self(AtomicI64::new(t.as_microsecond()))
+    }
+
+    pub fn get(&self) -> Timestamp {
+        Timestamp::from_microsecond(self.0.load(Ordering::Relaxed)).unwrap_or_default()
+    }
+
+    fn set(&self, t: Timestamp) {
+        self.0.store(t.as_microsecond(), Ordering::Relaxed);
+    }
+}
+
+impl Clone for Reported {
+    fn clone(&self) -> Self {
+        Self::new(self.get())
+    }
+}
+
+impl PartialEq for Reported {
+    fn eq(&self, other: &Self) -> bool {
+        self.get() == other.get()
+    }
+}
+
+impl Serialize for Reported {
+    fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        crate::clock::serialize_iso(&self.get(), s)
+    }
 }
 
 #[derive(Default)]
@@ -97,8 +141,8 @@ impl StateMachine {
     /// Write a state and, if it changed, fire `state_changed` to the
     /// lossless listeners and the bus before the lock is released, so every
     /// consumer sees one order. The timestamp is read under the lock for the
-    /// same reason. An unchanged write returns the existing `Arc` and fires
-    /// nothing.
+    /// same reason. An unchanged write returns the existing `Arc`, moves
+    /// only its `last_reported`, and fires no `state_changed`.
     pub(crate) fn set(
         &self,
         entity_id: EntityId,
@@ -115,6 +159,7 @@ impl StateMachine {
             && o.state == state
             && o.attributes == attributes
         {
+            o.last_reported.set(clock.now());
             return o.clone();
         }
 
@@ -129,6 +174,7 @@ impl StateMachine {
             state,
             attributes,
             last_changed,
+            last_reported: Reported::new(now),
             last_updated: now,
             context: context.clone(),
         });
@@ -420,5 +466,48 @@ mod tests {
             drop(hass.subscribe_state_changes());
         }
         assert_eq!(hass.states().listeners.lock().len(), 1);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn serializes_and_reports_like_has_state() {
+        let sim = crate::SimulatedClock::new("2026-11-14T13:29:29.778252Z".parse().unwrap());
+        let hass = Hass::with_clock(sim.clock());
+        let id = EntityId::parse("sensor.t").unwrap();
+        let mut attrs = Attributes::new();
+        attrs.insert("unit_of_measurement".into(), "°C".into());
+        let first = hass.set_state(id.clone(), "20", attrs.clone());
+        let json = serde_json::to_value(&*first).unwrap();
+        let keys: Vec<&str> = json
+            .as_object()
+            .unwrap()
+            .keys()
+            .map(String::as_str)
+            .collect();
+        assert_eq!(
+            keys,
+            [
+                "attributes",
+                "context",
+                "entity_id",
+                "last_changed",
+                "last_reported",
+                "last_updated",
+                "state"
+            ]
+        );
+        for k in ["last_changed", "last_reported", "last_updated"] {
+            assert_eq!(json[k], "2026-11-14T13:29:29.778252+00:00", "{k}");
+        }
+
+        // The same write later: same state object, only `last_reported`
+        // moves, and nothing fires.
+        let mut rx = hass.bus().subscribe();
+        tokio::time::advance(std::time::Duration::from_secs(2)).await;
+        let again = hass.set_state(id.clone(), "20", attrs);
+        assert!(Arc::ptr_eq(&first, &again));
+        let json = serde_json::to_value(&*hass.states().get(&id).unwrap()).unwrap();
+        assert_eq!(json["last_reported"], "2026-11-14T13:29:31.778252+00:00");
+        assert_eq!(json["last_updated"], "2026-11-14T13:29:29.778252+00:00");
+        assert!(rx.try_recv().is_err());
     }
 }

@@ -40,6 +40,7 @@ pub enum EventKind {
 pub struct Event {
     #[serde(flatten)]
     pub kind: EventKind,
+    #[serde(serialize_with = "crate::clock::serialize_iso")]
     pub time_fired: Timestamp,
     pub context: Context,
 }

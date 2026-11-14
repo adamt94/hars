@@ -395,7 +395,22 @@ async fn subscribe_events_forwards_has_event_shape() {
     assert_eq!(event["data"]["entity_id"], "switch.a");
     assert_eq!(event["data"]["old_state"], Value::Null);
     assert_eq!(event["data"]["new_state"]["state"], "on");
-    assert!(event["time_fired"].is_string() && event["context"]["id"].is_string());
+    assert!(event["context"]["id"].is_string());
+    // HA's `isoformat()`: UTC as `+00:00`, at most microseconds.
+    let ha_time = |v: &Value| {
+        let s = v.as_str().unwrap_or_default();
+        let (main, frac) = s
+            .strip_suffix("+00:00")
+            .map_or((s, ""), |m| m.split_at(19.min(m.len())));
+        s.ends_with("+00:00")
+            && main.len() == 19
+            && (frac.is_empty() || (frac.len() == 7 && frac.starts_with('.')))
+    };
+    assert!(ha_time(&event["time_fired"]), "{}", event["time_fired"]);
+    let new = &event["data"]["new_state"];
+    for k in ["last_changed", "last_reported", "last_updated"] {
+        assert!(ha_time(&new[k]), "{k}: {}", new[k]);
+    }
 }
 
 #[tokio::test]

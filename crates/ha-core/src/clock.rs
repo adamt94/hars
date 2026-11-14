@@ -40,12 +40,14 @@ impl Clock {
         Self(Source::System)
     }
 
-    /// Current wall-clock time.
+    /// Current wall-clock time, to the microsecond (HA's datetimes have no
+    /// finer resolution, and its JSON shows microseconds).
     pub fn now(&self) -> Timestamp {
-        match &self.0 {
+        let t = match &self.0 {
             Source::System => Timestamp::now(),
             Source::Simulated(anchor) => anchor.lock().wall_at(Instant::now()),
-        }
+        };
+        Timestamp::from_microsecond(t.as_microsecond()).unwrap_or(t)
     }
 
     /// Current monotonic time. Use it for durations and `sleep_until`
@@ -106,6 +108,26 @@ impl SimulatedClock {
     }
 }
 
+/// Python's `datetime.isoformat()` of a UTC time, as HA's JSON shows it:
+/// `2026-11-14T13:29:29.778252+00:00`, and no fraction when it is zero.
+pub fn isoformat(t: Timestamp) -> String {
+    iso_display(t).to_string()
+}
+
+fn iso_display(t: Timestamp) -> impl std::fmt::Display {
+    t.strftime(if t.subsec_microsecond() == 0 {
+        "%Y-%m-%dT%H:%M:%S+00:00"
+    } else {
+        "%Y-%m-%dT%H:%M:%S%.6f+00:00"
+    })
+}
+
+/// `#[serde(serialize_with)]` for [`isoformat`], written straight into the
+/// output without a `String` per timestamp.
+pub fn serialize_iso<S: serde::Serializer>(t: &Timestamp, s: S) -> Result<S::Ok, S::Error> {
+    s.collect_str(&iso_display(*t))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -154,5 +176,28 @@ mod tests {
         let before = Timestamp::now();
         let now = Clock::default().now();
         assert!(now >= before && now <= Timestamp::now());
+    }
+
+    #[test]
+    fn isoformat_like_python() {
+        assert_eq!(
+            isoformat(ts("2026-11-14T13:29:29Z")),
+            "2026-11-14T13:29:29+00:00"
+        );
+        assert_eq!(
+            isoformat(ts("2026-11-14T13:29:29.778252Z")),
+            "2026-11-14T13:29:29.778252+00:00"
+        );
+        assert_eq!(
+            isoformat(ts("2026-11-14T13:29:29.000001Z")),
+            "2026-11-14T13:29:29.000001+00:00"
+        );
+    }
+
+    #[test]
+    fn now_is_whole_microseconds() {
+        for _ in 0..100 {
+            assert_eq!(Clock::system().now().subsec_nanosecond() % 1000, 0);
+        }
     }
 }

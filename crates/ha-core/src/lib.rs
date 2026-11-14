@@ -21,7 +21,7 @@ mod service;
 mod state;
 pub mod storage;
 
-pub use clock::{Clock, SimulatedClock};
+pub use clock::{Clock, SimulatedClock, isoformat, serialize_iso};
 pub use context::{Context, ContextId};
 pub use entity_id::{EntityId, EntityIdError};
 pub use event::{Event, EventBus, EventKind};
@@ -31,7 +31,7 @@ pub use service::{
     EntityTarget, ServiceCall, ServiceData, ServiceError, ServiceRegistry, ServiceResponse,
     SupportsResponse,
 };
-pub use state::{Attributes, State, StateChanges, StateMachine};
+pub use state::{Attributes, Reported, State, StateChanges, StateMachine};
 
 use service::lower;
 

@@ -127,6 +127,7 @@ mod tests {
             state: value.into(),
             attributes: attributes as Attributes,
             last_changed: ts(lc),
+            last_reported: ha_core::Reported::new(ts(lu)),
             last_updated: ts(lu),
             context: ctx,
         })

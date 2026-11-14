@@ -441,7 +441,7 @@ pub(super) fn event_json(event: &Event) -> Value {
         "event_type": event_type(&event.kind),
         "data": data,
         "origin": "LOCAL",
-        "time_fired": event.time_fired,
+        "time_fired": ha_core::isoformat(event.time_fired),
         "context": event.context,
     })
 }
