@@ -628,3 +628,39 @@ async fn a_runaway_entity_feed_disconnects() {
         .await
         .expect("the subscription should report overflow");
 }
+
+/// A client that fell 4096 messages behind still gets a Close frame when it
+/// reads again, promptly, even though the outbox was full.
+#[tokio::test]
+async fn overflowed_clients_get_a_close_frame() {
+    let s = server().await;
+    let mut c = Client::authed(&s, &token(&s.auth).0).await;
+    assert_eq!(
+        c.call(json!({"id": 2, "type": "subscribe_events", "event_type": "state_changed"}))
+            .await["success"],
+        true
+    );
+    // Stop reading while far more events than the outbox holds are fired.
+    let big = "x".repeat(2048);
+    for i in 0..(super::MAX_PENDING * 3) {
+        s.hass.set_state(
+            EntityId::parse("sensor.flood").unwrap(),
+            i.to_string().as_str(),
+            attrs(json!({"pad": big})),
+        );
+    }
+    let start = std::time::Instant::now();
+    let mut saw_close = false;
+    while let Ok(Some(frame)) = tokio::time::timeout(Duration::from_secs(5), c.ws.next()).await {
+        match frame {
+            Ok(Message::Close(_)) => {
+                saw_close = true;
+                break;
+            }
+            Ok(_) => {}
+            Err(_) => break,
+        }
+    }
+    assert!(saw_close, "expected a Close frame");
+    assert!(start.elapsed() < Duration::from_secs(5));
+}

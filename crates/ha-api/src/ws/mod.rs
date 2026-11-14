@@ -69,7 +69,6 @@ async fn upgrade(
 enum Frame {
     Json(String),
     Ping,
-    Close,
 }
 
 /// The connection's outgoing queue, shared with its subscription tasks.
@@ -183,7 +182,8 @@ async fn run(mut socket: WebSocket, shared: Shared, ip: Option<IpAddr>) {
     let (sink, mut stream) = socket.split();
     let (tx, rx) = mpsc::channel(MAX_PENDING);
     let coalesce = Arc::new(AtomicBool::new(false));
-    let mut writer = tokio::spawn(write(sink, rx, coalesce.clone()));
+    let closing = Arc::new(Notify::new());
+    let mut writer = tokio::spawn(write(sink, rx, coalesce.clone(), closing.clone()));
     let overflow = Arc::new(Notify::new());
     let mut conn = Conn {
         shared,
@@ -246,8 +246,9 @@ async fn run(mut socket: WebSocket, shared: Shared, ip: Option<IpAddr>) {
     };
     conn.close();
     if !writer_done {
-        // Say goodbye if the writer can, but never wait on a stuck client.
-        let _ = conn.out.tx.try_send(Frame::Close);
+        // Say goodbye if the writer can, but never wait on a stuck client. The
+        // signal is outside the queue, so a full outbox can't swallow it.
+        closing.notify_one();
         if tokio::time::timeout(Duration::from_secs(1), &mut writer)
             .await
             .is_err()
@@ -263,22 +264,27 @@ async fn write(
     mut sink: SplitSink<WebSocket, Message>,
     mut rx: mpsc::Receiver<Frame>,
     coalesce: Arc<AtomicBool>,
+    closing: Arc<Notify>,
 ) {
     let mut next = None;
     loop {
         let frame = match next.take() {
             Some(f) => f,
-            None => match rx.recv().await {
-                Some(f) => f,
-                None => return,
+            None => tokio::select! {
+                // Closing wins over what's still queued.
+                biased;
+                _ = closing.notified() => {
+                    let _ = sink.send(Message::Close(None)).await;
+                    return;
+                }
+                f = rx.recv() => match f {
+                    Some(f) => f,
+                    None => return,
+                },
             },
         };
         let msg = match frame {
             Frame::Ping => Message::Ping(Default::default()),
-            Frame::Close => {
-                let _ = sink.send(Message::Close(None)).await;
-                return;
-            }
             Frame::Json(first) if !coalesce.load(Ordering::Relaxed) => Message::Text(first.into()),
             Frame::Json(first) => {
                 let mut batch = vec![first];
