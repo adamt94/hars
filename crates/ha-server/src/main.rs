@@ -156,6 +156,8 @@ async fn run(thp_disabled: std::io::Result<bool>) -> anyhow::Result<()> {
     if !mobile_app.is_empty() {
         api_config.integrations.push("mobile_app");
     }
+    // The apps' sensors, restored, before start.
+    mobile_app.setup(&hass, registry.clone());
     api_config.mobile_app = Some(std::sync::Arc::new(mobile_app));
     // `configuration.yaml`'s automations (written now; triggers attach at
     // `homeassistant_started`).

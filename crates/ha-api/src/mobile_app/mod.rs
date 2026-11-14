@@ -410,6 +410,26 @@ async fn command(shared: &Shared, reg: &Arc<Registration>, ty: &str, payload: Va
             webhook_response(reg, StatusCode::OK, &json!(zones))
         }
         "get_config" => webhook_response(reg, StatusCode::OK, &get_config(shared, reg)),
+        "update_sensor_states" => {
+            let Some(sensors) = shared.config.mobile_app.as_ref().and_then(|a| a.sensors()) else {
+                return ok();
+            };
+            match sensors.update_states(reg, &payload) {
+                Some(resp) => webhook_response(reg, StatusCode::OK, &Value::Object(resp)),
+                None => ok(),
+            }
+        }
+        "register_sensor" => {
+            let Some(sensors) = shared.config.mobile_app.as_ref().and_then(|a| a.sensors()) else {
+                return ok();
+            };
+            let device = device_registry_id(shared, reg);
+            if sensors.register(reg, device.as_deref(), &payload) {
+                webhook_response(reg, StatusCode::CREATED, &json!({"success": true}))
+            } else {
+                ok()
+            }
+        }
         "update_registration" => update_registration(reg, &payload),
         "enable_encryption" => {
             let secret: String = rand::random::<[u8; 32]>()

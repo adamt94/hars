@@ -1,0 +1,2499 @@
+{
+ "exchanges": [
+  {
+   "type": "update_sensor_states",
+   "request": {
+    "data_plaintext": "[{\"attributes\":{},\"icon\":\"mdi:battery-60\",\"state\":61,\"type\":\"sensor\",\"unique_id\":\"battery_level\"},{\"attributes\":{\"Low Power Mode\":true},\"icon\":\"mdi:battery-60\",\"state\":\"Not Charging\",\"type\":\"sensor\",\"unique_id\":\"battery_state\"},{\"attributes\":{\"Available\":\"1 GB\",\"Total\":\"2 GB\"},\"icon\":\"mdi:database\",\"state\":\"50.00\",\"type\":\"sensor\",\"unique_id\":\"storage\"},{\"icon\":\"mdi:tablet-dashboard\",\"state\":true,\"type\":\"binary_sensor\",\"unique_id\":\"kioskMode\"},{\"icon\":\"mdi:dots-square\",\"state\":\"unavailable\",\"type\":\"sensor\",\"unique_id\":\"kioskBrightness\"},{\"icon\":\"mdi:dots-square\",\"state\":\"unavailable\",\"type\":\"sensor\",\"unique_id\":\"cameraStream\"},{\"state\":\"x\",\"type\":\"sensor\",\"unique_id\":\"never_registered\"},{\"state\":[1],\"type\":\"sensor\",\"unique_id\":\"app-version\"},{\"state\":\"2026.9.0\",\"type\":\"binary_sensor\",\"unique_id\":\"app-version\"}]",
+    "nonce_hex": "4150502d4e4f4e43457570646174655f73656e736f725f73",
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"QVBQLU5PTkNFdXBkYXRlX3NlbnNvcl9zoSH57D9jnhXU9gXNjukcfcq3A+zi2FxYSzjFtEE2tDdOm8mJ2J4VhqMSmEacgsaeoTpEyjQFNq95jca0yJTM0ydrbSfmurZlGQgxiMsrGfgWqjpq1b\\/vmmy2qj+RzS5AmjOhz5lkoRFiQNMavCulKO5nvkI28kcNZcnziDRQ1mD4cYUBqEQv1jjlFV52\\/NS6GepRJYL+SGAhGgDKndkW8AIaqM0EE6cmXkQO3zPe074T1VUR69f6H8diV9b7DxxN4xWTUNAomOaKUSXXaXWjVecmwXezW0a\\/476UZ2ES9xmpM5X\\/faoX8t06nhLF+WxssWxEpt+vMHwsE39pEIanArJzfeT7LWM++lqVgNx7sxt3HA7LX61MobiCTIK20GGagSmTzPhw78lyJLp4Pm5noaLta6LMp9Mj6IqbWsfFouQmapqHlY3nXbwmnRg+7kD+xMzthpPnP7QjpBW0GZXW5o\\/iKlD5VGrxj+baFv2d2r3Rq8h1gtnbsePZ9PpJVdwNN3W46Goi9G4mmzNDfkiDrJxmzfVN9saxk+o4xseKD9eiBQcIMQUlneoSBYOoRqPKeftDv6vgrv4i7ISSAnPtp6FZ37Ua\\/TdM6gdyN2d2iOFts61+AhY6D2msoUmxHMpOERqjEAz9scjaqaY3tifxLP0wB2av3bdIYUMVAAgOpRFgp2SxWKiM1CE8ThI32XZq1lmw4Pn68owr6DCKM9fUKJoHR+aM1COMDkHcuRbc2Ip0Di8otVOCWIwapaPxMyB+SpGeW0M59r9aXiW\\/yXZDJGylDwbRYzpyZ8Kc9q6apZV90azgJlKGZX2zO0sUxYUDaYhSAewW9nB86bJYoku2btOksR\\/pHC4lEDyNMcM4kTh8LnvsRtinexlHfe60Vi3IEwem6MHMSPV323RgVnes5hUIeT90QJ60ipu+r6b2NR5UfBbdaKdWc6GzsCUL7CmrvZOyq58iOkKUG9nMzflbfRA+ZZKe3cjMPE5kXJFuDnszDAgdpDM5YGUEBnyGxWXxtnatV468rM8cqVP86tNnkS2z\\/yJExEfZ0FnRR2PiYq7La35ubUmSJeGkNzimYjJrhZoB4IBDGPm8hrRMwTVgWH1ypKvW\",\"type\":\"update_sensor_states\"}"
+   },
+   "response": {
+    "status": 200,
+    "headers": {
+     "Content-Type": "application/json"
+    },
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"SEEtTk9OQ0UAAAAAAAAAAAAAAAAAAAAB6+4d6uXBE097vDcFqfTmGi17F9Rlx+dafQcKH2CAYqfn215LVGub9e8r03ds5ndTa5k4APnXqBHDGL8VrpYDQC3gtfWjBXNC1cfYMtxJMZJ2sbdwNzxqcb3xBSV5w6IqGKIVOvvQ8WnJOPEs1ots6F9WxCZX2WPPxfgD4dIAqKIsaaGxDWjb2BDB5wakaJaUoivR228yWIgH5UQkzYiMiW7/I1uo8KQnDSFVxOAd1wDViIvGI1SnlKDlkJ8hvn04DEAwZ4iVk7ngtbXoIR0/J6AQjLZmw6tal/DVL5ourojSkYKxt9Yhxe4Qa3PZZn/kijOZ/omqLhSxaWI8uPnI0AIOhOxyV9oxHQVQ51HjD/Su4vQKaStF3XsZ5dnL6+bFtTDbF7g2jSJ/bsEoiqMAsqb7mZ4ahCKnE7tMKjIoQhCHRgHi7/7W8xFTq3lxfLfQK+bfz+D4nZliaXErXoXelVNRCry4ibaUxGQ6qu0lKdwBIpIpiceTNY5gU5upsz5eddXiKTAxKiSRpigA8RPyrwsIoHqgZNyswLF9s5D+V2hTBuOve1EMnycZgkoJa0vMNssvv111WRsnd6DfNlcNDFGxAXxM/Rlb1ark3e1IwgmptQA01+z5YQ==\"}",
+    "decrypted": "{\"battery_level\":{\"success\":true},\"battery_state\":{\"success\":true},\"storage\":{\"success\":true},\"kioskMode\":{\"success\":true},\"kioskBrightness\":{\"success\":true},\"cameraStream\":{\"success\":true,\"is_disabled\":true},\"never_registered\":{\"success\":false,\"error\":{\"code\":\"not_registered\",\"message\":\"sensor never_registered is not registered\"}},\"app-version\":{\"success\":false,\"error\":{\"code\":\"not_registered\",\"message\":\"binary_sensor app-version is not registered\"}}}",
+    "nonce_hex": "48412d4e4f4e434500000000000000000000000000000001"
+   },
+   "effects": {
+    "state_writes": [
+     {
+      "entity_id": "sensor.phone_battery_level",
+      "state": "61",
+      "attributes": {
+       "unit_of_measurement": "%",
+       "device_class": "battery",
+       "icon": "mdi:battery-60",
+       "friendly_name": " Phone Battery Level"
+      },
+      "context_user_id": null
+     },
+     {
+      "entity_id": "binary_sensor.phone_kiosk_mode",
+      "state": "on",
+      "attributes": {
+       "icon": "mdi:tablet-dashboard",
+       "friendly_name": " Phone Kiosk Mode"
+      },
+      "context_user_id": null
+     },
+     {
+      "entity_id": "sensor.phone_storage",
+      "state": "50.00",
+      "attributes": {
+       "Available": "1 GB",
+       "Total": "2 GB",
+       "unit_of_measurement": "% available",
+       "icon": "mdi:database",
+       "friendly_name": " Phone Storage"
+      },
+      "context_user_id": null
+     },
+     {
+      "entity_id": "sensor.phone_battery_state",
+      "state": "Not Charging",
+      "attributes": {
+       "Low Power Mode": true,
+       "icon": "mdi:battery-60",
+       "friendly_name": " Phone Battery State"
+      },
+      "context_user_id": null
+     }
+    ],
+    "events": [],
+    "service_calls": []
+   },
+   "states_after": {
+    "binary_sensor.phone_kiosk_mode": {
+     "state": "on",
+     "attributes": {
+      "icon": "mdi:tablet-dashboard",
+      "friendly_name": " Phone Kiosk Mode"
+     }
+    },
+    "binary_sensor.phone_kiosk_screensaver": {
+     "state": "off",
+     "attributes": {
+      "icon": "mdi:sleep-off",
+      "friendly_name": " Phone Kiosk Screensaver"
+     }
+    },
+    "sensor.phone_app_version": {
+     "state": "2026.9.0",
+     "attributes": {
+      "icon": "mdi:cellphone",
+      "friendly_name": " Phone App Version"
+     }
+    },
+    "sensor.phone_audio_output": {
+     "state": "Built-in Speaker",
+     "attributes": {
+      "icon": "mdi:volume-high",
+      "friendly_name": " Phone Audio Output"
+     }
+    },
+    "sensor.phone_battery_level": {
+     "state": "61",
+     "attributes": {
+      "unit_of_measurement": "%",
+      "device_class": "battery",
+      "icon": "mdi:battery-60",
+      "friendly_name": " Phone Battery Level"
+     }
+    },
+    "sensor.phone_battery_state": {
+     "state": "Not Charging",
+     "attributes": {
+      "Low Power Mode": true,
+      "icon": "mdi:battery-60",
+      "friendly_name": " Phone Battery State"
+     }
+    },
+    "sensor.phone_bssid": {
+     "state": "02:00:00:00:00:01",
+     "attributes": {
+      "icon": "mdi:wifi-star",
+      "friendly_name": " Phone BSSID"
+     }
+    },
+    "sensor.phone_connection_type": {
+     "state": "Wi-Fi",
+     "attributes": {
+      "icon": "mdi:wifi",
+      "friendly_name": " Phone Connection Type"
+     }
+    },
+    "sensor.phone_geocoded_location": {
+     "state": "Unknown",
+     "attributes": {
+      "icon": "mdi:map",
+      "friendly_name": " Phone Geocoded Location"
+     }
+    },
+    "sensor.phone_kiosk_brightness": {
+     "state": "unavailable",
+     "attributes": {
+      "icon": "mdi:dots-square",
+      "friendly_name": " Phone Kiosk Brightness"
+     }
+    },
+    "sensor.phone_kiosk_volume": {
+     "state": "unavailable",
+     "attributes": {
+      "icon": "mdi:dots-square",
+      "friendly_name": " Phone Kiosk Volume"
+     }
+    },
+    "sensor.phone_last_update_trigger": {
+     "state": "Launch",
+     "attributes": {
+      "icon": "mdi:cellphone-wireless",
+      "friendly_name": " Phone Last Update Trigger"
+     }
+    },
+    "sensor.phone_location_permission": {
+     "state": "Authorized when in use",
+     "attributes": {
+      "icon": "mdi:map",
+      "friendly_name": " Phone Location permission"
+     }
+    },
+    "sensor.phone_sim_1": {
+     "state": "--",
+     "attributes": {
+      "Allows VoIP": true,
+      "Carrier ID": "0000000100000001",
+      "Carrier Name": "--",
+      "ISO Country Code": "--",
+      "Mobile Country Code": "65535",
+      "Mobile Network Code": "65535",
+      "icon": "mdi:sim",
+      "friendly_name": " Phone SIM 1"
+     }
+    },
+    "sensor.phone_sim_2": {
+     "state": "--",
+     "attributes": {
+      "Allows VoIP": true,
+      "Carrier ID": "0000000100000002",
+      "Carrier Name": "--",
+      "Current Radio Technology": "Enhanced Data rates for GSM Evolution (EDGE)",
+      "ISO Country Code": "--",
+      "Mobile Country Code": "65535",
+      "Mobile Network Code": "65535",
+      "icon": "mdi:sim",
+      "friendly_name": " Phone SIM 2"
+     }
+    },
+    "sensor.phone_ssid": {
+     "state": "FakeSSID",
+     "attributes": {
+      "icon": "mdi:wifi",
+      "friendly_name": " Phone SSID"
+     }
+    },
+    "sensor.phone_storage": {
+     "state": "50.00",
+     "attributes": {
+      "Available": "1 GB",
+      "Total": "2 GB",
+      "unit_of_measurement": "% available",
+      "icon": "mdi:database",
+      "friendly_name": " Phone Storage"
+     }
+    }
+   }
+  },
+  {
+   "type": "update_sensor_states",
+   "request": {
+    "data_plaintext": "{\"state\":62,\"type\":\"sensor\",\"unique_id\":\"battery_level\"}",
+    "nonce_hex": "4150502d4e4f4e43457570646174655f73656e736f725f73",
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"QVBQLU5PTkNFdXBkYXRlX3NlbnNvcl9zP5eDJHfhaci8wWGI8xdZAuruUvn32EsTE3uD\\/RBg9zxWldHCyJQV1\\/ZC1w7XzcqWpDtE5yRMIqV5w4WzyJDKz1o9PmCv9OBh\",\"type\":\"update_sensor_states\"}"
+   },
+   "response": {
+    "status": 200,
+    "headers": {
+     "Content-Type": "application/json"
+    },
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"SEEtTk9OQ0UAAAAAAAAAAAAAAAAAAAACOENUSbIaKb9qiqgaIPV+aAYXqwajLAR7rv4Hhk01iWoDri1IKduyBwEqjIqGRZOi1+Q=\"}",
+    "decrypted": "{\"battery_level\":{\"success\":true}}",
+    "nonce_hex": "48412d4e4f4e434500000000000000000000000000000002"
+   },
+   "effects": {
+    "state_writes": [
+     {
+      "entity_id": "sensor.phone_battery_level",
+      "state": "62",
+      "attributes": {
+       "unit_of_measurement": "%",
+       "device_class": "battery",
+       "icon": "mdi:cellphone",
+       "friendly_name": " Phone Battery Level"
+      },
+      "context_user_id": null
+     }
+    ],
+    "events": [],
+    "service_calls": []
+   }
+  },
+  {
+   "type": "update_sensor_states",
+   "request": {
+    "data_plaintext": "[{\"state\":1,\"unique_id\":\"battery_level\"}]",
+    "nonce_hex": "4150502d4e4f4e43457570646174655f73656e736f725f73",
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"QVBQLU5PTkNFdXBkYXRlX3NlbnNvcl9znRAnw++T8Z8CO0AM7AWQEsq3A\\/7izVpUC3eA\\/RBh4CVCwo6\\/0pVZnrtSlFaB3daGiiJEzihEIuIG\",\"type\":\"update_sensor_states\"}"
+   },
+   "response": {
+    "status": 200,
+    "headers": {
+     "Content-Type": "application/json; charset=utf-8"
+    },
+    "body": "{}"
+   },
+   "effects": {
+    "state_writes": [],
+    "events": [],
+    "service_calls": []
+   }
+  },
+  {
+   "type": "update_sensor_states",
+   "request": {
+    "data_plaintext": "[{\"icon\":\"mdi:battery-30\",\"state\":3.25,\"type\":\"sensor\",\"unique_id\":\"battery_level\"},{\"icon\":\"mdi:database\",\"state\":null,\"type\":\"sensor\",\"unique_id\":\"storage\"},{\"icon\":\"mdi:tablet\",\"state\":false,\"type\":\"binary_sensor\",\"unique_id\":\"kioskMode\"},{\"icon\":\"mdi:sleep\",\"state\":\"on\",\"type\":\"binary_sensor\",\"unique_id\":\"kioskScreensaver\"},{\"icon\":\"mdi:x\",\"state\":\"unknown\",\"type\":\"sensor\",\"unique_id\":\"audio_output_x\"},{\"icon\":null,\"state\":\"Hello\",\"type\":\"sensor\",\"unique_id\":\"iphone-audio-output\"},{\"icon\":\"bad icon\",\"state\":\"Hello\",\"type\":\"sensor\",\"unique_id\":\"location-permission\"}]",
+    "nonce_hex": "4150502d4e4f4e43457570646174655f73656e736f725f73",
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"QVBQLU5PTkNFdXBkYXRlX3NlbnNvcl9z0HctEG5tnMJVxLRfBF4px8q3A+T1w0ATE2\\/ctVsu7C1Hw46SwtxIlLsc11GB2dCa93QSln8dLL0v2JSins+axWA\\/KHm4uu4+HAN6w5w9I\\/8B53Jqm\\/zugGC1pgWiwTwHzDO+gpYyrQB0cZ1F6COtY6kvpBQ25FIMaYmq3iJXlS7mcfMAqggTlW30Hg5esYr9SLVLJJjpF2AhBg3Mgo5JjQYa481EAac9SVcQlyeT3ekTz0If8ZDiB4hIUZivLRZA9AbYEpV5wKWKTXeILS7tVedkkGy4CQ+\\/rPKff3oW2gmSYsqzbKQRpJRqkiPf\\/Hh9iyddqJ6vOmE3En1GCpanU+1lfeTTOG05tAHVgd0ws0oqWSz5X61MhqOXWYu20GHHz0z9zPElvcUzcfY4bSJrt7KIfKbWtd4wucObA4vfp\\/A3UNHZlYL1GOV5zF9P+UvrxICkxZbnI+Ux+ky6UoPX4dytbWL0WXKzj7mMCvudyb3R7MZ7ztvWsfqV7PQGRcxHJjbgpnwzt3komnkNM1yfoc8\\/itlQ85Duk7E50NuAfJqjCAcYZ2B\\/3f5QH9O4er\\/BNbJCuOWgoKk\\/8ZSTAg6+4csGkbIcsGgF0xFmN2cxhukqtL1+HhYsD3GmoQKgFuFUWEvoRwT\\/vIWY7vgiojf9Yep9B3y+3qIDcA4MTgRP5l025Da2G\\/aOzic9U19p2Sk8wkO8s7a95YAjpmWKdJzPIoEgF7XJzzKMGF3duUfS1sZ0HDUjyADEF9JR86j9Jic6Vo7GSlQuufoLXjix0zEcQw==\",\"type\":\"update_sensor_states\"}"
+   },
+   "response": {
+    "status": 200,
+    "headers": {
+     "Content-Type": "application/json"
+    },
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"SEEtTk9OQ0UAAAAAAAAAAAAAAAAAAAADbZ9/zdUm1ahmLJsHrZgL8BiZ9t5GQATU4Lhop92Hnpp7XBTwdEGwSopt8hRXoRamgCZNUwfH6mYijqBeEiOoksi7xQ/d+vsL/9alOsJslJ1lZVTCNQ8F58cEHStTjkVmIyKEci8xN3a3HZGF5LVG2ALunvR1kBZdUkBh8SKbvQbqAv1/RmVKsE9JdoBe1w+2f7kBZmigsB0l3b1gGLz2vLkPRCWs9EihQtiFniOmg/eFNVDOIsSge5Dz/Rj/Lj6fozyDGPs4aV1qVnYbAN3BxgmC78uNF88AiGV3X3yO/ILR94OmjGip9CibliT47kKXQBtOwKpANcMJO6bLwMf/eW9HEBBqraTf4+8dXM0LLTUeBCAnFs5BMlY8gT8qa56y1QHbOVcs57SVo6O6XBIxvqEEVAF8qQ3kVVr7ZrLB6fOQiPVZnOdypQFAtBhu2+PT/S9KNL8WSRYhxOkvBXU2O4zgRAldB26s384jeLDJuE9Pqt0JO9Q6mHKSITr8BgRmJWQIYNleXaxo+1TkN6ED3tcjQTVvri+YzpQ5rZINg8OTL/k/ZrUlyggrDdxbiVQF5UADBOWqPmUmeKe450hSaCR8o7Oryc1wHe0=\"}",
+    "decrypted": "{\"battery_level\":{\"success\":true},\"storage\":{\"success\":true},\"kioskMode\":{\"success\":true},\"kioskScreensaver\":{\"success\":true},\"audio_output_x\":{\"success\":false,\"error\":{\"code\":\"not_registered\",\"message\":\"sensor audio_output_x is not registered\"}},\"iphone-audio-output\":{\"success\":true},\"location-permission\":{\"success\":false,\"error\":{\"code\":\"invalid_format\",\"message\":\"not a valid value for dictionary value @ data['icon']. Got 'bad icon'\"}}}",
+    "nonce_hex": "48412d4e4f4e434500000000000000000000000000000003"
+   },
+   "effects": {
+    "state_writes": [
+     {
+      "entity_id": "sensor.phone_battery_level",
+      "state": "3.25",
+      "attributes": {
+       "unit_of_measurement": "%",
+       "device_class": "battery",
+       "icon": "mdi:battery-30",
+       "friendly_name": " Phone Battery Level"
+      },
+      "context_user_id": null
+     },
+     {
+      "entity_id": "sensor.phone_storage",
+      "state": "unknown",
+      "attributes": {
+       "unit_of_measurement": "% available",
+       "icon": "mdi:database",
+       "friendly_name": " Phone Storage"
+      },
+      "context_user_id": null
+     },
+     {
+      "entity_id": "binary_sensor.phone_kiosk_screensaver",
+      "state": "on",
+      "attributes": {
+       "icon": "mdi:sleep",
+       "friendly_name": " Phone Kiosk Screensaver"
+      },
+      "context_user_id": null
+     },
+     {
+      "entity_id": "sensor.phone_audio_output",
+      "state": "Hello",
+      "attributes": {
+       "friendly_name": " Phone Audio Output"
+      },
+      "context_user_id": null
+     },
+     {
+      "entity_id": "binary_sensor.phone_kiosk_mode",
+      "state": "off",
+      "attributes": {
+       "icon": "mdi:tablet",
+       "friendly_name": " Phone Kiosk Mode"
+      },
+      "context_user_id": null
+     }
+    ],
+    "events": [],
+    "service_calls": []
+   },
+   "states_after": {
+    "binary_sensor.phone_kiosk_mode": {
+     "state": "off",
+     "attributes": {
+      "icon": "mdi:tablet",
+      "friendly_name": " Phone Kiosk Mode"
+     }
+    },
+    "binary_sensor.phone_kiosk_screensaver": {
+     "state": "on",
+     "attributes": {
+      "icon": "mdi:sleep",
+      "friendly_name": " Phone Kiosk Screensaver"
+     }
+    },
+    "sensor.phone_app_version": {
+     "state": "2026.9.0",
+     "attributes": {
+      "icon": "mdi:cellphone",
+      "friendly_name": " Phone App Version"
+     }
+    },
+    "sensor.phone_audio_output": {
+     "state": "Hello",
+     "attributes": {
+      "friendly_name": " Phone Audio Output"
+     }
+    },
+    "sensor.phone_battery_level": {
+     "state": "3.25",
+     "attributes": {
+      "unit_of_measurement": "%",
+      "device_class": "battery",
+      "icon": "mdi:battery-30",
+      "friendly_name": " Phone Battery Level"
+     }
+    },
+    "sensor.phone_battery_state": {
+     "state": "Not Charging",
+     "attributes": {
+      "Low Power Mode": true,
+      "icon": "mdi:battery-60",
+      "friendly_name": " Phone Battery State"
+     }
+    },
+    "sensor.phone_bssid": {
+     "state": "02:00:00:00:00:01",
+     "attributes": {
+      "icon": "mdi:wifi-star",
+      "friendly_name": " Phone BSSID"
+     }
+    },
+    "sensor.phone_connection_type": {
+     "state": "Wi-Fi",
+     "attributes": {
+      "icon": "mdi:wifi",
+      "friendly_name": " Phone Connection Type"
+     }
+    },
+    "sensor.phone_geocoded_location": {
+     "state": "Unknown",
+     "attributes": {
+      "icon": "mdi:map",
+      "friendly_name": " Phone Geocoded Location"
+     }
+    },
+    "sensor.phone_kiosk_brightness": {
+     "state": "unavailable",
+     "attributes": {
+      "icon": "mdi:dots-square",
+      "friendly_name": " Phone Kiosk Brightness"
+     }
+    },
+    "sensor.phone_kiosk_volume": {
+     "state": "unavailable",
+     "attributes": {
+      "icon": "mdi:dots-square",
+      "friendly_name": " Phone Kiosk Volume"
+     }
+    },
+    "sensor.phone_last_update_trigger": {
+     "state": "Launch",
+     "attributes": {
+      "icon": "mdi:cellphone-wireless",
+      "friendly_name": " Phone Last Update Trigger"
+     }
+    },
+    "sensor.phone_location_permission": {
+     "state": "Authorized when in use",
+     "attributes": {
+      "icon": "mdi:map",
+      "friendly_name": " Phone Location permission"
+     }
+    },
+    "sensor.phone_sim_1": {
+     "state": "--",
+     "attributes": {
+      "Allows VoIP": true,
+      "Carrier ID": "0000000100000001",
+      "Carrier Name": "--",
+      "ISO Country Code": "--",
+      "Mobile Country Code": "65535",
+      "Mobile Network Code": "65535",
+      "icon": "mdi:sim",
+      "friendly_name": " Phone SIM 1"
+     }
+    },
+    "sensor.phone_sim_2": {
+     "state": "--",
+     "attributes": {
+      "Allows VoIP": true,
+      "Carrier ID": "0000000100000002",
+      "Carrier Name": "--",
+      "Current Radio Technology": "Enhanced Data rates for GSM Evolution (EDGE)",
+      "ISO Country Code": "--",
+      "Mobile Country Code": "65535",
+      "Mobile Network Code": "65535",
+      "icon": "mdi:sim",
+      "friendly_name": " Phone SIM 2"
+     }
+    },
+    "sensor.phone_ssid": {
+     "state": "FakeSSID",
+     "attributes": {
+      "icon": "mdi:wifi",
+      "friendly_name": " Phone SSID"
+     }
+    },
+    "sensor.phone_storage": {
+     "state": "unknown",
+     "attributes": {
+      "unit_of_measurement": "% available",
+      "icon": "mdi:database",
+      "friendly_name": " Phone Storage"
+     }
+    }
+   }
+  },
+  {
+   "type": "register_sensor",
+   "request": {
+    "data_plaintext": "{\"attributes\":{},\"icon\":\"mdi:walk\",\"name\":\"Steps\",\"state\":1234,\"state_class\":\"total_increasing\",\"type\":\"sensor\",\"unique_id\":\"steps\",\"unit_of_measurement\":\"steps\"}",
+    "nonce_hex": "4150502d4e4f4e434572656769737465725f73656e736f72",
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"QVBQLU5PTkNFcmVnaXN0ZXJfc2Vuc29yuEp8aYLi61ByJPMSAkOMy9r8cZT2GhBAFFPE95p\\/jfTlDzXU54FtKryGhQHYZ061KDjJDJQXz4pJvVNjhukXep52rVw1Gmeb3mMjCAwzuupUXAVB0NyMxD0MW\\/ajRmnAtr39HmBKoEfZI1xk+PengFs7dts2M3hDUYq4DkJLQk2a5nwwqfwtN1onPYUGEvrTmE1K8aAIhMA5NOwM0dRUB+Fi3D7FJ0YlcfW7lzIwikKprQ==\",\"type\":\"register_sensor\"}"
+   },
+   "response": {
+    "status": 201,
+    "headers": {
+     "Content-Type": "application/json"
+    },
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"SEEtTk9OQ0UAAAAAAAAAAAAAAAAAAAAEjb7vXEzGgXsx/G9FfIAbjtxIPdu2cabKFpees+QNoKo=\"}",
+    "decrypted": "{\"success\":true}",
+    "nonce_hex": "48412d4e4f4e434500000000000000000000000000000004"
+   },
+   "effects": {
+    "state_writes": [
+     {
+      "entity_id": "sensor.phone_steps",
+      "state": "1234",
+      "attributes": {
+       "state_class": "total_increasing",
+       "unit_of_measurement": "steps",
+       "icon": "mdi:walk",
+       "friendly_name": " Phone Steps"
+      },
+      "context_user_id": null
+     }
+    ],
+    "events": [
+     {
+      "event_type": "entity_registry_updated",
+      "data": {
+       "action": "create",
+       "entity_id": "sensor.phone_steps"
+      },
+      "origin": "LOCAL",
+      "context_user_id": null
+     }
+    ],
+    "service_calls": []
+   }
+  },
+  {
+   "type": "register_sensor",
+   "request": {
+    "data_plaintext": "{\"attributes\":{},\"device_class\":\"timestamp\",\"icon\":\"mdi:restart\",\"name\":\"Last Reboot\",\"state\":\"2026-11-14T08:00:00.000+00:00\",\"type\":\"sensor\",\"unique_id\":\"last_reboot\"}",
+    "nonce_hex": "4150502d4e4f4e434572656769737465725f73656e736f72",
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"QVBQLU5PTkNFcmVnaXN0ZXJfc2Vuc29ypwRZ+AzOtYETGpeoGzYH8Nr8cZT2GhBAFFPE95p\\/jfTlDzjS\\/oYsdcGIjQmRYw3jYW6MQ58F1o4G91Mc0OUEZtJ4tQ0sH3rEjjxhTl514uoLCgpU2ObNkn4zSaftRE\\/KoLP+NSsI4UbII1totKqnnkl9OYZiIG9QFrvmRRcJUFuIozxp6LljWAN5L48GTazCkU4N\\/7hfmcwjGOwYrJUTE\\/x+3y7NHUE1cfW7iCcmjm75tWYQCu9lQg==\",\"type\":\"register_sensor\"}"
+   },
+   "response": {
+    "status": 201,
+    "headers": {
+     "Content-Type": "application/json"
+    },
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"SEEtTk9OQ0UAAAAAAAAAAAAAAAAAAAAFHvN+v74fjiQZ3nkK69p3AUFLQhVDDBcrrho1ab+YHlw=\"}",
+    "decrypted": "{\"success\":true}",
+    "nonce_hex": "48412d4e4f4e434500000000000000000000000000000005"
+   },
+   "effects": {
+    "state_writes": [
+     {
+      "entity_id": "sensor.phone_last_reboot",
+      "state": "2026-11-14T08:00:00+00:00",
+      "attributes": {
+       "device_class": "timestamp",
+       "icon": "mdi:restart",
+       "friendly_name": " Phone Last Reboot"
+      },
+      "context_user_id": null
+     }
+    ],
+    "events": [
+     {
+      "event_type": "entity_registry_updated",
+      "data": {
+       "action": "create",
+       "entity_id": "sensor.phone_last_reboot"
+      },
+      "origin": "LOCAL",
+      "context_user_id": null
+     }
+    ],
+    "service_calls": []
+   }
+  },
+  {
+   "type": "register_sensor",
+   "request": {
+    "data_plaintext": "{\"attributes\":{},\"device_class\":\"date\",\"name\":\"Some Date\",\"state\":\"2026-11-14\",\"type\":\"sensor\",\"unique_id\":\"some_date\"}",
+    "nonce_hex": "4150502d4e4f4e434572656769737465725f73656e736f72",
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"QVBQLU5PTkNFcmVnaXN0ZXJfc2Vuc29yfPedr3Tk9hn+oLA5E8XgLNr8cZT2GhBAFFPE95p\\/jfTlDzjS\\/oYsdcGIjQmRYw3jYX6EWp9Ujs0F5hxV0LZFWtM36g8FGmeb3nUwSUtm4q0FEkYHhbHZhW1OBeWtRjGNtqXhJCse4UbZLFxi5LKpjgwhZtomdB0IRs3sX15WDQTn93Mtvas1\",\"type\":\"register_sensor\"}"
+   },
+   "response": {
+    "status": 201,
+    "headers": {
+     "Content-Type": "application/json"
+    },
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"SEEtTk9OQ0UAAAAAAAAAAAAAAAAAAAAGu/+kcrnsCdSfmgxLO27e181wUuCaxomKzceYy4PIxYQ=\"}",
+    "decrypted": "{\"success\":true}",
+    "nonce_hex": "48412d4e4f4e434500000000000000000000000000000006"
+   },
+   "effects": {
+    "state_writes": [
+     {
+      "entity_id": "sensor.phone_some_date",
+      "state": "2026-11-14",
+      "attributes": {
+       "device_class": "date",
+       "icon": "mdi:cellphone",
+       "friendly_name": " Phone Some Date"
+      },
+      "context_user_id": null
+     }
+    ],
+    "events": [
+     {
+      "event_type": "entity_registry_updated",
+      "data": {
+       "action": "create",
+       "entity_id": "sensor.phone_some_date"
+      },
+      "origin": "LOCAL",
+      "context_user_id": null
+     }
+    ],
+    "service_calls": []
+   }
+  },
+  {
+   "type": "register_sensor",
+   "request": {
+    "data_plaintext": "{\"attributes\":{},\"device_class\":\"Motion\",\"icon\":\"mdi:monitor\",\"name\":\"Active\",\"state\":true,\"type\":\"binary_sensor\",\"unique_id\":\"active\"}",
+    "nonce_hex": "4150502d4e4f4e434572656769737465725f73656e736f72",
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"QVBQLU5PTkNFcmVnaXN0ZXJfc2Vuc29yOTbf0ahHzRSq0VO4Df8n6tr8cZT2GhBAFFPE95p\\/jfTlDzjS\\/oYsdcGIjQmRYw3jYVeKWpMZzM1HpRhTneJFM54360Z7FnyQlS19SB0rtKZGRQEXj6GuyygWXrG7SD\\/ctr3lJCset0fJJwMv4un1yVt1Lck6fyMTW7ClGENKDxOavzAstuA5HVYcdtsGW6zXi0oBq+dflw==\",\"type\":\"register_sensor\"}"
+   },
+   "response": {
+    "status": 201,
+    "headers": {
+     "Content-Type": "application/json"
+    },
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"SEEtTk9OQ0UAAAAAAAAAAAAAAAAAAAAHDMeLFjYoT64z53nDeIhsD7xSEXHTWbLdkKcNrw5JVIU=\"}",
+    "decrypted": "{\"success\":true}",
+    "nonce_hex": "48412d4e4f4e434500000000000000000000000000000007"
+   },
+   "effects": {
+    "state_writes": [
+     {
+      "entity_id": "binary_sensor.phone_active",
+      "state": "on",
+      "attributes": {
+       "device_class": "motion",
+       "icon": "mdi:monitor",
+       "friendly_name": " Phone Active"
+      },
+      "context_user_id": null
+     }
+    ],
+    "events": [
+     {
+      "event_type": "entity_registry_updated",
+      "data": {
+       "action": "create",
+       "entity_id": "binary_sensor.phone_active"
+      },
+      "origin": "LOCAL",
+      "context_user_id": null
+     }
+    ],
+    "service_calls": []
+   }
+  },
+  {
+   "type": "register_sensor",
+   "request": {
+    "data_plaintext": "{\"attributes\":{},\"disabled\":true,\"name\":\"Focus\",\"state\":false,\"type\":\"binary_sensor\",\"unique_id\":\"focus\"}",
+    "nonce_hex": "4150502d4e4f4e434572656769737465725f73656e736f72",
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"QVBQLU5PTkNFcmVnaXN0ZXJfc2Vuc29yBEbbUQD7r6fMeWGd2nakmdr8cZT2GhBAFFPE95p\\/jfTlDzje+44tfPuPw1KWYlq8bziLT5cTgNVJwR5Th\\/9FJZ4p+041HjHEmjh+SVortLxeWAEXj6GNwTIeWq3GF3jBsbPjYyUGtlvVM1poyfnhjkNtacQwZDFDXw==\",\"type\":\"register_sensor\"}"
+   },
+   "response": {
+    "status": 201,
+    "headers": {
+     "Content-Type": "application/json"
+    },
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"SEEtTk9OQ0UAAAAAAAAAAAAAAAAAAAAILo96TihHLMu122DIxp9ylCUDixVpE+VE7kaR9vAXDig=\"}",
+    "decrypted": "{\"success\":true}",
+    "nonce_hex": "48412d4e4f4e434500000000000000000000000000000008"
+   },
+   "effects": {
+    "state_writes": [],
+    "events": [
+     {
+      "event_type": "entity_registry_updated",
+      "data": {
+       "action": "create",
+       "entity_id": "binary_sensor.phone_focus"
+      },
+      "origin": "LOCAL",
+      "context_user_id": null
+     }
+    ],
+    "service_calls": []
+   }
+  },
+  {
+   "type": "register_sensor",
+   "request": {
+    "data_plaintext": "{\"attributes\":{},\"device_class\":\"pressure\",\"entity_category\":\"diagnostic\",\"name\":\"Pressure\",\"state\":101.3,\"state_class\":\"measurement\",\"type\":\"sensor\",\"unique_id\":\"pressure\",\"unit_of_measurement\":\"kPa\"}",
+    "nonce_hex": "4150502d4e4f4e434572656769737465725f73656e736f72",
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"QVBQLU5PTkNFcmVnaXN0ZXJfc2Vuc29yAi6htiI7\\/VOEJBeBiKAQe9r8cZT2GhBAFFPE95p\\/jfTlDzjS\\/oYsdcGIjQmRYw3jYWqXS4kF150OpV0Sl+ITYMgj0EwgD3aZkytrGAUl8qFGTwpaxveGy35TCrr4CXiN+P7BM2xXsEDOJw0htOPxzQ0qLZFiIXNPEcP0DllYFATn8H44q\\/pqUhEuet5XFPzThVsGqaBRyN00G+ZItJtCA\\/xkwSmKbgokPabokSMKk1Wp6iYPF\\/40TMn76g3YL5G0c3TqWoUe+VW4UZqV3jjXswK\\/Nvp7LSEVng==\",\"type\":\"register_sensor\"}"
+   },
+   "response": {
+    "status": 201,
+    "headers": {
+     "Content-Type": "application/json"
+    },
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"SEEtTk9OQ0UAAAAAAAAAAAAAAAAAAAAJvBC2z4xBLf2yPP6l9/ljnZw3kuIwoMq/JrlCgwr0oaQ=\"}",
+    "decrypted": "{\"success\":true}",
+    "nonce_hex": "48412d4e4f4e434500000000000000000000000000000009"
+   },
+   "effects": {
+    "state_writes": [
+     {
+      "entity_id": "sensor.phone_pressure",
+      "state": "101.3",
+      "attributes": {
+       "state_class": "measurement",
+       "unit_of_measurement": "kPa",
+       "device_class": "pressure",
+       "icon": "mdi:cellphone",
+       "friendly_name": " Phone Pressure"
+      },
+      "context_user_id": null
+     }
+    ],
+    "events": [
+     {
+      "event_type": "entity_registry_updated",
+      "data": {
+       "action": "update",
+       "entity_id": "sensor.phone_pressure",
+       "changes": {
+        "options": {}
+       }
+      },
+      "origin": "LOCAL",
+      "context_user_id": null
+     },
+     {
+      "event_type": "entity_registry_updated",
+      "data": {
+       "action": "create",
+       "entity_id": "sensor.phone_pressure"
+      },
+      "origin": "LOCAL",
+      "context_user_id": null
+     }
+    ],
+    "service_calls": []
+   }
+  },
+  {
+   "type": "register_sensor",
+   "request": {
+    "data_plaintext": "{\"attributes\":{},\"name\":\"Bad\",\"state\":1,\"state_class\":\"measurement\",\"type\":\"binary_sensor\",\"unique_id\":\"bad_sc\"}",
+    "nonce_hex": "4150502d4e4f4e434572656769737465725f73656e736f72",
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"QVBQLU5PTkNFcmVnaXN0ZXJfc2Vuc29yXUSn0Jp35V2K386FsYy3kNr8cZT2GhBAFFPE95p\\/jfTlDzLW5YptKrypgAzAPA2qN3uRS9hMk8NJ9AVRhuk4atA7\\/FxjQTGTmThhT01i+61JXEYZl\\/eW2DldEvb7DXPOsKXOMmxKsFrOYAMv4\\/7s3QwqUMI3M3hDQI6yIl5aQhw=\",\"type\":\"register_sensor\"}"
+   },
+   "response": {
+    "status": 200,
+    "headers": {
+     "Content-Type": "application/json; charset=utf-8"
+    },
+    "body": "{}"
+   },
+   "effects": {
+    "state_writes": [],
+    "events": [],
+    "service_calls": []
+   }
+  },
+  {
+   "type": "register_sensor",
+   "request": {
+    "data_plaintext": "{\"attributes\":{},\"device_class\":\"not_a_class\",\"name\":\"Bad DC\",\"state\":1,\"type\":\"sensor\",\"unique_id\":\"bad_dc\"}",
+    "nonce_hex": "4150502d4e4f4e434572656769737465725f73656e736f72",
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"QVBQLU5PTkNFcmVnaXN0ZXJfc2Vuc29ysqyQmiET89fOyed4pEWSW9r8cZT2GhBAFFPE95p\\/jfTlDzjS\\/oYsdcGIjQmRYw3jYXSKWqUX\\/YwH5gJD0KBFZ9036g17WVGfmHlWeR0rtLtTSRBQl7nehH4LUaT8RieNsbn\\/MmZW4RmeN0Fk5+Xg8xArLZFxcyMFfYu1X1A=\",\"type\":\"register_sensor\"}"
+   },
+   "response": {
+    "status": 200,
+    "headers": {
+     "Content-Type": "application/json; charset=utf-8"
+    },
+    "body": "{}"
+   },
+   "effects": {
+    "state_writes": [],
+    "events": [],
+    "service_calls": []
+   }
+  },
+  {
+   "type": "register_sensor",
+   "request": {
+    "data_plaintext": "{\"name\":\"No State\",\"type\":\"sensor\",\"unique_id\":\"no_state\"}",
+    "nonce_hex": "4150502d4e4f4e434572656769737465725f73656e736f72",
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"QVBQLU5PTkNFcmVnaXN0ZXJfc2Vuc29yOyxLPcm5GlKZ+WwfMjrWM9r8foHvDVsYQ2nOpOsxl\\/2sD3CV\\/JY\\/dbzRwxuHfly2MTjJDI8Yy54e4i5Zlq5dK9I10Fw1Gmeb3iQ=\",\"type\":\"register_sensor\"}"
+   },
+   "response": {
+    "status": 201,
+    "headers": {
+     "Content-Type": "application/json"
+    },
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"SEEtTk9OQ0UAAAAAAAAAAAAAAAAAAAAK8mZx4jFokVnL0YiHcY0qH6IsoH5rDgo/cqeA4hrrDqs=\"}",
+    "decrypted": "{\"success\":true}",
+    "nonce_hex": "48412d4e4f4e43450000000000000000000000000000000a"
+   },
+   "effects": {
+    "state_writes": [
+     {
+      "entity_id": "sensor.phone_no_state",
+      "state": "unknown",
+      "attributes": {
+       "icon": "mdi:cellphone",
+       "friendly_name": " Phone No State"
+      },
+      "context_user_id": null
+     }
+    ],
+    "events": [
+     {
+      "event_type": "entity_registry_updated",
+      "data": {
+       "action": "create",
+       "entity_id": "sensor.phone_no_state"
+      },
+      "origin": "LOCAL",
+      "context_user_id": null
+     }
+    ],
+    "service_calls": []
+   }
+  },
+  {
+   "type": "register_sensor",
+   "request": {
+    "data_plaintext": "{\"attributes\":{},\"name\":\"Case Twin\",\"state\":5,\"type\":\"sensor\",\"unique_id\":\"Battery_Level\"}",
+    "nonce_hex": "4150502d4e4f4e434572656769737465725f73656e736f72",
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"QVBQLU5PTkNFcmVnaXN0ZXJfc2Vuc29yI7ZP\\/gZUw23rvwwouNbS6tr8cZT2GhBAFFPE95p\\/jfTlDzLW5YptKryogBuHMHuuKnTHAtgF1o4f4lMKx6BFfcUq6g17WWCbkip9SB0rtL1JQRVA0NyGzH5FCpb4EGnKsKXODWxSplmePw==\",\"type\":\"register_sensor\"}"
+   },
+   "response": {
+    "status": 201,
+    "headers": {
+     "Content-Type": "application/json"
+    },
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"SEEtTk9OQ0UAAAAAAAAAAAAAAAAAAAALeS0FZ9tyrfCLhDkGXcxyx1PDVZJipZ/klKsrBzXWIYA=\"}",
+    "decrypted": "{\"success\":true}",
+    "nonce_hex": "48412d4e4f4e43450000000000000000000000000000000b"
+   },
+   "effects": {
+    "state_writes": [
+     {
+      "entity_id": "sensor.phone_case_twin",
+      "state": "5",
+      "attributes": {
+       "icon": "mdi:cellphone",
+       "friendly_name": " Phone Case Twin"
+      },
+      "context_user_id": null
+     }
+    ],
+    "events": [
+     {
+      "event_type": "entity_registry_updated",
+      "data": {
+       "action": "create",
+       "entity_id": "sensor.phone_case_twin"
+      },
+      "origin": "LOCAL",
+      "context_user_id": null
+     }
+    ],
+    "service_calls": []
+   }
+  },
+  {
+   "registry_after_register": {
+    "binary_sensor.phone_active": {
+     "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_active",
+     "original_name": " Phone Active",
+     "original_icon": "mdi:monitor",
+     "device_class": null,
+     "original_device_class": "motion",
+     "unit_of_measurement": null,
+     "entity_category": null,
+     "disabled_by": null,
+     "capabilities": null,
+     "has_entity_name": false,
+     "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+    },
+    "binary_sensor.phone_camera_motion": {
+     "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_cameraMotion",
+     "original_name": " Phone Camera Motion",
+     "original_icon": "mdi:dots-square",
+     "device_class": null,
+     "original_device_class": null,
+     "unit_of_measurement": null,
+     "entity_category": null,
+     "disabled_by": "integration",
+     "capabilities": null,
+     "has_entity_name": false,
+     "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+    },
+    "binary_sensor.phone_focus": {
+     "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_focus",
+     "original_name": " Phone Focus",
+     "original_icon": "mdi:cellphone",
+     "device_class": null,
+     "original_device_class": null,
+     "unit_of_measurement": null,
+     "entity_category": null,
+     "disabled_by": "integration",
+     "capabilities": null,
+     "has_entity_name": false,
+     "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+    },
+    "binary_sensor.phone_kiosk_mode": {
+     "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_kioskMode",
+     "original_name": " Phone Kiosk Mode",
+     "original_icon": "mdi:tablet",
+     "device_class": null,
+     "original_device_class": null,
+     "unit_of_measurement": null,
+     "entity_category": null,
+     "disabled_by": null,
+     "capabilities": null,
+     "has_entity_name": false,
+     "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+    },
+    "binary_sensor.phone_kiosk_screensaver": {
+     "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_kioskScreensaver",
+     "original_name": " Phone Kiosk Screensaver",
+     "original_icon": "mdi:sleep-off",
+     "device_class": null,
+     "original_device_class": null,
+     "unit_of_measurement": null,
+     "entity_category": null,
+     "disabled_by": null,
+     "capabilities": null,
+     "has_entity_name": false,
+     "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+    },
+    "device_tracker.legacy": {
+     "unique_id": "LEGACY",
+     "original_name": "Legacy",
+     "original_icon": null,
+     "device_class": null,
+     "original_device_class": null,
+     "unit_of_measurement": null,
+     "entity_category": "diagnostic",
+     "disabled_by": null,
+     "capabilities": null,
+     "has_entity_name": false,
+     "config_entry_id": "01JFAKEMOBILEAPPLEGACY0000"
+    },
+    "device_tracker.phone": {
+     "unique_id": "11111111-2222-4333-8444-555555555555",
+     "original_name": " Phone",
+     "original_icon": null,
+     "device_class": null,
+     "original_device_class": null,
+     "unit_of_measurement": null,
+     "entity_category": "diagnostic",
+     "disabled_by": null,
+     "capabilities": null,
+     "has_entity_name": false,
+     "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+    },
+    "device_tracker.plain": {
+     "unique_id": "PLAIN",
+     "original_name": "Plain",
+     "original_icon": null,
+     "device_class": null,
+     "original_device_class": null,
+     "unit_of_measurement": null,
+     "entity_category": "diagnostic",
+     "disabled_by": null,
+     "capabilities": null,
+     "has_entity_name": false,
+     "config_entry_id": "01JFAKEMOBILEAPPPLAIN00000"
+    },
+    "notify.legacy": {
+     "unique_id": "LEGACY",
+     "original_name": null,
+     "original_icon": null,
+     "device_class": null,
+     "original_device_class": null,
+     "unit_of_measurement": null,
+     "entity_category": null,
+     "disabled_by": null,
+     "capabilities": null,
+     "has_entity_name": true,
+     "config_entry_id": "01JFAKEMOBILEAPPLEGACY0000"
+    },
+    "notify.phone": {
+     "unique_id": "11111111-2222-4333-8444-555555555555",
+     "original_name": null,
+     "original_icon": null,
+     "device_class": null,
+     "original_device_class": null,
+     "unit_of_measurement": null,
+     "entity_category": null,
+     "disabled_by": null,
+     "capabilities": null,
+     "has_entity_name": true,
+     "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+    },
+    "sensor.phone_app_version": {
+     "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_app-version",
+     "original_name": " Phone App Version",
+     "original_icon": "mdi:cellphone",
+     "device_class": null,
+     "original_device_class": null,
+     "unit_of_measurement": null,
+     "entity_category": "diagnostic",
+     "disabled_by": null,
+     "capabilities": null,
+     "has_entity_name": false,
+     "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+    },
+    "sensor.phone_audio_output": {
+     "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_iphone-audio-output",
+     "original_name": " Phone Audio Output",
+     "original_icon": "mdi:volume-high",
+     "device_class": null,
+     "original_device_class": null,
+     "unit_of_measurement": null,
+     "entity_category": null,
+     "disabled_by": null,
+     "capabilities": null,
+     "has_entity_name": false,
+     "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+    },
+    "sensor.phone_battery_level": {
+     "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_battery_level",
+     "original_name": " Phone Battery Level",
+     "original_icon": "mdi:battery-60",
+     "device_class": null,
+     "original_device_class": "battery",
+     "unit_of_measurement": "%",
+     "entity_category": null,
+     "disabled_by": null,
+     "capabilities": null,
+     "has_entity_name": false,
+     "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+    },
+    "sensor.phone_battery_state": {
+     "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_battery_state",
+     "original_name": " Phone Battery State",
+     "original_icon": "mdi:battery-60",
+     "device_class": null,
+     "original_device_class": null,
+     "unit_of_measurement": null,
+     "entity_category": null,
+     "disabled_by": null,
+     "capabilities": null,
+     "has_entity_name": false,
+     "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+    },
+    "sensor.phone_bssid": {
+     "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_connectivity_bssid",
+     "original_name": " Phone BSSID",
+     "original_icon": "mdi:wifi-off",
+     "device_class": null,
+     "original_device_class": null,
+     "unit_of_measurement": null,
+     "entity_category": null,
+     "disabled_by": null,
+     "capabilities": null,
+     "has_entity_name": false,
+     "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+    },
+    "sensor.phone_camera_stream": {
+     "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_cameraStream",
+     "original_name": " Phone Camera Stream",
+     "original_icon": "mdi:dots-square",
+     "device_class": null,
+     "original_device_class": null,
+     "unit_of_measurement": null,
+     "entity_category": null,
+     "disabled_by": "integration",
+     "capabilities": null,
+     "has_entity_name": false,
+     "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+    },
+    "sensor.phone_case_twin": {
+     "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_Battery_Level",
+     "original_name": " Phone Case Twin",
+     "original_icon": "mdi:cellphone",
+     "device_class": null,
+     "original_device_class": null,
+     "unit_of_measurement": null,
+     "entity_category": null,
+     "disabled_by": null,
+     "capabilities": null,
+     "has_entity_name": false,
+     "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+    },
+    "sensor.phone_connection_type": {
+     "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_connectivity_connection_type",
+     "original_name": " Phone Connection Type",
+     "original_icon": "mdi:wifi",
+     "device_class": null,
+     "original_device_class": null,
+     "unit_of_measurement": null,
+     "entity_category": null,
+     "disabled_by": null,
+     "capabilities": null,
+     "has_entity_name": false,
+     "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+    },
+    "sensor.phone_geocoded_location": {
+     "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_geocoded_location",
+     "original_name": " Phone Geocoded Location",
+     "original_icon": "mdi:map",
+     "device_class": null,
+     "original_device_class": null,
+     "unit_of_measurement": null,
+     "entity_category": null,
+     "disabled_by": null,
+     "capabilities": null,
+     "has_entity_name": false,
+     "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+    },
+    "sensor.phone_kiosk_brightness": {
+     "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_kioskBrightness",
+     "original_name": " Phone Kiosk Brightness",
+     "original_icon": "mdi:dots-square",
+     "device_class": null,
+     "original_device_class": null,
+     "unit_of_measurement": null,
+     "entity_category": null,
+     "disabled_by": null,
+     "capabilities": null,
+     "has_entity_name": false,
+     "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+    },
+    "sensor.phone_kiosk_volume": {
+     "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_kioskVolume",
+     "original_name": " Phone Kiosk Volume",
+     "original_icon": "mdi:dots-square",
+     "device_class": null,
+     "original_device_class": null,
+     "unit_of_measurement": null,
+     "entity_category": null,
+     "disabled_by": null,
+     "capabilities": null,
+     "has_entity_name": false,
+     "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+    },
+    "sensor.phone_last_reboot": {
+     "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_last_reboot",
+     "original_name": " Phone Last Reboot",
+     "original_icon": "mdi:restart",
+     "device_class": null,
+     "original_device_class": "timestamp",
+     "unit_of_measurement": null,
+     "entity_category": null,
+     "disabled_by": null,
+     "capabilities": null,
+     "has_entity_name": false,
+     "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+    },
+    "sensor.phone_last_update_trigger": {
+     "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_last_update_trigger",
+     "original_name": " Phone Last Update Trigger",
+     "original_icon": "mdi:cellphone-wireless",
+     "device_class": null,
+     "original_device_class": null,
+     "unit_of_measurement": null,
+     "entity_category": null,
+     "disabled_by": null,
+     "capabilities": null,
+     "has_entity_name": false,
+     "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+    },
+    "sensor.phone_location_permission": {
+     "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_location-permission",
+     "original_name": " Phone Location permission",
+     "original_icon": "mdi:map",
+     "device_class": null,
+     "original_device_class": null,
+     "unit_of_measurement": null,
+     "entity_category": null,
+     "disabled_by": null,
+     "capabilities": null,
+     "has_entity_name": false,
+     "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+    },
+    "sensor.phone_no_state": {
+     "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_no_state",
+     "original_name": " Phone No State",
+     "original_icon": "mdi:cellphone",
+     "device_class": null,
+     "original_device_class": null,
+     "unit_of_measurement": null,
+     "entity_category": null,
+     "disabled_by": null,
+     "capabilities": null,
+     "has_entity_name": false,
+     "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+    },
+    "sensor.phone_pressure": {
+     "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_pressure",
+     "original_name": " Phone Pressure",
+     "original_icon": "mdi:cellphone",
+     "device_class": null,
+     "original_device_class": "pressure",
+     "unit_of_measurement": "kPa",
+     "entity_category": "diagnostic",
+     "disabled_by": null,
+     "capabilities": {
+      "state_class": "measurement"
+     },
+     "has_entity_name": false,
+     "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+    },
+    "sensor.phone_sim_1": {
+     "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_connectivity_sim_1",
+     "original_name": " Phone SIM 1",
+     "original_icon": "mdi:sim",
+     "device_class": null,
+     "original_device_class": null,
+     "unit_of_measurement": null,
+     "entity_category": null,
+     "disabled_by": null,
+     "capabilities": null,
+     "has_entity_name": false,
+     "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+    },
+    "sensor.phone_sim_2": {
+     "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_connectivity_sim_2",
+     "original_name": " Phone SIM 2",
+     "original_icon": "mdi:sim",
+     "device_class": null,
+     "original_device_class": null,
+     "unit_of_measurement": null,
+     "entity_category": null,
+     "disabled_by": null,
+     "capabilities": null,
+     "has_entity_name": false,
+     "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+    },
+    "sensor.phone_some_date": {
+     "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_some_date",
+     "original_name": " Phone Some Date",
+     "original_icon": "mdi:cellphone",
+     "device_class": null,
+     "original_device_class": "date",
+     "unit_of_measurement": null,
+     "entity_category": null,
+     "disabled_by": null,
+     "capabilities": null,
+     "has_entity_name": false,
+     "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+    },
+    "sensor.phone_ssid": {
+     "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_connectivity_ssid",
+     "original_name": " Phone SSID",
+     "original_icon": "mdi:wifi-off",
+     "device_class": null,
+     "original_device_class": null,
+     "unit_of_measurement": null,
+     "entity_category": null,
+     "disabled_by": null,
+     "capabilities": null,
+     "has_entity_name": false,
+     "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+    },
+    "sensor.phone_steps": {
+     "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_steps",
+     "original_name": " Phone Steps",
+     "original_icon": "mdi:walk",
+     "device_class": null,
+     "original_device_class": null,
+     "unit_of_measurement": "steps",
+     "entity_category": null,
+     "disabled_by": null,
+     "capabilities": {
+      "state_class": "total_increasing"
+     },
+     "has_entity_name": false,
+     "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+    },
+    "sensor.phone_storage": {
+     "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_storage",
+     "original_name": " Phone Storage",
+     "original_icon": "mdi:database",
+     "device_class": null,
+     "original_device_class": null,
+     "unit_of_measurement": "% available",
+     "entity_category": null,
+     "disabled_by": null,
+     "capabilities": null,
+     "has_entity_name": false,
+     "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+    }
+   },
+   "states_after_register": {
+    "binary_sensor.phone_active": {
+     "state": "on",
+     "attributes": {
+      "device_class": "motion",
+      "icon": "mdi:monitor",
+      "friendly_name": " Phone Active"
+     }
+    },
+    "binary_sensor.phone_kiosk_mode": {
+     "state": "off",
+     "attributes": {
+      "icon": "mdi:tablet",
+      "friendly_name": " Phone Kiosk Mode"
+     }
+    },
+    "binary_sensor.phone_kiosk_screensaver": {
+     "state": "on",
+     "attributes": {
+      "icon": "mdi:sleep",
+      "friendly_name": " Phone Kiosk Screensaver"
+     }
+    },
+    "sensor.phone_app_version": {
+     "state": "2026.9.0",
+     "attributes": {
+      "icon": "mdi:cellphone",
+      "friendly_name": " Phone App Version"
+     }
+    },
+    "sensor.phone_audio_output": {
+     "state": "Hello",
+     "attributes": {
+      "friendly_name": " Phone Audio Output"
+     }
+    },
+    "sensor.phone_battery_level": {
+     "state": "3.25",
+     "attributes": {
+      "unit_of_measurement": "%",
+      "device_class": "battery",
+      "icon": "mdi:battery-30",
+      "friendly_name": " Phone Battery Level"
+     }
+    },
+    "sensor.phone_battery_state": {
+     "state": "Not Charging",
+     "attributes": {
+      "Low Power Mode": true,
+      "icon": "mdi:battery-60",
+      "friendly_name": " Phone Battery State"
+     }
+    },
+    "sensor.phone_bssid": {
+     "state": "02:00:00:00:00:01",
+     "attributes": {
+      "icon": "mdi:wifi-star",
+      "friendly_name": " Phone BSSID"
+     }
+    },
+    "sensor.phone_case_twin": {
+     "state": "5",
+     "attributes": {
+      "icon": "mdi:cellphone",
+      "friendly_name": " Phone Case Twin"
+     }
+    },
+    "sensor.phone_connection_type": {
+     "state": "Wi-Fi",
+     "attributes": {
+      "icon": "mdi:wifi",
+      "friendly_name": " Phone Connection Type"
+     }
+    },
+    "sensor.phone_geocoded_location": {
+     "state": "Unknown",
+     "attributes": {
+      "icon": "mdi:map",
+      "friendly_name": " Phone Geocoded Location"
+     }
+    },
+    "sensor.phone_kiosk_brightness": {
+     "state": "unavailable",
+     "attributes": {
+      "icon": "mdi:dots-square",
+      "friendly_name": " Phone Kiosk Brightness"
+     }
+    },
+    "sensor.phone_kiosk_volume": {
+     "state": "unavailable",
+     "attributes": {
+      "icon": "mdi:dots-square",
+      "friendly_name": " Phone Kiosk Volume"
+     }
+    },
+    "sensor.phone_last_reboot": {
+     "state": "2026-11-14T08:00:00+00:00",
+     "attributes": {
+      "device_class": "timestamp",
+      "icon": "mdi:restart",
+      "friendly_name": " Phone Last Reboot"
+     }
+    },
+    "sensor.phone_last_update_trigger": {
+     "state": "Launch",
+     "attributes": {
+      "icon": "mdi:cellphone-wireless",
+      "friendly_name": " Phone Last Update Trigger"
+     }
+    },
+    "sensor.phone_location_permission": {
+     "state": "Authorized when in use",
+     "attributes": {
+      "icon": "mdi:map",
+      "friendly_name": " Phone Location permission"
+     }
+    },
+    "sensor.phone_no_state": {
+     "state": "unknown",
+     "attributes": {
+      "icon": "mdi:cellphone",
+      "friendly_name": " Phone No State"
+     }
+    },
+    "sensor.phone_pressure": {
+     "state": "101.3",
+     "attributes": {
+      "state_class": "measurement",
+      "unit_of_measurement": "kPa",
+      "device_class": "pressure",
+      "icon": "mdi:cellphone",
+      "friendly_name": " Phone Pressure"
+     }
+    },
+    "sensor.phone_sim_1": {
+     "state": "--",
+     "attributes": {
+      "Allows VoIP": true,
+      "Carrier ID": "0000000100000001",
+      "Carrier Name": "--",
+      "ISO Country Code": "--",
+      "Mobile Country Code": "65535",
+      "Mobile Network Code": "65535",
+      "icon": "mdi:sim",
+      "friendly_name": " Phone SIM 1"
+     }
+    },
+    "sensor.phone_sim_2": {
+     "state": "--",
+     "attributes": {
+      "Allows VoIP": true,
+      "Carrier ID": "0000000100000002",
+      "Carrier Name": "--",
+      "Current Radio Technology": "Enhanced Data rates for GSM Evolution (EDGE)",
+      "ISO Country Code": "--",
+      "Mobile Country Code": "65535",
+      "Mobile Network Code": "65535",
+      "icon": "mdi:sim",
+      "friendly_name": " Phone SIM 2"
+     }
+    },
+    "sensor.phone_some_date": {
+     "state": "2026-11-14",
+     "attributes": {
+      "device_class": "date",
+      "icon": "mdi:cellphone",
+      "friendly_name": " Phone Some Date"
+     }
+    },
+    "sensor.phone_ssid": {
+     "state": "FakeSSID",
+     "attributes": {
+      "icon": "mdi:wifi",
+      "friendly_name": " Phone SSID"
+     }
+    },
+    "sensor.phone_steps": {
+     "state": "1234",
+     "attributes": {
+      "state_class": "total_increasing",
+      "unit_of_measurement": "steps",
+      "icon": "mdi:walk",
+      "friendly_name": " Phone Steps"
+     }
+    },
+    "sensor.phone_storage": {
+     "state": "unknown",
+     "attributes": {
+      "unit_of_measurement": "% available",
+      "icon": "mdi:database",
+      "friendly_name": " Phone Storage"
+     }
+    }
+   }
+  },
+  {
+   "type": "register_sensor",
+   "request": {
+    "data_plaintext": "{\"attributes\":{},\"device_class\":\"battery\",\"icon\":\"mdi:battery-50\",\"name\":\"Battery Level\",\"state\":55,\"state_class\":\"measurement\",\"type\":\"sensor\",\"unique_id\":\"battery_level\",\"unit_of_measurement\":\"%\"}",
+    "nonce_hex": "4150502d4e4f4e434572656769737465725f73656e736f72",
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"QVBQLU5PTkNFcmVnaXN0ZXJfc2Vuc29yMqs\\/1DV1giq12nkv2FNsJtr8cZT2GhBAFFPE95p\\/jfTlDzjS\\/oYsdcGIjQmRYw3jYXiEWo4T0JZJq1NZkeMJK4Z44ksoQXGfiC13SEYqo\\/gFBEZb1O6KimZdarXtEHjdu\\/zdJH9BrxeQYFx59+TgjkN6OodxYjYAVoqJHkFYExKaqTA0veg7HUEmctpKFayaykoRredf0Is+Du0Z4csTSrBiwDLZN00OOqu73mQ3m0X\\/tXYGOvciSdnlrQPWeIqzbl\\/aU7ws8VGqV52C1jDcqVSnLv0yAA==\",\"type\":\"register_sensor\"}"
+   },
+   "response": {
+    "status": 201,
+    "headers": {
+     "Content-Type": "application/json"
+    },
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"SEEtTk9OQ0UAAAAAAAAAAAAAAAAAAAAMSXYz1H7pUgZrprg1Sgedg9RXzJl6N6sp8S45jP8Z0C4=\"}",
+    "decrypted": "{\"success\":true}",
+    "nonce_hex": "48412d4e4f4e43450000000000000000000000000000000c"
+   },
+   "effects": {
+    "state_writes": [
+     {
+      "entity_id": "sensor.phone_battery_level",
+      "state": "55",
+      "attributes": {
+       "state_class": "measurement",
+       "unit_of_measurement": "%",
+       "device_class": "battery",
+       "icon": "mdi:battery-50",
+       "friendly_name": " Phone Battery Level"
+      },
+      "context_user_id": null
+     }
+    ],
+    "events": [
+     {
+      "event_type": "entity_registry_updated",
+      "data": {
+       "action": "update",
+       "entity_id": "sensor.phone_battery_level",
+       "changes": {
+        "capabilities": null
+       }
+      },
+      "origin": "LOCAL",
+      "context_user_id": null
+     },
+     {
+      "event_type": "entity_registry_updated",
+      "data": {
+       "action": "update",
+       "entity_id": "sensor.phone_battery_level",
+       "changes": {
+        "device_class": null,
+        "original_icon": "mdi:battery-60"
+       }
+      },
+      "origin": "LOCAL",
+      "context_user_id": null
+     }
+    ],
+    "service_calls": []
+   }
+  },
+  {
+   "type": "register_sensor",
+   "request": {
+    "data_plaintext": "{\"attributes\":{},\"disabled\":true,\"icon\":\"mdi:brightness-6\",\"name\":\"Kiosk Brightness\",\"state\":0.5,\"type\":\"sensor\",\"unique_id\":\"kioskBrightness\"}",
+    "nonce_hex": "4150502d4e4f4e434572656769737465725f73656e736f72",
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"QVBQLU5PTkNFcmVnaXN0ZXJfc2Vuc29ynsn0ihO3499IZgjtm4yPKNr8cZT2GhBAFFPE95p\\/jfTlDzje+44tfPuPw1KWYlq8bziMTZUYgNVJ6hVZyO4VYNsy+0EkCGDTyns+GFFm+60FEkZ+3Oycw3w9Wr3+DGnBp6\\/iYyUGsEHdNkovrKCrmVVte9IjdGBbAJyzE15WEkOUsWc3sfg9DWwqe50eQ+Xfh00Dn\\/AUjcE5BeYZ\\/ZtM\",\"type\":\"register_sensor\"}"
+   },
+   "response": {
+    "status": 201,
+    "headers": {
+     "Content-Type": "application/json"
+    },
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"SEEtTk9OQ0UAAAAAAAAAAAAAAAAAAAANEbcZBE8FA3pOgpsc0v+mQzXPsdhrXQu6xaV1y470eR0=\"}",
+    "decrypted": "{\"success\":true}",
+    "nonce_hex": "48412d4e4f4e43450000000000000000000000000000000d"
+   },
+   "effects": {
+    "state_writes": [
+     {
+      "entity_id": "sensor.phone_kiosk_brightness",
+      "state": null,
+      "attributes": null,
+      "context_user_id": null
+     }
+    ],
+    "events": [
+     {
+      "event_type": "entity_registry_updated",
+      "data": {
+       "action": "update",
+       "entity_id": "sensor.phone_kiosk_brightness",
+       "changes": {
+        "disabled_by": null,
+        "original_icon": "mdi:dots-square"
+       }
+      },
+      "origin": "LOCAL",
+      "context_user_id": null
+     }
+    ],
+    "service_calls": []
+   }
+  },
+  {
+   "type": "register_sensor",
+   "request": {
+    "data_plaintext": "{\"attributes\":{},\"disabled\":false,\"name\":\"Camera Motion\",\"state\":false,\"type\":\"binary_sensor\",\"unique_id\":\"cameraMotion\"}",
+    "nonce_hex": "4150502d4e4f4e434572656769737465725f73656e736f72",
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"QVBQLU5PTkNFcmVnaXN0ZXJfc2Vuc29yck+1KkGz9l4T3vHi4AaMutr8cZT2GhBAFFPE95p\\/jfTlDzje+44tfPuPw1KEcUOqJjbHQJsbx81RpTJRn+kVaJwX4FsoFH3c0HthTl5z8+odTgVZxubDiigGWLG7Xj\\/Nq7LwM3B7sFDSMUB\\/tLyn2Rcmft42TisFANX0HkxUBRPZ3n0tseYmSk4=\",\"type\":\"register_sensor\"}"
+   },
+   "response": {
+    "status": 201,
+    "headers": {
+     "Content-Type": "application/json"
+    },
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"SEEtTk9OQ0UAAAAAAAAAAAAAAAAAAAAOJYZJSHlSlwowd9jjZKcSJsRia/K6LN+I775c5LQC/1o=\"}",
+    "decrypted": "{\"success\":true}",
+    "nonce_hex": "48412d4e4f4e43450000000000000000000000000000000e"
+   },
+   "effects": {
+    "state_writes": [],
+    "events": [
+     {
+      "event_type": "entity_registry_updated",
+      "data": {
+       "action": "update",
+       "entity_id": "binary_sensor.phone_camera_motion",
+       "changes": {
+        "disabled_by": "integration",
+        "original_icon": "mdi:dots-square"
+       }
+      },
+      "origin": "LOCAL",
+      "context_user_id": null
+     }
+    ],
+    "service_calls": []
+   }
+  },
+  {
+   "type": "register_sensor",
+   "request": {
+    "data_plaintext": "{\"attributes\":{},\"icon\":\"mdi:battery-charging\",\"name\":\"Renamed State\",\"state\":\"Charging\",\"type\":\"sensor\",\"unique_id\":\"battery_state\"}",
+    "nonce_hex": "4150502d4e4f4e434572656769737465725f73656e736f72",
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"QVBQLU5PTkNFcmVnaXN0ZXJfc2Vuc29y6fYKGBgqR2SGL48Fb+t6tNr8cZT2GhBAFFPE95p\\/jfTlDzXU54FtKryGhQHYck6tN3+XV9cVyo4Z4Bhela5LK9I74kpjQTGsmTdzV1pjtptTSRBQl6\\/N2ygeXLG7Xj\\/sqr3jJmBKpBeQYFt05vWnlls8asUgfjBDDs2jE0RIFQTn+nZ74qsqCUc3es1dPv3CiUoN\\/\\/8=\",\"type\":\"register_sensor\"}"
+   },
+   "response": {
+    "status": 201,
+    "headers": {
+     "Content-Type": "application/json"
+    },
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"SEEtTk9OQ0UAAAAAAAAAAAAAAAAAAAAPWE9dy/nVpIMB0wBtnDgYzZ5HDg4MGgIAZjU+w5OCBT4=\"}",
+    "decrypted": "{\"success\":true}",
+    "nonce_hex": "48412d4e4f4e43450000000000000000000000000000000f"
+   },
+   "effects": {
+    "state_writes": [
+     {
+      "entity_id": "sensor.phone_battery_state",
+      "state": "Charging",
+      "attributes": {
+       "icon": "mdi:battery-charging",
+       "friendly_name": " Phone Battery State"
+      },
+      "context_user_id": null
+     }
+    ],
+    "events": [
+     {
+      "event_type": "entity_registry_updated",
+      "data": {
+       "action": "update",
+       "entity_id": "sensor.phone_battery_state",
+       "changes": {
+        "original_icon": "mdi:battery-60",
+        "original_name": " Phone Battery State"
+       }
+      },
+      "origin": "LOCAL",
+      "context_user_id": null
+     },
+     {
+      "event_type": "entity_registry_updated",
+      "data": {
+       "action": "update",
+       "entity_id": "sensor.phone_battery_state",
+       "changes": {
+        "original_name": " Phone Renamed State"
+       }
+      },
+      "origin": "LOCAL",
+      "context_user_id": null
+     }
+    ],
+    "service_calls": []
+   }
+  },
+  {
+   "registry_after_reregister": {
+    "binary_sensor.phone_active": {
+     "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_active",
+     "original_name": " Phone Active",
+     "original_icon": "mdi:monitor",
+     "device_class": null,
+     "original_device_class": "motion",
+     "unit_of_measurement": null,
+     "entity_category": null,
+     "disabled_by": null,
+     "capabilities": null,
+     "has_entity_name": false,
+     "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+    },
+    "binary_sensor.phone_camera_motion": {
+     "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_cameraMotion",
+     "original_name": " Phone Camera Motion",
+     "original_icon": "mdi:cellphone",
+     "device_class": null,
+     "original_device_class": null,
+     "unit_of_measurement": null,
+     "entity_category": null,
+     "disabled_by": null,
+     "capabilities": null,
+     "has_entity_name": false,
+     "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+    },
+    "binary_sensor.phone_focus": {
+     "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_focus",
+     "original_name": " Phone Focus",
+     "original_icon": "mdi:cellphone",
+     "device_class": null,
+     "original_device_class": null,
+     "unit_of_measurement": null,
+     "entity_category": null,
+     "disabled_by": "integration",
+     "capabilities": null,
+     "has_entity_name": false,
+     "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+    },
+    "binary_sensor.phone_kiosk_mode": {
+     "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_kioskMode",
+     "original_name": " Phone Kiosk Mode",
+     "original_icon": "mdi:tablet",
+     "device_class": null,
+     "original_device_class": null,
+     "unit_of_measurement": null,
+     "entity_category": null,
+     "disabled_by": null,
+     "capabilities": null,
+     "has_entity_name": false,
+     "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+    },
+    "binary_sensor.phone_kiosk_screensaver": {
+     "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_kioskScreensaver",
+     "original_name": " Phone Kiosk Screensaver",
+     "original_icon": "mdi:sleep-off",
+     "device_class": null,
+     "original_device_class": null,
+     "unit_of_measurement": null,
+     "entity_category": null,
+     "disabled_by": null,
+     "capabilities": null,
+     "has_entity_name": false,
+     "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+    },
+    "device_tracker.legacy": {
+     "unique_id": "LEGACY",
+     "original_name": "Legacy",
+     "original_icon": null,
+     "device_class": null,
+     "original_device_class": null,
+     "unit_of_measurement": null,
+     "entity_category": "diagnostic",
+     "disabled_by": null,
+     "capabilities": null,
+     "has_entity_name": false,
+     "config_entry_id": "01JFAKEMOBILEAPPLEGACY0000"
+    },
+    "device_tracker.phone": {
+     "unique_id": "11111111-2222-4333-8444-555555555555",
+     "original_name": " Phone",
+     "original_icon": null,
+     "device_class": null,
+     "original_device_class": null,
+     "unit_of_measurement": null,
+     "entity_category": "diagnostic",
+     "disabled_by": null,
+     "capabilities": null,
+     "has_entity_name": false,
+     "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+    },
+    "device_tracker.plain": {
+     "unique_id": "PLAIN",
+     "original_name": "Plain",
+     "original_icon": null,
+     "device_class": null,
+     "original_device_class": null,
+     "unit_of_measurement": null,
+     "entity_category": "diagnostic",
+     "disabled_by": null,
+     "capabilities": null,
+     "has_entity_name": false,
+     "config_entry_id": "01JFAKEMOBILEAPPPLAIN00000"
+    },
+    "notify.legacy": {
+     "unique_id": "LEGACY",
+     "original_name": null,
+     "original_icon": null,
+     "device_class": null,
+     "original_device_class": null,
+     "unit_of_measurement": null,
+     "entity_category": null,
+     "disabled_by": null,
+     "capabilities": null,
+     "has_entity_name": true,
+     "config_entry_id": "01JFAKEMOBILEAPPLEGACY0000"
+    },
+    "notify.phone": {
+     "unique_id": "11111111-2222-4333-8444-555555555555",
+     "original_name": null,
+     "original_icon": null,
+     "device_class": null,
+     "original_device_class": null,
+     "unit_of_measurement": null,
+     "entity_category": null,
+     "disabled_by": null,
+     "capabilities": null,
+     "has_entity_name": true,
+     "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+    },
+    "sensor.phone_app_version": {
+     "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_app-version",
+     "original_name": " Phone App Version",
+     "original_icon": "mdi:cellphone",
+     "device_class": null,
+     "original_device_class": null,
+     "unit_of_measurement": null,
+     "entity_category": "diagnostic",
+     "disabled_by": null,
+     "capabilities": null,
+     "has_entity_name": false,
+     "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+    },
+    "sensor.phone_audio_output": {
+     "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_iphone-audio-output",
+     "original_name": " Phone Audio Output",
+     "original_icon": "mdi:volume-high",
+     "device_class": null,
+     "original_device_class": null,
+     "unit_of_measurement": null,
+     "entity_category": null,
+     "disabled_by": null,
+     "capabilities": null,
+     "has_entity_name": false,
+     "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+    },
+    "sensor.phone_battery_level": {
+     "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_battery_level",
+     "original_name": " Phone Battery Level",
+     "original_icon": "mdi:battery-50",
+     "device_class": "battery",
+     "original_device_class": "battery",
+     "unit_of_measurement": "%",
+     "entity_category": null,
+     "disabled_by": null,
+     "capabilities": {
+      "state_class": "measurement"
+     },
+     "has_entity_name": false,
+     "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+    },
+    "sensor.phone_battery_state": {
+     "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_battery_state",
+     "original_name": " Phone Battery State",
+     "original_icon": "mdi:battery-charging",
+     "device_class": null,
+     "original_device_class": null,
+     "unit_of_measurement": null,
+     "entity_category": null,
+     "disabled_by": null,
+     "capabilities": null,
+     "has_entity_name": false,
+     "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+    },
+    "sensor.phone_bssid": {
+     "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_connectivity_bssid",
+     "original_name": " Phone BSSID",
+     "original_icon": "mdi:wifi-off",
+     "device_class": null,
+     "original_device_class": null,
+     "unit_of_measurement": null,
+     "entity_category": null,
+     "disabled_by": null,
+     "capabilities": null,
+     "has_entity_name": false,
+     "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+    },
+    "sensor.phone_camera_stream": {
+     "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_cameraStream",
+     "original_name": " Phone Camera Stream",
+     "original_icon": "mdi:dots-square",
+     "device_class": null,
+     "original_device_class": null,
+     "unit_of_measurement": null,
+     "entity_category": null,
+     "disabled_by": "integration",
+     "capabilities": null,
+     "has_entity_name": false,
+     "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+    },
+    "sensor.phone_case_twin": {
+     "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_Battery_Level",
+     "original_name": " Phone Case Twin",
+     "original_icon": "mdi:cellphone",
+     "device_class": null,
+     "original_device_class": null,
+     "unit_of_measurement": null,
+     "entity_category": null,
+     "disabled_by": null,
+     "capabilities": null,
+     "has_entity_name": false,
+     "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+    },
+    "sensor.phone_connection_type": {
+     "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_connectivity_connection_type",
+     "original_name": " Phone Connection Type",
+     "original_icon": "mdi:wifi",
+     "device_class": null,
+     "original_device_class": null,
+     "unit_of_measurement": null,
+     "entity_category": null,
+     "disabled_by": null,
+     "capabilities": null,
+     "has_entity_name": false,
+     "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+    },
+    "sensor.phone_geocoded_location": {
+     "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_geocoded_location",
+     "original_name": " Phone Geocoded Location",
+     "original_icon": "mdi:map",
+     "device_class": null,
+     "original_device_class": null,
+     "unit_of_measurement": null,
+     "entity_category": null,
+     "disabled_by": null,
+     "capabilities": null,
+     "has_entity_name": false,
+     "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+    },
+    "sensor.phone_kiosk_brightness": {
+     "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_kioskBrightness",
+     "original_name": " Phone Kiosk Brightness",
+     "original_icon": "mdi:brightness-6",
+     "device_class": null,
+     "original_device_class": null,
+     "unit_of_measurement": null,
+     "entity_category": null,
+     "disabled_by": "integration",
+     "capabilities": null,
+     "has_entity_name": false,
+     "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+    },
+    "sensor.phone_kiosk_volume": {
+     "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_kioskVolume",
+     "original_name": " Phone Kiosk Volume",
+     "original_icon": "mdi:dots-square",
+     "device_class": null,
+     "original_device_class": null,
+     "unit_of_measurement": null,
+     "entity_category": null,
+     "disabled_by": null,
+     "capabilities": null,
+     "has_entity_name": false,
+     "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+    },
+    "sensor.phone_last_reboot": {
+     "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_last_reboot",
+     "original_name": " Phone Last Reboot",
+     "original_icon": "mdi:restart",
+     "device_class": null,
+     "original_device_class": "timestamp",
+     "unit_of_measurement": null,
+     "entity_category": null,
+     "disabled_by": null,
+     "capabilities": null,
+     "has_entity_name": false,
+     "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+    },
+    "sensor.phone_last_update_trigger": {
+     "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_last_update_trigger",
+     "original_name": " Phone Last Update Trigger",
+     "original_icon": "mdi:cellphone-wireless",
+     "device_class": null,
+     "original_device_class": null,
+     "unit_of_measurement": null,
+     "entity_category": null,
+     "disabled_by": null,
+     "capabilities": null,
+     "has_entity_name": false,
+     "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+    },
+    "sensor.phone_location_permission": {
+     "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_location-permission",
+     "original_name": " Phone Location permission",
+     "original_icon": "mdi:map",
+     "device_class": null,
+     "original_device_class": null,
+     "unit_of_measurement": null,
+     "entity_category": null,
+     "disabled_by": null,
+     "capabilities": null,
+     "has_entity_name": false,
+     "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+    },
+    "sensor.phone_no_state": {
+     "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_no_state",
+     "original_name": " Phone No State",
+     "original_icon": "mdi:cellphone",
+     "device_class": null,
+     "original_device_class": null,
+     "unit_of_measurement": null,
+     "entity_category": null,
+     "disabled_by": null,
+     "capabilities": null,
+     "has_entity_name": false,
+     "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+    },
+    "sensor.phone_pressure": {
+     "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_pressure",
+     "original_name": " Phone Pressure",
+     "original_icon": "mdi:cellphone",
+     "device_class": null,
+     "original_device_class": "pressure",
+     "unit_of_measurement": "kPa",
+     "entity_category": "diagnostic",
+     "disabled_by": null,
+     "capabilities": {
+      "state_class": "measurement"
+     },
+     "has_entity_name": false,
+     "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+    },
+    "sensor.phone_sim_1": {
+     "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_connectivity_sim_1",
+     "original_name": " Phone SIM 1",
+     "original_icon": "mdi:sim",
+     "device_class": null,
+     "original_device_class": null,
+     "unit_of_measurement": null,
+     "entity_category": null,
+     "disabled_by": null,
+     "capabilities": null,
+     "has_entity_name": false,
+     "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+    },
+    "sensor.phone_sim_2": {
+     "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_connectivity_sim_2",
+     "original_name": " Phone SIM 2",
+     "original_icon": "mdi:sim",
+     "device_class": null,
+     "original_device_class": null,
+     "unit_of_measurement": null,
+     "entity_category": null,
+     "disabled_by": null,
+     "capabilities": null,
+     "has_entity_name": false,
+     "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+    },
+    "sensor.phone_some_date": {
+     "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_some_date",
+     "original_name": " Phone Some Date",
+     "original_icon": "mdi:cellphone",
+     "device_class": null,
+     "original_device_class": "date",
+     "unit_of_measurement": null,
+     "entity_category": null,
+     "disabled_by": null,
+     "capabilities": null,
+     "has_entity_name": false,
+     "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+    },
+    "sensor.phone_ssid": {
+     "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_connectivity_ssid",
+     "original_name": " Phone SSID",
+     "original_icon": "mdi:wifi-off",
+     "device_class": null,
+     "original_device_class": null,
+     "unit_of_measurement": null,
+     "entity_category": null,
+     "disabled_by": null,
+     "capabilities": null,
+     "has_entity_name": false,
+     "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+    },
+    "sensor.phone_steps": {
+     "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_steps",
+     "original_name": " Phone Steps",
+     "original_icon": "mdi:walk",
+     "device_class": null,
+     "original_device_class": null,
+     "unit_of_measurement": "steps",
+     "entity_category": null,
+     "disabled_by": null,
+     "capabilities": {
+      "state_class": "total_increasing"
+     },
+     "has_entity_name": false,
+     "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+    },
+    "sensor.phone_storage": {
+     "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_storage",
+     "original_name": " Phone Storage",
+     "original_icon": "mdi:database",
+     "device_class": null,
+     "original_device_class": null,
+     "unit_of_measurement": "% available",
+     "entity_category": null,
+     "disabled_by": null,
+     "capabilities": null,
+     "has_entity_name": false,
+     "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+    }
+   },
+   "states_after_reregister": {
+    "binary_sensor.phone_active": {
+     "state": "on",
+     "attributes": {
+      "device_class": "motion",
+      "icon": "mdi:monitor",
+      "friendly_name": " Phone Active"
+     }
+    },
+    "binary_sensor.phone_kiosk_mode": {
+     "state": "off",
+     "attributes": {
+      "icon": "mdi:tablet",
+      "friendly_name": " Phone Kiosk Mode"
+     }
+    },
+    "binary_sensor.phone_kiosk_screensaver": {
+     "state": "on",
+     "attributes": {
+      "icon": "mdi:sleep",
+      "friendly_name": " Phone Kiosk Screensaver"
+     }
+    },
+    "sensor.phone_app_version": {
+     "state": "2026.9.0",
+     "attributes": {
+      "icon": "mdi:cellphone",
+      "friendly_name": " Phone App Version"
+     }
+    },
+    "sensor.phone_audio_output": {
+     "state": "Hello",
+     "attributes": {
+      "friendly_name": " Phone Audio Output"
+     }
+    },
+    "sensor.phone_battery_level": {
+     "state": "55",
+     "attributes": {
+      "state_class": "measurement",
+      "unit_of_measurement": "%",
+      "device_class": "battery",
+      "icon": "mdi:battery-50",
+      "friendly_name": " Phone Battery Level"
+     }
+    },
+    "sensor.phone_battery_state": {
+     "state": "Charging",
+     "attributes": {
+      "icon": "mdi:battery-charging",
+      "friendly_name": " Phone Battery State"
+     }
+    },
+    "sensor.phone_bssid": {
+     "state": "02:00:00:00:00:01",
+     "attributes": {
+      "icon": "mdi:wifi-star",
+      "friendly_name": " Phone BSSID"
+     }
+    },
+    "sensor.phone_case_twin": {
+     "state": "5",
+     "attributes": {
+      "icon": "mdi:cellphone",
+      "friendly_name": " Phone Case Twin"
+     }
+    },
+    "sensor.phone_connection_type": {
+     "state": "Wi-Fi",
+     "attributes": {
+      "icon": "mdi:wifi",
+      "friendly_name": " Phone Connection Type"
+     }
+    },
+    "sensor.phone_geocoded_location": {
+     "state": "Unknown",
+     "attributes": {
+      "icon": "mdi:map",
+      "friendly_name": " Phone Geocoded Location"
+     }
+    },
+    "sensor.phone_kiosk_volume": {
+     "state": "unavailable",
+     "attributes": {
+      "icon": "mdi:dots-square",
+      "friendly_name": " Phone Kiosk Volume"
+     }
+    },
+    "sensor.phone_last_reboot": {
+     "state": "2026-11-14T08:00:00+00:00",
+     "attributes": {
+      "device_class": "timestamp",
+      "icon": "mdi:restart",
+      "friendly_name": " Phone Last Reboot"
+     }
+    },
+    "sensor.phone_last_update_trigger": {
+     "state": "Launch",
+     "attributes": {
+      "icon": "mdi:cellphone-wireless",
+      "friendly_name": " Phone Last Update Trigger"
+     }
+    },
+    "sensor.phone_location_permission": {
+     "state": "Authorized when in use",
+     "attributes": {
+      "icon": "mdi:map",
+      "friendly_name": " Phone Location permission"
+     }
+    },
+    "sensor.phone_no_state": {
+     "state": "unknown",
+     "attributes": {
+      "icon": "mdi:cellphone",
+      "friendly_name": " Phone No State"
+     }
+    },
+    "sensor.phone_pressure": {
+     "state": "101.3",
+     "attributes": {
+      "state_class": "measurement",
+      "unit_of_measurement": "kPa",
+      "device_class": "pressure",
+      "icon": "mdi:cellphone",
+      "friendly_name": " Phone Pressure"
+     }
+    },
+    "sensor.phone_sim_1": {
+     "state": "--",
+     "attributes": {
+      "Allows VoIP": true,
+      "Carrier ID": "0000000100000001",
+      "Carrier Name": "--",
+      "ISO Country Code": "--",
+      "Mobile Country Code": "65535",
+      "Mobile Network Code": "65535",
+      "icon": "mdi:sim",
+      "friendly_name": " Phone SIM 1"
+     }
+    },
+    "sensor.phone_sim_2": {
+     "state": "--",
+     "attributes": {
+      "Allows VoIP": true,
+      "Carrier ID": "0000000100000002",
+      "Carrier Name": "--",
+      "Current Radio Technology": "Enhanced Data rates for GSM Evolution (EDGE)",
+      "ISO Country Code": "--",
+      "Mobile Country Code": "65535",
+      "Mobile Network Code": "65535",
+      "icon": "mdi:sim",
+      "friendly_name": " Phone SIM 2"
+     }
+    },
+    "sensor.phone_some_date": {
+     "state": "2026-11-14",
+     "attributes": {
+      "device_class": "date",
+      "icon": "mdi:cellphone",
+      "friendly_name": " Phone Some Date"
+     }
+    },
+    "sensor.phone_ssid": {
+     "state": "FakeSSID",
+     "attributes": {
+      "icon": "mdi:wifi",
+      "friendly_name": " Phone SSID"
+     }
+    },
+    "sensor.phone_steps": {
+     "state": "1234",
+     "attributes": {
+      "state_class": "total_increasing",
+      "unit_of_measurement": "steps",
+      "icon": "mdi:walk",
+      "friendly_name": " Phone Steps"
+     }
+    },
+    "sensor.phone_storage": {
+     "state": "unknown",
+     "attributes": {
+      "unit_of_measurement": "% available",
+      "icon": "mdi:database",
+      "friendly_name": " Phone Storage"
+     }
+    }
+   }
+  },
+  {
+   "type": "update_sensor_states",
+   "request": {
+    "data_plaintext": "[{\"icon\":\"mdi:brightness-6\",\"state\":0.7,\"type\":\"sensor\",\"unique_id\":\"kioskBrightness\"},{\"icon\":\"mdi:x\",\"state\":true,\"type\":\"binary_sensor\",\"unique_id\":\"focus\"}]",
+    "nonce_hex": "4150502d4e4f4e43457570646174655f73656e736f725f73",
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"QVBQLU5PTkNFdXBkYXRlX3NlbnNvcl9zmnhroQU490XiJfuHPil3Zsq3A+T1w0ATE2\\/ctVsu7D5a0IOU1ZQI17QG1w7Xy9CeoSsDgn0GN7N51Z232deClHY0NWWl6uAwSxh925gtGckMoWpy2\\/bzm3asnSinwyIWznSw3c9t6Bg5dtwQpGzzKP4vrFovpB9df9\\/niDQBzi7xJqxC\\/RAGySqiXVxZ+t6+Sal6JJL1RiNxUU+HhpVFoxobnp4CUOlwXVkUh3bMjM8=\",\"type\":\"update_sensor_states\"}"
+   },
+   "response": {
+    "status": 200,
+    "headers": {
+     "Content-Type": "application/json"
+    },
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"SEEtTk9OQ0UAAAAAAAAAAAAAAAAAAAAQCNzD2xLwrKPaIQl6qRm81S3X3jfSRP3JTlbJCChlmcRwENWpsQ5B03Oo+1Yw7Mr/hUF8sqHnql/DFeGLiE+8tYe285oo3sGb5CKAzNl8ZDwi/ULwu9Vm/oG0dZbUlsbnFP2SnzfdBE78AjuMB9frJBziEA==\"}",
+    "decrypted": "{\"kioskBrightness\":{\"success\":true,\"is_disabled\":true},\"focus\":{\"success\":true,\"is_disabled\":true}}",
+    "nonce_hex": "48412d4e4f4e434500000000000000000000000000000010"
+   },
+   "effects": {
+    "state_writes": [],
+    "events": [],
+    "service_calls": []
+   }
+  },
+  {
+   "type": "update_sensor_states",
+   "request": {
+    "data_plaintext": "[{\"attributes\":{\"x\":1},\"icon\":\"mdi:battery\",\"state\":\"unavailable\",\"type\":\"sensor\",\"unique_id\":\"battery_level\"},{\"icon\":\"mdi:sleep\",\"state\":\"off\",\"type\":\"binary_sensor\",\"unique_id\":\"kioskScreensaver\"},{\"icon\":\"mdi:tablet\",\"state\":0,\"type\":\"binary_sensor\",\"unique_id\":\"kioskMode\"}]",
+    "nonce_hex": "4150502d4e4f4e43457570646174655f73656e736f725f73",
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"QVBQLU5PTkNFdXBkYXRlX3NlbnNvcl9zUtE8f8CpvJynMFG8b6Z80sq3A+zi2FxYSzjFtEE2tDcRz8naioxXhvBTmkzXgoaSsScb2ixcdPop2MbrnobM13E0eSzo7ax9Hwx63og6EPNH6Wo8gO3\\/1j\\/lrD+g1yUQgj3h24N5tRZ+QNYb6HTraPI\\/sQUl\\/2wTad3jkHNe2CGhOqoBsUZFmyLkDkRI\\/9W6S\\/IJdYTvVDhmUVmHnJ1K8ENctY4WF\\/FoGVQenGSciM1Cw08D8MD6CcdZVsuqORFz+BbYBJVh3auNQwbROSrkSPEpxH2zWxex7fKUdXsZikrvfMu0Jb8C5NQtk2+ar35stTpcqJ69fSosGGZuR8jgE\\/knZ7TDBHEy+EiYnpt1q0woVTj8GN4HkfXMD4X9hTDD7AG1i6chkA==\",\"type\":\"update_sensor_states\"}"
+   },
+   "response": {
+    "status": 200,
+    "headers": {
+     "Content-Type": "application/json"
+    },
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"SEEtTk9OQ0UAAAAAAAAAAAAAAAAAAAARpBPzr2HwjkAp0WIdbLldzMqEvoGeJJfEY8CmCe8J2pQ8EmuTrHDEQCEme+sJaFwMm9i4mycTDgZ/0cXcTtB4dH8dkucjswpO03ys5c7b6iB5vdMjtFowiK+pW0mnp/Qq4mK+8L4ezeG0idtjqAkk1Lq45A==\"}",
+    "decrypted": "{\"battery_level\":{\"success\":true},\"kioskScreensaver\":{\"success\":true},\"kioskMode\":{\"success\":true}}",
+    "nonce_hex": "48412d4e4f4e434500000000000000000000000000000011"
+   },
+   "effects": {
+    "state_writes": [
+     {
+      "entity_id": "sensor.phone_battery_level",
+      "state": "unavailable",
+      "attributes": {
+       "state_class": "measurement",
+       "unit_of_measurement": "%",
+       "device_class": "battery",
+       "icon": "mdi:battery",
+       "friendly_name": " Phone Battery Level"
+      },
+      "context_user_id": null
+     }
+    ],
+    "events": [],
+    "service_calls": []
+   },
+   "states_after": {
+    "binary_sensor.phone_kiosk_mode": {
+     "state": "off",
+     "attributes": {
+      "icon": "mdi:tablet",
+      "friendly_name": " Phone Kiosk Mode"
+     }
+    },
+    "binary_sensor.phone_kiosk_screensaver": {
+     "state": "on",
+     "attributes": {
+      "icon": "mdi:sleep",
+      "friendly_name": " Phone Kiosk Screensaver"
+     }
+    },
+    "sensor.phone_battery_level": {
+     "state": "unavailable",
+     "attributes": {
+      "state_class": "measurement",
+      "unit_of_measurement": "%",
+      "device_class": "battery",
+      "icon": "mdi:battery",
+      "friendly_name": " Phone Battery Level"
+     }
+    }
+   }
+  },
+  {
+   "type": "update_sensor_states",
+   "request": {
+    "data_plaintext": "[{\"icon\":\"mdi:battery\",\"state\":\"high\",\"type\":\"sensor\",\"unique_id\":\"battery_level\"}]",
+    "nonce_hex": "4150502d4e4f4e43457570646174655f73656e736f725f73",
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"QVBQLU5PTkNFdXBkYXRlX3NlbnNvcl9z1Rao9JqUbPDI1hVXY4qHvsq3A+T1w0ATE2\\/ctVsu7C1Hw46SwtNXhupElFaQmp7dvSdG0G8EIusi0YHlhtfL02siNGTotOBpBwRix4wHFfJH\\/2oqmOnukXe+gDar0i8Ogmye\",\"type\":\"update_sensor_states\"}"
+   },
+   "response": {
+    "status": 200,
+    "headers": {
+     "Content-Type": "application/json"
+    },
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"SEEtTk9OQ0UAAAAAAAAAAAAAAAAAAAAS2iLSvamUTgJ8Dhn01YRZG7HOjPqIbW1eBSEJQ0dFuedKRGwuu2U3g0gFgbhhr35fOyU=\"}",
+    "decrypted": "{\"battery_level\":{\"success\":true}}",
+    "nonce_hex": "48412d4e4f4e434500000000000000000000000000000012"
+   },
+   "effects": {
+    "state_writes": [],
+    "events": [],
+    "service_calls": []
+   },
+   "states_after": {
+    "sensor.phone_battery_level": {
+     "state": "unavailable",
+     "attributes": {
+      "state_class": "measurement",
+      "unit_of_measurement": "%",
+      "device_class": "battery",
+      "icon": "mdi:battery",
+      "friendly_name": " Phone Battery Level"
+     }
+    }
+   }
+  },
+  {
+   "type": "get_config",
+   "request": {
+    "data_plaintext": "{}",
+    "nonce_hex": "4150502d4e4f4e43456765745f636f6e6669670000000000",
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"QVBQLU5PTkNFZ2V0X2NvbmZpZwAAAAAAaF8m\\/0IS2YUDVoY+PYwY5\\/tw\",\"type\":\"get_config\"}"
+   },
+   "response": {
+    "status": 200,
+    "headers": {
+     "Content-Type": "application/json"
+    },
+    "body": "{\"encrypted\":true,\"encrypted_data\":\"SEEtTk9OQ0UAAAAAAAAAAAAAAAAAAAATcBOhZqxbINrwLXaHVC4kQUFcreqm9LtmZqdhSmSZV0lQ0WxdNmVtaDhqO5vYJelPETuCnVwpu+q25SQEkQwpQJwKFSgmjn4tqxqQi2DVzyaSGhBX3nTrQs4Ovl3vlbYS742Is6FuCK1H+i0R+qbnK4uvWzfdw320Vx5+17O5eZEsxBYHfd00eC7eM0ow4gFy/FgkveAeBWNnrbskBm7XFrv9vgUEdHVlSdogq5FUOfVe6KBn67eTCZ9c/GGDH2i1Rf/YE/yEUqbju5NWQgO7ACPAmKHDJxxqpWkr3JtMUU2bztplm5Dlb/aRW11IpcBtGhYvkcArMJqdAXkIoF++qi5GdKCn1h42o6c1SWhzAWsSKOpoYbnZXROzNSTR6Aer4+GFqjix3aCBgg3x1wqMeqZ4g6K4NZVFpulOl9Lv6d51ZV1L3d48uCLHAimheEASf3Fb5hSO4TX3zNDEcSmMoulxTNv0xDVL7rzl25NqslBK2hv4SJhX0XD5z1v8zgg4XTAljjO0nTRyHCsyvQbTM/ELrkasSlm99v6FbDLs2bV5IhFm5kyB/wXzfSTQkNnEjIq+JerQQ9Ulz7B7Kwhl+eBAvsfgBulEJkfDT4pOJXDzmhqS0qx5oEWDBzRWZm6skUmvJc6lZtsAqPycUyynxIpTlnVet1lc7U4bSjWL4bBa8eUwUnBmvsS7OHyAx53Wct7wUveovtxkOH73JRtE4r01iR8dG1Q4J41mhTHEX9n5H5Y5jxggd2rsWrBmhmEO1kZUor0dK0YEt0a/JpF61HLr+h+ztDkvJjeeE0NmlJQ7fQUe4iAJMheHRSAqllgW2frW2vqWXFtzSrsCvTO2LDsyycRPKupCr/w/JB8FJAohm52Sx1J+z634uGVPSX+uIWLv8AUu1P14hWaJnAz2o7ETqPeWQJ77CkbT+2svVAJcu83lsEJtK335p9Dmjzs///PlN8Co4A822LOd6JvdyA4TdJOf2+UZk3wk/Rt2U5UuspZ4SfjFB2yMvFKGJz1CAUXAQCSlqbYPXdD2anrKJySZfnKBSIdHD8YdBc77ZcUETUl2pXA3OtBctbsHopiRneksJrFV58svd9rygpI0waz11zmhUKHuQcubYlbs4BOzyK9RbI1chHdHV/+Gl+QGeM0zPTw5KjbR2z5S+/ifwuldS+7q6A+9I+vQ3zN8Hizr4HeePneBhOj1tIE2Hizr2kTkDvhNNMQYn24qEK/GHty5znwsy2G9oEeHcGMn+K3IunSjbjWIvHR2PoqbHUYyqRV7bfRYkdqAp8AgEUIDJlqgWW1C7sMnqdGWvWh0AU0oM+O0UAAtPJN0JyA0gvs7UKB5CUmjWfMFsZlMhd4vcBt4PURnDlDwPXKAYrNiu6bLAISxUSqYVLXvZxIIoJpYm/wqOMsrwFAz79UAIA3upQuy+8YJw2Qux7GzLqE7NHVZBeNtJdp0YDUQvw5KClCJDPPdkW680e6kutT0K12AAeOC85gDsgoxlaDxq+XjkNRNEzoirP+Lo0GbkZkZ3OIRPW6hL/gMWfYHkBpPufbGPTxaIVk2yXjP1WAXk9yiQkwoDvxAE0UAloKpC01bCU42lWw+0iRw8+ExELGHTGZey1ncugW1WAhYTBorWnF6srr74Dpj1u9304n9KbtRk0DhQYV/pjcaJjxBpz8uwNXLPuiX00Hp5DyB82L4mxbdD/AUEGMZLDRhxu1WVUTSbWpBAljWN+t4g1F+scb6x8UC7BCcMUWxfBc1Z7MPmmB6jnIoUOLHCojWRks4C21rZrU5H0iXVvKD+PhB+QyNdJ2jgpV6W7EFLag2t2oZtTcE2Xf79i1JALrcikWcCe7qj70MSJ2R8hPU9RcwCigP0fVF7Fi1kcQ5IXRWeoJI9aISOMt66+BHR5TkMS7lLHksXdO4FNtNcO2d660TuHSA/X/Ccf9KZ+pcJlh31FMHYHDFr3UY5LV59ZAAsDIDfw12qAFwTDvyDuk9CZql+u8jX0zMsPQgIE1BB6IM8nGcby8iraCO0qPh2Fv/4yH8jBJMYZNCGh/sdvPARk6VIsUnlVKVvkVzEe2LSmkLO9yuoCfYhiBQrhpFydAhA2UvJ3Apm2FOgVlqqnkfQdHk2n5l4xMpdwCdzS89bqvapGTBd0wJGZGE08bwWWbLp4j+B4vWC8spcjpgV3YVIEMw7zC3L/GoCayqPCmvr7lcZPG90pcUfktNt5SIj9rIBtJU0EBNKBv8aA==\"}",
+    "decrypted": "{\"latitude\":0.5,\"longitude\":0.5,\"elevation\":10,\"hass_device_id\":\"d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0\",\"unit_system\":{\"length\":\"km\",\"accumulated_precipitation\":\"mm\",\"area\":\"m²\",\"mass\":\"g\",\"pressure\":\"Pa\",\"temperature\":\"°C\",\"volume\":\"L\",\"wind_speed\":\"m/s\"},\"location_name\":\"Home\",\"time_zone\":\"Europe/London\",\"components\":[\"person\",\"mobile_app\",\"intent\",\"zone\",\"network\",\"auth\",\"sensor\",\"image_upload\",\"notify\",\"device_tracker\",\"websocket_api\",\"tag\",\"http\",\"mobile_app.binary_sensor\",\"webhook\",\"mobile_app.device_tracker\",\"repairs\",\"mobile_app.notify\",\"binary_sensor\",\"mobile_app.sensor\",\"homeassistant\"],\"version\":\"2026.6.1\",\"theme_color\":\"#2980b9\",\"entities\":{\"11111111-2222-4333-8444-555555555555\":{\"disabled\":false},\"storage\":{\"disabled\":false},\"connectivity_sim_1\":{\"disabled\":false},\"connectivity_sim_2\":{\"disabled\":false},\"geocoded_location\":{\"disabled\":false},\"connectivity_ssid\":{\"disabled\":false},\"connectivity_bssid\":{\"disabled\":false},\"connectivity_connection_type\":{\"disabled\":false},\"last_update_trigger\":{\"disabled\":false},\"location-permission\":{\"disabled\":false},\"iphone-audio-output\":{\"disabled\":false},\"app-version\":{\"disabled\":false},\"kioskMode\":{\"disabled\":false},\"kioskVolume\":{\"disabled\":false},\"kioskScreensaver\":{\"disabled\":false},\"cameraStream\":{\"disabled\":true},\"steps\":{\"disabled\":false},\"last_reboot\":{\"disabled\":false},\"some_date\":{\"disabled\":false},\"active\":{\"disabled\":false},\"focus\":{\"disabled\":true},\"pressure\":{\"disabled\":false},\"no_state\":{\"disabled\":false},\"Battery_Level\":{\"disabled\":false},\"battery_level\":{\"disabled\":false},\"kioskBrightness\":{\"disabled\":true},\"cameraMotion\":{\"disabled\":false},\"battery_state\":{\"disabled\":false}}}",
+    "nonce_hex": "48412d4e4f4e434500000000000000000000000000000013"
+   },
+   "effects": {
+    "state_writes": [],
+    "events": [],
+    "service_calls": []
+   }
+  }
+ ],
+ "logs": [
+  "DEBUG homeassistant.components.mobile_app.helpers: Successfully decrypted mobile_app payload",
+  "DEBUG homeassistant.components.mobile_app.webhook: Received webhook payload from  Phone for type update_sensor_states: [{'attributes': {}, 'icon': 'mdi:battery-60', 'state': 61, 'type': 'sensor', 'unique_id': 'battery_level'}, {'attributes': {'Low Power Mode': True}, 'icon': 'mdi:battery-60', 'state': 'Not Charging', 'type': 'sensor', 'unique_id': 'battery_state'}, {'attributes': {'Available': '1 GB', 'Total': '2 GB'}, 'icon': 'mdi:database', 'state': '50.00', 'type': 'sensor', 'unique_id': 'storage'}, {'icon': 'mdi:tablet-dashboard', 'state': True, 'type': 'binary_sensor', 'unique_id': 'kioskMode'}, {'icon': 'mdi:dots-square', 'state': 'unavailable', 'type': 'sensor', 'unique_id': 'kioskBrightness'}, {'icon': 'mdi:dots-square', 'state': 'unavailable', 'type': 'sensor', 'unique_id': 'cameraStream'}, {'state': 'x', 'type': 'sensor', 'unique_id': 'never_registered'}, {'state': [1], 'type': 'sensor', 'unique_id': 'app-version'}, {'state': '2026.9.0', 'type': 'binary_sensor', 'unique_id': 'app-version'}]",
+  "DEBUG homeassistant.components.mobile_app.entity: Applying pending update for 0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_battery_level: {'attributes': {}, 'icon': 'mdi:battery-60', 'state': 61, 'type': 'sensor', 'unique_id': 'battery_level', 'webhook_id': '0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f'}",
+  "DEBUG homeassistant.components.mobile_app.entity: Applying pending update for 0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_battery_state: {'attributes': {'Low Power Mode': True}, 'icon': 'mdi:battery-60', 'state': 'Not Charging', 'type': 'sensor', 'unique_id': 'battery_state', 'webhook_id': '0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f'}",
+  "DEBUG homeassistant.components.mobile_app.entity: Applying pending update for 0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_storage: {'attributes': {'Available': '1 GB', 'Total': '2 GB'}, 'icon': 'mdi:database', 'state': '50.00', 'type': 'sensor', 'unique_id': 'storage', 'webhook_id': '0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f'}",
+  "DEBUG homeassistant.components.mobile_app.entity: Applying pending update for 0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_kioskMode: {'icon': 'mdi:tablet-dashboard', 'state': True, 'type': 'binary_sensor', 'unique_id': 'kioskMode', 'attributes': {}, 'webhook_id': '0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f'}",
+  "DEBUG homeassistant.components.mobile_app.entity: Applying pending update for 0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_kioskBrightness: {'icon': 'mdi:dots-square', 'state': 'unavailable', 'type': 'sensor', 'unique_id': 'kioskBrightness', 'attributes': {}, 'webhook_id': '0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f'}",
+  "DEBUG homeassistant.components.mobile_app.webhook: Refusing to update  Phone non-registered sensor: 0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_never_registered",
+  "ERROR homeassistant.components.mobile_app.webhook: Received invalid sensor payload from  Phone for app-version: not a valid value for dictionary value @ data['state']. Got [1]",
+  "DEBUG homeassistant.components.mobile_app.webhook: Refusing to update  Phone non-registered sensor: 0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_app-version",
+  "DEBUG homeassistant.components.mobile_app.helpers: Successfully decrypted mobile_app payload",
+  "DEBUG homeassistant.components.mobile_app.webhook: Received webhook payload from  Phone for type update_sensor_states: {'state': 62, 'type': 'sensor', 'unique_id': 'battery_level'}",
+  "DEBUG homeassistant.components.mobile_app.entity: Applying pending update for 0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_battery_level: {'state': 62, 'type': 'sensor', 'unique_id': 'battery_level', 'icon': 'mdi:cellphone', 'attributes': {}, 'webhook_id': '0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f'}",
+  "DEBUG homeassistant.components.mobile_app.helpers: Successfully decrypted mobile_app payload",
+  "DEBUG homeassistant.components.mobile_app.webhook: Received webhook payload from  Phone for type update_sensor_states: [{'state': 1, 'unique_id': 'battery_level'}]",
+  "ERROR homeassistant.components.mobile_app.webhook: Received invalid webhook payload: required key not provided @ data[0]['type']. Got None",
+  "DEBUG homeassistant.components.mobile_app.helpers: Successfully decrypted mobile_app payload",
+  "DEBUG homeassistant.components.mobile_app.webhook: Received webhook payload from  Phone for type update_sensor_states: [{'icon': 'mdi:battery-30', 'state': 3.25, 'type': 'sensor', 'unique_id': 'battery_level'}, {'icon': 'mdi:database', 'state': None, 'type': 'sensor', 'unique_id': 'storage'}, {'icon': 'mdi:tablet', 'state': False, 'type': 'binary_sensor', 'unique_id': 'kioskMode'}, {'icon': 'mdi:sleep', 'state': 'on', 'type': 'binary_sensor', 'unique_id': 'kioskScreensaver'}, {'icon': 'mdi:x', 'state': 'unknown', 'type': 'sensor', 'unique_id': 'audio_output_x'}, {'icon': None, 'state': 'Hello', 'type': 'sensor', 'unique_id': 'iphone-audio-output'}, {'icon': 'bad icon', 'state': 'Hello', 'type': 'sensor', 'unique_id': 'location-permission'}]",
+  "DEBUG homeassistant.components.mobile_app.entity: Applying pending update for 0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_battery_level: {'icon': 'mdi:battery-30', 'state': 3.25, 'type': 'sensor', 'unique_id': 'battery_level', 'attributes': {}, 'webhook_id': '0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f'}",
+  "DEBUG homeassistant.components.mobile_app.entity: Applying pending update for 0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_storage: {'icon': 'mdi:database', 'state': None, 'type': 'sensor', 'unique_id': 'storage', 'attributes': {}, 'webhook_id': '0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f'}",
+  "DEBUG homeassistant.components.mobile_app.entity: Applying pending update for 0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_kioskMode: {'icon': 'mdi:tablet', 'state': False, 'type': 'binary_sensor', 'unique_id': 'kioskMode', 'attributes': {}, 'webhook_id': '0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f'}",
+  "DEBUG homeassistant.components.mobile_app.entity: Applying pending update for 0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_kioskScreensaver: {'icon': 'mdi:sleep', 'state': 'on', 'type': 'binary_sensor', 'unique_id': 'kioskScreensaver', 'attributes': {}, 'webhook_id': '0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f'}",
+  "DEBUG homeassistant.components.mobile_app.webhook: Refusing to update  Phone non-registered sensor: 0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_audio_output_x",
+  "DEBUG homeassistant.components.mobile_app.entity: Applying pending update for 0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_iphone-audio-output: {'icon': None, 'state': 'Hello', 'type': 'sensor', 'unique_id': 'iphone-audio-output', 'attributes': {}, 'webhook_id': '0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f'}",
+  "ERROR homeassistant.components.mobile_app.webhook: Received invalid sensor payload from  Phone for location-permission: not a valid value for dictionary value @ data['icon']. Got 'bad icon'",
+  "DEBUG homeassistant.components.mobile_app.helpers: Successfully decrypted mobile_app payload",
+  "DEBUG homeassistant.components.mobile_app.webhook: Received webhook payload from  Phone for type register_sensor: {'attributes': {}, 'icon': 'mdi:walk', 'name': 'Steps', 'state': 1234, 'state_class': 'total_increasing', 'type': 'sensor', 'unique_id': 'steps', 'unit_of_measurement': 'steps'}",
+  "DEBUG homeassistant.components.mobile_app.helpers: Successfully decrypted mobile_app payload",
+  "DEBUG homeassistant.components.mobile_app.webhook: Received webhook payload from  Phone for type register_sensor: {'attributes': {}, 'device_class': 'timestamp', 'icon': 'mdi:restart', 'name': 'Last Reboot', 'state': '2026-11-14T08:00:00.000+00:00', 'type': 'sensor', 'unique_id': 'last_reboot'}",
+  "DEBUG homeassistant.components.mobile_app.helpers: Successfully decrypted mobile_app payload",
+  "DEBUG homeassistant.components.mobile_app.webhook: Received webhook payload from  Phone for type register_sensor: {'attributes': {}, 'device_class': 'date', 'name': 'Some Date', 'state': '2026-11-14', 'type': 'sensor', 'unique_id': 'some_date'}",
+  "DEBUG homeassistant.components.mobile_app.helpers: Successfully decrypted mobile_app payload",
+  "DEBUG homeassistant.components.mobile_app.webhook: Received webhook payload from  Phone for type register_sensor: {'attributes': {}, 'device_class': 'Motion', 'icon': 'mdi:monitor', 'name': 'Active', 'state': True, 'type': 'binary_sensor', 'unique_id': 'active'}",
+  "DEBUG homeassistant.components.mobile_app.helpers: Successfully decrypted mobile_app payload",
+  "DEBUG homeassistant.components.mobile_app.webhook: Received webhook payload from  Phone for type register_sensor: {'attributes': {}, 'disabled': True, 'name': 'Focus', 'state': False, 'type': 'binary_sensor', 'unique_id': 'focus'}",
+  "DEBUG homeassistant.components.mobile_app.helpers: Successfully decrypted mobile_app payload",
+  "DEBUG homeassistant.components.mobile_app.webhook: Received webhook payload from  Phone for type register_sensor: {'attributes': {}, 'device_class': 'pressure', 'entity_category': 'diagnostic', 'name': 'Pressure', 'state': 101.3, 'state_class': 'measurement', 'type': 'sensor', 'unique_id': 'pressure', 'unit_of_measurement': 'kPa'}",
+  "DEBUG homeassistant.components.mobile_app.helpers: Successfully decrypted mobile_app payload",
+  "DEBUG homeassistant.components.mobile_app.webhook: Received webhook payload from  Phone for type register_sensor: {'attributes': {}, 'name': 'Bad', 'state': 1, 'state_class': 'measurement', 'type': 'binary_sensor', 'unique_id': 'bad_sc'}",
+  "ERROR homeassistant.components.mobile_app.webhook: Received invalid webhook payload: state_class only allowed for sensors. Got {'attributes': {}, 'name': 'Bad', 'state': 1, 'state_class': 'measurement', 'type': 'binary_sensor', 'unique_id': 'bad_sc'}",
+  "DEBUG homeassistant.components.mobile_app.helpers: Successfully decrypted mobile_app payload",
+  "DEBUG homeassistant.components.mobile_app.webhook: Received webhook payload from  Phone for type register_sensor: {'attributes': {}, 'device_class': 'not_a_class', 'name': 'Bad DC', 'state': 1, 'type': 'sensor', 'unique_id': 'bad_dc'}",
+  "ERROR homeassistant.components.mobile_app.webhook: Received invalid webhook payload: not a valid value for dictionary value @ data['device_class']. Got 'not_a_class'",
+  "DEBUG homeassistant.components.mobile_app.helpers: Successfully decrypted mobile_app payload",
+  "DEBUG homeassistant.components.mobile_app.webhook: Received webhook payload from  Phone for type register_sensor: {'name': 'No State', 'type': 'sensor', 'unique_id': 'no_state'}",
+  "DEBUG homeassistant.components.mobile_app.helpers: Successfully decrypted mobile_app payload",
+  "DEBUG homeassistant.components.mobile_app.webhook: Received webhook payload from  Phone for type register_sensor: {'attributes': {}, 'name': 'Case Twin', 'state': 5, 'type': 'sensor', 'unique_id': 'Battery_Level'}",
+  "DEBUG homeassistant.components.mobile_app.helpers: Successfully decrypted mobile_app payload",
+  "DEBUG homeassistant.components.mobile_app.webhook: Received webhook payload from  Phone for type register_sensor: {'attributes': {}, 'device_class': 'battery', 'icon': 'mdi:battery-50', 'name': 'Battery Level', 'state': 55, 'state_class': 'measurement', 'type': 'sensor', 'unique_id': 'battery_level', 'unit_of_measurement': '%'}",
+  "DEBUG homeassistant.components.mobile_app.webhook: Re-register for  Phone of existing sensor battery_level",
+  "DEBUG homeassistant.components.mobile_app.entity: Applying pending update for 0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_battery_level: {'attributes': {}, 'device_class': <BinarySensorDeviceClass.BATTERY: 'battery'>, 'icon': 'mdi:battery-50', 'name': 'Battery Level', 'state': 55, 'state_class': <SensorStateClass.MEASUREMENT: 'measurement'>, 'type': 'sensor', 'unique_id': 'battery_level', 'unit_of_measurement': '%', 'webhook_id': '0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f'}",
+  "DEBUG homeassistant.components.mobile_app.helpers: Successfully decrypted mobile_app payload",
+  "DEBUG homeassistant.components.mobile_app.webhook: Received webhook payload from  Phone for type register_sensor: {'attributes': {}, 'disabled': True, 'icon': 'mdi:brightness-6', 'name': 'Kiosk Brightness', 'state': 0.5, 'type': 'sensor', 'unique_id': 'kioskBrightness'}",
+  "DEBUG homeassistant.components.mobile_app.webhook: Re-register for  Phone of existing sensor kioskBrightness",
+  "DEBUG homeassistant.components.mobile_app.helpers: Successfully decrypted mobile_app payload",
+  "DEBUG homeassistant.components.mobile_app.webhook: Received webhook payload from  Phone for type register_sensor: {'attributes': {}, 'disabled': False, 'name': 'Camera Motion', 'state': False, 'type': 'binary_sensor', 'unique_id': 'cameraMotion'}",
+  "DEBUG homeassistant.components.mobile_app.webhook: Re-register for  Phone of existing sensor cameraMotion",
+  "DEBUG homeassistant.components.mobile_app.helpers: Successfully decrypted mobile_app payload",
+  "DEBUG homeassistant.components.mobile_app.webhook: Received webhook payload from  Phone for type register_sensor: {'attributes': {}, 'icon': 'mdi:battery-charging', 'name': 'Renamed State', 'state': 'Charging', 'type': 'sensor', 'unique_id': 'battery_state'}",
+  "DEBUG homeassistant.components.mobile_app.webhook: Re-register for  Phone of existing sensor battery_state",
+  "DEBUG homeassistant.components.mobile_app.entity: Applying pending update for 0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_battery_state: {'attributes': {}, 'icon': 'mdi:battery-charging', 'name': 'Renamed State', 'state': 'Charging', 'type': 'sensor', 'unique_id': 'battery_state', 'webhook_id': '0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f'}",
+  "DEBUG homeassistant.components.mobile_app.helpers: Successfully decrypted mobile_app payload",
+  "DEBUG homeassistant.components.mobile_app.webhook: Received webhook payload from  Phone for type update_sensor_states: [{'icon': 'mdi:brightness-6', 'state': 0.7, 'type': 'sensor', 'unique_id': 'kioskBrightness'}, {'icon': 'mdi:x', 'state': True, 'type': 'binary_sensor', 'unique_id': 'focus'}]",
+  "DEBUG homeassistant.components.mobile_app.helpers: Successfully decrypted mobile_app payload",
+  "DEBUG homeassistant.components.mobile_app.webhook: Received webhook payload from  Phone for type update_sensor_states: [{'attributes': {'x': 1}, 'icon': 'mdi:battery', 'state': 'unavailable', 'type': 'sensor', 'unique_id': 'battery_level'}, {'icon': 'mdi:sleep', 'state': 'off', 'type': 'binary_sensor', 'unique_id': 'kioskScreensaver'}, {'icon': 'mdi:tablet', 'state': 0, 'type': 'binary_sensor', 'unique_id': 'kioskMode'}]",
+  "DEBUG homeassistant.components.mobile_app.entity: Applying pending update for 0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_battery_level: {'attributes': {'x': 1}, 'icon': 'mdi:battery', 'state': 'unavailable', 'type': 'sensor', 'unique_id': 'battery_level', 'webhook_id': '0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f'}",
+  "DEBUG homeassistant.components.mobile_app.entity: Applying pending update for 0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_kioskScreensaver: {'icon': 'mdi:sleep', 'state': 'off', 'type': 'binary_sensor', 'unique_id': 'kioskScreensaver', 'attributes': {}, 'webhook_id': '0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f'}",
+  "DEBUG homeassistant.components.mobile_app.entity: Applying pending update for 0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_kioskMode: {'icon': 'mdi:tablet', 'state': 0, 'type': 'binary_sensor', 'unique_id': 'kioskMode', 'attributes': {}, 'webhook_id': '0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f'}",
+  "DEBUG homeassistant.components.mobile_app.helpers: Successfully decrypted mobile_app payload",
+  "DEBUG homeassistant.components.mobile_app.webhook: Received webhook payload from  Phone for type update_sensor_states: [{'icon': 'mdi:battery', 'state': 'high', 'type': 'sensor', 'unique_id': 'battery_level'}]",
+  "DEBUG homeassistant.components.mobile_app.entity: Applying pending update for 0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_battery_level: {'icon': 'mdi:battery', 'state': 'high', 'type': 'sensor', 'unique_id': 'battery_level', 'attributes': {}, 'webhook_id': '0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f'}",
+  "DEBUG homeassistant.components.mobile_app.helpers: Successfully decrypted mobile_app payload",
+  "DEBUG homeassistant.components.mobile_app.webhook: Received webhook payload from  Phone for type get_config: {}"
+ ]
+}

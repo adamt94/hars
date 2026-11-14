@@ -1,0 +1,762 @@
+{
+ "states": {
+  "binary_sensor.phone_kiosk_mode": {
+   "state": "off",
+   "attributes": {
+    "icon": "mdi:tablet",
+    "friendly_name": " Phone Kiosk Mode"
+   }
+  },
+  "binary_sensor.phone_kiosk_screensaver": {
+   "state": "off",
+   "attributes": {
+    "icon": "mdi:sleep-off",
+    "friendly_name": " Phone Kiosk Screensaver"
+   }
+  },
+  "device_tracker.legacy": {
+   "state": "unknown",
+   "attributes": {
+    "in_zones": [],
+    "source_type": "gps",
+    "friendly_name": "Legacy"
+   }
+  },
+  "device_tracker.phone": {
+   "state": "unknown",
+   "attributes": {
+    "in_zones": [],
+    "source_type": "gps",
+    "battery_level": 70,
+    "friendly_name": " Phone"
+   }
+  },
+  "device_tracker.plain": {
+   "state": "unknown",
+   "attributes": {
+    "in_zones": [],
+    "source_type": "gps",
+    "friendly_name": "Plain"
+   }
+  },
+  "notify.legacy": {
+   "state": "unknown",
+   "attributes": {
+    "friendly_name": "Legacy",
+    "supported_features": 1
+   }
+  },
+  "notify.phone": {
+   "state": "unknown",
+   "attributes": {
+    "friendly_name": " Phone",
+    "supported_features": 1
+   }
+  },
+  "person.adam": {
+   "state": "unknown",
+   "attributes": {
+    "editable": true,
+    "id": "adam",
+    "device_trackers": [
+     "device_tracker.phone"
+    ],
+    "in_zones": [],
+    "user_id": "00112233445566778899aabbccddeeff",
+    "friendly_name": "adam"
+   }
+  },
+  "sensor.phone_app_version": {
+   "state": "2026.9.0",
+   "attributes": {
+    "icon": "mdi:cellphone",
+    "friendly_name": " Phone App Version"
+   }
+  },
+  "sensor.phone_audio_output": {
+   "state": "Built-in Speaker",
+   "attributes": {
+    "icon": "mdi:volume-high",
+    "friendly_name": " Phone Audio Output"
+   }
+  },
+  "sensor.phone_battery_level": {
+   "state": "70",
+   "attributes": {
+    "unit_of_measurement": "%",
+    "device_class": "battery",
+    "icon": "mdi:battery-70",
+    "friendly_name": " Phone Battery Level"
+   }
+  },
+  "sensor.phone_battery_state": {
+   "state": "Not Charging",
+   "attributes": {
+    "Low Power Mode": false,
+    "icon": "mdi:battery-70",
+    "friendly_name": " Phone Battery State"
+   }
+  },
+  "sensor.phone_bssid": {
+   "state": "02:00:00:00:00:01",
+   "attributes": {
+    "icon": "mdi:wifi-star",
+    "friendly_name": " Phone BSSID"
+   }
+  },
+  "sensor.phone_connection_type": {
+   "state": "Wi-Fi",
+   "attributes": {
+    "icon": "mdi:wifi",
+    "friendly_name": " Phone Connection Type"
+   }
+  },
+  "sensor.phone_geocoded_location": {
+   "state": "Unknown",
+   "attributes": {
+    "icon": "mdi:map",
+    "friendly_name": " Phone Geocoded Location"
+   }
+  },
+  "sensor.phone_kiosk_brightness": {
+   "state": "unavailable",
+   "attributes": {
+    "icon": "mdi:dots-square",
+    "friendly_name": " Phone Kiosk Brightness"
+   }
+  },
+  "sensor.phone_kiosk_volume": {
+   "state": "unavailable",
+   "attributes": {
+    "icon": "mdi:dots-square",
+    "friendly_name": " Phone Kiosk Volume"
+   }
+  },
+  "sensor.phone_last_update_trigger": {
+   "state": "Launch",
+   "attributes": {
+    "icon": "mdi:cellphone-wireless",
+    "friendly_name": " Phone Last Update Trigger"
+   }
+  },
+  "sensor.phone_location_permission": {
+   "state": "Authorized when in use",
+   "attributes": {
+    "icon": "mdi:map",
+    "friendly_name": " Phone Location permission"
+   }
+  },
+  "sensor.phone_sim_1": {
+   "state": "--",
+   "attributes": {
+    "Allows VoIP": true,
+    "Carrier ID": "0000000100000001",
+    "Carrier Name": "--",
+    "ISO Country Code": "--",
+    "Mobile Country Code": "65535",
+    "Mobile Network Code": "65535",
+    "icon": "mdi:sim",
+    "friendly_name": " Phone SIM 1"
+   }
+  },
+  "sensor.phone_sim_2": {
+   "state": "--",
+   "attributes": {
+    "Allows VoIP": true,
+    "Carrier ID": "0000000100000002",
+    "Carrier Name": "--",
+    "Current Radio Technology": "Enhanced Data rates for GSM Evolution (EDGE)",
+    "ISO Country Code": "--",
+    "Mobile Country Code": "65535",
+    "Mobile Network Code": "65535",
+    "icon": "mdi:sim",
+    "friendly_name": " Phone SIM 2"
+   }
+  },
+  "sensor.phone_ssid": {
+   "state": "FakeSSID",
+   "attributes": {
+    "icon": "mdi:wifi",
+    "friendly_name": " Phone SSID"
+   }
+  },
+  "sensor.phone_storage": {
+   "state": "21.68",
+   "attributes": {
+    "Available": "38.99 GB",
+    "Available (Important)": "82.71 GB",
+    "Available (Opportunistic)": "55.38 GB",
+    "Total": "255.42 GB",
+    "unit_of_measurement": "% available",
+    "icon": "mdi:database",
+    "friendly_name": " Phone Storage"
+   }
+  },
+  "zone.home": {
+   "state": "0",
+   "attributes": {
+    "latitude": 0.5,
+    "longitude": 0.5,
+    "radius": 100,
+    "passive": false,
+    "persons": [],
+    "editable": true,
+    "icon": "mdi:home",
+    "friendly_name": "Home"
+   }
+  }
+ },
+ "registry": {
+  "binary_sensor.phone_camera_motion": {
+   "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_cameraMotion",
+   "original_name": " Phone Camera Motion",
+   "original_icon": "mdi:dots-square",
+   "device_class": null,
+   "original_device_class": null,
+   "unit_of_measurement": null,
+   "entity_category": null,
+   "disabled_by": "integration",
+   "capabilities": null,
+   "has_entity_name": false,
+   "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+  },
+  "binary_sensor.phone_kiosk_mode": {
+   "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_kioskMode",
+   "original_name": " Phone Kiosk Mode",
+   "original_icon": "mdi:tablet",
+   "device_class": null,
+   "original_device_class": null,
+   "unit_of_measurement": null,
+   "entity_category": null,
+   "disabled_by": null,
+   "capabilities": null,
+   "has_entity_name": false,
+   "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+  },
+  "binary_sensor.phone_kiosk_screensaver": {
+   "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_kioskScreensaver",
+   "original_name": " Phone Kiosk Screensaver",
+   "original_icon": "mdi:sleep-off",
+   "device_class": null,
+   "original_device_class": null,
+   "unit_of_measurement": null,
+   "entity_category": null,
+   "disabled_by": null,
+   "capabilities": null,
+   "has_entity_name": false,
+   "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+  },
+  "device_tracker.legacy": {
+   "unique_id": "LEGACY",
+   "original_name": "Legacy",
+   "original_icon": null,
+   "device_class": null,
+   "original_device_class": null,
+   "unit_of_measurement": null,
+   "entity_category": "diagnostic",
+   "disabled_by": null,
+   "capabilities": null,
+   "has_entity_name": false,
+   "config_entry_id": "01JFAKEMOBILEAPPLEGACY0000"
+  },
+  "device_tracker.phone": {
+   "unique_id": "11111111-2222-4333-8444-555555555555",
+   "original_name": " Phone",
+   "original_icon": null,
+   "device_class": null,
+   "original_device_class": null,
+   "unit_of_measurement": null,
+   "entity_category": "diagnostic",
+   "disabled_by": null,
+   "capabilities": null,
+   "has_entity_name": false,
+   "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+  },
+  "device_tracker.plain": {
+   "unique_id": "PLAIN",
+   "original_name": "Plain",
+   "original_icon": null,
+   "device_class": null,
+   "original_device_class": null,
+   "unit_of_measurement": null,
+   "entity_category": "diagnostic",
+   "disabled_by": null,
+   "capabilities": null,
+   "has_entity_name": false,
+   "config_entry_id": "01JFAKEMOBILEAPPPLAIN00000"
+  },
+  "notify.legacy": {
+   "unique_id": "LEGACY",
+   "original_name": null,
+   "original_icon": null,
+   "device_class": null,
+   "original_device_class": null,
+   "unit_of_measurement": null,
+   "entity_category": null,
+   "disabled_by": null,
+   "capabilities": null,
+   "has_entity_name": true,
+   "config_entry_id": "01JFAKEMOBILEAPPLEGACY0000"
+  },
+  "notify.phone": {
+   "unique_id": "11111111-2222-4333-8444-555555555555",
+   "original_name": null,
+   "original_icon": null,
+   "device_class": null,
+   "original_device_class": null,
+   "unit_of_measurement": null,
+   "entity_category": null,
+   "disabled_by": null,
+   "capabilities": null,
+   "has_entity_name": true,
+   "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+  },
+  "sensor.phone_app_version": {
+   "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_app-version",
+   "original_name": " Phone App Version",
+   "original_icon": "mdi:cellphone",
+   "device_class": null,
+   "original_device_class": null,
+   "unit_of_measurement": null,
+   "entity_category": "diagnostic",
+   "disabled_by": null,
+   "capabilities": null,
+   "has_entity_name": false,
+   "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+  },
+  "sensor.phone_audio_output": {
+   "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_iphone-audio-output",
+   "original_name": " Phone Audio Output",
+   "original_icon": "mdi:volume-high",
+   "device_class": null,
+   "original_device_class": null,
+   "unit_of_measurement": null,
+   "entity_category": null,
+   "disabled_by": null,
+   "capabilities": null,
+   "has_entity_name": false,
+   "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+  },
+  "sensor.phone_battery_level": {
+   "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_battery_level",
+   "original_name": " Phone Battery Level",
+   "original_icon": "mdi:battery-60",
+   "device_class": null,
+   "original_device_class": "battery",
+   "unit_of_measurement": "%",
+   "entity_category": null,
+   "disabled_by": null,
+   "capabilities": null,
+   "has_entity_name": false,
+   "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+  },
+  "sensor.phone_battery_state": {
+   "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_battery_state",
+   "original_name": " Phone Battery State",
+   "original_icon": "mdi:battery-60",
+   "device_class": null,
+   "original_device_class": null,
+   "unit_of_measurement": null,
+   "entity_category": null,
+   "disabled_by": null,
+   "capabilities": null,
+   "has_entity_name": false,
+   "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+  },
+  "sensor.phone_bssid": {
+   "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_connectivity_bssid",
+   "original_name": " Phone BSSID",
+   "original_icon": "mdi:wifi-off",
+   "device_class": null,
+   "original_device_class": null,
+   "unit_of_measurement": null,
+   "entity_category": null,
+   "disabled_by": null,
+   "capabilities": null,
+   "has_entity_name": false,
+   "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+  },
+  "sensor.phone_camera_stream": {
+   "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_cameraStream",
+   "original_name": " Phone Camera Stream",
+   "original_icon": "mdi:dots-square",
+   "device_class": null,
+   "original_device_class": null,
+   "unit_of_measurement": null,
+   "entity_category": null,
+   "disabled_by": "integration",
+   "capabilities": null,
+   "has_entity_name": false,
+   "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+  },
+  "sensor.phone_connection_type": {
+   "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_connectivity_connection_type",
+   "original_name": " Phone Connection Type",
+   "original_icon": "mdi:wifi",
+   "device_class": null,
+   "original_device_class": null,
+   "unit_of_measurement": null,
+   "entity_category": null,
+   "disabled_by": null,
+   "capabilities": null,
+   "has_entity_name": false,
+   "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+  },
+  "sensor.phone_geocoded_location": {
+   "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_geocoded_location",
+   "original_name": " Phone Geocoded Location",
+   "original_icon": "mdi:map",
+   "device_class": null,
+   "original_device_class": null,
+   "unit_of_measurement": null,
+   "entity_category": null,
+   "disabled_by": null,
+   "capabilities": null,
+   "has_entity_name": false,
+   "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+  },
+  "sensor.phone_kiosk_brightness": {
+   "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_kioskBrightness",
+   "original_name": " Phone Kiosk Brightness",
+   "original_icon": "mdi:dots-square",
+   "device_class": null,
+   "original_device_class": null,
+   "unit_of_measurement": null,
+   "entity_category": null,
+   "disabled_by": null,
+   "capabilities": null,
+   "has_entity_name": false,
+   "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+  },
+  "sensor.phone_kiosk_volume": {
+   "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_kioskVolume",
+   "original_name": " Phone Kiosk Volume",
+   "original_icon": "mdi:dots-square",
+   "device_class": null,
+   "original_device_class": null,
+   "unit_of_measurement": null,
+   "entity_category": null,
+   "disabled_by": null,
+   "capabilities": null,
+   "has_entity_name": false,
+   "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+  },
+  "sensor.phone_last_update_trigger": {
+   "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_last_update_trigger",
+   "original_name": " Phone Last Update Trigger",
+   "original_icon": "mdi:cellphone-wireless",
+   "device_class": null,
+   "original_device_class": null,
+   "unit_of_measurement": null,
+   "entity_category": null,
+   "disabled_by": null,
+   "capabilities": null,
+   "has_entity_name": false,
+   "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+  },
+  "sensor.phone_location_permission": {
+   "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_location-permission",
+   "original_name": " Phone Location permission",
+   "original_icon": "mdi:map",
+   "device_class": null,
+   "original_device_class": null,
+   "unit_of_measurement": null,
+   "entity_category": null,
+   "disabled_by": null,
+   "capabilities": null,
+   "has_entity_name": false,
+   "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+  },
+  "sensor.phone_sim_1": {
+   "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_connectivity_sim_1",
+   "original_name": " Phone SIM 1",
+   "original_icon": "mdi:sim",
+   "device_class": null,
+   "original_device_class": null,
+   "unit_of_measurement": null,
+   "entity_category": null,
+   "disabled_by": null,
+   "capabilities": null,
+   "has_entity_name": false,
+   "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+  },
+  "sensor.phone_sim_2": {
+   "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_connectivity_sim_2",
+   "original_name": " Phone SIM 2",
+   "original_icon": "mdi:sim",
+   "device_class": null,
+   "original_device_class": null,
+   "unit_of_measurement": null,
+   "entity_category": null,
+   "disabled_by": null,
+   "capabilities": null,
+   "has_entity_name": false,
+   "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+  },
+  "sensor.phone_ssid": {
+   "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_connectivity_ssid",
+   "original_name": " Phone SSID",
+   "original_icon": "mdi:wifi-off",
+   "device_class": null,
+   "original_device_class": null,
+   "unit_of_measurement": null,
+   "entity_category": null,
+   "disabled_by": null,
+   "capabilities": null,
+   "has_entity_name": false,
+   "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+  },
+  "sensor.phone_storage": {
+   "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_storage",
+   "original_name": " Phone Storage",
+   "original_icon": "mdi:database",
+   "device_class": null,
+   "original_device_class": null,
+   "unit_of_measurement": "% available",
+   "entity_category": null,
+   "disabled_by": null,
+   "capabilities": null,
+   "has_entity_name": false,
+   "config_entry_id": "01JFAKEMOBILEAPPENTRY00000"
+  }
+ },
+ "devices": [
+  {
+   "id": "76d6f301257d6f41b61270aac7b2db4d",
+   "identifiers": [
+    [
+     "mobile_app",
+     "PLAIN"
+    ]
+   ],
+   "name": "Plain",
+   "manufacturer": "Apple",
+   "model": "iPhone17,1",
+   "sw_version": "27.0",
+   "config_entries": [
+    "01JFAKEMOBILEAPPPLAIN00000"
+   ]
+  },
+  {
+   "id": "919b266715c0c0c788b9132c87ab1764",
+   "identifiers": [
+    [
+     "mobile_app",
+     "LEGACY"
+    ]
+   ],
+   "name": "Legacy",
+   "manufacturer": "Apple",
+   "model": "iPhone17,1",
+   "sw_version": "27.0",
+   "config_entries": [
+    "01JFAKEMOBILEAPPLEGACY0000"
+   ]
+  },
+  {
+   "id": "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0",
+   "identifiers": [
+    [
+     "mobile_app",
+     "11111111-2222-4333-8444-555555555555"
+    ]
+   ],
+   "name": " Phone",
+   "manufacturer": "Apple",
+   "model": "iPhone17,1",
+   "sw_version": "27.0",
+   "config_entries": [
+    "01JFAKEMOBILEAPPENTRY00000"
+   ]
+  }
+ ],
+ "logs": [],
+ "states_without_restore": {
+  "binary_sensor.phone_kiosk_mode": {
+   "state": "unknown",
+   "attributes": {
+    "icon": "mdi:tablet",
+    "friendly_name": " Phone Kiosk Mode"
+   }
+  },
+  "binary_sensor.phone_kiosk_screensaver": {
+   "state": "unknown",
+   "attributes": {
+    "icon": "mdi:sleep-off",
+    "friendly_name": " Phone Kiosk Screensaver"
+   }
+  },
+  "device_tracker.legacy": {
+   "state": "unknown",
+   "attributes": {
+    "in_zones": [],
+    "source_type": "gps",
+    "friendly_name": "Legacy"
+   }
+  },
+  "device_tracker.phone": {
+   "state": "unknown",
+   "attributes": {
+    "in_zones": [],
+    "source_type": "gps",
+    "friendly_name": " Phone"
+   }
+  },
+  "device_tracker.plain": {
+   "state": "unknown",
+   "attributes": {
+    "in_zones": [],
+    "source_type": "gps",
+    "friendly_name": "Plain"
+   }
+  },
+  "notify.legacy": {
+   "state": "unknown",
+   "attributes": {
+    "friendly_name": "Legacy",
+    "supported_features": 1
+   }
+  },
+  "notify.phone": {
+   "state": "unknown",
+   "attributes": {
+    "friendly_name": " Phone",
+    "supported_features": 1
+   }
+  },
+  "person.adam": {
+   "state": "unknown",
+   "attributes": {
+    "editable": true,
+    "id": "adam",
+    "device_trackers": [
+     "device_tracker.phone"
+    ],
+    "in_zones": [],
+    "user_id": "00112233445566778899aabbccddeeff",
+    "friendly_name": "adam"
+   }
+  },
+  "sensor.phone_app_version": {
+   "state": "unknown",
+   "attributes": {
+    "icon": "mdi:cellphone",
+    "friendly_name": " Phone App Version"
+   }
+  },
+  "sensor.phone_audio_output": {
+   "state": "unknown",
+   "attributes": {
+    "icon": "mdi:volume-high",
+    "friendly_name": " Phone Audio Output"
+   }
+  },
+  "sensor.phone_battery_level": {
+   "state": "unknown",
+   "attributes": {
+    "unit_of_measurement": "%",
+    "device_class": "battery",
+    "icon": "mdi:battery-60",
+    "friendly_name": " Phone Battery Level"
+   }
+  },
+  "sensor.phone_battery_state": {
+   "state": "unknown",
+   "attributes": {
+    "icon": "mdi:battery-60",
+    "friendly_name": " Phone Battery State"
+   }
+  },
+  "sensor.phone_bssid": {
+   "state": "unknown",
+   "attributes": {
+    "icon": "mdi:wifi-off",
+    "friendly_name": " Phone BSSID"
+   }
+  },
+  "sensor.phone_connection_type": {
+   "state": "unknown",
+   "attributes": {
+    "icon": "mdi:wifi",
+    "friendly_name": " Phone Connection Type"
+   }
+  },
+  "sensor.phone_geocoded_location": {
+   "state": "unknown",
+   "attributes": {
+    "icon": "mdi:map",
+    "friendly_name": " Phone Geocoded Location"
+   }
+  },
+  "sensor.phone_kiosk_brightness": {
+   "state": "unknown",
+   "attributes": {
+    "icon": "mdi:dots-square",
+    "friendly_name": " Phone Kiosk Brightness"
+   }
+  },
+  "sensor.phone_kiosk_volume": {
+   "state": "unknown",
+   "attributes": {
+    "icon": "mdi:dots-square",
+    "friendly_name": " Phone Kiosk Volume"
+   }
+  },
+  "sensor.phone_last_update_trigger": {
+   "state": "unknown",
+   "attributes": {
+    "icon": "mdi:cellphone-wireless",
+    "friendly_name": " Phone Last Update Trigger"
+   }
+  },
+  "sensor.phone_location_permission": {
+   "state": "unknown",
+   "attributes": {
+    "icon": "mdi:map",
+    "friendly_name": " Phone Location permission"
+   }
+  },
+  "sensor.phone_sim_1": {
+   "state": "unknown",
+   "attributes": {
+    "icon": "mdi:sim",
+    "friendly_name": " Phone SIM 1"
+   }
+  },
+  "sensor.phone_sim_2": {
+   "state": "unknown",
+   "attributes": {
+    "icon": "mdi:sim",
+    "friendly_name": " Phone SIM 2"
+   }
+  },
+  "sensor.phone_ssid": {
+   "state": "unknown",
+   "attributes": {
+    "icon": "mdi:wifi-off",
+    "friendly_name": " Phone SSID"
+   }
+  },
+  "sensor.phone_storage": {
+   "state": "unknown",
+   "attributes": {
+    "unit_of_measurement": "% available",
+    "icon": "mdi:database",
+    "friendly_name": " Phone Storage"
+   }
+  },
+  "zone.home": {
+   "state": "0",
+   "attributes": {
+    "latitude": 0.5,
+    "longitude": 0.5,
+    "radius": 100,
+    "passive": false,
+    "persons": [],
+    "editable": true,
+    "icon": "mdi:home",
+    "friendly_name": "Home"
+   }
+  }
+ }
+}

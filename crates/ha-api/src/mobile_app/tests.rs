@@ -20,6 +20,9 @@ fn vector(name: &str) -> Value {
         "commands" => include_str!("vectors/commands.json"),
         "entities" => include_str!("vectors/entity_registry_mobile_app.json"),
         "device" => include_str!("vectors/device_registry_mobile_app.json"),
+        "sensors" => include_str!("vectors/sensors.json"),
+        "startup" => include_str!("vectors/startup.json"),
+        "restore" => include_str!("vectors/restore_state_phone.json"),
         _ => unreachable!(),
     };
     serde_json::from_str(text).unwrap()
@@ -58,6 +61,7 @@ fn entry() -> Map<String, Value> {
 struct App {
     hass: Hass,
     router: Router,
+    registry: Arc<ha_registry::Registry>,
 }
 
 fn app_with(entries: &[Map<String, Value>]) -> App {
@@ -86,9 +90,28 @@ fn app_with(entries: &[Map<String, Value>]) -> App {
         devices: ha_registry::rows![serde_json::from_value(vector("device")).unwrap()],
         ..Default::default()
     };
+    // HA's last states for the phone, as the restore store has them.
+    let dir = std::env::temp_dir().join(format!(
+        "hars-mobile-{}-{}",
+        std::process::id(),
+        rand::random::<u32>()
+    ));
+    std::fs::create_dir_all(dir.join(".storage")).unwrap();
+    std::fs::write(
+        dir.join(".storage").join(ha_core::restore::KEY),
+        json!({"version": 1, "minor_version": 1, "key": ha_core::restore::KEY,
+               "data": vector("restore")})
+        .to_string(),
+    )
+    .unwrap();
+    hass.set_restore(ha_core::restore::RestoreState::load(&dir));
+    let _ = std::fs::remove_dir_all(&dir);
+    let registry = ha_registry::Registry::in_memory(&hass, registries);
+    let mobile_app = Arc::new(MobileApp::new(entries, vec![DELETED.into()]));
+    mobile_app.setup(&hass, registry.clone());
     let config = crate::ApiConfig {
-        registry: Some(ha_registry::Registry::in_memory(&hass, registries)),
-        mobile_app: Some(Arc::new(MobileApp::new(entries, vec![DELETED.into()]))),
+        registry: Some(registry.clone()),
+        mobile_app: Some(mobile_app),
         ..Default::default()
     };
     let shared = Shared {
@@ -99,6 +122,7 @@ fn app_with(entries: &[Map<String, Value>]) -> App {
     App {
         hass,
         router: routes(shared),
+        registry,
     }
 }
 
@@ -549,4 +573,142 @@ async fn a_hung_up_request_still_runs() {
         tokio::time::sleep(std::time::Duration::from_millis(10)).await;
     }
     panic!("the service was cancelled with the request");
+}
+
+fn state_json(hass: &Hass, id: &str) -> Value {
+    match hass.states().get(&EntityId::parse(id).unwrap()) {
+        Some(s) => json!({"state": s.state.as_str(), "attributes": s.attributes}),
+        None => Value::Null,
+    }
+}
+
+/// HA's `startup.json`: the phone's restored sensors before any webhook.
+#[tokio::test]
+async fn sensors_restore_as_ha() {
+    let app = app();
+    let v = vector("startup");
+    let mut n = 0;
+    for (id, want) in v["states"].as_object().unwrap() {
+        if !(id.starts_with("sensor.") || id.starts_with("binary_sensor.")) {
+            continue;
+        }
+        assert_eq!(state_json(&app.hass, id), *want, "{id}");
+        n += 1;
+    }
+    assert_eq!(n, 17);
+    // Disabled rows get no entity.
+    assert_eq!(
+        state_json(&app.hass, "sensor.phone_camera_stream"),
+        Value::Null
+    );
+}
+
+/// HA's `sensors.json`: updates and (re-)registrations in order: replies,
+/// state writes, registry events and rows.
+#[tokio::test]
+async fn sensors_update_and_register_as_ha() {
+    let app = app();
+    let registry = app.registry.clone();
+    let v = vector("sensors");
+    let mut bus = app.hass.bus().subscribe();
+    let mut feed = app.hass.subscribe_state_changes();
+    for (i, x) in v["exchanges"].as_array().unwrap().iter().enumerate() {
+        if let Some(rows) = x
+            .get("registry_after_register")
+            .or(x.get("registry_after_reregister"))
+        {
+            check_rows(&registry, rows, i);
+            continue;
+        }
+        let ty = x["type"].as_str().unwrap();
+        let got = send(&app, WEBHOOK, "POST", x["request"]["body"].as_str(), None).await;
+        let want = &x["response"];
+        assert_eq!(got.status, want["status"], "{i} {ty}");
+        let theirs = match want.get("decrypted") {
+            Some(Value::String(d)) => serde_json::from_str(d).unwrap(),
+            _ => plain(want["body"].as_str().unwrap()),
+        };
+        let mut ours = plain(&got.body);
+        let mut theirs = theirs;
+        if ty == "get_config" {
+            ours.as_object_mut().unwrap().remove("components");
+            theirs.as_object_mut().unwrap().remove("components");
+        }
+        assert_eq!(ours, theirs, "{i} {ty}");
+
+        // State writes: what HA wrote is what's there now.
+        let mut written: Vec<String> = std::iter::from_fn(|| feed.try_recv())
+            .filter_map(|e| match &e.kind {
+                EventKind::StateChanged { entity_id, .. } => Some(entity_id.to_string()),
+                _ => None,
+            })
+            .collect();
+        written.sort();
+        written.dedup();
+        let writes = x["effects"]["state_writes"].as_array().unwrap();
+        let mut want_ids: Vec<String> = writes
+            .iter()
+            .map(|w| w["entity_id"].as_str().unwrap().to_owned())
+            .collect();
+        want_ids.sort();
+        want_ids.dedup();
+        // Re-enabling adds the entity now, not 30 s later (spec D2).
+        if i == 17 {
+            want_ids.push("binary_sensor.phone_camera_motion".into());
+        }
+        assert_eq!(written, want_ids, "{i} {ty} written");
+        for w in writes {
+            let id = w["entity_id"].as_str().unwrap();
+            let want = if w["state"].is_null() {
+                Value::Null
+            } else {
+                json!({"state": w["state"], "attributes": w["attributes"]})
+            };
+            if writes.iter().rfind(|x| x["entity_id"] == id) == Some(w) {
+                assert_eq!(state_json(&app.hass, id), want, "{i} {ty} {id}");
+            }
+        }
+
+        // Registry events (as a set: HA delivers nested ones first), but the
+        // display-precision option (spec R6).
+        let mut got_events: Vec<String> = std::iter::from_fn(|| bus.try_recv().ok())
+            .filter_map(|e| match &e.kind {
+                EventKind::Custom { name, data } if name == "entity_registry_updated" => {
+                    Some(data.to_string())
+                }
+                _ => None,
+            })
+            .collect();
+        let mut want_events: Vec<String> = x["effects"]["events"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|e| e["event_type"] == "entity_registry_updated")
+            .filter(|e| e["data"]["changes"] != json!({"options": {}}))
+            .map(|e| e["data"].to_string())
+            .collect();
+        got_events.sort();
+        want_events.sort();
+        assert_eq!(got_events, want_events, "{i} {ty} events");
+    }
+}
+
+/// The registry rows HA had after the registrations, field by field.
+fn check_rows(registry: &ha_registry::Registry, rows: &Value, i: usize) {
+    let snap = registry.snapshot();
+    for (id, want) in rows.as_object().unwrap() {
+        // HA's extra test registrations aren't in this fixture.
+        if want["config_entry_id"] != "01JFAKEMOBILEAPPENTRY00000" {
+            continue;
+        }
+        let row = snap
+            .entities
+            .iter()
+            .find(|e| &e.entity_id == id)
+            .unwrap_or_else(|| panic!("{i}: no row {id}"));
+        let got = serde_json::to_value(&**row).unwrap();
+        for (k, v) in want.as_object().unwrap() {
+            assert_eq!(&got[k], v, "{i} {id} {k}");
+        }
+    }
 }

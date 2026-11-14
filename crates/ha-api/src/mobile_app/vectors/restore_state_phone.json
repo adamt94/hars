@@ -1,0 +1,480 @@
+[
+ {
+  "state": {
+   "entity_id": "person.adam",
+   "state": "unknown",
+   "attributes": {
+    "editable": true,
+    "id": "adam",
+    "device_trackers": [
+     "device_tracker.phone"
+    ],
+    "in_zones": [],
+    "user_id": "00112233445566778899aabbccddeeff",
+    "friendly_name": "adam"
+   },
+   "last_changed": "2026-11-14T08:00:28.766446+00:00",
+   "last_reported": "2026-11-14T08:00:30.618072+00:00",
+   "last_updated": "2026-11-14T08:00:30.618072+00:00",
+   "context": {
+    "id": "01JFAKECONTEXT000000000000",
+    "parent_id": null,
+    "user_id": null
+   }
+  },
+  "extra_data": null,
+  "last_seen": "2026-11-14T19:45:31.126715+00:00"
+ },
+ {
+  "state": {
+   "entity_id": "binary_sensor.phone_kiosk_mode",
+   "state": "off",
+   "attributes": {
+    "icon": "mdi:tablet",
+    "friendly_name": " Phone Kiosk Mode"
+   },
+   "last_changed": "2026-11-14T08:00:30.263880+00:00",
+   "last_reported": "2026-11-14T08:00:30.263880+00:00",
+   "last_updated": "2026-11-14T08:00:30.263880+00:00",
+   "context": {
+    "id": "01JFAKECONTEXT000000000000",
+    "parent_id": null,
+    "user_id": null
+   }
+  },
+  "extra_data": null,
+  "last_seen": "2026-11-14T19:45:31.126715+00:00"
+ },
+ {
+  "state": {
+   "entity_id": "binary_sensor.phone_kiosk_screensaver",
+   "state": "off",
+   "attributes": {
+    "icon": "mdi:sleep-off",
+    "friendly_name": " Phone Kiosk Screensaver"
+   },
+   "last_changed": "2026-11-14T08:00:30.264093+00:00",
+   "last_reported": "2026-11-14T08:00:30.264093+00:00",
+   "last_updated": "2026-11-14T08:00:30.264093+00:00",
+   "context": {
+    "id": "01JFAKECONTEXT000000000000",
+    "parent_id": null,
+    "user_id": null
+   }
+  },
+  "extra_data": null,
+  "last_seen": "2026-11-14T19:45:31.126715+00:00"
+ },
+ {
+  "state": {
+   "entity_id": "device_tracker.phone",
+   "state": "unknown",
+   "attributes": {
+    "in_zones": [],
+    "source_type": "gps",
+    "battery_level": 70,
+    "friendly_name": " Phone"
+   },
+   "last_changed": "2026-11-14T08:00:30.264598+00:00",
+   "last_reported": "2026-11-14T08:00:30.264598+00:00",
+   "last_updated": "2026-11-14T08:00:30.264598+00:00",
+   "context": {
+    "id": "01JFAKECONTEXT000000000000",
+    "parent_id": null,
+    "user_id": null
+   }
+  },
+  "extra_data": {
+   "data": {
+    "battery": 70
+   }
+  },
+  "last_seen": "2026-11-14T19:45:31.126715+00:00"
+ },
+ {
+  "state": {
+   "entity_id": "notify.phone",
+   "state": "unknown",
+   "attributes": {
+    "friendly_name": " Phone",
+    "supported_features": 1
+   },
+   "last_changed": "2026-11-14T08:00:30.264847+00:00",
+   "last_reported": "2026-11-14T08:00:30.264847+00:00",
+   "last_updated": "2026-11-14T08:00:30.264847+00:00",
+   "context": {
+    "id": "01JFAKECONTEXT000000000000",
+    "parent_id": null,
+    "user_id": null
+   }
+  },
+  "extra_data": null,
+  "last_seen": "2026-11-14T19:45:31.126715+00:00"
+ },
+ {
+  "state": {
+   "entity_id": "sensor.phone_battery_level",
+   "state": "70",
+   "attributes": {
+    "unit_of_measurement": "%",
+    "device_class": "battery",
+    "icon": "mdi:battery-70",
+    "friendly_name": " Phone Battery Level"
+   },
+   "last_changed": "2026-11-14T08:00:30.265231+00:00",
+   "last_reported": "2026-11-14T08:00:30.265231+00:00",
+   "last_updated": "2026-11-14T08:00:30.265231+00:00",
+   "context": {
+    "id": "01JFAKECONTEXT000000000000",
+    "parent_id": null,
+    "user_id": null
+   }
+  },
+  "extra_data": {
+   "native_value": 70,
+   "native_unit_of_measurement": "%"
+  },
+  "last_seen": "2026-11-14T19:45:31.126715+00:00"
+ },
+ {
+  "state": {
+   "entity_id": "sensor.phone_storage",
+   "state": "21.68",
+   "attributes": {
+    "Available": "38.99 GB",
+    "Available (Important)": "82.71 GB",
+    "Available (Opportunistic)": "55.38 GB",
+    "Total": "255.42 GB",
+    "unit_of_measurement": "% available",
+    "icon": "mdi:database",
+    "friendly_name": " Phone Storage"
+   },
+   "last_changed": "2026-11-14T08:00:30.265358+00:00",
+   "last_reported": "2026-11-14T08:00:30.265358+00:00",
+   "last_updated": "2026-11-14T08:00:30.265358+00:00",
+   "context": {
+    "id": "01JFAKECONTEXT000000000000",
+    "parent_id": null,
+    "user_id": null
+   }
+  },
+  "extra_data": {
+   "native_value": "21.68",
+   "native_unit_of_measurement": "% available"
+  },
+  "last_seen": "2026-11-14T19:45:31.126715+00:00"
+ },
+ {
+  "state": {
+   "entity_id": "sensor.phone_battery_state",
+   "state": "Not Charging",
+   "attributes": {
+    "Low Power Mode": false,
+    "icon": "mdi:battery-70",
+    "friendly_name": " Phone Battery State"
+   },
+   "last_changed": "2026-11-14T08:00:30.265455+00:00",
+   "last_reported": "2026-11-14T08:00:30.265455+00:00",
+   "last_updated": "2026-11-14T08:00:30.265455+00:00",
+   "context": {
+    "id": "01JFAKECONTEXT000000000000",
+    "parent_id": null,
+    "user_id": null
+   }
+  },
+  "extra_data": {
+   "native_value": "Not Charging",
+   "native_unit_of_measurement": null
+  },
+  "last_seen": "2026-11-14T19:45:31.126715+00:00"
+ },
+ {
+  "state": {
+   "entity_id": "sensor.phone_sim_1",
+   "state": "--",
+   "attributes": {
+    "Allows VoIP": true,
+    "Carrier ID": "0000000100000001",
+    "Carrier Name": "--",
+    "ISO Country Code": "--",
+    "Mobile Country Code": "65535",
+    "Mobile Network Code": "65535",
+    "icon": "mdi:sim",
+    "friendly_name": " Phone SIM 1"
+   },
+   "last_changed": "2026-11-14T08:00:30.265564+00:00",
+   "last_reported": "2026-11-14T08:00:30.265564+00:00",
+   "last_updated": "2026-11-14T08:00:30.265564+00:00",
+   "context": {
+    "id": "01JFAKECONTEXT000000000000",
+    "parent_id": null,
+    "user_id": null
+   }
+  },
+  "extra_data": {
+   "native_value": "--",
+   "native_unit_of_measurement": null
+  },
+  "last_seen": "2026-11-14T19:45:31.126715+00:00"
+ },
+ {
+  "state": {
+   "entity_id": "sensor.phone_sim_2",
+   "state": "--",
+   "attributes": {
+    "Allows VoIP": true,
+    "Carrier ID": "0000000100000002",
+    "Carrier Name": "--",
+    "Current Radio Technology": "Enhanced Data rates for GSM Evolution (EDGE)",
+    "ISO Country Code": "--",
+    "Mobile Country Code": "65535",
+    "Mobile Network Code": "65535",
+    "icon": "mdi:sim",
+    "friendly_name": " Phone SIM 2"
+   },
+   "last_changed": "2026-11-14T08:00:30.265655+00:00",
+   "last_reported": "2026-11-14T08:00:30.265655+00:00",
+   "last_updated": "2026-11-14T08:00:30.265655+00:00",
+   "context": {
+    "id": "01JFAKECONTEXT000000000000",
+    "parent_id": null,
+    "user_id": null
+   }
+  },
+  "extra_data": {
+   "native_value": "--",
+   "native_unit_of_measurement": null
+  },
+  "last_seen": "2026-11-14T19:45:31.126715+00:00"
+ },
+ {
+  "state": {
+   "entity_id": "sensor.phone_geocoded_location",
+   "state": "Unknown",
+   "attributes": {
+    "icon": "mdi:map",
+    "friendly_name": " Phone Geocoded Location"
+   },
+   "last_changed": "2026-11-14T08:00:30.265863+00:00",
+   "last_reported": "2026-11-14T08:00:30.265863+00:00",
+   "last_updated": "2026-11-14T08:00:30.265863+00:00",
+   "context": {
+    "id": "01JFAKECONTEXT000000000000",
+    "parent_id": null,
+    "user_id": null
+   }
+  },
+  "extra_data": {
+   "native_value": "Unknown",
+   "native_unit_of_measurement": null
+  },
+  "last_seen": "2026-11-14T19:45:31.126715+00:00"
+ },
+ {
+  "state": {
+   "entity_id": "sensor.phone_ssid",
+   "state": "FakeSSID",
+   "attributes": {
+    "icon": "mdi:wifi",
+    "friendly_name": " Phone SSID"
+   },
+   "last_changed": "2026-11-14T08:00:30.266037+00:00",
+   "last_reported": "2026-11-14T08:00:30.266037+00:00",
+   "last_updated": "2026-11-14T08:00:30.266037+00:00",
+   "context": {
+    "id": "01JFAKECONTEXT000000000000",
+    "parent_id": null,
+    "user_id": null
+   }
+  },
+  "extra_data": {
+   "native_value": "FakeSSID",
+   "native_unit_of_measurement": null
+  },
+  "last_seen": "2026-11-14T19:45:31.126715+00:00"
+ },
+ {
+  "state": {
+   "entity_id": "sensor.phone_bssid",
+   "state": "02:00:00:00:00:01",
+   "attributes": {
+    "icon": "mdi:wifi-star",
+    "friendly_name": " Phone BSSID"
+   },
+   "last_changed": "2026-11-14T08:00:30.266187+00:00",
+   "last_reported": "2026-11-14T08:00:30.266187+00:00",
+   "last_updated": "2026-11-14T08:00:30.266187+00:00",
+   "context": {
+    "id": "01JFAKECONTEXT000000000000",
+    "parent_id": null,
+    "user_id": null
+   }
+  },
+  "extra_data": {
+   "native_value": "02:00:00:00:00:01",
+   "native_unit_of_measurement": null
+  },
+  "last_seen": "2026-11-14T19:45:31.126715+00:00"
+ },
+ {
+  "state": {
+   "entity_id": "sensor.phone_connection_type",
+   "state": "Wi-Fi",
+   "attributes": {
+    "icon": "mdi:wifi",
+    "friendly_name": " Phone Connection Type"
+   },
+   "last_changed": "2026-11-14T08:00:30.266282+00:00",
+   "last_reported": "2026-11-14T08:00:30.266282+00:00",
+   "last_updated": "2026-11-14T08:00:30.266282+00:00",
+   "context": {
+    "id": "01JFAKECONTEXT000000000000",
+    "parent_id": null,
+    "user_id": null
+   }
+  },
+  "extra_data": {
+   "native_value": "Wi-Fi",
+   "native_unit_of_measurement": null
+  },
+  "last_seen": "2026-11-14T19:45:31.126715+00:00"
+ },
+ {
+  "state": {
+   "entity_id": "sensor.phone_last_update_trigger",
+   "state": "Launch",
+   "attributes": {
+    "icon": "mdi:cellphone-wireless",
+    "friendly_name": " Phone Last Update Trigger"
+   },
+   "last_changed": "2026-11-14T08:00:30.266368+00:00",
+   "last_reported": "2026-11-14T08:00:30.266368+00:00",
+   "last_updated": "2026-11-14T08:00:30.266368+00:00",
+   "context": {
+    "id": "01JFAKECONTEXT000000000000",
+    "parent_id": null,
+    "user_id": null
+   }
+  },
+  "extra_data": {
+   "native_value": "Launch",
+   "native_unit_of_measurement": null
+  },
+  "last_seen": "2026-11-14T19:45:31.126715+00:00"
+ },
+ {
+  "state": {
+   "entity_id": "sensor.phone_kiosk_brightness",
+   "state": "unavailable",
+   "attributes": {
+    "icon": "mdi:dots-square",
+    "friendly_name": " Phone Kiosk Brightness"
+   },
+   "last_changed": "2026-11-14T08:00:30.266454+00:00",
+   "last_reported": "2026-11-14T08:00:30.266454+00:00",
+   "last_updated": "2026-11-14T08:00:30.266454+00:00",
+   "context": {
+    "id": "01JFAKECONTEXT000000000000",
+    "parent_id": null,
+    "user_id": null
+   }
+  },
+  "extra_data": {
+   "native_value": "unavailable",
+   "native_unit_of_measurement": null
+  },
+  "last_seen": "2026-11-14T19:45:31.126715+00:00"
+ },
+ {
+  "state": {
+   "entity_id": "sensor.phone_location_permission",
+   "state": "Authorized when in use",
+   "attributes": {
+    "icon": "mdi:map",
+    "friendly_name": " Phone Location permission"
+   },
+   "last_changed": "2026-11-14T08:00:30.266545+00:00",
+   "last_reported": "2026-11-14T08:00:30.266545+00:00",
+   "last_updated": "2026-11-14T08:00:30.266545+00:00",
+   "context": {
+    "id": "01JFAKECONTEXT000000000000",
+    "parent_id": null,
+    "user_id": null
+   }
+  },
+  "extra_data": {
+   "native_value": "Authorized when in use",
+   "native_unit_of_measurement": null
+  },
+  "last_seen": "2026-11-14T19:45:31.126715+00:00"
+ },
+ {
+  "state": {
+   "entity_id": "sensor.phone_audio_output",
+   "state": "Built-in Speaker",
+   "attributes": {
+    "icon": "mdi:volume-high",
+    "friendly_name": " Phone Audio Output"
+   },
+   "last_changed": "2026-11-14T08:00:30.266631+00:00",
+   "last_reported": "2026-11-14T08:00:30.266631+00:00",
+   "last_updated": "2026-11-14T08:00:30.266631+00:00",
+   "context": {
+    "id": "01JFAKECONTEXT000000000000",
+    "parent_id": null,
+    "user_id": null
+   }
+  },
+  "extra_data": {
+   "native_value": "Built-in Speaker",
+   "native_unit_of_measurement": null
+  },
+  "last_seen": "2026-11-14T19:45:31.126715+00:00"
+ },
+ {
+  "state": {
+   "entity_id": "sensor.phone_app_version",
+   "state": "2026.9.0",
+   "attributes": {
+    "icon": "mdi:cellphone",
+    "friendly_name": " Phone App Version"
+   },
+   "last_changed": "2026-11-14T08:00:30.266707+00:00",
+   "last_reported": "2026-11-14T08:00:30.266707+00:00",
+   "last_updated": "2026-11-14T08:00:30.266707+00:00",
+   "context": {
+    "id": "01JFAKECONTEXT000000000000",
+    "parent_id": null,
+    "user_id": null
+   }
+  },
+  "extra_data": {
+   "native_value": "2026.9.0",
+   "native_unit_of_measurement": null
+  },
+  "last_seen": "2026-11-14T19:45:31.126715+00:00"
+ },
+ {
+  "state": {
+   "entity_id": "sensor.phone_kiosk_volume",
+   "state": "unavailable",
+   "attributes": {
+    "icon": "mdi:dots-square",
+    "friendly_name": " Phone Kiosk Volume"
+   },
+   "last_changed": "2026-11-14T08:00:30.266790+00:00",
+   "last_reported": "2026-11-14T08:00:30.266790+00:00",
+   "last_updated": "2026-11-14T08:00:30.266790+00:00",
+   "context": {
+    "id": "01JFAKECONTEXT000000000000",
+    "parent_id": null,
+    "user_id": null
+   }
+  },
+  "extra_data": {
+   "native_value": "unavailable",
+   "native_unit_of_measurement": null
+  },
+  "last_seen": "2026-11-14T19:45:31.126715+00:00"
+ }
+]

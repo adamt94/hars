@@ -2,6 +2,7 @@
 //! `core.config_entries`. The webhook itself is served by `ha-api`.
 
 pub mod crypto;
+pub mod sensor;
 
 use crypto::Key;
 use parking_lot::RwLock;
@@ -176,6 +177,7 @@ pub fn truthy(v: &Value) -> bool {
 pub struct MobileApp {
     registrations: RwLock<HashMap<Arc<str>, Arc<Registration>>>,
     deleted_ids: HashSet<String>,
+    sensors: std::sync::OnceLock<sensor::Sensors>,
 }
 
 /// The webhook's view of an id.
@@ -217,7 +219,22 @@ impl MobileApp {
         Self {
             registrations: RwLock::new(registrations),
             deleted_ids: deleted_ids.into_iter().collect(),
+            sensors: std::sync::OnceLock::new(),
         }
+    }
+
+    /// The registrations' entities, restored and written (before start, as
+    /// HA's platforms set up).
+    pub fn setup(&self, hass: &ha_core::Hass, registry: Arc<ha_registry::Registry>) {
+        let regs: Vec<Arc<Registration>> = self.registrations.read().values().cloned().collect();
+        let _ = self
+            .sensors
+            .set(sensor::Sensors::setup(hass, registry, &regs));
+    }
+
+    /// The sensors, once [`MobileApp::setup`] ran.
+    pub fn sensors(&self) -> Option<&sensor::Sensors> {
+        self.sensors.get()
     }
 
     /// Whether any app is registered (for `components`).

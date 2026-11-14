@@ -371,6 +371,9 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
 - [ ] Webhook commands: `register_sensor`, `update_sensor_states`,
       `update_location`, `get_config` (entity enabled-state sync), `get_zones`,
       `update_registration`, `call_service`, `fire_event`
+  - [x] all but `update_location`; sensors and binary sensors restore as HA's
+        `RestoreSensor` (17 of `startup.json`), and HA's `sensors.json` (updates,
+        registrations, re-registrations, disable/enable) matches
 - [ ] `/api/mobile_app/registrations` for fresh registrations (re-pair fallback)
 - [x] WS `subscribe_entities` `include`/`exclude` filters (HA's `entityfilter`
       cases 1-6, `fnmatch` globs, `cv.entity_ids`): the app subscribes to
