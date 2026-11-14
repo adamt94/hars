@@ -141,6 +141,9 @@ pub(crate) enum Subscription {
     /// Served by the connection's shared bus listener.
     Events,
     Task(TaskSub),
+    /// Fed by a listener elsewhere, which checks `live` (held while it
+    /// queues an event, as [`TaskSub`]'s) and lets go once it's false.
+    Listener(Arc<parking_lot::Mutex<bool>>),
     /// Registered so it can be unsubscribed, but nothing ever fires it
     /// (`persistent_notification/subscribe` while there are none).
     Idle,
@@ -490,6 +493,11 @@ impl Conn {
                         listener.abort();
                     }
                 }
+            }
+            Some(Subscription::Listener(live)) => {
+                let mut live = live.lock();
+                *live = false;
+                reply(&self.out);
             }
             Some(Subscription::Idle) => reply(&self.out),
             None => return false,

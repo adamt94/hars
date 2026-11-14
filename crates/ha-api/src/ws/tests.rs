@@ -489,6 +489,9 @@ async fn read_only_users_are_limited() {
         c.call(json!({"id": 5, "type": "get_states"})).await["success"],
         true
     );
+    // Labs is admin-only.
+    let r = c.call(json!({"id": 50, "type": "labs/list"})).await;
+    assert_eq!(r["error"], unauthorized);
 }
 
 #[tokio::test]
@@ -1240,15 +1243,14 @@ async fn labs_features_list_subscribe_and_update() {
     let r = c
         .call(json!({"id": 6, "type": "labs/update", "domain": "frontend", "preview_feature": "winter_mode", "enabled": true}))
         .await;
-    // The subscriber hears of it (before or after the result).
-    let (result, event) = if r["type"] == "result" {
-        (r, c.recv().await)
-    } else {
-        (c.recv().await, r)
-    };
-    assert_eq!(result["success"], true);
-    assert_eq!(event["id"], 4);
-    assert_eq!(event["event"]["enabled"], true);
+    // The subscriber hears of it before the result, as in HA.
+    assert_eq!(r["id"], 4);
+    assert_eq!(r["event"]["enabled"], true);
+    let result = c.recv().await;
+    assert_eq!(
+        (result["id"].clone(), result["success"].clone()),
+        (json!(6), json!(true))
+    );
     let r = c
         .call(json!({"id": 7, "type": "labs/update", "domain": "frontend", "preview_feature": "winter_mode"}))
         .await;

@@ -35,8 +35,14 @@ const FEATURES: &[(&str, &str, &str, &str, &str)] = &[
 
 const KEY: &str = "core.labs";
 
+/// Told of each change to its feature with the new description; returns
+/// `false` once it's gone (and is then dropped).
+pub type Listener = Box<dyn Fn(&Value) -> bool + Send + Sync>;
+
 /// The enabled preview features, and where they're saved.
 pub struct Labs {
+    /// `labs/subscribe`rs: (domain, feature, listener).
+    listeners: Mutex<Vec<(String, String, Listener)>>,
     /// The config directory; `None` keeps everything in memory (tests).
     dir: Option<PathBuf>,
     enabled: Mutex<Vec<(String, String)>>,
@@ -47,6 +53,7 @@ pub struct Labs {
 impl Default for Labs {
     fn default() -> Self {
         Self {
+            listeners: Mutex::new(Vec::new()),
             dir: None,
             enabled: Mutex::new(Vec::new()),
             save_turn: tokio::sync::Mutex::new(()),
@@ -102,6 +109,7 @@ impl Labs {
             }
         }
         let labs = Self {
+            listeners: Mutex::new(Vec::new()),
             dir: Some(config_dir.to_owned()),
             enabled: Mutex::new(enabled),
             save_turn: tokio::sync::Mutex::new(()),
@@ -145,11 +153,22 @@ impl Labs {
         json!({ "features": features })
     }
 
-    /// Turn a feature on or off and save. `false` for an unknown feature.
-    pub async fn update(&self, domain: &str, name: &str, on: bool) -> Result<bool, std::io::Error> {
-        if feature(domain, name).is_none() {
-            return Ok(false);
-        }
+    /// Listen to a feature: its description now, taken together with the
+    /// registration so no change falls in between. `None` if unknown.
+    pub fn subscribe(&self, domain: &str, name: &str, listener: Listener) -> Option<Value> {
+        let mut listeners = self.listeners.lock();
+        let now = self.describe(domain, name, self.is_enabled(domain, name))?;
+        listeners.push((domain.to_owned(), name.to_owned(), listener));
+        Some(now)
+    }
+
+    /// Turn a feature on or off, save, and tell its listeners (before the
+    /// caller answers, as HA's eager listeners do). As HA's store, a failed
+    /// save is logged and the change stands. `false` for an unknown feature.
+    pub async fn update(&self, domain: &str, name: &str, on: bool) -> bool {
+        let Some(changed) = self.describe(domain, name, on) else {
+            return false;
+        };
         let _turn = self.save_turn.lock().await;
         {
             let mut enabled = self.enabled.lock();
@@ -160,11 +179,17 @@ impl Labs {
         }
         let snapshot = self.snapshot();
         if let Some(dir) = self.dir.clone() {
-            tokio::task::spawn_blocking(move || store(&dir).save(&snapshot))
-                .await
-                .map_err(std::io::Error::other)??;
+            let saved = tokio::task::spawn_blocking(move || store(&dir).save(&snapshot)).await;
+            match saved {
+                Ok(Ok(())) => {}
+                Ok(Err(e)) => tracing::error!("saving {KEY}: {e}"),
+                Err(e) => tracing::error!("saving {KEY}: {e}"),
+            }
         }
-        Ok(true)
+        self.listeners
+            .lock()
+            .retain(|(d, f, listener)| d != domain || f != name || listener(&changed));
+        true
     }
 
     fn snapshot(&self) -> Value {
@@ -211,13 +236,13 @@ mod tests {
         let saved: Value = store.load().unwrap().unwrap();
         assert_eq!(saved["preview_feature_status"].as_array().unwrap().len(), 1);
 
-        assert!(labs.update("frontend", "winter_mode", false).await.unwrap());
+        assert!(labs.update("frontend", "winter_mode", false).await);
         assert!(!labs.is_enabled("frontend", "winter_mode"));
         assert_eq!(
             Labs::load(&dir).snapshot(),
             json!({"preview_feature_status": []})
         );
-        assert!(!labs.update("nope", "x", true).await.unwrap());
+        assert!(!labs.update("nope", "x", true).await);
 
         let list = labs.list(&["frontend", "sun"]);
         assert_eq!(
@@ -226,5 +251,37 @@ mod tests {
                 "is_built_in": true, "feedback_url": "", "learn_more_url": "", "report_issue_url": ""}]})
         );
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn listeners_hear_changes_even_when_saving_fails() {
+        // A config "directory" that is a file: every save fails.
+        let file = std::env::temp_dir().join(format!("hars-labs-file-{}", std::process::id()));
+        std::fs::write(&file, b"not a directory").unwrap();
+        let labs = Labs::load(&file);
+        let heard = std::sync::Arc::new(Mutex::new(Vec::new()));
+        let h = heard.clone();
+        let now = labs
+            .subscribe(
+                "frontend",
+                "winter_mode",
+                Box::new(move |v: &Value| {
+                    h.lock().push(v["enabled"].clone());
+                    true
+                }),
+            )
+            .unwrap();
+        assert_eq!(now["enabled"], false);
+        // A listener that's gone is dropped at the next change.
+        labs.subscribe("frontend", "winter_mode", Box::new(|_: &Value| false));
+        assert!(labs.update("frontend", "winter_mode", true).await);
+        assert!(labs.is_enabled("frontend", "winter_mode"));
+        assert_eq!(*heard.lock(), [json!(true)]);
+        assert_eq!(labs.listeners.lock().len(), 1);
+        assert!(
+            labs.subscribe("frontend", "nope", Box::new(|_: &Value| true))
+                .is_none()
+        );
+        let _ = std::fs::remove_file(&file);
     }
 }

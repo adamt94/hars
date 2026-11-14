@@ -71,14 +71,18 @@ pub(super) fn dispatch(
             empty(conn, r)
         }
         "repairs/list_issues" => empty(conn, json!({"issues": []})),
-        "labs/list" => {
+        "labs/list" => only_keys(msg, &[]).map(|()| {
+            if conn.principal.permission < Permission::Admin {
+                conn.out.error(json!(id), "unauthorized", "Unauthorized");
+                return;
+            }
             let r = conn
                 .shared
                 .config
                 .labs
                 .list(&crate::components(&conn.shared.config));
-            empty(conn, r)
-        }
+            conn.out.result(id, r);
+        }),
         "labs/subscribe" => labs_subscribe(conn, id, msg),
         "labs/update" => labs_update(conn, id, msg),
         "persistent_notification/subscribe" => only_keys(msg, &[]).map(|()| {
@@ -181,13 +185,27 @@ fn get_icons(conn: &mut Conn, id: u64, msg: &Map<String, Value>) -> Result<(), I
 }
 
 /// `labs/subscribe`: the result, the feature now as an event, then an
-/// event on each `labs_updated` for it.
+/// event on each change to it.
 fn labs_subscribe(conn: &mut Conn, id: u64, msg: &Map<String, Value>) -> Result<(), Invalid> {
     only_keys(msg, &["domain", "preview_feature"])?;
     let domain = required_str(msg, "domain")?.to_owned();
     let feature = required_str(msg, "preview_feature")?.to_owned();
-    let labs = conn.shared.config.labs.clone();
-    let Some(now) = labs.describe(&domain, &feature, labs.is_enabled(&domain, &feature)) else {
+    let out = conn.out.clone();
+    let live = Arc::new(parking_lot::Mutex::new(true));
+    let listener_live = live.clone();
+    let listener: crate::labs::Listener = Box::new(move |update: &Value| {
+        let live = listener_live.lock();
+        *live && out.event(id, update)
+    });
+    // Held until the first event is queued, so a change can't come first.
+    let guard = live.lock();
+    let Some(now) = conn
+        .shared
+        .config
+        .labs
+        .subscribe(&domain, &feature, listener)
+    else {
+        drop(guard);
         conn.out.error(
             json!(id),
             "not_found",
@@ -195,47 +213,10 @@ fn labs_subscribe(conn: &mut Conn, id: u64, msg: &Map<String, Value>) -> Result<
         );
         return Ok(());
     };
-    // Listening before the first event, so no update is missed.
-    let mut events = conn.shared.hass.bus().subscribe();
     conn.out.result(id, Value::Null);
     conn.out.event(id, &now);
-    let out = conn.out.clone();
-    let live = Arc::new(parking_lot::Mutex::new(true));
-    let task_live = live.clone();
-    let task = tokio::spawn(async move {
-        use tokio::sync::broadcast::error::RecvError;
-        loop {
-            let event = match events.recv().await {
-                Ok(e) => e,
-                Err(RecvError::Lagged(_)) => continue,
-                Err(RecvError::Closed) => return,
-            };
-            let ha_core::EventKind::Custom { name, data } = &event.kind else {
-                continue;
-            };
-            if name != "labs_updated"
-                || data["domain"] != domain.as_str()
-                || data["preview_feature"] != feature.as_str()
-            {
-                continue;
-            }
-            let enabled = data["enabled"].as_bool().unwrap_or(false);
-            let Some(update) = labs.describe(&domain, &feature, enabled) else {
-                continue;
-            };
-            let live = task_live.lock();
-            if !*live || !out.event(id, &update) {
-                return;
-            }
-        }
-    });
-    conn.subs.insert(
-        id,
-        Subscription::Task(TaskSub {
-            abort: task.abort_handle(),
-            live,
-        }),
-    );
+    drop(guard);
+    conn.subs.insert(id, Subscription::Listener(live));
     Ok(())
 }
 
@@ -282,14 +263,7 @@ fn labs_update(conn: &mut Conn, id: u64, msg: &Map<String, Value>) -> Result<(),
             );
             return;
         }
-        if let Err(e) = labs.update(&domain, &feature, enabled).await {
-            out.error(
-                json!(id),
-                "home_assistant_error",
-                &format!("Saving failed: {e}"),
-            );
-            return;
-        }
+        labs.update(&domain, &feature, enabled).await;
         let now = hass.clock().now();
         hass.bus().fire(ha_core::Event::new(
             ha_core::EventKind::Custom {
