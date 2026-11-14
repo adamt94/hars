@@ -10,6 +10,7 @@
 mod commands;
 mod entities;
 mod frontend;
+mod sensor;
 mod weather;
 
 use crate::Shared;
@@ -525,6 +526,14 @@ pub(crate) type Invalid = String;
 /// whole message when it names none; `None` when nothing is there), cut to
 /// 500 characters.
 pub(crate) fn humanize(msg: &Value, why: &str) -> String {
+    // Several errors (voluptuous's `MultipleInvalid`): one line each.
+    if why.contains('\n') {
+        return why
+            .lines()
+            .map(|line| humanize(msg, line))
+            .collect::<Vec<_>>()
+            .join("\n");
+    }
     let at = match why.rfind(" @ data") {
         Some(i) => path_value(msg, &why[i + " @ data".len()..]),
         None => Some(msg),

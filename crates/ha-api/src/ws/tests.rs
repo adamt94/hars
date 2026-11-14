@@ -1259,3 +1259,38 @@ async fn labs_features_list_subscribe_and_update() {
         "required key not provided @ data['enabled']. Got None"
     );
 }
+
+#[tokio::test]
+async fn sensor_unit_tables_are_has() {
+    let s = server().await;
+    let mut c = Client::authed(&s, &token(&s.auth).0).await;
+    let r = c
+        .call(json!({"id": 2, "type": "sensor/numeric_device_classes"}))
+        .await;
+    let classes = r["result"]["numeric_device_classes"].as_array().unwrap();
+    assert_eq!(classes.len(), 57);
+    assert!(classes.contains(&json!("temperature")) && !classes.contains(&json!("enum")));
+    let r = c
+        .call(json!({"id": 3, "type": "sensor/device_class_convertible_units", "device_class": "temperature"}))
+        .await;
+    assert_eq!(r["result"], json!({"units": ["K", "°C", "°F"]}));
+    let r = c
+        .call(json!({"id": 4, "type": "sensor/device_class_convertible_units", "device_class": "enum"}))
+        .await;
+    assert_eq!(r["result"], json!({"units": []}));
+    // voluptuous's errors, every one, humanized.
+    let r = c
+        .call(json!({"id": 5, "type": "sensor/numeric_device_classes", "extra": true}))
+        .await;
+    assert_eq!(
+        r["error"],
+        json!({"code": "invalid_format", "message": "extra keys not allowed @ data['extra']. Got True"})
+    );
+    let r = c
+        .call(json!({"id": 6, "type": "sensor/device_class_convertible_units", "extra": true}))
+        .await;
+    assert_eq!(
+        r["error"]["message"],
+        "extra keys not allowed @ data['extra']. Got True\nrequired key not provided @ data['device_class']. Got None"
+    );
+}

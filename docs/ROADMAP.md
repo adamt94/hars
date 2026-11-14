@@ -329,8 +329,10 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
       (`homeassistant_final_write`) need a completion barrier, as HA's
       `async_stop` waits for each stage's handlers; today they only fire events
 - [ ] Crash test: kill -9 loses at most one batch window and never corrupts the DB
+- [x] WS `sensor/numeric_device_classes` and
+      `sensor/device_class_convertible_units` (HA 2026.6.1's tables)
 - [ ] WS `history/stream`, `logbook/event_stream`,
-      `sensor/numeric_device_classes`, `recorder/get_statistics_metadata` and
+      `recorder/get_statistics_metadata` and
       `recorder/statistics_during_period` (empty statistics, so the frontend
       falls back to history), `recorder/info`
 - [ ] Acceptance: more-info history graphs and the Map trail render

@@ -65,6 +65,7 @@ pub(super) fn dispatch(conn: &mut Conn, id: u64, ty: &str, msg: &Map<String, Val
         "subscribe_entities" => subscribe_entities(conn, id, msg),
         _ => match super::frontend::dispatch(conn, id, ty, msg)
             .or_else(|| super::weather::dispatch(conn, id, ty, msg))
+            .or_else(|| super::sensor::dispatch(conn, id, ty, msg))
         {
             Some(res) => res,
             None => return false,
