@@ -1,0 +1,751 @@
+{
+ "host": "192.168.0.60",
+ "captured_utc": "2026-11-14T16:03:04Z",
+ "records": [
+  {
+   "request": "GetService",
+   "request_type": 2,
+   "note": "unicast GetService, tagged=1 target=0 (discovery style)",
+   "sent_hex": "24000034eeb1929100000000000000000000000000000101000000000000000002000000",
+   "source": 2442310126,
+   "seq": 1,
+   "replies": [
+    {
+     "t_ms": 5.05,
+     "hex": "29000014eeb19291d073d513bccd00004c4946585632010108111264d5f4e71803000000017cdd0000",
+     "decoded": {
+      "type": 3,
+      "class": "StateService",
+      "size": 41,
+      "origin": 0,
+      "tagged": 0,
+      "addressable": 1,
+      "protocol": 1024,
+      "source_id": 2442310126,
+      "target_addr": "d0:73:d5:13:bc:cd",
+      "seq_num": 1,
+      "ack_requested": 0,
+      "response_requested": 1,
+      "service": 1,
+      "port": 56700
+     }
+    },
+    {
+     "t_ms": 38.45,
+     "hex": "29000014eeb19291d073d513bccd00004c494658563201010859fa65d5f4e71803000000057cdd0000",
+     "decoded": {
+      "type": 3,
+      "class": "StateService",
+      "size": 41,
+      "origin": 0,
+      "tagged": 0,
+      "addressable": 1,
+      "protocol": 1024,
+      "source_id": 2442310126,
+      "target_addr": "d0:73:d5:13:bc:cd",
+      "seq_num": 1,
+      "ack_requested": 0,
+      "response_requested": 1,
+      "service": 5,
+      "port": 56700
+     }
+    }
+   ]
+  },
+  {
+   "request": "GetHostFirmware",
+   "request_type": 14,
+   "note": "GetHostFirmware (setup)",
+   "sent_hex": "24000014eeb192910000000000000000000000000000010200000000000000000e000000",
+   "source": 2442310126,
+   "seq": 2,
+   "replies": [
+    {
+     "t_ms": 13.05,
+     "hex": "38000014eeb19291d073d513bccd00004c494658563201020813407fd5f4e7180f000000009418581c05d914009418581c05d91416000100",
+     "decoded": {
+      "type": 15,
+      "class": "StateHostFirmware",
+      "size": 56,
+      "origin": 0,
+      "tagged": 0,
+      "addressable": 1,
+      "protocol": 1024,
+      "source_id": 2442310126,
+      "target_addr": "d0:73:d5:13:bc:cd",
+      "seq_num": 2,
+      "ack_requested": 0,
+      "response_requested": 1,
+      "build": 1502237570000000000,
+      "reserved1": 1502237570000000000,
+      "version": 65558
+     }
+    }
+   ]
+  },
+  {
+   "request": "GetVersion",
+   "request_type": 32,
+   "note": "GetVersion (setup)",
+   "sent_hex": "24000014eeb1929100000000000000000000000000000103000000000000000020000000",
+   "source": 2442310126,
+   "seq": 3,
+   "replies": [
+    {
+     "t_ms": 7.3,
+     "hex": "30000014eeb19291d073d513bccd00004c4946585632010308bb0b98d5f4e71821000000010000001600000000000000",
+     "decoded": {
+      "type": 33,
+      "class": "StateVersion",
+      "size": 48,
+      "origin": 0,
+      "tagged": 0,
+      "addressable": 1,
+      "protocol": 1024,
+      "source_id": 2442310126,
+      "target_addr": "d0:73:d5:13:bc:cd",
+      "seq_num": 3,
+      "ack_requested": 0,
+      "response_requested": 1,
+      "vendor": 1,
+      "product": 22,
+      "version": 0
+     }
+    }
+   ]
+  },
+  {
+   "request": "GetLabel",
+   "request_type": 23,
+   "note": "GetLabel (config flow)",
+   "sent_hex": "24000014eeb1929100000000000000000000000000000104000000000000000017000000",
+   "source": 2442310126,
+   "seq": 4,
+   "replies": [
+    {
+     "t_ms": 12.82,
+     "hex": "44000014eeb19291d073d513bccd00004c49465856320104087551b1d5f4e718190000004b69746368656e204c6967687400000000000000000000000000000000000000",
+     "decoded": {
+      "type": 25,
+      "class": "StateLabel",
+      "size": 68,
+      "origin": 0,
+      "tagged": 0,
+      "addressable": 1,
+      "protocol": 1024,
+      "source_id": 2442310126,
+      "target_addr": "d0:73:d5:13:bc:cd",
+      "seq_num": 4,
+      "ack_requested": 0,
+      "response_requested": 1,
+      "label": {
+       "bytes_hex": "4b69746368656e204c6967687400000000000000000000000000000000000000",
+       "decoded": "Kitchen Light"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "request": "GetGroup",
+   "request_type": 51,
+   "note": "GetGroup (setup)",
+   "sent_hex": "24000014eeb1929100000000000000000000000000000105000000000000000033000000",
+   "source": 2442310126,
+   "seq": 5,
+   "replies": [
+    {
+     "t_ms": 12.92,
+     "hex": "5c000014eeb19291d073d513bccd00004c49465856320105082f97cad5f4e718350000009f5f21550c008bdf0c29e542ea2a24234b69746368656e00000000000000000000000000000000000000000000000000c0aaeef180769518",
+     "decoded": {
+      "type": 53,
+      "class": "StateGroup",
+      "size": 92,
+      "origin": 0,
+      "tagged": 0,
+      "addressable": 1,
+      "protocol": 1024,
+      "source_id": 2442310126,
+      "target_addr": "d0:73:d5:13:bc:cd",
+      "seq_num": 5,
+      "ack_requested": 0,
+      "response_requested": 1,
+      "group": [
+       159,
+       95,
+       33,
+       85,
+       12,
+       0,
+       139,
+       223,
+       12,
+       41,
+       229,
+       66,
+       234,
+       42,
+       36,
+       35
+      ],
+      "label": {
+       "bytes_hex": "4b69746368656e00000000000000000000000000000000000000000000000000",
+       "decoded": "Kitchen"
+      },
+      "updated_at": 1771452324627000000
+     }
+    }
+   ]
+  },
+  {
+   "request": "GetLocation",
+   "request_type": 48,
+   "note": "GetLocation (not used by HA)",
+   "sent_hex": "24000014eeb1929100000000000000000000000000000106000000000000000030000000",
+   "source": 2442310126,
+   "seq": 6,
+   "replies": [
+    {
+     "t_ms": 12.72,
+     "hex": "5c000014eeb19291d073d513bccd00004c4946585632010608e9dce3d5f4e71832000000658a256b837b13442e04ddbe101087b9486f6d6500000000000000000000000000000000000000000000000000000000c0aaeef180769518",
+     "decoded": {
+      "type": 50,
+      "class": "StateLocation",
+      "size": 92,
+      "origin": 0,
+      "tagged": 0,
+      "addressable": 1,
+      "protocol": 1024,
+      "source_id": 2442310126,
+      "target_addr": "d0:73:d5:13:bc:cd",
+      "seq_num": 6,
+      "ack_requested": 0,
+      "response_requested": 1,
+      "location": [
+       101,
+       138,
+       37,
+       107,
+       131,
+       123,
+       19,
+       68,
+       46,
+       4,
+       221,
+       190,
+       16,
+       16,
+       135,
+       185
+      ],
+      "label": {
+       "bytes_hex": "486f6d6500000000000000000000000000000000000000000000000000000000",
+       "decoded": "Home"
+      },
+      "updated_at": 1771452324627000000
+     }
+    }
+   ]
+  },
+  {
+   "request": "LightGet",
+   "request_type": 101,
+   "note": "LightGet = HA's poll",
+   "sent_hex": "24000014eeb1929100000000000000000000000000000107000000000000000065000000",
+   "source": 2442310126,
+   "seq": 7,
+   "replies": [
+    {
+     "t_ms": 8.36,
+     "hex": "58000014eeb19291d073d513bccd00004c494658563201070891a8fcd5f4e7186b0000000000000099998c0a0000ffff4b69746368656e204c69676874000000000000000000000000000000000000000000000000000000",
+     "decoded": {
+      "type": 107,
+      "class": "LightState",
+      "size": 88,
+      "origin": 0,
+      "tagged": 0,
+      "addressable": 1,
+      "protocol": 1024,
+      "source_id": 2442310126,
+      "target_addr": "d0:73:d5:13:bc:cd",
+      "seq_num": 7,
+      "ack_requested": 0,
+      "response_requested": 1,
+      "color": [
+       0,
+       0,
+       39321,
+       2700
+      ],
+      "reserved1": 0,
+      "power_level": 65535,
+      "label": {
+       "bytes_hex": "4b69746368656e204c6967687400000000000000000000000000000000000000",
+       "decoded": "Kitchen Light"
+      },
+      "reserved2": 0
+     }
+    }
+   ]
+  },
+  {
+   "request": "LightGetPower",
+   "request_type": 116,
+   "note": "LightGetPower (not used by HA)",
+   "sent_hex": "24000014eeb1929100000000000000000000000000000108000000000000000074000000",
+   "source": 2442310126,
+   "seq": 8,
+   "replies": [
+    {
+     "t_ms": 5.73,
+     "hex": "26000014eeb19291d073d513bccd00004c4946585632010808397415d6f4e71876000000ffff",
+     "decoded": {
+      "type": 118,
+      "class": "LightStatePower",
+      "size": 38,
+      "origin": 0,
+      "tagged": 0,
+      "addressable": 1,
+      "protocol": 1024,
+      "source_id": 2442310126,
+      "target_addr": "d0:73:d5:13:bc:cd",
+      "seq_num": 8,
+      "ack_requested": 0,
+      "response_requested": 1,
+      "power_level": 65535
+     }
+    }
+   ]
+  },
+  {
+   "request": "GetPower",
+   "request_type": 20,
+   "note": "GetPower (device-level, not used by HA)",
+   "sent_hex": "24000014eeb1929100000000000000000000000000000109000000000000000014000000",
+   "source": 2442310126,
+   "seq": 9,
+   "replies": [
+    {
+     "t_ms": 13.92,
+     "hex": "26000014eeb19291d073d513bccd00004c4946585632010908f3b92ed6f4e71816000000ffff",
+     "decoded": {
+      "type": 22,
+      "class": "StatePower",
+      "size": 38,
+      "origin": 0,
+      "tagged": 0,
+      "addressable": 1,
+      "protocol": 1024,
+      "source_id": 2442310126,
+      "target_addr": "d0:73:d5:13:bc:cd",
+      "seq_num": 9,
+      "ack_requested": 0,
+      "response_requested": 1,
+      "power_level": 65535
+     }
+    }
+   ]
+  },
+  {
+   "request": "GetWifiInfo",
+   "request_type": 16,
+   "note": "GetWifiInfo (RSSI sensor poll)",
+   "sent_hex": "24000014eeb192910000000000000000000000000000010a000000000000000010000000",
+   "source": 2442310126,
+   "seq": 10,
+   "replies": [
+    {
+     "t_ms": 12.85,
+     "hex": "32000014eeb19291d073d513bccd00004c4946585632010a08adff47d6f4e7181100000096bfd633ae257509015a1646fe15",
+     "decoded": {
+      "type": 17,
+      "class": "StateWifiInfo",
+      "size": 50,
+      "origin": 0,
+      "tagged": 0,
+      "addressable": 1,
+      "protocol": 1024,
+      "source_id": 2442310126,
+      "target_addr": "d0:73:d5:13:bc:cd",
+      "seq_num": 10,
+      "ack_requested": 0,
+      "response_requested": 1,
+      "signal": 1.000000082740371e-07,
+      "tx": 158672302,
+      "rx": 1175869953,
+      "reserved1": 5630
+     }
+    }
+   ]
+  },
+  {
+   "request": "GetWifiFirmware",
+   "request_type": 18,
+   "note": "GetWifiFirmware (not used by HA)",
+   "sent_hex": "24000014eeb192910000000000000000000000000000010b000000000000000012000000",
+   "source": 2442310126,
+   "seq": 11,
+   "replies": [
+    {
+     "t_ms": 7.8,
+     "hex": "38000014eeb19291d073d513bccd00004c4946585632010b085e0861d6f4e71813000000008882aa7d15351400000000000000003e006500",
+     "decoded": {
+      "type": 19,
+      "class": "StateWifiFirmware",
+      "size": 56,
+      "origin": 0,
+      "tagged": 0,
+      "addressable": 1,
+      "protocol": 1024,
+      "source_id": 2442310126,
+      "target_addr": "d0:73:d5:13:bc:cd",
+      "seq_num": 11,
+      "ack_requested": 0,
+      "response_requested": 1,
+      "build": 1456093684000000000,
+      "reserved1": 0,
+      "version": 6619198
+     }
+    }
+   ]
+  },
+  {
+   "request": "GetHostInfo",
+   "request_type": 12,
+   "note": "GetHostInfo (not used by HA)",
+   "sent_hex": "24000014eeb192910000000000000000000000000000010c00000000000000000c000000",
+   "source": 2442310126,
+   "seq": 12,
+   "replies": [
+    {
+     "t_ms": 15.69,
+     "hex": "32000014eeb19291d073d513bccd00004c4946585632010c08184e7ad6f4e7180d000000000000000000000000000000bf1c",
+     "decoded": {
+      "type": 13,
+      "class": "StateHostInfo",
+      "size": 50,
+      "origin": 0,
+      "tagged": 0,
+      "addressable": 1,
+      "protocol": 1024,
+      "source_id": 2442310126,
+      "target_addr": "d0:73:d5:13:bc:cd",
+      "seq_num": 12,
+      "ack_requested": 0,
+      "response_requested": 1,
+      "signal": 0.0,
+      "tx": 0,
+      "rx": 0,
+      "reserved1": 7359
+     }
+    }
+   ]
+  },
+  {
+   "request": "GetInfo",
+   "request_type": 34,
+   "note": "GetInfo (uptime; not used by HA)",
+   "sent_hex": "24000014eeb192910000000000000000000000000000010d000000000000000022000000",
+   "source": 2442310126,
+   "seq": 13,
+   "replies": [
+    {
+     "t_ms": 10.27,
+     "hex": "3c000014eeb19291d073d513bccd00004c4946585632010d08c95693d6f4e7182300000008c95693d6f4e7188004a22611e903000000000000000000",
+     "decoded": {
+      "type": 35,
+      "class": "StateInfo",
+      "size": 60,
+      "origin": 0,
+      "tagged": 0,
+      "addressable": 1,
+      "protocol": 1024,
+      "source_id": 2442310126,
+      "target_addr": "d0:73:d5:13:bc:cd",
+      "seq_num": 13,
+      "ack_requested": 0,
+      "response_requested": 1,
+      "time": 1794672178962549000,
+      "uptime": 1100684802000000,
+      "downtime": 0
+     }
+    }
+   ]
+  },
+  {
+   "request": "LightGetInfrared",
+   "request_type": 120,
+   "note": "LightGetInfrared: unsupported on this product",
+   "sent_hex": "24000014eeb192910000000000000000000000000000010e000000000000000078000000",
+   "source": 2442310126,
+   "seq": 14,
+   "replies": []
+  },
+  {
+   "request": "LightGet",
+   "request_type": 101,
+   "note": "LightGet with ack_requested=1 too",
+   "sent_hex": "24000014eeb192910000000000000000000000000000030f000000000000000065000000",
+   "source": 2442310126,
+   "seq": 15,
+   "replies": [
+    {
+     "t_ms": 5.81,
+     "hex": "24000014eeb19291d073d513bccd00004c4946585632010f08c9680dd7f4e7182d000000",
+     "decoded": {
+      "type": 45,
+      "class": "Acknowledgement",
+      "size": 36,
+      "origin": 0,
+      "tagged": 0,
+      "addressable": 1,
+      "protocol": 1024,
+      "source_id": 2442310126,
+      "target_addr": "d0:73:d5:13:bc:cd",
+      "seq_num": 15,
+      "ack_requested": 0,
+      "response_requested": 1
+     }
+    },
+    {
+     "t_ms": 14.14,
+     "hex": "58000014eeb19291d073d513bccd00004c4946585632010f08dbe20dd7f4e7186b0000000000000099998c0a0000ffff4b69746368656e204c69676874000000000000000000000000000000000000000000000000000000",
+     "decoded": {
+      "type": 107,
+      "class": "LightState",
+      "size": 88,
+      "origin": 0,
+      "tagged": 0,
+      "addressable": 1,
+      "protocol": 1024,
+      "source_id": 2442310126,
+      "target_addr": "d0:73:d5:13:bc:cd",
+      "seq_num": 15,
+      "ack_requested": 0,
+      "response_requested": 1,
+      "color": [
+       0,
+       0,
+       39321,
+       2700
+      ],
+      "reserved1": 0,
+      "power_level": 65535,
+      "label": {
+       "bytes_hex": "4b69746368656e204c6967687400000000000000000000000000000000000000",
+       "decoded": "Kitchen Light"
+      },
+      "reserved2": 0
+     }
+    }
+   ]
+  },
+  {
+   "request": "LightGet",
+   "request_type": 101,
+   "note": "LightGet latency sample 0",
+   "sent_hex": "24000014eeb1929100000000000000000000000000000110000000000000000065000000",
+   "source": 2442310126,
+   "seq": 16,
+   "replies": [
+    {
+     "t_ms": 12.45,
+     "hex": "58000014eeb19291d073d513bccd00004c4946585632011008952827d7f4e7186b0000000000000099998c0a0000ffff4b69746368656e204c69676874000000000000000000000000000000000000000000000000000000",
+     "decoded": {
+      "type": 107,
+      "class": "LightState",
+      "size": 88,
+      "origin": 0,
+      "tagged": 0,
+      "addressable": 1,
+      "protocol": 1024,
+      "source_id": 2442310126,
+      "target_addr": "d0:73:d5:13:bc:cd",
+      "seq_num": 16,
+      "ack_requested": 0,
+      "response_requested": 1,
+      "color": [
+       0,
+       0,
+       39321,
+       2700
+      ],
+      "reserved1": 0,
+      "power_level": 65535,
+      "label": {
+       "bytes_hex": "4b69746368656e204c6967687400000000000000000000000000000000000000",
+       "decoded": "Kitchen Light"
+      },
+      "reserved2": 0
+     }
+    }
+   ]
+  },
+  {
+   "request": "LightGet",
+   "request_type": 101,
+   "note": "LightGet latency sample 1",
+   "sent_hex": "24000014eeb1929100000000000000000000000000000111000000000000000065000000",
+   "source": 2442310126,
+   "seq": 17,
+   "replies": [
+    {
+     "t_ms": 33.68,
+     "hex": "58000014eeb19291d073d513bccd00004c4946585632011108736241d7f4e7186b0000000000000099998c0a0000ffff4b69746368656e204c69676874000000000000000000000000000000000000000000000000000000",
+     "decoded": {
+      "type": 107,
+      "class": "LightState",
+      "size": 88,
+      "origin": 0,
+      "tagged": 0,
+      "addressable": 1,
+      "protocol": 1024,
+      "source_id": 2442310126,
+      "target_addr": "d0:73:d5:13:bc:cd",
+      "seq_num": 17,
+      "ack_requested": 0,
+      "response_requested": 1,
+      "color": [
+       0,
+       0,
+       39321,
+       2700
+      ],
+      "reserved1": 0,
+      "power_level": 65535,
+      "label": {
+       "bytes_hex": "4b69746368656e204c6967687400000000000000000000000000000000000000",
+       "decoded": "Kitchen Light"
+      },
+      "reserved2": 0
+     }
+    }
+   ]
+  },
+  {
+   "request": "LightGet",
+   "request_type": 101,
+   "note": "LightGet latency sample 2",
+   "sent_hex": "24000014eeb1929100000000000000000000000000000112000000000000000065000000",
+   "source": 2442310126,
+   "seq": 18,
+   "replies": [
+    {
+     "t_ms": 9.52,
+     "hex": "58000014eeb19291d073d513bccd00004c49465856320112082da85ad7f4e7186b0000000000000099998c0a0000ffff4b69746368656e204c69676874000000000000000000000000000000000000000000000000000000",
+     "decoded": {
+      "type": 107,
+      "class": "LightState",
+      "size": 88,
+      "origin": 0,
+      "tagged": 0,
+      "addressable": 1,
+      "protocol": 1024,
+      "source_id": 2442310126,
+      "target_addr": "d0:73:d5:13:bc:cd",
+      "seq_num": 18,
+      "ack_requested": 0,
+      "response_requested": 1,
+      "color": [
+       0,
+       0,
+       39321,
+       2700
+      ],
+      "reserved1": 0,
+      "power_level": 65535,
+      "label": {
+       "bytes_hex": "4b69746368656e204c6967687400000000000000000000000000000000000000",
+       "decoded": "Kitchen Light"
+      },
+      "reserved2": 0
+     }
+    }
+   ]
+  },
+  {
+   "request": "LightGet",
+   "request_type": 101,
+   "note": "LightGet latency sample 3",
+   "sent_hex": "24000014eeb1929100000000000000000000000000000113000000000000000065000000",
+   "source": 2442310126,
+   "seq": 19,
+   "replies": [
+    {
+     "t_ms": 11.14,
+     "hex": "58000014eeb19291d073d513bccd00004c4946585632011308e7ed73d7f4e7186b0000000000000099998c0a0000ffff4b69746368656e204c69676874000000000000000000000000000000000000000000000000000000",
+     "decoded": {
+      "type": 107,
+      "class": "LightState",
+      "size": 88,
+      "origin": 0,
+      "tagged": 0,
+      "addressable": 1,
+      "protocol": 1024,
+      "source_id": 2442310126,
+      "target_addr": "d0:73:d5:13:bc:cd",
+      "seq_num": 19,
+      "ack_requested": 0,
+      "response_requested": 1,
+      "color": [
+       0,
+       0,
+       39321,
+       2700
+      ],
+      "reserved1": 0,
+      "power_level": 65535,
+      "label": {
+       "bytes_hex": "4b69746368656e204c6967687400000000000000000000000000000000000000",
+       "decoded": "Kitchen Light"
+      },
+      "reserved2": 0
+     }
+    }
+   ]
+  },
+  {
+   "request": "LightGet",
+   "request_type": 101,
+   "note": "LightGet latency sample 4",
+   "sent_hex": "24000014eeb1929100000000000000000000000000000114000000000000000065000000",
+   "source": 2442310126,
+   "seq": 20,
+   "replies": [
+    {
+     "t_ms": 14.56,
+     "hex": "58000014eeb19291d073d513bccd00004c4946585632011408a1338dd7f4e7186b0000000000000099998c0a0000ffff4b69746368656e204c69676874000000000000000000000000000000000000000000000000000000",
+     "decoded": {
+      "type": 107,
+      "class": "LightState",
+      "size": 88,
+      "origin": 0,
+      "tagged": 0,
+      "addressable": 1,
+      "protocol": 1024,
+      "source_id": 2442310126,
+      "target_addr": "d0:73:d5:13:bc:cd",
+      "seq_num": 20,
+      "ack_requested": 0,
+      "response_requested": 1,
+      "color": [
+       0,
+       0,
+       39321,
+       2700
+      ],
+      "reserved1": 0,
+      "power_level": 65535,
+      "label": {
+       "bytes_hex": "4b69746368656e204c6967687400000000000000000000000000000000000000",
+       "decoded": "Kitchen Light"
+      },
+      "reserved2": 0
+     }
+    }
+   ]
+  }
+ ],
+ "note": "Read-only Get queries to the real LIFX Color 1000 (fw 1.22, product 22). Decoded with aiolifx 1.2.1 unpack_lifx_message. Location/group UUIDs are random ids, not personal data."
+}

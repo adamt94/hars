@@ -1,0 +1,42 @@
+[
+ {
+  "area_id": "kitchen",
+  "config_entries": [
+   "01KTF77A32XCKE6QEYSA624DSX"
+  ],
+  "config_entries_subentries": {
+   "01KTF77A32XCKE6QEYSA624DSX": [
+    null
+   ]
+  },
+  "configuration_url": null,
+  "connections": [
+   [
+    "mac",
+    "d0:73:d5:13:bc:cd"
+   ]
+  ],
+  "created_at": "2026-06-06T19:40:40.463156+00:00",
+  "disabled_by": null,
+  "entry_type": null,
+  "hw_version": null,
+  "id": "d15f4984f39d24666badd280abd43ac8",
+  "identifiers": [
+   [
+    "lifx",
+    "d0:73:d5:13:bc:cd"
+   ]
+  ],
+  "labels": [],
+  "manufacturer": "LIFX",
+  "model": "LIFX Color 1000",
+  "model_id": null,
+  "modified_at": "2026-06-06T19:40:40.463210+00:00",
+  "name_by_user": null,
+  "name": "Kitchen Light",
+  "primary_config_entry": "01KTF77A32XCKE6QEYSA624DSX",
+  "serial_number": null,
+  "sw_version": "1.22",
+  "via_device_id": null
+ }
+]

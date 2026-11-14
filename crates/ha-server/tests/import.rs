@@ -91,7 +91,7 @@ fn ha_config(dir: &Path) -> String {
         json!({"entries": [
             {"entry_id": "e1", "domain": "hue", "title": "Hue Bridge", "disabled_by": null, "data": {"host": "10.0.0.2", "api_key": "secret-key"}},
             {"entry_id": "e2", "domain": "met", "title": "Home", "disabled_by": "user", "data": {}},
-            {"entry_id": "e3", "domain": "lifx", "title": "Kitchen Light", "disabled_by": null, "data": {"host": "10.0.0.3"}}
+            {"entry_id": "e3", "domain": "radio_browser", "title": "Radio Browser", "disabled_by": null, "data": {}}
         ]}),
     );
     write_store(
@@ -164,7 +164,7 @@ fn imports_an_ha_install_and_keeps_its_sessions() {
     assert!(out.status.success(), "{out:?}");
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(
-        stdout.contains("integrations not in hars yet: lifx (Kitchen Light)\n"),
+        stdout.contains("integrations not in hars yet: radio_browser (Radio Browser)\n"),
         "{stdout}"
     );
 

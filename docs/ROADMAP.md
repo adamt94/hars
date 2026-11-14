@@ -305,10 +305,18 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
       sensor; mDNS
       rediscovery if the imported host moves; user-initiated re-pairing if
       the key is rejected
-- [ ] `lifx`: imported host + broadcast rediscovery, source/sequence matching,
-      bounded retries, offline → `unavailable`, re-read state after a
-      transition (the ack is not the final state); on/off/brightness/kelvin/HSBK;
-      identify/restart buttons
+- [x] `lifx`: one UDP socket per bulb, aiolifx's framing and matching
+      (sequence mod 128, source, expected type), HA's retry layer (5 tries,
+      a new message each; 3 s apart for commands, 18 s for polls; a late
+      reply to any try counts), a `LightGet` every 10 s, unavailable after a
+      poll's 90 s of silence; HA's `set_state` (cached-power branches,
+      waveform-optional colour, 0.3 s settle, the debounced and
+      end-of-transition re-reads); identify/restart buttons; broadcast
+      rediscovery that reconnects. Matched against HA's own code: 27 light
+      service vectors byte for byte, the real bulb's replies, buttons,
+      timeouts. Checked against the real bulb with Get messages only
+- [ ] `lifx`: the `lifx.*` services (effects, `set_state`, themes), the
+      RSSI sensor, persisting a rediscovered host
 - [x] `switchbot_cloud`: the library's signing, envelope and error classes;
       HA's setup classification and retry ladder; Hub 2 and Bot polled every
       600 s (HA stops polling the Bot once its webhook is set; `hars` never

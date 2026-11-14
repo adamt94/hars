@@ -1,0 +1,172 @@
+[
+ {
+  "aliases": [],
+  "aliases_v2": [
+   null
+  ],
+  "area_id": null,
+  "categories": {},
+  "capabilities": null,
+  "config_entry_id": "01KTF77A32XCKE6QEYSA624DSX",
+  "config_subentry_id": null,
+  "created_at": "2026-06-06T19:40:40.463507+00:00",
+  "device_class": null,
+  "device_id": "d15f4984f39d24666badd280abd43ac8",
+  "disabled_by": null,
+  "entity_category": "config",
+  "entity_id": "button.kitchen_kitchen_light_restart",
+  "hidden_by": null,
+  "icon": null,
+  "id": "1e7f74d17b803ac7b3f4e5b9c8bd7f6a",
+  "has_entity_name": true,
+  "labels": [],
+  "modified_at": "2026-06-06T19:40:40.464035+00:00",
+  "name": null,
+  "object_id_base": "Restart",
+  "options": {
+   "conversation": {
+    "should_expose": false
+   }
+  },
+  "original_device_class": "restart",
+  "original_icon": null,
+  "original_name": "Restart",
+  "platform": "lifx",
+  "suggested_object_id": null,
+  "supported_features": 0,
+  "translation_key": null,
+  "unique_id": "d0:73:d5:13:bc:cd_restart",
+  "previous_unique_id": null,
+  "unit_of_measurement": null
+ },
+ {
+  "aliases": [],
+  "aliases_v2": [
+   null
+  ],
+  "area_id": null,
+  "categories": {},
+  "capabilities": null,
+  "config_entry_id": "01KTF77A32XCKE6QEYSA624DSX",
+  "config_subentry_id": null,
+  "created_at": "2026-06-06T19:40:40.464303+00:00",
+  "device_class": null,
+  "device_id": "d15f4984f39d24666badd280abd43ac8",
+  "disabled_by": null,
+  "entity_category": "config",
+  "entity_id": "button.kitchen_kitchen_light_identify",
+  "hidden_by": null,
+  "icon": null,
+  "id": "0335b5f503b2ed29737c7545075893f8",
+  "has_entity_name": true,
+  "labels": [],
+  "modified_at": "2026-06-06T19:40:40.464533+00:00",
+  "name": null,
+  "object_id_base": "Identify",
+  "options": {
+   "conversation": {
+    "should_expose": false
+   }
+  },
+  "original_device_class": "identify",
+  "original_icon": null,
+  "original_name": "Identify",
+  "platform": "lifx",
+  "suggested_object_id": null,
+  "supported_features": 0,
+  "translation_key": null,
+  "unique_id": "d0:73:d5:13:bc:cd_identify",
+  "previous_unique_id": null,
+  "unit_of_measurement": null
+ },
+ {
+  "aliases": [],
+  "aliases_v2": [
+   null
+  ],
+  "area_id": null,
+  "categories": {},
+  "capabilities": {
+   "min_color_temp_kelvin": 2500,
+   "max_color_temp_kelvin": 9000,
+   "effect_list": [
+    "effect_colorloop",
+    "effect_pulse",
+    "effect_stop"
+   ],
+   "supported_color_modes": [
+    "color_temp",
+    "hs"
+   ]
+  },
+  "config_entry_id": "01KTF77A32XCKE6QEYSA624DSX",
+  "config_subentry_id": null,
+  "created_at": "2026-06-06T19:40:40.467531+00:00",
+  "device_class": null,
+  "device_id": "d15f4984f39d24666badd280abd43ac8",
+  "disabled_by": null,
+  "entity_category": null,
+  "entity_id": "light.kitchen_kitchen_light",
+  "hidden_by": null,
+  "icon": null,
+  "id": "97a4432699ae8b4356e27d66a77dd8f4",
+  "has_entity_name": true,
+  "labels": [],
+  "modified_at": "2026-06-06T19:40:40.468002+00:00",
+  "name": null,
+  "object_id_base": null,
+  "options": {
+   "conversation": {
+    "should_expose": true
+   }
+  },
+  "original_device_class": null,
+  "original_icon": null,
+  "original_name": null,
+  "platform": "lifx",
+  "suggested_object_id": null,
+  "supported_features": 36,
+  "translation_key": null,
+  "unique_id": "d0:73:d5:13:bc:cd",
+  "previous_unique_id": null,
+  "unit_of_measurement": null
+ },
+ {
+  "aliases": [],
+  "aliases_v2": [
+   null
+  ],
+  "area_id": null,
+  "categories": {},
+  "capabilities": {
+   "state_class": "measurement"
+  },
+  "config_entry_id": "01KTF77A32XCKE6QEYSA624DSX",
+  "config_subentry_id": null,
+  "created_at": "2026-06-06T19:40:40.468582+00:00",
+  "device_class": null,
+  "device_id": "d15f4984f39d24666badd280abd43ac8",
+  "disabled_by": "integration",
+  "entity_category": "diagnostic",
+  "entity_id": "sensor.kitchen_kitchen_light_rssi",
+  "hidden_by": null,
+  "icon": null,
+  "id": "dc7aa9088c215c2764ff8e61b4689def",
+  "has_entity_name": true,
+  "labels": [],
+  "modified_at": "2026-06-06T19:40:40.468635+00:00",
+  "name": null,
+  "object_id_base": "RSSI",
+  "options": {},
+  "original_device_class": "signal_strength",
+  "original_icon": null,
+  "original_name": "RSSI",
+  "platform": "lifx",
+  "suggested_object_id": null,
+  "supported_features": 0,
+  "translation_key": "rssi",
+  "unique_id": "d0:73:d5:13:bc:cd_rssi",
+  "previous_unique_id": null,
+  "unit_of_measurement": "dB"
+ }
+]

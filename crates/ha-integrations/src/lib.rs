@@ -5,6 +5,7 @@ pub mod button;
 pub mod climate;
 pub mod components;
 pub mod hue;
+pub mod lifx;
 pub mod light;
 pub mod met;
 pub mod naming;
@@ -46,6 +47,7 @@ pub const SUPPORTED: &[&str] = &[
     met::DOMAIN,
     hue::DOMAIN,
     switchbot_cloud::DOMAIN,
+    lifx::DOMAIN,
 ];
 
 /// Who `hars` says it is to the services it calls.
@@ -135,6 +137,14 @@ pub fn start(
             ));
         }
         running.extend(["switchbot_cloud", "button", "climate", "sensor", "switch"]);
+    }
+    let lifx: Vec<Map<String, Value>> = enabled(lifx::DOMAIN).cloned().collect();
+    if !lifx.is_empty() {
+        let _ = (components.lights(), components.buttons());
+        for entry in lifx {
+            tokio::spawn(lifx::run(components.clone(), entry, lifx::conn::PORT));
+        }
+        running.extend(["lifx", "light", "button"]);
     }
     running.sort_unstable();
     running.dedup();

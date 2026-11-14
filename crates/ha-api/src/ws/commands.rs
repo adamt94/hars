@@ -263,6 +263,22 @@ fn call_service(conn: &mut Conn, id: u64, msg: &Map<String, Value>) -> Result<()
                 }
                 out.result(id, result)
             }
+            // A service the called one called (HA swaps the names).
+            Err(ServiceError::NotFound {
+                domain: child_domain,
+                service: child_service,
+            }) if (child_domain.as_str(), child_service.as_str()) != (&*domain, &*service) => out
+                .error_with(
+                    json!(id),
+                    json!({
+                        "code": "home_assistant_error",
+                        "message": format!("Service {child_domain}.{child_service} called service {domain}.{service} which was not found."),
+                        "translation_key": "child_service_not_found",
+                        "translation_placeholders": {"domain": domain, "service": service,
+                            "child_domain": child_domain, "child_service": child_service},
+                        "translation_domain": "homeassistant",
+                    }),
+                ),
             Err(ServiceError::NotFound { domain, service }) => out.error_with(
                 json!(id),
                 json!({
