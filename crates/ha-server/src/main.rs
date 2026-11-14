@@ -61,11 +61,20 @@ fn disable_transparent_huge_pages() -> std::io::Result<bool> {
 }
 
 async fn run(thp_disabled: std::io::Result<bool>) -> anyhow::Result<()> {
-    tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()))
-        // No colour codes in `docker logs` or journald.
-        .with_ansi(std::io::IsTerminal::is_terminal(&std::io::stdout()))
-        .init();
+    {
+        use tracing_subscriber::{Layer, layer::SubscriberExt, util::SubscriberInitExt};
+        let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into());
+        tracing_subscriber::registry()
+            .with(
+                tracing_subscriber::fmt::layer()
+                    // No colour codes in `docker logs` or journald.
+                    .with_ansi(std::io::IsTerminal::is_terminal(&std::io::stdout()))
+                    .with_filter(filter),
+            )
+            // Warnings and errors for `system_log/list`, whatever the filter.
+            .with(ha_api::system_log::layer())
+            .init();
+    }
 
     match thp_disabled {
         Ok(true) => tracing::debug!("transparent huge pages disabled"),

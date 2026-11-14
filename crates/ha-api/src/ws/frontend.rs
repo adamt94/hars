@@ -71,6 +71,14 @@ pub(super) fn dispatch(
             empty(conn, r)
         }
         "repairs/list_issues" => empty(conn, json!({"issues": []})),
+        // `require_admin`.
+        "system_log/list" => super::sensor::validate(msg, false).map(|()| {
+            if conn.principal.permission < Permission::Admin {
+                conn.out.error(json!(id), "unauthorized", "Unauthorized");
+                return;
+            }
+            conn.out.result(id, crate::system_log::list());
+        }),
         "brands/access_token" => {
             let token = conn.shared.config.brands.as_ref()?.token();
             super::sensor::validate(msg, false).map(|()| {

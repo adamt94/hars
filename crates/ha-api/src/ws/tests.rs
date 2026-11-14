@@ -1420,3 +1420,18 @@ async fn manifests_as_ha() {
         "expected a list for dictionary value @ data['integrations']. Got 'hue'"
     );
 }
+
+#[tokio::test]
+async fn system_log_list_is_admin_only() {
+    let s = server().await;
+    let mut c = Client::authed(&s, &token(&s.auth).0).await;
+    let r = c.call(json!({"id": 2, "type": "system_log/list"})).await;
+    assert!(r["result"].is_array(), "{r}");
+    let r = c
+        .call(json!({"id": 3, "type": "system_log/list", "x": 1}))
+        .await;
+    assert_eq!(
+        r["error"]["message"],
+        "extra keys not allowed @ data['x']. Got 1"
+    );
+}
