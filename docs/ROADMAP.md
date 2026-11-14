@@ -169,6 +169,11 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
       `analytics` and `integration` steps (needs WS); a fresh install
       redirects to `/onboarding.html` until then
 - [ ] CORS for `/auth/token` and `/auth/revoke` (HA allows any origin)
+- [ ] Permissions beyond the built-in groups: custom group policies (users
+      with only custom groups are refused for now), per-entity filtering, and
+      admin-only services once services exist that need it
+- [ ] REST bodies parsed as JSON whatever the `Content-Type`, as HA does
+      (today a missing `application/json` is a 415)
 - [ ] REST `/api/config` (truthful `components` list, version, units, location)
 - [ ] WS core: `auth`, `ping`, `supported_features` (**coalescing only once it
       is negotiated**), `subscribe_events`/`unsubscribe_events`, `get_states`,

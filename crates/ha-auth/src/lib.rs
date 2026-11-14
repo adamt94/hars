@@ -6,6 +6,7 @@
 //! writes what changed. The API is synchronous: password hashing and file
 //! writes block, so call those from `spawn_blocking`.
 
+mod casefold;
 pub mod indieauth;
 mod jwt;
 mod models;
@@ -55,7 +56,39 @@ pub const ONBOARDING_STEPS: [&str; 4] = ["user", "core_config", "analytics", "in
 pub struct Principal {
     pub user_id: String,
     pub refresh_token_id: String,
-    pub is_admin: bool,
+    pub permission: Permission,
+}
+
+/// What a user may do, from HA's built-in group policies
+/// (`auth/permissions/const.py`). Custom group policies are not evaluated
+/// yet, so a user with only custom groups gets [`Permission::None`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Permission {
+    None,
+    /// `system-read-only`: read every entity, control none.
+    Read,
+    /// `system-users`: read and control every entity; no admin-only views.
+    Control,
+    /// Owner or `system-admin`.
+    Admin,
+}
+
+impl User {
+    /// The strongest built-in policy among the user's groups.
+    pub fn permission(&self) -> Permission {
+        if self.is_admin() {
+            return Permission::Admin;
+        }
+        self.group_ids
+            .iter()
+            .map(|g| match g.as_str() {
+                GROUP_ID_USER => Permission::Control,
+                GROUP_ID_READ_ONLY => Permission::Read,
+                _ => Permission::None,
+            })
+            .max()
+            .unwrap_or(Permission::None)
+    }
 }
 
 /// What `/auth/token` returns on success.
@@ -601,8 +634,20 @@ impl Auth {
         Some(Principal {
             user_id: user.id.clone(),
             refresh_token_id: rt.id.clone(),
-            is_admin: user.is_admin(),
+            permission: user.permission(),
         })
+    }
+
+    /// `async_update_user(group_ids=...)`. Takes effect on the next request:
+    /// permissions are read when each access token is validated.
+    pub fn set_user_groups(&self, user_id: &str, group_ids: &[&str]) -> bool {
+        let mut s = self.0.state.lock();
+        let Some(user) = s.data.users.iter_mut().find(|u| u.id == user_id) else {
+            return false;
+        };
+        user.group_ids = group_ids.iter().map(|g| g.to_string()).collect();
+        s.dirty |= DIRTY_AUTH;
+        true
     }
 
     pub fn user(&self, user_id: &str) -> Option<User> {
@@ -623,7 +668,7 @@ impl Auth {
 
 /// `normalize_username`: `str.strip().casefold()`.
 fn normalize_username(username: &str) -> String {
-    username.trim().to_lowercase()
+    casefold::casefold(username.trim())
 }
 
 /// bcrypt only uses the first 72 bytes; HA truncates explicitly.

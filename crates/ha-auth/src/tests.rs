@@ -91,7 +91,7 @@ fn full_login_issues_working_tokens() {
     let p = auth
         .validate_access_token(&tokens.access_token, lan())
         .unwrap();
-    assert!(p.is_admin);
+    assert_eq!(p.permission, Permission::Admin);
     assert_eq!(auth.user(&p.user_id).unwrap().name.as_deref(), Some("adam"));
     assert!(auth.validate_access_token("garbage", lan()).is_none());
 
@@ -305,13 +305,13 @@ fn inactive_and_local_only_users_are_blocked() {
 
 #[test]
 fn state_survives_a_restart() {
-    let (auth, _, dir) = setup("restart");
+    let (auth, sim, dir) = setup("restart");
     let tokens = login(&auth);
     assert!(auth.needs_save());
     auth.save().unwrap();
     assert!(!auth.needs_save());
 
-    let again = Auth::load(&dir, Clock::system()).unwrap();
+    let again = Auth::load(&dir, sim.clock()).unwrap();
     assert!(again.is_onboarded());
     // Logged-in clients stay logged in.
     assert!(
@@ -376,8 +376,12 @@ fn reads_and_preserves_has_files() {
         .unwrap();
     let p = auth.validate_access_token(&r.access_token, lan()).unwrap();
     assert_eq!(
-        (p.user_id.as_str(), p.refresh_token_id.as_str(), p.is_admin),
-        ("u1", "t1", true)
+        (
+            p.user_id.as_str(),
+            p.refresh_token_id.as_str(),
+            p.permission
+        ),
+        ("u1", "t1", Permission::Admin)
     );
     // An existing user logs in through their linked credential.
     let flow = auth.start_login_flow(REDIRECT, lan());
@@ -451,4 +455,52 @@ fn ids_and_times_have_has_formats() {
     assert_eq!(token_hex().len(), 128);
     let t: Timestamp = "2026-06-10T12:34:56.789012Z".parse().unwrap();
     assert_eq!(iso(t), "2026-06-10T12:34:56.789012+00:00");
+}
+
+#[test]
+fn usernames_are_case_folded_like_python() {
+    let (auth, _, dir) = setup("casefold");
+    auth.add_user("strasse", "pw").unwrap();
+    // HA: "straße".casefold() == "strasse".
+    assert_eq!(
+        auth.check_password("Straße", "pw").as_deref(),
+        Some("strasse")
+    );
+    assert!(
+        matches!(auth.add_user("straße", "x"), Err(AddUserError::NotNormalized(n)) if n == "strasse")
+    );
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[test]
+fn permissions_follow_the_built_in_groups() {
+    let user = |groups: &[&str], owner: bool| User {
+        id: "u".into(),
+        group_ids: groups.iter().map(|g| g.to_string()).collect(),
+        is_owner: owner,
+        is_active: true,
+        name: None,
+        system_generated: false,
+        local_only: false,
+        extra: Map::new(),
+    };
+    assert_eq!(user(&[], true).permission(), Permission::Admin);
+    assert_eq!(
+        user(&[GROUP_ID_ADMIN], false).permission(),
+        Permission::Admin
+    );
+    assert_eq!(
+        user(&[GROUP_ID_USER], false).permission(),
+        Permission::Control
+    );
+    assert_eq!(
+        user(&[GROUP_ID_READ_ONLY], false).permission(),
+        Permission::Read
+    );
+    assert_eq!(
+        user(&[GROUP_ID_READ_ONLY, GROUP_ID_USER], false).permission(),
+        Permission::Control
+    );
+    assert_eq!(user(&["custom"], false).permission(), Permission::None);
+    assert_eq!(user(&[], false).permission(), Permission::None);
 }

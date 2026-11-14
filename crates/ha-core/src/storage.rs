@@ -140,7 +140,12 @@ impl Store {
             let mut file = open_new(&tmp, self.private)?;
             file.write_all(&json)?;
             file.sync_all()?;
-            fs::rename(&tmp, &self.path)
+            fs::rename(&tmp, &self.path)?;
+            // Make the rename itself durable: without this, power loss can
+            // bring back the old file (a revoked token, say).
+            #[cfg(unix)]
+            fs::File::open(dir)?.sync_all()?;
+            Ok(())
         })();
         if result.is_err() {
             let _ = fs::remove_file(&tmp);

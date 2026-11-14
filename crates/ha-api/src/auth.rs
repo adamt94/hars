@@ -9,13 +9,13 @@
 use axum::{
     Json, Router,
     body::Bytes,
-    extract::{ConnectInfo, FromRequestParts, Path, Request, State},
-    http::{HeaderMap, StatusCode, header, request::Parts},
+    extract::{ConnectInfo, DefaultBodyLimit, FromRequestParts, MatchedPath, Path, Request, State},
+    http::{HeaderMap, Method, StatusCode, header, request::Parts},
     middleware::Next,
     response::{IntoResponse, Response},
     routing::get,
 };
-use ha_auth::{Auth, LoginError, Principal, TokenError, Tokens, indieauth};
+use ha_auth::{Auth, LoginError, Permission, Principal, TokenError, Tokens, indieauth};
 use serde_json::{Map, Value, json};
 use std::collections::HashMap;
 use std::net::{IpAddr, SocketAddr};
@@ -37,8 +37,16 @@ pub(crate) fn routes(auth: Auth) -> Router {
         .route("/auth/revoke", axum::routing::post(revoke))
         .route("/api/onboarding", get(onboarding_status))
         .route("/api/onboarding/installation_type", get(installation_type))
+        // These bodies are a few hundred bytes; don't buffer megabytes for
+        // anonymous callers.
+        .layer(DefaultBodyLimit::max(MAX_BODY))
         .with_state(auth)
 }
+
+const MAX_BODY: usize = 16 * 1024;
+/// Client ids and redirect URIs are kept while a flow or code is pending, so
+/// their length is bounded (HA has no limit; real ones are under 100 bytes).
+const MAX_URL: usize = 2048;
 
 /// The client's address, if the server recorded it. IPv4-mapped IPv6
 /// addresses from dual-stack sockets are unwrapped, as `ip_address()` sees
@@ -109,12 +117,31 @@ pub(crate) async fn require_auth(
         .and_then(|v| v.split_once(' '))
         .filter(|(scheme, _)| *scheme == "Bearer")
         .and_then(|(_, token)| auth.validate_access_token(token, ip));
+    let needed = required_permission(
+        req.method(),
+        req.extensions()
+            .get::<MatchedPath>()
+            .map(MatchedPath::as_str),
+    );
     match principal {
-        Some(p) => {
+        // HA raises `Unauthorized` for a missing permission too: also a 401.
+        Some(p) if p.permission >= needed => {
             req.extensions_mut().insert::<Principal>(p);
             next.run(req).await
         }
-        None => unauthorized(),
+        _ => unauthorized(),
+    }
+}
+
+/// What each REST view checks in HA's `components/api`: writing a state is
+/// admin-only, calling a service needs entity control (`system-read-only`
+/// users have none), and reads need entity read access, which every built-in
+/// group has. Admin-only *services* are checked when such services exist.
+fn required_permission(method: &Method, path: Option<&str>) -> Permission {
+    match (method, path) {
+        (&Method::POST, Some("/api/states/{entity_id}")) => Permission::Admin,
+        (&Method::POST, Some("/api/services/{domain}/{service}")) => Permission::Control,
+        _ => Permission::Read,
     }
 }
 
@@ -173,6 +200,9 @@ fn format_error(detail: &str) -> Response {
 
 fn required_str<'a>(data: &'a Map<String, Value>, key: &str) -> Result<&'a str, Response> {
     match data.get(key) {
+        Some(Value::String(s)) if s.len() > MAX_URL => Err(format_error(&format!(
+            "length of value must be at most {MAX_URL} for dictionary value @ data['{key}']"
+        ))),
         Some(Value::String(s)) => Ok(s),
         Some(_) => Err(format_error(&format!(
             "expected str for dictionary value @ data['{key}']"
@@ -258,6 +288,11 @@ async fn login_flow_step(
         Err(e) => return e,
     };
     let client_id = match data.remove("client_id") {
+        Some(Value::String(s)) if s.len() > MAX_URL => {
+            return format_error(&format!(
+                "length of value must be at most {MAX_URL} for dictionary value @ data['client_id']"
+            ));
+        }
         Some(Value::String(s)) => s,
         Some(_) => return format_error("expected str for dictionary value @ data['client_id']"),
         None => return format_error("required key not provided @ data['client_id']"),
@@ -598,8 +633,12 @@ mod tests {
             self.send(req, Body::empty()).await
         }
 
-        /// `authorize.html`'s requests, then the token exchange `core.js` does.
         async fn login(&self, password: &str) -> Reply {
+            self.login_with("adam", password).await
+        }
+
+        /// `authorize.html`'s requests, then the token exchange `core.js` does.
+        async fn login_with(&self, username: &str, password: &str) -> Reply {
             let flow = self
                 .post_json(
                     "/auth/login_flow",
@@ -611,7 +650,7 @@ mod tests {
             let done = self
                 .post_json(
                     &format!("/auth/login_flow/{id}"),
-                    json!({"client_id": CLIENT, "username": "adam", "password": password}),
+                    json!({"client_id": CLIENT, "username": username, "password": password}),
                 )
                 .await;
             if done.json()["type"] != "create_entry" {
@@ -776,6 +815,91 @@ mod tests {
             c.send(req, Body::empty()).await.status,
             StatusCode::NOT_FOUND
         );
+    }
+
+    /// A non-admin user from an imported HA install, logged in.
+    async fn login_as(c: &Client, auth: &Auth, username: &str, group: &str) -> String {
+        auth.add_user(username, "pw").unwrap();
+        // The first login creates the user (an admin, as in HA).
+        let token = c.login_with(username, "pw").await.json()["access_token"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        let user_id = auth.validate_access_token(&token, None).unwrap().user_id;
+        assert!(auth.set_user_groups(&user_id, &[group]));
+        token
+    }
+
+    #[tokio::test]
+    async fn non_admins_get_has_permissions() {
+        let auth = crate::test_util::auth(true);
+        let c = Client::new(auth.clone());
+        let send = |token: &str, method: Method, uri: &str, body: &str| {
+            let req = Request::builder()
+                .method(method)
+                .uri(uri)
+                .header(header::CONTENT_TYPE, "application/json")
+                .header(header::AUTHORIZATION, format!("Bearer {token}"));
+            c.send(req, body.to_owned())
+        };
+        let write = r#"{"state": "on"}"#;
+        let call = "{}";
+
+        let reader = login_as(&c, &auth, "reader", ha_auth::GROUP_ID_READ_ONLY).await;
+        assert_eq!(
+            send(&reader, Method::GET, "/api/states", "").await.status,
+            StatusCode::OK
+        );
+        assert_eq!(
+            send(&reader, Method::GET, "/api/services", "").await.status,
+            StatusCode::OK
+        );
+        let r = send(&reader, Method::POST, "/api/states/sensor.x", write).await;
+        assert_eq!(r.status, StatusCode::UNAUTHORIZED);
+        let r = send(&reader, Method::POST, "/api/services/light/turn_on", call).await;
+        assert_eq!(r.status, StatusCode::UNAUTHORIZED);
+
+        let user = login_as(&c, &auth, "user", ha_auth::GROUP_ID_USER).await;
+        let r = send(&user, Method::POST, "/api/states/sensor.x", write).await;
+        assert_eq!(r.status, StatusCode::UNAUTHORIZED);
+        // Allowed through; the (unregistered) service is then a 400.
+        let r = send(&user, Method::POST, "/api/services/light/turn_on", call).await;
+        assert_eq!(r.status, StatusCode::BAD_REQUEST);
+
+        let custom = login_as(&c, &auth, "custom", "some-custom-group").await;
+        assert_eq!(
+            send(&custom, Method::GET, "/api/states", "").await.status,
+            StatusCode::UNAUTHORIZED
+        );
+
+        let owner = c.login("secret").await.json()["access_token"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        let r = send(&owner, Method::POST, "/api/states/sensor.x", write).await;
+        assert_eq!(r.status, StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn pending_flows_hold_bounded_memory() {
+        let c = Client::new(crate::test_util::auth(true));
+        let long = format!("http://192.168.1.5:8123/{}", "a".repeat(MAX_URL));
+        let r = c
+            .post_json(
+                "/auth/login_flow",
+                json!({"client_id": CLIENT, "handler": ["homeassistant", null], "redirect_uri": long}),
+            )
+            .await;
+        assert_eq!(r.status, StatusCode::BAD_REQUEST);
+        assert!(
+            r.json()["message"]
+                .as_str()
+                .unwrap()
+                .contains("at most 2048")
+        );
+        let huge = "x".repeat(MAX_BODY + 1);
+        let r = c.send(Request::post("/auth/login_flow"), huge).await;
+        assert_eq!(r.status, StatusCode::PAYLOAD_TOO_LARGE);
     }
 
     #[tokio::test]
