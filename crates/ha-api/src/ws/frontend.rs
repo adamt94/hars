@@ -40,7 +40,7 @@ pub(super) fn dispatch(
         | "config/area_registry/list"
         | "config/floor_registry/list"
         | "config/label_registry/list" => {
-            let r = &conn.shared.config.registries;
+            let r = conn.shared.config.registries();
             let list = match ty {
                 "config/entity_registry/list_for_display" => r.entities_for_display(),
                 "config/device_registry/list" => r.devices_json(),

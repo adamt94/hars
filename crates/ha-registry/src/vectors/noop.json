@@ -1,0 +1,116 @@
+{
+ "scenario": "noop",
+ "steps": [
+  {
+   "step": "boot",
+   "pending_saves_after_boot": {
+    "core.entity_registry": {
+     "delay_s": 179
+    }
+   },
+   "what_the_boot_save_changed_vs_fixture": {
+    "core.entity_registry": {
+     "entities": {
+      "added": [
+       {
+        "aliases": [],
+        "aliases_v2": [
+         null
+        ],
+        "area_id": null,
+        "categories": {},
+        "capabilities": null,
+        "config_entry_id": null,
+        "config_subentry_id": null,
+        "created_at": "<t:boot#1>",
+        "device_class": null,
+        "device_id": null,
+        "disabled_by": null,
+        "entity_category": null,
+        "entity_id": "person.adam",
+        "hidden_by": null,
+        "icon": null,
+        "id": "<uuid#1>",
+        "has_entity_name": false,
+        "labels": [],
+        "modified_at": "<t:boot#2>",
+        "name": null,
+        "object_id_base": "adam",
+        "options": {},
+        "original_device_class": null,
+        "original_icon": null,
+        "original_name": "adam",
+        "platform": "person",
+        "suggested_object_id": null,
+        "supported_features": 0,
+        "translation_key": null,
+        "unique_id": "adam",
+        "previous_unique_id": null,
+        "unit_of_measurement": null
+       }
+      ],
+      "removed": [],
+      "changed": {}
+     },
+     "deleted_entities": {
+      "added": [],
+      "removed": [],
+      "changed": {}
+     }
+    }
+   }
+  },
+  {
+   "step": "update_registration_identical",
+   "result": {
+    "type": "update_registration",
+    "status": 200,
+    "decrypted": "{\"app_data\":{\"push_token\":\"fake-push-token\",\"push_url\":\"https://mobile-apps.home-assistant.io/api/sendPushNotification\",\"start_live_activity_token\":\"abababababababab\"},\"app_id\":\"io.robbie.HomeAssistant\",\"app_name\":\"Home Assistant\",\"app_version\":\"2026.9.0 (2026.2874)\",\"device_name\":\" Phone\",\"manufacturer\":\"Apple\",\"model\":\"iPhone17,1\",\"os_version\":\"27.0\",\"supports_encryption\":true}"
+   },
+   "config_entry_signals_ws": [],
+   "ws_event_frames": [],
+   "final_states": {},
+   "pending_saves": {},
+   "files_changed": [],
+   "file_diffs": {},
+   "file_modes": {
+    "core.entity_registry": "0o644",
+    "core.device_registry": "0o644",
+    "core.config_entries": "0o644"
+   }
+  },
+  {
+   "step": "register_sensor_identical",
+   "result": {
+    "type": "register_sensor",
+    "status": 201,
+    "decrypted": "{\"success\":true}"
+   },
+   "config_entry_signals_ws": [],
+   "ws_event_frames": [],
+   "final_states": {},
+   "pending_saves": {},
+   "files_changed": [],
+   "file_diffs": {},
+   "file_modes": {
+    "core.entity_registry": "0o644",
+    "core.device_registry": "0o644",
+    "core.config_entries": "0o644"
+   }
+  },
+  {
+   "step": "update_entity_same_value_direct",
+   "config_entry_signals_ws": [],
+   "ws_event_frames": [],
+   "final_states": {},
+   "pending_saves": {},
+   "files_changed": [],
+   "file_diffs": {},
+   "file_modes": {
+    "core.entity_registry": "0o644",
+    "core.device_registry": "0o644",
+    "core.config_entries": "0o644"
+   }
+  }
+ ]
+}

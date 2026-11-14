@@ -20,6 +20,7 @@ mod lifecycle;
 pub mod restore;
 mod schema;
 mod service;
+mod slug;
 mod state;
 pub mod storage;
 pub mod yaml;
@@ -34,6 +35,7 @@ pub use service::{
     EntityTarget, Raised, ServiceCall, ServiceData, ServiceError, ServiceRegistry, ServiceResponse,
     SupportsResponse,
 };
+pub use slug::slugify;
 pub use state::{Attributes, Reported, State, StateChanges, StateMachine};
 
 use service::lower;

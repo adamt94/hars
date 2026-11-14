@@ -87,7 +87,7 @@ fn app_with(entries: &[Map<String, Value>]) -> App {
         ..Default::default()
     };
     let config = crate::ApiConfig {
-        registries: Arc::new(registries),
+        registry: Some(ha_registry::Registry::in_memory(&hass, registries)),
         mobile_app: Some(Arc::new(MobileApp::new(entries, vec![DELETED.into()]))),
         ..Default::default()
     };

@@ -595,8 +595,10 @@ dependencies = [
  "ha-core",
  "jiff",
  "parking_lot",
+ "rand",
  "serde",
  "serde_json",
+ "tokio",
  "tracing",
 ]
 

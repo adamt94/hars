@@ -1,0 +1,774 @@
+{
+ "scenario": "entity_ids",
+ "steps": [
+  {
+   "step": "boot",
+   "pending_saves_after_boot": {
+    "core.entity_registry": {
+     "delay_s": 180
+    }
+   },
+   "what_the_boot_save_changed_vs_fixture": {
+    "core.entity_registry": {
+     "entities": {
+      "added": [
+       {
+        "aliases": [],
+        "aliases_v2": [
+         null
+        ],
+        "area_id": null,
+        "categories": {},
+        "capabilities": null,
+        "config_entry_id": null,
+        "config_subentry_id": null,
+        "created_at": "<t:boot#1>",
+        "device_class": null,
+        "device_id": null,
+        "disabled_by": null,
+        "entity_category": null,
+        "entity_id": "person.adam",
+        "hidden_by": null,
+        "icon": null,
+        "id": "<uuid#1>",
+        "has_entity_name": false,
+        "labels": [],
+        "modified_at": "<t:boot#2>",
+        "name": null,
+        "object_id_base": "adam",
+        "options": {},
+        "original_device_class": null,
+        "original_icon": null,
+        "original_name": "adam",
+        "platform": "person",
+        "suggested_object_id": null,
+        "supported_features": 0,
+        "translation_key": null,
+        "unique_id": "adam",
+        "previous_unique_id": null,
+        "unit_of_measurement": null
+       }
+      ],
+      "removed": [],
+      "changed": {}
+     },
+     "deleted_entities": {
+      "added": [],
+      "removed": [],
+      "changed": {}
+     }
+    }
+   }
+  },
+  {
+   "step": "async_get_available_entity_id",
+   "result": {
+    "' Phone Steps'": "sensor.phone_steps",
+    "'Phone  Steps!!'": "sensor.phone_steps",
+    "'Ünïcödé Nàme'": "sensor.unicode_name",
+    "''": "sensor.",
+    "'!!!'": "sensor.unknown",
+    "'Battery Level'": "sensor.battery_level",
+    "' Phone Battery Level'": "sensor.phone_battery_level_2",
+    "'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'": "sensor.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "'café-latte 2'": "sensor.cafe_latte_2",
+    "'Ⅻ ﬁ'": "sensor.xii_fi",
+    "'123'": "sensor.123",
+    "'_a_'": "sensor.a",
+    "'taken' (a state, no row)": "sensor.taken_2",
+    "'taken' current_entity_id=sensor.taken": "sensor.taken",
+    "'phone_battery_level' reserved {…_2}": "sensor.phone_battery_level_3"
+   },
+   "config_entry_signals_ws": [],
+   "ws_event_frames": [],
+   "final_states": {
+    "sensor.taken": {
+     "state": "1",
+     "attributes": {}
+    }
+   },
+   "pending_saves": {},
+   "files_changed": [],
+   "file_diffs": {},
+   "file_modes": {
+    "core.entity_registry": "0o644",
+    "core.device_registry": "0o644",
+    "core.config_entries": "0o644"
+   }
+  },
+  {
+   "step": "async_get_or_create",
+   "result": {
+    "object_id_base ' Phone Speed' (device ' Phone', no area)": "sensor.phone_speed",
+    "object_id_base 'Speed' (no device prefix)": "sensor.phone_speed_2",
+    "object_id_base None": "sensor.phone",
+    "restore deleted 'speed' while sensor.phone_speed is a live state": "sensor.phone_speed_3",
+    "restore deleted 'speed' again (deleted row now remembers the _3 id)": "sensor.phone_speed_3",
+    "deleted row for 'speed' (as stored)": {
+     "aliases": [],
+     "aliases_v2": [
+      null
+     ],
+     "area_id": null,
+     "categories": {},
+     "config_entry_id": "01JFAKEMOBILEAPPENTRY00000",
+     "config_subentry_id": null,
+     "created_at": "<t:async_get_or_create#1>",
+     "device_class": null,
+     "disabled_by": null,
+     "disabled_by_undefined": false,
+     "entity_id": "sensor.phone_speed_3",
+     "hidden_by": null,
+     "hidden_by_undefined": false,
+     "icon": null,
+     "id": "<uuid#6>",
+     "labels": [],
+     "modified_at": "<t:async_get_or_create#13>",
+     "name": null,
+     "options": {},
+     "options_undefined": false,
+     "orphaned_timestamp": null,
+     "platform": "mobile_app",
+     "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_speed"
+    },
+    "object_id_base ' Phone Heading' (device in area 'Bedroom')": "sensor.bedroom_phone_heading",
+    "object_id_base ' Phone Altitude' (device renamed by user, in area)": "sensor.bedroom_adam_s_iphone_phone_altitude",
+    "sensor.phone_battery_level name after the user renamed the device": "Adam's iPhone Battery Level"
+   },
+   "config_entry_signals_ws": [],
+   "ws_event_frames": [
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"create\",\"entity_id\":\"sensor.phone_speed\"},\"origin\":\"LOCAL\",\"time_fired\":\"<t:async_get_or_create#2>\",\"context\":{\"id\":\"<ulid#1>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"create\",\"entity_id\":\"sensor.phone_speed_2\"},\"origin\":\"LOCAL\",\"time_fired\":\"<t:async_get_or_create#5>\",\"context\":{\"id\":\"<ulid#2>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"create\",\"entity_id\":\"sensor.phone\"},\"origin\":\"LOCAL\",\"time_fired\":\"<t:async_get_or_create#8>\",\"context\":{\"id\":\"<ulid#3>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"remove\",\"entity_id\":\"sensor.phone_speed\"},\"origin\":\"LOCAL\",\"time_fired\":\"<t:async_get_or_create#9>\",\"context\":{\"id\":\"<ulid#4>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"create\",\"entity_id\":\"sensor.phone_speed_3\"},\"origin\":\"LOCAL\",\"time_fired\":\"<t:async_get_or_create#10>\",\"context\":{\"id\":\"<ulid#5>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"remove\",\"entity_id\":\"sensor.phone_speed_3\"},\"origin\":\"LOCAL\",\"time_fired\":\"<t:async_get_or_create#11>\",\"context\":{\"id\":\"<ulid#6>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"create\",\"entity_id\":\"sensor.phone_speed_3\"},\"origin\":\"LOCAL\",\"time_fired\":\"<t:async_get_or_create#12>\",\"context\":{\"id\":\"<ulid#7>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"remove\",\"entity_id\":\"sensor.phone_speed_3\"},\"origin\":\"LOCAL\",\"time_fired\":\"<t:async_get_or_create#14>\",\"context\":{\"id\":\"<ulid#8>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"device_registry_updated\",\"data\":{\"action\":\"update\",\"device_id\":\"d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0\",\"changes\":{\"area_id\":null}},\"origin\":\"LOCAL\",\"time_fired\":\"<t:async_get_or_create#15>\",\"context\":{\"id\":\"<ulid#9>\",\"parent_id\":null,\"user_id\":null}},\"id\":2}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"create\",\"entity_id\":\"sensor.bedroom_phone_heading\"},\"origin\":\"LOCAL\",\"time_fired\":\"<t:async_get_or_create#17>\",\"context\":{\"id\":\"<ulid#10>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"device_registry_updated\",\"data\":{\"action\":\"update\",\"device_id\":\"d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0\",\"changes\":{\"name_by_user\":null}},\"origin\":\"LOCAL\",\"time_fired\":\"<t:async_get_or_create#19>\",\"context\":{\"id\":\"<ulid#11>\",\"parent_id\":null,\"user_id\":null}},\"id\":2}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"update\",\"entity_id\":\"device_tracker.phone\",\"changes\":{\"name\":null}},\"origin\":\"LOCAL\",\"time_fired\":\"<t:async_get_or_create#21>\",\"context\":{\"id\":\"<ulid#12>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"update\",\"entity_id\":\"sensor.phone_battery_level\",\"changes\":{\"name\":null}},\"origin\":\"LOCAL\",\"time_fired\":\"<t:async_get_or_create#23>\",\"context\":{\"id\":\"<ulid#13>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"update\",\"entity_id\":\"sensor.phone_storage\",\"changes\":{\"name\":null}},\"origin\":\"LOCAL\",\"time_fired\":\"<t:async_get_or_create#25>\",\"context\":{\"id\":\"<ulid#14>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"update\",\"entity_id\":\"sensor.phone_battery_state\",\"changes\":{\"name\":null}},\"origin\":\"LOCAL\",\"time_fired\":\"<t:async_get_or_create#27>\",\"context\":{\"id\":\"<ulid#15>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"update\",\"entity_id\":\"sensor.phone_sim_1\",\"changes\":{\"name\":null}},\"origin\":\"LOCAL\",\"time_fired\":\"<t:async_get_or_create#29>\",\"context\":{\"id\":\"<ulid#16>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"update\",\"entity_id\":\"sensor.phone_sim_2\",\"changes\":{\"name\":null}},\"origin\":\"LOCAL\",\"time_fired\":\"<t:async_get_or_create#31>\",\"context\":{\"id\":\"<ulid#17>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"update\",\"entity_id\":\"sensor.phone_geocoded_location\",\"changes\":{\"name\":null}},\"origin\":\"LOCAL\",\"time_fired\":\"<t:async_get_or_create#33>\",\"context\":{\"id\":\"<ulid#18>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"update\",\"entity_id\":\"sensor.phone_ssid\",\"changes\":{\"name\":null}},\"origin\":\"LOCAL\",\"time_fired\":\"<t:async_get_or_create#35>\",\"context\":{\"id\":\"<ulid#19>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"update\",\"entity_id\":\"sensor.phone_bssid\",\"changes\":{\"name\":null}},\"origin\":\"LOCAL\",\"time_fired\":\"<t:async_get_or_create#37>\",\"context\":{\"id\":\"<ulid#20>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"update\",\"entity_id\":\"sensor.phone_connection_type\",\"changes\":{\"name\":null}},\"origin\":\"LOCAL\",\"time_fired\":\"<t:async_get_or_create#39>\",\"context\":{\"id\":\"<ulid#21>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"update\",\"entity_id\":\"sensor.phone_last_update_trigger\",\"changes\":{\"name\":null}},\"origin\":\"LOCAL\",\"time_fired\":\"<t:async_get_or_create#41>\",\"context\":{\"id\":\"<ulid#22>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"update\",\"entity_id\":\"sensor.phone_kiosk_brightness\",\"changes\":{\"name\":null}},\"origin\":\"LOCAL\",\"time_fired\":\"<t:async_get_or_create#43>\",\"context\":{\"id\":\"<ulid#23>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"update\",\"entity_id\":\"sensor.phone_location_permission\",\"changes\":{\"name\":null}},\"origin\":\"LOCAL\",\"time_fired\":\"<t:async_get_or_create#45>\",\"context\":{\"id\":\"<ulid#24>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"update\",\"entity_id\":\"sensor.phone_audio_output\",\"changes\":{\"name\":null}},\"origin\":\"LOCAL\",\"time_fired\":\"<t:async_get_or_create#47>\",\"context\":{\"id\":\"<ulid#25>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"update\",\"entity_id\":\"sensor.phone_app_version\",\"changes\":{\"name\":null}},\"origin\":\"LOCAL\",\"time_fired\":\"<t:async_get_or_create#49>\",\"context\":{\"id\":\"<ulid#26>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"update\",\"entity_id\":\"binary_sensor.phone_kiosk_mode\",\"changes\":{\"name\":null}},\"origin\":\"LOCAL\",\"time_fired\":\"<t:async_get_or_create#51>\",\"context\":{\"id\":\"<ulid#27>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"update\",\"entity_id\":\"sensor.phone_kiosk_volume\",\"changes\":{\"name\":null}},\"origin\":\"LOCAL\",\"time_fired\":\"<t:async_get_or_create#53>\",\"context\":{\"id\":\"<ulid#28>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"update\",\"entity_id\":\"binary_sensor.phone_camera_motion\",\"changes\":{\"name\":null}},\"origin\":\"LOCAL\",\"time_fired\":\"<t:async_get_or_create#55>\",\"context\":{\"id\":\"<ulid#29>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"update\",\"entity_id\":\"binary_sensor.phone_kiosk_screensaver\",\"changes\":{\"name\":null}},\"origin\":\"LOCAL\",\"time_fired\":\"<t:async_get_or_create#57>\",\"context\":{\"id\":\"<ulid#30>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"update\",\"entity_id\":\"sensor.phone_camera_stream\",\"changes\":{\"name\":null}},\"origin\":\"LOCAL\",\"time_fired\":\"<t:async_get_or_create#59>\",\"context\":{\"id\":\"<ulid#31>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"update\",\"entity_id\":\"sensor.bedroom_phone_heading\",\"changes\":{\"name\":null}},\"origin\":\"LOCAL\",\"time_fired\":\"<t:async_get_or_create#61>\",\"context\":{\"id\":\"<ulid#32>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"create\",\"entity_id\":\"sensor.bedroom_adam_s_iphone_phone_altitude\"},\"origin\":\"LOCAL\",\"time_fired\":\"<t:async_get_or_create#64>\",\"context\":{\"id\":\"<ulid#33>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}"
+   ],
+   "final_states": {
+    "binary_sensor.phone_kiosk_mode": {
+     "state": "off",
+     "attributes": {
+      "icon": "mdi:tablet",
+      "friendly_name": "Adam's iPhone Kiosk Mode"
+     }
+    },
+    "binary_sensor.phone_kiosk_screensaver": {
+     "state": "off",
+     "attributes": {
+      "icon": "mdi:sleep-off",
+      "friendly_name": "Adam's iPhone Kiosk Screensaver"
+     }
+    },
+    "device_tracker.phone": {
+     "state": "unknown",
+     "attributes": {
+      "in_zones": [],
+      "source_type": "gps",
+      "battery_level": 70,
+      "friendly_name": "Adam's iPhone"
+     }
+    },
+    "notify.phone": {
+     "state": "unknown",
+     "attributes": {
+      "friendly_name": "Adam's iPhone",
+      "supported_features": 1
+     }
+    },
+    "sensor.phone_app_version": {
+     "state": "2026.9.0",
+     "attributes": {
+      "icon": "mdi:cellphone",
+      "friendly_name": "Adam's iPhone App Version"
+     }
+    },
+    "sensor.phone_audio_output": {
+     "state": "Built-in Speaker",
+     "attributes": {
+      "icon": "mdi:volume-high",
+      "friendly_name": "Adam's iPhone Audio Output"
+     }
+    },
+    "sensor.phone_battery_level": {
+     "state": "70",
+     "attributes": {
+      "unit_of_measurement": "%",
+      "device_class": "battery",
+      "icon": "mdi:battery-70",
+      "friendly_name": "Adam's iPhone Battery Level"
+     }
+    },
+    "sensor.phone_battery_state": {
+     "state": "Not Charging",
+     "attributes": {
+      "Low Power Mode": false,
+      "icon": "mdi:battery-70",
+      "friendly_name": "Adam's iPhone Battery State"
+     }
+    },
+    "sensor.phone_bssid": {
+     "state": "02:00:00:00:00:01",
+     "attributes": {
+      "icon": "mdi:wifi-star",
+      "friendly_name": "Adam's iPhone BSSID"
+     }
+    },
+    "sensor.phone_connection_type": {
+     "state": "Wi-Fi",
+     "attributes": {
+      "icon": "mdi:wifi",
+      "friendly_name": "Adam's iPhone Connection Type"
+     }
+    },
+    "sensor.phone_geocoded_location": {
+     "state": "Unknown",
+     "attributes": {
+      "icon": "mdi:map",
+      "friendly_name": "Adam's iPhone Geocoded Location"
+     }
+    },
+    "sensor.phone_kiosk_brightness": {
+     "state": "unavailable",
+     "attributes": {
+      "icon": "mdi:dots-square",
+      "friendly_name": "Adam's iPhone Kiosk Brightness"
+     }
+    },
+    "sensor.phone_kiosk_volume": {
+     "state": "unavailable",
+     "attributes": {
+      "icon": "mdi:dots-square",
+      "friendly_name": "Adam's iPhone Kiosk Volume"
+     }
+    },
+    "sensor.phone_last_update_trigger": {
+     "state": "Launch",
+     "attributes": {
+      "icon": "mdi:cellphone-wireless",
+      "friendly_name": "Adam's iPhone Last Update Trigger"
+     }
+    },
+    "sensor.phone_location_permission": {
+     "state": "Authorized when in use",
+     "attributes": {
+      "icon": "mdi:map",
+      "friendly_name": "Adam's iPhone Location permission"
+     }
+    },
+    "sensor.phone_sim_1": {
+     "state": "--",
+     "attributes": {
+      "Allows VoIP": true,
+      "Carrier ID": "0000000100000001",
+      "Carrier Name": "--",
+      "ISO Country Code": "--",
+      "Mobile Country Code": "65535",
+      "Mobile Network Code": "65535",
+      "icon": "mdi:sim",
+      "friendly_name": "Adam's iPhone SIM 1"
+     }
+    },
+    "sensor.phone_sim_2": {
+     "state": "--",
+     "attributes": {
+      "Allows VoIP": true,
+      "Carrier ID": "0000000100000002",
+      "Carrier Name": "--",
+      "Current Radio Technology": "Enhanced Data rates for GSM Evolution (EDGE)",
+      "ISO Country Code": "--",
+      "Mobile Country Code": "65535",
+      "Mobile Network Code": "65535",
+      "icon": "mdi:sim",
+      "friendly_name": "Adam's iPhone SIM 2"
+     }
+    },
+    "sensor.phone_speed": null,
+    "sensor.phone_ssid": {
+     "state": "FakeSSID",
+     "attributes": {
+      "icon": "mdi:wifi",
+      "friendly_name": "Adam's iPhone SSID"
+     }
+    },
+    "sensor.phone_storage": {
+     "state": "21.68",
+     "attributes": {
+      "Available": "38.99 GB",
+      "Available (Important)": "82.71 GB",
+      "Available (Opportunistic)": "55.38 GB",
+      "Total": "255.42 GB",
+      "unit_of_measurement": "% available",
+      "icon": "mdi:database",
+      "friendly_name": "Adam's iPhone Storage"
+     }
+    }
+   },
+   "pending_saves": {
+    "core.entity_registry": {
+     "delay_s": 10
+    },
+    "core.device_registry": {
+     "delay_s": 10
+    }
+   },
+   "files_changed": [
+    "core.entity_registry",
+    "core.device_registry"
+   ],
+   "file_diffs": {
+    "core.entity_registry": {
+     "entities": {
+      "added": [
+       {
+        "aliases": [],
+        "aliases_v2": [
+         null
+        ],
+        "area_id": null,
+        "categories": {},
+        "capabilities": null,
+        "config_entry_id": "01JFAKEMOBILEAPPENTRY00000",
+        "config_subentry_id": null,
+        "created_at": "<t:async_get_or_create#3>",
+        "device_class": null,
+        "device_id": "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0",
+        "disabled_by": null,
+        "entity_category": null,
+        "entity_id": "sensor.phone_speed_2",
+        "hidden_by": null,
+        "icon": null,
+        "id": "<uuid#2>",
+        "has_entity_name": false,
+        "labels": [],
+        "modified_at": "<t:async_get_or_create#4>",
+        "name": null,
+        "object_id_base": "Speed",
+        "options": {},
+        "original_device_class": null,
+        "original_icon": null,
+        "original_name": "Speed",
+        "platform": "mobile_app",
+        "suggested_object_id": null,
+        "supported_features": 0,
+        "translation_key": null,
+        "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_speed2",
+        "previous_unique_id": null,
+        "unit_of_measurement": null
+       },
+       {
+        "aliases": [],
+        "aliases_v2": [
+         null
+        ],
+        "area_id": null,
+        "categories": {},
+        "capabilities": null,
+        "config_entry_id": "01JFAKEMOBILEAPPENTRY00000",
+        "config_subentry_id": null,
+        "created_at": "<t:async_get_or_create#6>",
+        "device_class": null,
+        "device_id": "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0",
+        "disabled_by": null,
+        "entity_category": null,
+        "entity_id": "sensor.phone",
+        "hidden_by": null,
+        "icon": null,
+        "id": "<uuid#3>",
+        "has_entity_name": false,
+        "labels": [],
+        "modified_at": "<t:async_get_or_create#7>",
+        "name": null,
+        "object_id_base": null,
+        "options": {},
+        "original_device_class": null,
+        "original_icon": null,
+        "original_name": null,
+        "platform": "mobile_app",
+        "suggested_object_id": null,
+        "supported_features": 0,
+        "translation_key": null,
+        "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_nobase",
+        "previous_unique_id": null,
+        "unit_of_measurement": null
+       },
+       {
+        "aliases": [],
+        "aliases_v2": [
+         null
+        ],
+        "area_id": null,
+        "categories": {},
+        "capabilities": null,
+        "config_entry_id": "01JFAKEMOBILEAPPENTRY00000",
+        "config_subentry_id": null,
+        "created_at": "<t:async_get_or_create#16>",
+        "device_class": null,
+        "device_id": "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0",
+        "disabled_by": null,
+        "entity_category": null,
+        "entity_id": "sensor.bedroom_phone_heading",
+        "hidden_by": null,
+        "icon": null,
+        "id": "<uuid#4>",
+        "has_entity_name": false,
+        "labels": [],
+        "modified_at": "<t:async_get_or_create#60>",
+        "name": "Adam's iPhone Heading",
+        "object_id_base": " Phone Heading",
+        "options": {},
+        "original_device_class": null,
+        "original_icon": null,
+        "original_name": " Phone Heading",
+        "platform": "mobile_app",
+        "suggested_object_id": null,
+        "supported_features": 0,
+        "translation_key": null,
+        "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_heading",
+        "previous_unique_id": null,
+        "unit_of_measurement": null
+       },
+       {
+        "aliases": [],
+        "aliases_v2": [
+         null
+        ],
+        "area_id": null,
+        "categories": {},
+        "capabilities": null,
+        "config_entry_id": "01JFAKEMOBILEAPPENTRY00000",
+        "config_subentry_id": null,
+        "created_at": "<t:async_get_or_create#62>",
+        "device_class": null,
+        "device_id": "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0",
+        "disabled_by": null,
+        "entity_category": null,
+        "entity_id": "sensor.bedroom_adam_s_iphone_phone_altitude",
+        "hidden_by": null,
+        "icon": null,
+        "id": "<uuid#5>",
+        "has_entity_name": false,
+        "labels": [],
+        "modified_at": "<t:async_get_or_create#63>",
+        "name": null,
+        "object_id_base": " Phone Altitude",
+        "options": {},
+        "original_device_class": null,
+        "original_icon": null,
+        "original_name": " Phone Altitude",
+        "platform": "mobile_app",
+        "suggested_object_id": null,
+        "supported_features": 0,
+        "translation_key": null,
+        "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_alt",
+        "previous_unique_id": null,
+        "unit_of_measurement": null
+       }
+      ],
+      "removed": [],
+      "changed": {
+       "00000000000000000000000000000000": {
+        "modified_at": [
+         "2026-07-08T13:35:56.374652+00:00",
+         "<t:async_get_or_create#20>"
+        ],
+        "name": [
+         null,
+         "Adam's iPhone"
+        ]
+       },
+       "00000000000000000000000000000002": {
+        "modified_at": [
+         "2026-07-08T13:35:56.520017+00:00",
+         "<t:async_get_or_create#22>"
+        ],
+        "name": [
+         null,
+         "Adam's iPhone Battery Level"
+        ]
+       },
+       "00000000000000000000000000000003": {
+        "modified_at": [
+         "2026-07-08T13:35:56.524360+00:00",
+         "<t:async_get_or_create#24>"
+        ],
+        "name": [
+         null,
+         "Adam's iPhone Storage"
+        ]
+       },
+       "00000000000000000000000000000004": {
+        "modified_at": [
+         "2026-07-08T13:35:56.524975+00:00",
+         "<t:async_get_or_create#26>"
+        ],
+        "name": [
+         null,
+         "Adam's iPhone Battery State"
+        ]
+       },
+       "00000000000000000000000000000005": {
+        "modified_at": [
+         "2026-07-08T13:35:56.529336+00:00",
+         "<t:async_get_or_create#28>"
+        ],
+        "name": [
+         null,
+         "Adam's iPhone SIM 1"
+        ]
+       },
+       "00000000000000000000000000000006": {
+        "modified_at": [
+         "2026-07-08T13:35:56.529800+00:00",
+         "<t:async_get_or_create#30>"
+        ],
+        "name": [
+         null,
+         "Adam's iPhone SIM 2"
+        ]
+       },
+       "00000000000000000000000000000007": {
+        "modified_at": [
+         "2026-07-08T13:35:56.530240+00:00",
+         "<t:async_get_or_create#32>"
+        ],
+        "name": [
+         null,
+         "Adam's iPhone Geocoded Location"
+        ]
+       },
+       "00000000000000000000000000000008": {
+        "modified_at": [
+         "2026-07-08T13:35:56.533911+00:00",
+         "<t:async_get_or_create#34>"
+        ],
+        "name": [
+         null,
+         "Adam's iPhone SSID"
+        ]
+       },
+       "00000000000000000000000000000009": {
+        "modified_at": [
+         "2026-07-08T13:35:56.536564+00:00",
+         "<t:async_get_or_create#36>"
+        ],
+        "name": [
+         null,
+         "Adam's iPhone BSSID"
+        ]
+       },
+       "0000000000000000000000000000000a": {
+        "modified_at": [
+         "2026-07-08T13:35:56.539720+00:00",
+         "<t:async_get_or_create#38>"
+        ],
+        "name": [
+         null,
+         "Adam's iPhone Connection Type"
+        ]
+       },
+       "0000000000000000000000000000000b": {
+        "modified_at": [
+         "2026-07-08T13:35:56.542632+00:00",
+         "<t:async_get_or_create#40>"
+        ],
+        "name": [
+         null,
+         "Adam's iPhone Last Update Trigger"
+        ]
+       },
+       "0000000000000000000000000000000c": {
+        "modified_at": [
+         "2026-07-08T13:35:56.549354+00:00",
+         "<t:async_get_or_create#42>"
+        ],
+        "name": [
+         null,
+         "Adam's iPhone Kiosk Brightness"
+        ]
+       },
+       "0000000000000000000000000000000d": {
+        "modified_at": [
+         "2026-07-08T13:35:56.550888+00:00",
+         "<t:async_get_or_create#44>"
+        ],
+        "name": [
+         null,
+         "Adam's iPhone Location permission"
+        ]
+       },
+       "0000000000000000000000000000000e": {
+        "modified_at": [
+         "2026-07-08T13:35:56.551341+00:00",
+         "<t:async_get_or_create#46>"
+        ],
+        "name": [
+         null,
+         "Adam's iPhone Audio Output"
+        ]
+       },
+       "0000000000000000000000000000000f": {
+        "modified_at": [
+         "2026-07-08T13:35:56.552256+00:00",
+         "<t:async_get_or_create#48>"
+        ],
+        "name": [
+         null,
+         "Adam's iPhone App Version"
+        ]
+       },
+       "00000000000000000000000000000010": {
+        "modified_at": [
+         "2026-07-08T13:35:56.554781+00:00",
+         "<t:async_get_or_create#50>"
+        ],
+        "name": [
+         null,
+         "Adam's iPhone Kiosk Mode"
+        ]
+       },
+       "00000000000000000000000000000011": {
+        "modified_at": [
+         "2026-07-08T13:35:56.556339+00:00",
+         "<t:async_get_or_create#52>"
+        ],
+        "name": [
+         null,
+         "Adam's iPhone Kiosk Volume"
+        ]
+       },
+       "00000000000000000000000000000012": {
+        "modified_at": [
+         "2026-09-15T21:13:49.097059+00:00",
+         "<t:async_get_or_create#54>"
+        ],
+        "name": [
+         null,
+         "Adam's iPhone Camera Motion"
+        ]
+       },
+       "00000000000000000000000000000013": {
+        "modified_at": [
+         "2026-09-15T21:13:49.108532+00:00",
+         "<t:async_get_or_create#56>"
+        ],
+        "name": [
+         null,
+         "Adam's iPhone Kiosk Screensaver"
+        ]
+       },
+       "00000000000000000000000000000014": {
+        "modified_at": [
+         "2026-09-15T21:13:49.118147+00:00",
+         "<t:async_get_or_create#58>"
+        ],
+        "name": [
+         null,
+         "Adam's iPhone Camera Stream"
+        ]
+       }
+      }
+     },
+     "deleted_entities": {
+      "added": [
+       {
+        "aliases": [],
+        "aliases_v2": [
+         null
+        ],
+        "area_id": null,
+        "categories": {},
+        "config_entry_id": "01JFAKEMOBILEAPPENTRY00000",
+        "config_subentry_id": null,
+        "created_at": "<t:async_get_or_create#1>",
+        "device_class": null,
+        "disabled_by": null,
+        "disabled_by_undefined": false,
+        "entity_id": "sensor.phone_speed_3",
+        "hidden_by": null,
+        "hidden_by_undefined": false,
+        "icon": null,
+        "id": "<uuid#6>",
+        "labels": [],
+        "modified_at": "<t:async_get_or_create#13>",
+        "name": null,
+        "options": {},
+        "options_undefined": false,
+        "orphaned_timestamp": null,
+        "platform": "mobile_app",
+        "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_speed"
+       }
+      ],
+      "removed": [],
+      "changed": {}
+     }
+    },
+    "core.device_registry": {
+     "devices": {
+      "added": [],
+      "removed": [],
+      "changed": {
+       "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0": {
+        "area_id": [
+         null,
+         "bedroom"
+        ],
+        "modified_at": [
+         "2026-09-15T21:13:48.636995+00:00",
+         "<t:async_get_or_create#18>"
+        ],
+        "name_by_user": [
+         null,
+         "Adam's iPhone"
+        ]
+       }
+      }
+     },
+     "deleted_devices": {
+      "added": [],
+      "removed": [],
+      "changed": {}
+     }
+    },
+    "core.config_entries": {
+     "entries": {
+      "added": [],
+      "removed": [],
+      "changed": {}
+     }
+    }
+   },
+   "file_modes": {
+    "core.entity_registry": "0o644",
+    "core.device_registry": "0o644",
+    "core.config_entries": "0o644"
+   }
+  }
+ ]
+}

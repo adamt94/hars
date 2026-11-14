@@ -235,7 +235,10 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
 - [x] WS registries: `config/entity_registry/list_for_display` (HA's display
       keys, legacy device-name prefix stripping),
       `config/{device,area,floor,label}_registry/list`
-- [ ] Registry `*_updated` events, once registries change at runtime
+- [x] Registry `*_updated` events, once registries change at runtime:
+      `entity_registry_updated` (create/update/remove) and
+      `device_registry_updated` (create/update), with HA's delayed saves (10 s
+      after the last change, 180 s before start)
 - [x] WS lovelace: `lovelace/info`, `lovelace/dashboards/list`,
       `lovelace/config` (`config_not_found` for Overview),
       `lovelace/config/save` + `/delete` (admin, fire `lovelace_updated`),

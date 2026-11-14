@@ -91,12 +91,15 @@ async fn run(thp_disabled: std::io::Result<bool>) -> anyhow::Result<()> {
         tokio::task::spawn_blocking(move || ha_core::config::CoreConfig::load(&dir)).await??
     };
     hass.set_config(core_config);
-    api_config.registries = {
+    let registry = {
         let dir = config_dir.clone();
-        std::sync::Arc::new(
-            tokio::task::spawn_blocking(move || ha_registry::Registries::load(&dir)).await??,
-        )
+        let loaded =
+            tokio::task::spawn_blocking(move || ha_registry::Registries::load(&dir)).await??;
+        ha_registry::Registry::new(&hass, &config_dir, loaded)
     };
+    // What the integrations and automations read at setup.
+    let registries = registry.snapshot();
+    api_config.registry = Some(registry.clone());
     // Last states, before any entity that restores itself is made.
     let restore = {
         let dir = config_dir.clone();
@@ -108,7 +111,7 @@ async fn run(thp_disabled: std::io::Result<bool>) -> anyhow::Result<()> {
         tokio::task::spawn_blocking(move || ha_components::Components::load(&dir)).await?
     };
     // Zone and person entities, before anything can read the states.
-    components.setup(&hass, &api_config.registries);
+    components.setup(&hass, &registries);
     let components = std::sync::Arc::new(components);
     components.track(&hass);
     api_config.components = components;
@@ -121,12 +124,7 @@ async fn run(thp_disabled: std::io::Result<bool>) -> anyhow::Result<()> {
         let dir = config_dir.clone();
         tokio::task::spawn_blocking(move || ha_integrations::light::Profiles::load(&dir)).await?
     };
-    let started = ha_integrations::start(
-        &hass,
-        api_config.registries.clone(),
-        entries.as_deref(),
-        profiles,
-    );
+    let started = ha_integrations::start(&hass, registries.clone(), entries.as_deref(), profiles);
     api_config.integrations = started.running;
     // The apps' registrations, before the listener serves their webhooks:
     // an unknown id makes the app register again.
@@ -162,7 +160,7 @@ async fn run(thp_disabled: std::io::Result<bool>) -> anyhow::Result<()> {
                 let items = ha_automation::from_config_yaml(&config);
                 Some(ha_automation::Automations::setup_yaml(
                     &hass,
-                    &api_config.registries,
+                    &registries,
                     &items,
                 ))
             }
@@ -249,7 +247,7 @@ async fn run(thp_disabled: std::io::Result<bool>) -> anyhow::Result<()> {
         Some(signal) => tracing::info!("{signal} received during startup, stopping"),
         None => {
             hass.begin_start();
-            api_config.registries.write_unavailable_states(&hass);
+            registry.snapshot().write_unavailable_states(&hass);
             api_config.components.start(&hass);
             hass.finish_start();
             if let Some(a) = &automations {
@@ -298,6 +296,7 @@ async fn run(thp_disabled: std::io::Result<bool>) -> anyhow::Result<()> {
         }
     }
     hass.restore().dump(&hass).await;
+    registry.flush().await;
     hass.finish_stop();
     tracing::info!("hars stopped");
     Ok(())

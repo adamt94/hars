@@ -916,7 +916,7 @@ async fn registry_lists_come_from_the_registries() {
         ..Default::default()
     };
     let config = crate::ApiConfig {
-        registries: std::sync::Arc::new(registries),
+        registry: Some(ha_registry::Registry::in_memory(&hass, registries)),
         ..Default::default()
     };
     let app = crate::router(hass.clone(), auth.clone(), &config)

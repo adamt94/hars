@@ -14,6 +14,10 @@ workspace = true
 ha-core.workspace = true
 jiff = "0.2.43"
 parking_lot = "0.12.5"
+rand = "0.9.5"
 serde = { version = "1.0.229", features = ["derive", "rc"] }
 serde_json = { version = "1.0.154", features = ["raw_value"] }
 tracing = "0.1.44"
+
+[dev-dependencies]
+tokio = { version = "1.54.1", features = ["macros", "rt", "test-util", "time"] }

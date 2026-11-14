@@ -502,7 +502,7 @@ fn device_registry_id(shared: &Shared, reg: &Registration) -> Option<String> {
     let want = json!(["mobile_app", device_id]);
     shared
         .config
-        .registries
+        .registries()
         .devices
         .iter()
         .find(|d| d.identifiers.contains(&want))
@@ -514,7 +514,7 @@ fn get_config(shared: &Shared, reg: &Registration) -> Value {
     let config = crate::config_json(shared, false);
     let webhook_id = &*reg.webhook_id;
     let mut entities = Map::new();
-    for e in &shared.config.registries.entities {
+    for e in &shared.config.registries().entities {
         if e.config_entry_id.as_deref() != Some(reg.entry_id.as_str()) {
             continue;
         }

@@ -1,0 +1,694 @@
+{
+ "scenario": "update_registration",
+ "steps": [
+  {
+   "step": "boot",
+   "pending_saves_after_boot": {
+    "core.entity_registry": {
+     "delay_s": 180
+    }
+   },
+   "what_the_boot_save_changed_vs_fixture": {
+    "core.entity_registry": {
+     "entities": {
+      "added": [
+       {
+        "aliases": [],
+        "aliases_v2": [
+         null
+        ],
+        "area_id": null,
+        "categories": {},
+        "capabilities": null,
+        "config_entry_id": null,
+        "config_subentry_id": null,
+        "created_at": "<t:boot#1>",
+        "device_class": null,
+        "device_id": null,
+        "disabled_by": null,
+        "entity_category": null,
+        "entity_id": "person.adam",
+        "hidden_by": null,
+        "icon": null,
+        "id": "<uuid#1>",
+        "has_entity_name": false,
+        "labels": [],
+        "modified_at": "<t:boot#2>",
+        "name": null,
+        "object_id_base": "adam",
+        "options": {},
+        "original_device_class": null,
+        "original_icon": null,
+        "original_name": "adam",
+        "platform": "person",
+        "suggested_object_id": null,
+        "supported_features": 0,
+        "translation_key": null,
+        "unique_id": "adam",
+        "previous_unique_id": null,
+        "unit_of_measurement": null
+       }
+      ],
+      "removed": [],
+      "changed": {}
+     },
+     "deleted_entities": {
+      "added": [],
+      "removed": [],
+      "changed": {}
+     }
+    }
+   }
+  },
+  {
+   "step": "os_and_app_version",
+   "result": {
+    "type": "update_registration",
+    "status": 200,
+    "decrypted": "{\"app_data\":{\"push_token\":\"fake-push-token\",\"push_url\":\"https://mobile-apps.home-assistant.io/api/sendPushNotification\",\"start_live_activity_token\":\"abababababababab\"},\"app_id\":\"io.robbie.HomeAssistant\",\"app_name\":\"Home Assistant\",\"app_version\":\"2026.9.1 (2026.2900)\",\"device_name\":\" Phone\",\"manufacturer\":\"Apple\",\"model\":\"iPhone17,1\",\"os_version\":\"27.0.1\",\"supports_encryption\":true}"
+   },
+   "config_entry_signals_ws": [
+    "{\"id\":3,\"type\":\"event\",\"event\":[{\"type\":\"updated\",\"entry\":{\"created_at\":1783517756.373075,\"entry_id\":\"01JFAKEMOBILEAPPENTRY00000\",\"domain\":\"mobile_app\",\"modified_at\":\"<ts:os_and_app_version#3>\",\"title\":\" Phone\",\"source\":\"registration\",\"state\":\"loaded\",\"supports_options\":false,\"supports_remove_device\":false,\"supports_unload\":true,\"supports_reconfigure\":false,\"supported_subentry_types\":{},\"pref_disable_new_entities\":false,\"pref_disable_polling\":false,\"disabled_by\":null,\"reason\":null,\"error_reason_translation_key\":null,\"error_reason_translation_placeholders\":null,\"num_subentries\":0}}]}"
+   ],
+   "ws_event_frames": [
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"device_registry_updated\",\"data\":{\"action\":\"update\",\"device_id\":\"d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0\",\"changes\":{\"sw_version\":\"27.0\"}},\"origin\":\"LOCAL\",\"time_fired\":\"<t:os_and_app_version#2>\",\"context\":{\"id\":\"<ulid#1>\",\"parent_id\":null,\"user_id\":null}},\"id\":2}"
+   ],
+   "final_states": {},
+   "pending_saves": {
+    "core.device_registry": {
+     "delay_s": 10
+    },
+    "core.config_entries": {
+     "delay_s": 1
+    }
+   },
+   "files_changed": [
+    "core.device_registry",
+    "core.config_entries"
+   ],
+   "file_diffs": {
+    "core.entity_registry": {
+     "entities": {
+      "added": [],
+      "removed": [],
+      "changed": {}
+     },
+     "deleted_entities": {
+      "added": [],
+      "removed": [],
+      "changed": {}
+     }
+    },
+    "core.device_registry": {
+     "devices": {
+      "added": [],
+      "removed": [],
+      "changed": {
+       "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0": {
+        "modified_at": [
+         "2026-09-15T21:13:48.636995+00:00",
+         "<t:os_and_app_version#1>"
+        ],
+        "sw_version": [
+         "27.0",
+         "27.0.1"
+        ]
+       }
+      }
+     },
+     "deleted_devices": {
+      "added": [],
+      "removed": [],
+      "changed": {}
+     }
+    },
+    "core.config_entries": {
+     "entries": {
+      "added": [],
+      "removed": [],
+      "changed": {
+       "01JFAKEMOBILEAPPENTRY00000": {
+        "data": [
+         {
+          "app_data": {
+           "push_token": "fake-push-token",
+           "push_url": "https://mobile-apps.home-assistant.io/api/sendPushNotification",
+           "start_live_activity_token": "abababababababab"
+          },
+          "app_id": "io.robbie.HomeAssistant",
+          "app_name": "Home Assistant",
+          "app_version": "2026.9.0 (2026.2874)",
+          "device_id": "11111111-2222-4333-8444-555555555555",
+          "device_name": " Phone",
+          "manufacturer": "Apple",
+          "model": "iPhone17,1",
+          "no_legacy_encryption": true,
+          "os_name": "iOS",
+          "os_version": "27.0",
+          "secret": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+          "supports_encryption": true,
+          "user_id": "00112233445566778899aabbccddeeff",
+          "webhook_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f"
+         },
+         {
+          "app_data": {
+           "push_token": "fake-push-token",
+           "push_url": "https://mobile-apps.home-assistant.io/api/sendPushNotification",
+           "start_live_activity_token": "abababababababab"
+          },
+          "app_id": "io.robbie.HomeAssistant",
+          "app_name": "Home Assistant",
+          "app_version": "2026.9.1 (2026.2900)",
+          "device_id": "11111111-2222-4333-8444-555555555555",
+          "device_name": " Phone",
+          "manufacturer": "Apple",
+          "model": "iPhone17,1",
+          "no_legacy_encryption": true,
+          "os_name": "iOS",
+          "os_version": "27.0.1",
+          "secret": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+          "supports_encryption": true,
+          "user_id": "00112233445566778899aabbccddeeff",
+          "webhook_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f"
+         }
+        ],
+        "modified_at": [
+         "2026-09-15T21:13:48.642920+00:00",
+         "<t:os_and_app_version#3>"
+        ]
+       }
+      }
+     }
+    }
+   },
+   "file_modes": {
+    "core.entity_registry": "0o644",
+    "core.device_registry": "0o644",
+    "core.config_entries": "0o644"
+   },
+   "entry_modified_at_changed": true
+  },
+  {
+   "step": "model_and_name",
+   "result": {
+    "type": "update_registration",
+    "status": 200,
+    "decrypted": "{\"app_data\":{\"push_token\":\"fake-push-token\",\"push_url\":\"https://mobile-apps.home-assistant.io/api/sendPushNotification\",\"start_live_activity_token\":\"abababababababab\"},\"app_id\":\"io.robbie.HomeAssistant\",\"app_name\":\"Home Assistant\",\"app_version\":\"2026.9.1 (2026.2900)\",\"device_name\":\" Phone Pro\",\"manufacturer\":\"Apple\",\"model\":\"iPhone18,1\",\"os_version\":\"27.0.1\",\"supports_encryption\":true}"
+   },
+   "config_entry_signals_ws": [
+    "{\"id\":3,\"type\":\"event\",\"event\":[{\"type\":\"updated\",\"entry\":{\"created_at\":1783517756.373075,\"entry_id\":\"01JFAKEMOBILEAPPENTRY00000\",\"domain\":\"mobile_app\",\"modified_at\":\"<ts:model_and_name#43>\",\"title\":\" Phone\",\"source\":\"registration\",\"state\":\"loaded\",\"supports_options\":false,\"supports_remove_device\":false,\"supports_unload\":true,\"supports_reconfigure\":false,\"supported_subentry_types\":{},\"pref_disable_new_entities\":false,\"pref_disable_polling\":false,\"disabled_by\":null,\"reason\":null,\"error_reason_translation_key\":null,\"error_reason_translation_placeholders\":null,\"num_subentries\":0}}]}"
+   ],
+   "ws_event_frames": [
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"device_registry_updated\",\"data\":{\"action\":\"update\",\"device_id\":\"d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0\",\"changes\":{\"model\":\"iPhone17,1\",\"name\":\" Phone\"}},\"origin\":\"LOCAL\",\"time_fired\":\"<t:model_and_name#2>\",\"context\":{\"id\":\"<ulid#2>\",\"parent_id\":null,\"user_id\":null}},\"id\":2}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"update\",\"entity_id\":\"device_tracker.phone\",\"changes\":{}},\"origin\":\"LOCAL\",\"time_fired\":\"<t:model_and_name#4>\",\"context\":{\"id\":\"<ulid#3>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"update\",\"entity_id\":\"sensor.phone_battery_level\",\"changes\":{}},\"origin\":\"LOCAL\",\"time_fired\":\"<t:model_and_name#6>\",\"context\":{\"id\":\"<ulid#4>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"update\",\"entity_id\":\"sensor.phone_storage\",\"changes\":{}},\"origin\":\"LOCAL\",\"time_fired\":\"<t:model_and_name#8>\",\"context\":{\"id\":\"<ulid#5>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"update\",\"entity_id\":\"sensor.phone_battery_state\",\"changes\":{}},\"origin\":\"LOCAL\",\"time_fired\":\"<t:model_and_name#10>\",\"context\":{\"id\":\"<ulid#6>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"update\",\"entity_id\":\"sensor.phone_sim_1\",\"changes\":{}},\"origin\":\"LOCAL\",\"time_fired\":\"<t:model_and_name#12>\",\"context\":{\"id\":\"<ulid#7>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"update\",\"entity_id\":\"sensor.phone_sim_2\",\"changes\":{}},\"origin\":\"LOCAL\",\"time_fired\":\"<t:model_and_name#14>\",\"context\":{\"id\":\"<ulid#8>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"update\",\"entity_id\":\"sensor.phone_geocoded_location\",\"changes\":{}},\"origin\":\"LOCAL\",\"time_fired\":\"<t:model_and_name#16>\",\"context\":{\"id\":\"<ulid#9>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"update\",\"entity_id\":\"sensor.phone_ssid\",\"changes\":{}},\"origin\":\"LOCAL\",\"time_fired\":\"<t:model_and_name#18>\",\"context\":{\"id\":\"<ulid#10>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"update\",\"entity_id\":\"sensor.phone_bssid\",\"changes\":{}},\"origin\":\"LOCAL\",\"time_fired\":\"<t:model_and_name#20>\",\"context\":{\"id\":\"<ulid#11>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"update\",\"entity_id\":\"sensor.phone_connection_type\",\"changes\":{}},\"origin\":\"LOCAL\",\"time_fired\":\"<t:model_and_name#22>\",\"context\":{\"id\":\"<ulid#12>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"update\",\"entity_id\":\"sensor.phone_last_update_trigger\",\"changes\":{}},\"origin\":\"LOCAL\",\"time_fired\":\"<t:model_and_name#24>\",\"context\":{\"id\":\"<ulid#13>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"update\",\"entity_id\":\"sensor.phone_kiosk_brightness\",\"changes\":{}},\"origin\":\"LOCAL\",\"time_fired\":\"<t:model_and_name#26>\",\"context\":{\"id\":\"<ulid#14>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"update\",\"entity_id\":\"sensor.phone_location_permission\",\"changes\":{}},\"origin\":\"LOCAL\",\"time_fired\":\"<t:model_and_name#28>\",\"context\":{\"id\":\"<ulid#15>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"update\",\"entity_id\":\"sensor.phone_audio_output\",\"changes\":{}},\"origin\":\"LOCAL\",\"time_fired\":\"<t:model_and_name#30>\",\"context\":{\"id\":\"<ulid#16>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"update\",\"entity_id\":\"sensor.phone_app_version\",\"changes\":{}},\"origin\":\"LOCAL\",\"time_fired\":\"<t:model_and_name#32>\",\"context\":{\"id\":\"<ulid#17>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"update\",\"entity_id\":\"binary_sensor.phone_kiosk_mode\",\"changes\":{}},\"origin\":\"LOCAL\",\"time_fired\":\"<t:model_and_name#34>\",\"context\":{\"id\":\"<ulid#18>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"update\",\"entity_id\":\"sensor.phone_kiosk_volume\",\"changes\":{}},\"origin\":\"LOCAL\",\"time_fired\":\"<t:model_and_name#36>\",\"context\":{\"id\":\"<ulid#19>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"update\",\"entity_id\":\"binary_sensor.phone_camera_motion\",\"changes\":{}},\"origin\":\"LOCAL\",\"time_fired\":\"<t:model_and_name#38>\",\"context\":{\"id\":\"<ulid#20>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"update\",\"entity_id\":\"binary_sensor.phone_kiosk_screensaver\",\"changes\":{}},\"origin\":\"LOCAL\",\"time_fired\":\"<t:model_and_name#40>\",\"context\":{\"id\":\"<ulid#21>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"update\",\"entity_id\":\"sensor.phone_camera_stream\",\"changes\":{}},\"origin\":\"LOCAL\",\"time_fired\":\"<t:model_and_name#42>\",\"context\":{\"id\":\"<ulid#22>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}"
+   ],
+   "final_states": {
+    "binary_sensor.phone_kiosk_mode": {
+     "state": "off",
+     "attributes": {
+      "icon": "mdi:tablet",
+      "friendly_name": " Phone Pro  Phone Kiosk Mode"
+     }
+    },
+    "binary_sensor.phone_kiosk_screensaver": {
+     "state": "off",
+     "attributes": {
+      "icon": "mdi:sleep-off",
+      "friendly_name": " Phone Pro  Phone Kiosk Screensaver"
+     }
+    },
+    "device_tracker.phone": {
+     "state": "unknown",
+     "attributes": {
+      "in_zones": [],
+      "source_type": "gps",
+      "battery_level": 70,
+      "friendly_name": " Phone Pro  Phone"
+     }
+    },
+    "notify.phone": {
+     "state": "unknown",
+     "attributes": {
+      "friendly_name": " Phone Pro",
+      "supported_features": 1
+     }
+    },
+    "sensor.phone_app_version": {
+     "state": "2026.9.0",
+     "attributes": {
+      "icon": "mdi:cellphone",
+      "friendly_name": " Phone Pro  Phone App Version"
+     }
+    },
+    "sensor.phone_audio_output": {
+     "state": "Built-in Speaker",
+     "attributes": {
+      "icon": "mdi:volume-high",
+      "friendly_name": " Phone Pro  Phone Audio Output"
+     }
+    },
+    "sensor.phone_battery_level": {
+     "state": "70",
+     "attributes": {
+      "unit_of_measurement": "%",
+      "device_class": "battery",
+      "icon": "mdi:battery-70",
+      "friendly_name": " Phone Pro  Phone Battery Level"
+     }
+    },
+    "sensor.phone_battery_state": {
+     "state": "Not Charging",
+     "attributes": {
+      "Low Power Mode": false,
+      "icon": "mdi:battery-70",
+      "friendly_name": " Phone Pro  Phone Battery State"
+     }
+    },
+    "sensor.phone_bssid": {
+     "state": "02:00:00:00:00:01",
+     "attributes": {
+      "icon": "mdi:wifi-star",
+      "friendly_name": " Phone Pro  Phone BSSID"
+     }
+    },
+    "sensor.phone_connection_type": {
+     "state": "Wi-Fi",
+     "attributes": {
+      "icon": "mdi:wifi",
+      "friendly_name": " Phone Pro  Phone Connection Type"
+     }
+    },
+    "sensor.phone_geocoded_location": {
+     "state": "Unknown",
+     "attributes": {
+      "icon": "mdi:map",
+      "friendly_name": " Phone Pro  Phone Geocoded Location"
+     }
+    },
+    "sensor.phone_kiosk_brightness": {
+     "state": "unavailable",
+     "attributes": {
+      "icon": "mdi:dots-square",
+      "friendly_name": " Phone Pro  Phone Kiosk Brightness"
+     }
+    },
+    "sensor.phone_kiosk_volume": {
+     "state": "unavailable",
+     "attributes": {
+      "icon": "mdi:dots-square",
+      "friendly_name": " Phone Pro  Phone Kiosk Volume"
+     }
+    },
+    "sensor.phone_last_update_trigger": {
+     "state": "Launch",
+     "attributes": {
+      "icon": "mdi:cellphone-wireless",
+      "friendly_name": " Phone Pro  Phone Last Update Trigger"
+     }
+    },
+    "sensor.phone_location_permission": {
+     "state": "Authorized when in use",
+     "attributes": {
+      "icon": "mdi:map",
+      "friendly_name": " Phone Pro  Phone Location permission"
+     }
+    },
+    "sensor.phone_sim_1": {
+     "state": "--",
+     "attributes": {
+      "Allows VoIP": true,
+      "Carrier ID": "0000000100000001",
+      "Carrier Name": "--",
+      "ISO Country Code": "--",
+      "Mobile Country Code": "65535",
+      "Mobile Network Code": "65535",
+      "icon": "mdi:sim",
+      "friendly_name": " Phone Pro  Phone SIM 1"
+     }
+    },
+    "sensor.phone_sim_2": {
+     "state": "--",
+     "attributes": {
+      "Allows VoIP": true,
+      "Carrier ID": "0000000100000002",
+      "Carrier Name": "--",
+      "Current Radio Technology": "Enhanced Data rates for GSM Evolution (EDGE)",
+      "ISO Country Code": "--",
+      "Mobile Country Code": "65535",
+      "Mobile Network Code": "65535",
+      "icon": "mdi:sim",
+      "friendly_name": " Phone Pro  Phone SIM 2"
+     }
+    },
+    "sensor.phone_ssid": {
+     "state": "FakeSSID",
+     "attributes": {
+      "icon": "mdi:wifi",
+      "friendly_name": " Phone Pro  Phone SSID"
+     }
+    },
+    "sensor.phone_storage": {
+     "state": "21.68",
+     "attributes": {
+      "Available": "38.99 GB",
+      "Available (Important)": "82.71 GB",
+      "Available (Opportunistic)": "55.38 GB",
+      "Total": "255.42 GB",
+      "unit_of_measurement": "% available",
+      "icon": "mdi:database",
+      "friendly_name": " Phone Pro  Phone Storage"
+     }
+    }
+   },
+   "pending_saves": {
+    "core.entity_registry": {
+     "delay_s": 10
+    },
+    "core.device_registry": {
+     "delay_s": 10
+    },
+    "core.config_entries": {
+     "delay_s": 1
+    }
+   },
+   "files_changed": [
+    "core.entity_registry",
+    "core.device_registry",
+    "core.config_entries"
+   ],
+   "file_diffs": {
+    "core.entity_registry": {
+     "entities": {
+      "added": [],
+      "removed": [],
+      "changed": {
+       "00000000000000000000000000000000": {
+        "modified_at": [
+         "2026-07-08T13:35:56.374652+00:00",
+         "<t:model_and_name#3>"
+        ]
+       },
+       "00000000000000000000000000000002": {
+        "modified_at": [
+         "2026-07-08T13:35:56.520017+00:00",
+         "<t:model_and_name#5>"
+        ]
+       },
+       "00000000000000000000000000000003": {
+        "modified_at": [
+         "2026-07-08T13:35:56.524360+00:00",
+         "<t:model_and_name#7>"
+        ]
+       },
+       "00000000000000000000000000000004": {
+        "modified_at": [
+         "2026-07-08T13:35:56.524975+00:00",
+         "<t:model_and_name#9>"
+        ]
+       },
+       "00000000000000000000000000000005": {
+        "modified_at": [
+         "2026-07-08T13:35:56.529336+00:00",
+         "<t:model_and_name#11>"
+        ]
+       },
+       "00000000000000000000000000000006": {
+        "modified_at": [
+         "2026-07-08T13:35:56.529800+00:00",
+         "<t:model_and_name#13>"
+        ]
+       },
+       "00000000000000000000000000000007": {
+        "modified_at": [
+         "2026-07-08T13:35:56.530240+00:00",
+         "<t:model_and_name#15>"
+        ]
+       },
+       "00000000000000000000000000000008": {
+        "modified_at": [
+         "2026-07-08T13:35:56.533911+00:00",
+         "<t:model_and_name#17>"
+        ]
+       },
+       "00000000000000000000000000000009": {
+        "modified_at": [
+         "2026-07-08T13:35:56.536564+00:00",
+         "<t:model_and_name#19>"
+        ]
+       },
+       "0000000000000000000000000000000a": {
+        "modified_at": [
+         "2026-07-08T13:35:56.539720+00:00",
+         "<t:model_and_name#21>"
+        ]
+       },
+       "0000000000000000000000000000000b": {
+        "modified_at": [
+         "2026-07-08T13:35:56.542632+00:00",
+         "<t:model_and_name#23>"
+        ]
+       },
+       "0000000000000000000000000000000c": {
+        "modified_at": [
+         "2026-07-08T13:35:56.549354+00:00",
+         "<t:model_and_name#25>"
+        ]
+       },
+       "0000000000000000000000000000000d": {
+        "modified_at": [
+         "2026-07-08T13:35:56.550888+00:00",
+         "<t:model_and_name#27>"
+        ]
+       },
+       "0000000000000000000000000000000e": {
+        "modified_at": [
+         "2026-07-08T13:35:56.551341+00:00",
+         "<t:model_and_name#29>"
+        ]
+       },
+       "0000000000000000000000000000000f": {
+        "modified_at": [
+         "2026-07-08T13:35:56.552256+00:00",
+         "<t:model_and_name#31>"
+        ]
+       },
+       "00000000000000000000000000000010": {
+        "modified_at": [
+         "2026-07-08T13:35:56.554781+00:00",
+         "<t:model_and_name#33>"
+        ]
+       },
+       "00000000000000000000000000000011": {
+        "modified_at": [
+         "2026-07-08T13:35:56.556339+00:00",
+         "<t:model_and_name#35>"
+        ]
+       },
+       "00000000000000000000000000000012": {
+        "modified_at": [
+         "2026-09-15T21:13:49.097059+00:00",
+         "<t:model_and_name#37>"
+        ]
+       },
+       "00000000000000000000000000000013": {
+        "modified_at": [
+         "2026-09-15T21:13:49.108532+00:00",
+         "<t:model_and_name#39>"
+        ]
+       },
+       "00000000000000000000000000000014": {
+        "modified_at": [
+         "2026-09-15T21:13:49.118147+00:00",
+         "<t:model_and_name#41>"
+        ]
+       }
+      }
+     },
+     "deleted_entities": {
+      "added": [],
+      "removed": [],
+      "changed": {}
+     }
+    },
+    "core.device_registry": {
+     "devices": {
+      "added": [],
+      "removed": [],
+      "changed": {
+       "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0": {
+        "model": [
+         "iPhone17,1",
+         "iPhone18,1"
+        ],
+        "modified_at": [
+         "<t:os_and_app_version#1>",
+         "<t:model_and_name#1>"
+        ],
+        "name": [
+         " Phone",
+         " Phone Pro"
+        ]
+       }
+      }
+     },
+     "deleted_devices": {
+      "added": [],
+      "removed": [],
+      "changed": {}
+     }
+    },
+    "core.config_entries": {
+     "entries": {
+      "added": [],
+      "removed": [],
+      "changed": {
+       "01JFAKEMOBILEAPPENTRY00000": {
+        "data": [
+         {
+          "app_data": {
+           "push_token": "fake-push-token",
+           "push_url": "https://mobile-apps.home-assistant.io/api/sendPushNotification",
+           "start_live_activity_token": "abababababababab"
+          },
+          "app_id": "io.robbie.HomeAssistant",
+          "app_name": "Home Assistant",
+          "app_version": "2026.9.1 (2026.2900)",
+          "device_id": "11111111-2222-4333-8444-555555555555",
+          "device_name": " Phone",
+          "manufacturer": "Apple",
+          "model": "iPhone17,1",
+          "no_legacy_encryption": true,
+          "os_name": "iOS",
+          "os_version": "27.0.1",
+          "secret": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+          "supports_encryption": true,
+          "user_id": "00112233445566778899aabbccddeeff",
+          "webhook_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f"
+         },
+         {
+          "app_data": {
+           "push_token": "fake-push-token",
+           "push_url": "https://mobile-apps.home-assistant.io/api/sendPushNotification",
+           "start_live_activity_token": "abababababababab"
+          },
+          "app_id": "io.robbie.HomeAssistant",
+          "app_name": "Home Assistant",
+          "app_version": "2026.9.1 (2026.2900)",
+          "device_id": "11111111-2222-4333-8444-555555555555",
+          "device_name": " Phone Pro",
+          "manufacturer": "Apple",
+          "model": "iPhone18,1",
+          "no_legacy_encryption": true,
+          "os_name": "iOS",
+          "os_version": "27.0.1",
+          "secret": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+          "supports_encryption": true,
+          "user_id": "00112233445566778899aabbccddeeff",
+          "webhook_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f"
+         }
+        ],
+        "modified_at": [
+         "<t:os_and_app_version#3>",
+         "<t:model_and_name#43>"
+        ]
+       }
+      }
+     }
+    }
+   },
+   "file_modes": {
+    "core.entity_registry": "0o644",
+    "core.device_registry": "0o644",
+    "core.config_entries": "0o644"
+   },
+   "device": [
+    {
+     "id": "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0",
+     "identifiers": [
+      [
+       "mobile_app",
+       "11111111-2222-4333-8444-555555555555"
+      ]
+     ],
+     "name": " Phone Pro",
+     "manufacturer": "Apple",
+     "model": "iPhone18,1",
+     "sw_version": "27.0.1",
+     "config_entries": [
+      "01JFAKEMOBILEAPPENTRY00000"
+     ]
+    }
+   ],
+   "entity_names_after": {
+    "device_tracker.phone": " Phone",
+    "sensor.phone_battery_level": " Phone Battery Level"
+   },
+   "friendly_name_after": " Phone Pro  Phone Battery Level",
+   "device_registry_list_phone": [
+    {
+     "area_id": null,
+     "configuration_url": null,
+     "config_entries": [
+      "01JFAKEMOBILEAPPENTRY00000"
+     ],
+     "config_entries_subentries": {
+      "01JFAKEMOBILEAPPENTRY00000": [
+       null
+      ]
+     },
+     "connections": [],
+     "created_at": 1783517756.37332,
+     "disabled_by": null,
+     "entry_type": null,
+     "hw_version": null,
+     "id": "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0",
+     "identifiers": [
+      [
+       "mobile_app",
+       "11111111-2222-4333-8444-555555555555"
+      ]
+     ],
+     "labels": [],
+     "manufacturer": "Apple",
+     "model": "iPhone18,1",
+     "model_id": null,
+     "modified_at": "<ts:model_and_name#1>",
+     "name_by_user": null,
+     "name": " Phone Pro",
+     "primary_config_entry": "01JFAKEMOBILEAPPENTRY00000",
+     "serial_number": null,
+     "sw_version": "27.0.1",
+     "via_device_id": null
+    }
+   ],
+   "list_for_display_phone_battery": [
+    {
+     "ei": "sensor.phone_battery_level",
+     "pl": "mobile_app",
+     "lb": [],
+     "di": "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0",
+     "en": " Phone Battery Level"
+    }
+   ]
+  }
+ ]
+}

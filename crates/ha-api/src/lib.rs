@@ -48,8 +48,8 @@ pub struct ApiConfig {
     pub frontend_data: Arc<FrontendData>,
     /// Home Assistant Labs' preview features.
     pub labs: Arc<Labs>,
-    /// Entity, device, area, floor and label registries.
-    pub registries: Arc<ha_registry::Registries>,
+    /// Entity, device, area, floor and label registries, as they change.
+    pub registry: Option<Arc<ha_registry::Registry>>,
     /// Lovelace dashboards.
     pub lovelace: Arc<Lovelace>,
     /// Stored zones and people.
@@ -64,6 +64,16 @@ pub struct ApiConfig {
     pub automations: Option<ha_automation::Automations>,
     /// The companion apps' registrations (`mobile_app`).
     pub mobile_app: Option<Arc<ha_integrations::mobile_app::MobileApp>>,
+}
+
+impl ApiConfig {
+    /// The registries as they are now (empty without a registry).
+    pub fn registries(&self) -> Arc<ha_registry::Registries> {
+        self.registry
+            .as_ref()
+            .map(|r| r.snapshot())
+            .unwrap_or_default()
+    }
 }
 
 /// What the WebSocket and `/api/config` need.

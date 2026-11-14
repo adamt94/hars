@@ -8,6 +8,9 @@
 //! versions) take HA's defaults. The `*_json` methods give the WebSocket
 //! shapes the frontend reads.
 
+mod live;
+pub use live::{DeviceInfo, EntityPatch, Registry, available_entity_id};
+
 use ha_core::storage::{Store, StoreError};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};

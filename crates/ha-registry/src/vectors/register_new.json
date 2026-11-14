@@ -1,0 +1,835 @@
+{
+ "scenario": "register_new",
+ "steps": [
+  {
+   "step": "boot",
+   "pending_saves_after_boot": {
+    "core.entity_registry": {
+     "delay_s": 180
+    }
+   },
+   "what_the_boot_save_changed_vs_fixture": {
+    "core.entity_registry": {
+     "entities": {
+      "added": [
+       {
+        "aliases": [],
+        "aliases_v2": [
+         null
+        ],
+        "area_id": null,
+        "categories": {},
+        "capabilities": null,
+        "config_entry_id": null,
+        "config_subentry_id": null,
+        "created_at": "<t:boot#1>",
+        "device_class": null,
+        "device_id": null,
+        "disabled_by": null,
+        "entity_category": null,
+        "entity_id": "person.adam",
+        "hidden_by": null,
+        "icon": null,
+        "id": "<uuid#1>",
+        "has_entity_name": false,
+        "labels": [],
+        "modified_at": "<t:boot#2>",
+        "name": null,
+        "object_id_base": "adam",
+        "options": {},
+        "original_device_class": null,
+        "original_icon": null,
+        "original_name": "adam",
+        "platform": "person",
+        "suggested_object_id": null,
+        "supported_features": 0,
+        "translation_key": null,
+        "unique_id": "adam",
+        "previous_unique_id": null,
+        "unit_of_measurement": null
+       }
+      ],
+      "removed": [],
+      "changed": {}
+     },
+     "deleted_entities": {
+      "added": [],
+      "removed": [],
+      "changed": {}
+     }
+    }
+   }
+  },
+  {
+   "step": "register_7_new_sensors",
+   "note": "sensor.phone_ghost exists as a state only (hass.states.async_set) before the step",
+   "result": {
+    "type": "register_sensor x7",
+    "status": null,
+    "decrypted": null,
+    "replies": {
+     "steps": {
+      "status": 201,
+      "decrypted": "{\"success\":true}"
+     },
+     "pressure": {
+      "status": 201,
+      "decrypted": "{\"success\":true}"
+     },
+     "focus": {
+      "status": 201,
+      "decrypted": "{\"success\":true}"
+     },
+     "activity": {
+      "status": 201,
+      "decrypted": "{\"success\":true}"
+     },
+     "battery_level_2": {
+      "status": 201,
+      "decrypted": "{\"success\":true}"
+     },
+     "ghost": {
+      "status": 201,
+      "decrypted": "{\"success\":true}"
+     },
+     "noname": {
+      "status": 201,
+      "decrypted": "{\"success\":true}"
+     }
+    }
+   },
+   "config_entry_signals_ws": [],
+   "ws_event_frames": [
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"create\",\"entity_id\":\"sensor.phone_steps\"},\"origin\":\"LOCAL\",\"time_fired\":\"<t:register_7_new_sensors#3>\",\"context\":{\"id\":\"<ulid#1>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"create\",\"entity_id\":\"sensor.phone_pressure\"},\"origin\":\"LOCAL\",\"time_fired\":\"<t:register_7_new_sensors#5>\",\"context\":{\"id\":\"<ulid#2>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"update\",\"entity_id\":\"sensor.phone_pressure\",\"changes\":{\"options\":{}}},\"origin\":\"LOCAL\",\"time_fired\":\"<t:register_7_new_sensors#7>\",\"context\":{\"id\":\"<ulid#3>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"create\",\"entity_id\":\"binary_sensor.phone_focus\"},\"origin\":\"LOCAL\",\"time_fired\":\"<t:register_7_new_sensors#10>\",\"context\":{\"id\":\"<ulid#4>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"create\",\"entity_id\":\"sensor.phone_activity\"},\"origin\":\"LOCAL\",\"time_fired\":\"<t:register_7_new_sensors#13>\",\"context\":{\"id\":\"<ulid#5>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"create\",\"entity_id\":\"sensor.phone_battery_level_2\"},\"origin\":\"LOCAL\",\"time_fired\":\"<t:register_7_new_sensors#16>\",\"context\":{\"id\":\"<ulid#6>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"create\",\"entity_id\":\"sensor.phone_ghost_2\"},\"origin\":\"LOCAL\",\"time_fired\":\"<t:register_7_new_sensors#19>\",\"context\":{\"id\":\"<ulid#7>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"create\",\"entity_id\":\"sensor.phone\"},\"origin\":\"LOCAL\",\"time_fired\":\"<t:register_7_new_sensors#22>\",\"context\":{\"id\":\"<ulid#8>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}"
+   ],
+   "final_states": {
+    "binary_sensor.phone_focus": {
+     "state": "on",
+     "attributes": {
+      "icon": "mdi:moon-waning-crescent",
+      "friendly_name": " Phone Focus"
+     }
+    },
+    "sensor.phone": {
+     "state": "x",
+     "attributes": {
+      "icon": "mdi:cellphone",
+      "friendly_name": " Phone"
+     }
+    },
+    "sensor.phone_battery_level_2": {
+     "state": "5",
+     "attributes": {
+      "unit_of_measurement": "%",
+      "device_class": "battery",
+      "icon": "mdi:cellphone",
+      "friendly_name": " Phone Battery Level"
+     }
+    },
+    "sensor.phone_ghost_2": {
+     "state": "boo",
+     "attributes": {
+      "icon": "mdi:cellphone",
+      "friendly_name": " Phone Ghost"
+     }
+    },
+    "sensor.phone_pressure": {
+     "state": "101.3",
+     "attributes": {
+      "state_class": "measurement",
+      "unit_of_measurement": "kPa",
+      "device_class": "pressure",
+      "icon": "mdi:gauge",
+      "friendly_name": " Phone Pressure"
+     }
+    },
+    "sensor.phone_steps": {
+     "state": "1234",
+     "attributes": {
+      "state_class": "total_increasing",
+      "unit_of_measurement": "steps",
+      "icon": "mdi:walk",
+      "friendly_name": " Phone Steps"
+     }
+    }
+   },
+   "pending_saves": {
+    "core.entity_registry": {
+     "delay_s": 10
+    }
+   },
+   "files_changed": [
+    "core.entity_registry"
+   ],
+   "file_diffs": {
+    "core.entity_registry": {
+     "entities": {
+      "added": [
+       {
+        "aliases": [],
+        "aliases_v2": [
+         null
+        ],
+        "area_id": null,
+        "categories": {},
+        "capabilities": {
+         "state_class": "total_increasing"
+        },
+        "config_entry_id": "01JFAKEMOBILEAPPENTRY00000",
+        "config_subentry_id": null,
+        "created_at": "<t:register_7_new_sensors#1>",
+        "device_class": null,
+        "device_id": "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0",
+        "disabled_by": null,
+        "entity_category": null,
+        "entity_id": "sensor.phone_steps",
+        "hidden_by": null,
+        "icon": null,
+        "id": "<uuid#2>",
+        "has_entity_name": false,
+        "labels": [],
+        "modified_at": "<t:register_7_new_sensors#2>",
+        "name": null,
+        "object_id_base": " Phone Steps",
+        "options": {},
+        "original_device_class": null,
+        "original_icon": "mdi:walk",
+        "original_name": " Phone Steps",
+        "platform": "mobile_app",
+        "suggested_object_id": null,
+        "supported_features": 0,
+        "translation_key": null,
+        "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_steps",
+        "previous_unique_id": null,
+        "unit_of_measurement": "steps"
+       },
+       {
+        "aliases": [],
+        "aliases_v2": [
+         null
+        ],
+        "area_id": null,
+        "categories": {},
+        "capabilities": {
+         "state_class": "measurement"
+        },
+        "config_entry_id": "01JFAKEMOBILEAPPENTRY00000",
+        "config_subentry_id": null,
+        "created_at": "<t:register_7_new_sensors#4>",
+        "device_class": null,
+        "device_id": "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0",
+        "disabled_by": null,
+        "entity_category": "diagnostic",
+        "entity_id": "sensor.phone_pressure",
+        "hidden_by": null,
+        "icon": null,
+        "id": "<uuid#3>",
+        "has_entity_name": false,
+        "labels": [],
+        "modified_at": "<t:register_7_new_sensors#6>",
+        "name": null,
+        "object_id_base": " Phone Pressure",
+        "options": {
+         "sensor": {
+          "suggested_display_precision": 2
+         }
+        },
+        "original_device_class": "pressure",
+        "original_icon": "mdi:gauge",
+        "original_name": " Phone Pressure",
+        "platform": "mobile_app",
+        "suggested_object_id": null,
+        "supported_features": 0,
+        "translation_key": null,
+        "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_pressure",
+        "previous_unique_id": null,
+        "unit_of_measurement": "kPa"
+       },
+       {
+        "aliases": [],
+        "aliases_v2": [
+         null
+        ],
+        "area_id": null,
+        "categories": {},
+        "capabilities": null,
+        "config_entry_id": "01JFAKEMOBILEAPPENTRY00000",
+        "config_subentry_id": null,
+        "created_at": "<t:register_7_new_sensors#8>",
+        "device_class": null,
+        "device_id": "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0",
+        "disabled_by": null,
+        "entity_category": null,
+        "entity_id": "binary_sensor.phone_focus",
+        "hidden_by": null,
+        "icon": null,
+        "id": "<uuid#4>",
+        "has_entity_name": false,
+        "labels": [],
+        "modified_at": "<t:register_7_new_sensors#9>",
+        "name": null,
+        "object_id_base": " Phone Focus",
+        "options": {},
+        "original_device_class": null,
+        "original_icon": "mdi:moon-waning-crescent",
+        "original_name": " Phone Focus",
+        "platform": "mobile_app",
+        "suggested_object_id": null,
+        "supported_features": 0,
+        "translation_key": null,
+        "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_focus",
+        "previous_unique_id": null,
+        "unit_of_measurement": null
+       },
+       {
+        "aliases": [],
+        "aliases_v2": [
+         null
+        ],
+        "area_id": null,
+        "categories": {},
+        "capabilities": null,
+        "config_entry_id": "01JFAKEMOBILEAPPENTRY00000",
+        "config_subentry_id": null,
+        "created_at": "<t:register_7_new_sensors#11>",
+        "device_class": null,
+        "device_id": "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0",
+        "disabled_by": "integration",
+        "entity_category": null,
+        "entity_id": "sensor.phone_activity",
+        "hidden_by": null,
+        "icon": null,
+        "id": "<uuid#5>",
+        "has_entity_name": false,
+        "labels": [],
+        "modified_at": "<t:register_7_new_sensors#12>",
+        "name": null,
+        "object_id_base": " Phone Activity",
+        "options": {},
+        "original_device_class": null,
+        "original_icon": "mdi:walk",
+        "original_name": " Phone Activity",
+        "platform": "mobile_app",
+        "suggested_object_id": null,
+        "supported_features": 0,
+        "translation_key": null,
+        "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_activity",
+        "previous_unique_id": null,
+        "unit_of_measurement": null
+       },
+       {
+        "aliases": [],
+        "aliases_v2": [
+         null
+        ],
+        "area_id": null,
+        "categories": {},
+        "capabilities": null,
+        "config_entry_id": "01JFAKEMOBILEAPPENTRY00000",
+        "config_subentry_id": null,
+        "created_at": "<t:register_7_new_sensors#14>",
+        "device_class": null,
+        "device_id": "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0",
+        "disabled_by": null,
+        "entity_category": null,
+        "entity_id": "sensor.phone_battery_level_2",
+        "hidden_by": null,
+        "icon": null,
+        "id": "<uuid#6>",
+        "has_entity_name": false,
+        "labels": [],
+        "modified_at": "<t:register_7_new_sensors#15>",
+        "name": null,
+        "object_id_base": " Phone Battery Level",
+        "options": {},
+        "original_device_class": "battery",
+        "original_icon": "mdi:cellphone",
+        "original_name": " Phone Battery Level",
+        "platform": "mobile_app",
+        "suggested_object_id": null,
+        "supported_features": 0,
+        "translation_key": null,
+        "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_battery_level_2",
+        "previous_unique_id": null,
+        "unit_of_measurement": "%"
+       },
+       {
+        "aliases": [],
+        "aliases_v2": [
+         null
+        ],
+        "area_id": null,
+        "categories": {},
+        "capabilities": null,
+        "config_entry_id": "01JFAKEMOBILEAPPENTRY00000",
+        "config_subentry_id": null,
+        "created_at": "<t:register_7_new_sensors#17>",
+        "device_class": null,
+        "device_id": "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0",
+        "disabled_by": null,
+        "entity_category": null,
+        "entity_id": "sensor.phone_ghost_2",
+        "hidden_by": null,
+        "icon": null,
+        "id": "<uuid#7>",
+        "has_entity_name": false,
+        "labels": [],
+        "modified_at": "<t:register_7_new_sensors#18>",
+        "name": null,
+        "object_id_base": " Phone Ghost",
+        "options": {},
+        "original_device_class": null,
+        "original_icon": "mdi:cellphone",
+        "original_name": " Phone Ghost",
+        "platform": "mobile_app",
+        "suggested_object_id": null,
+        "supported_features": 0,
+        "translation_key": null,
+        "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_ghost",
+        "previous_unique_id": null,
+        "unit_of_measurement": null
+       },
+       {
+        "aliases": [],
+        "aliases_v2": [
+         null
+        ],
+        "area_id": null,
+        "categories": {},
+        "capabilities": null,
+        "config_entry_id": "01JFAKEMOBILEAPPENTRY00000",
+        "config_subentry_id": null,
+        "created_at": "<t:register_7_new_sensors#20>",
+        "device_class": null,
+        "device_id": "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0",
+        "disabled_by": null,
+        "entity_category": null,
+        "entity_id": "sensor.phone",
+        "hidden_by": null,
+        "icon": null,
+        "id": "<uuid#8>",
+        "has_entity_name": false,
+        "labels": [],
+        "modified_at": "<t:register_7_new_sensors#21>",
+        "name": null,
+        "object_id_base": " Phone ",
+        "options": {},
+        "original_device_class": null,
+        "original_icon": "mdi:cellphone",
+        "original_name": " Phone ",
+        "platform": "mobile_app",
+        "suggested_object_id": null,
+        "supported_features": 0,
+        "translation_key": null,
+        "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_noname",
+        "previous_unique_id": null,
+        "unit_of_measurement": null
+       }
+      ],
+      "removed": [],
+      "changed": {}
+     },
+     "deleted_entities": {
+      "added": [],
+      "removed": [],
+      "changed": {}
+     }
+    },
+    "core.device_registry": {
+     "devices": {
+      "added": [],
+      "removed": [],
+      "changed": {}
+     },
+     "deleted_devices": {
+      "added": [],
+      "removed": [],
+      "changed": {}
+     }
+    },
+    "core.config_entries": {
+     "entries": {
+      "added": [],
+      "removed": [],
+      "changed": {}
+     }
+    }
+   },
+   "file_modes": {
+    "core.entity_registry": "0o644",
+    "core.device_registry": "0o644",
+    "core.config_entries": "0o644"
+   },
+   "rows": {
+    "sensor.phone_steps": {
+     "aliases": [],
+     "aliases_v2": [
+      null
+     ],
+     "area_id": null,
+     "categories": {},
+     "capabilities": {
+      "state_class": "total_increasing"
+     },
+     "config_entry_id": "01JFAKEMOBILEAPPENTRY00000",
+     "config_subentry_id": null,
+     "created_at": "<t:register_7_new_sensors#1>",
+     "device_class": null,
+     "device_id": "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0",
+     "disabled_by": null,
+     "entity_category": null,
+     "entity_id": "sensor.phone_steps",
+     "hidden_by": null,
+     "icon": null,
+     "id": "<uuid#2>",
+     "has_entity_name": false,
+     "labels": [],
+     "modified_at": "<t:register_7_new_sensors#2>",
+     "name": null,
+     "object_id_base": " Phone Steps",
+     "options": {},
+     "original_device_class": null,
+     "original_icon": "mdi:walk",
+     "original_name": " Phone Steps",
+     "platform": "mobile_app",
+     "suggested_object_id": null,
+     "supported_features": 0,
+     "translation_key": null,
+     "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_steps",
+     "previous_unique_id": null,
+     "unit_of_measurement": "steps"
+    },
+    "sensor.phone_pressure": {
+     "aliases": [],
+     "aliases_v2": [
+      null
+     ],
+     "area_id": null,
+     "categories": {},
+     "capabilities": {
+      "state_class": "measurement"
+     },
+     "config_entry_id": "01JFAKEMOBILEAPPENTRY00000",
+     "config_subentry_id": null,
+     "created_at": "<t:register_7_new_sensors#4>",
+     "device_class": null,
+     "device_id": "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0",
+     "disabled_by": null,
+     "entity_category": "diagnostic",
+     "entity_id": "sensor.phone_pressure",
+     "hidden_by": null,
+     "icon": null,
+     "id": "<uuid#3>",
+     "has_entity_name": false,
+     "labels": [],
+     "modified_at": "<t:register_7_new_sensors#6>",
+     "name": null,
+     "object_id_base": " Phone Pressure",
+     "options": {
+      "sensor": {
+       "suggested_display_precision": 2
+      }
+     },
+     "original_device_class": "pressure",
+     "original_icon": "mdi:gauge",
+     "original_name": " Phone Pressure",
+     "platform": "mobile_app",
+     "suggested_object_id": null,
+     "supported_features": 0,
+     "translation_key": null,
+     "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_pressure",
+     "previous_unique_id": null,
+     "unit_of_measurement": "kPa"
+    },
+    "binary_sensor.phone_focus": {
+     "aliases": [],
+     "aliases_v2": [
+      null
+     ],
+     "area_id": null,
+     "categories": {},
+     "capabilities": null,
+     "config_entry_id": "01JFAKEMOBILEAPPENTRY00000",
+     "config_subentry_id": null,
+     "created_at": "<t:register_7_new_sensors#8>",
+     "device_class": null,
+     "device_id": "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0",
+     "disabled_by": null,
+     "entity_category": null,
+     "entity_id": "binary_sensor.phone_focus",
+     "hidden_by": null,
+     "icon": null,
+     "id": "<uuid#4>",
+     "has_entity_name": false,
+     "labels": [],
+     "modified_at": "<t:register_7_new_sensors#9>",
+     "name": null,
+     "object_id_base": " Phone Focus",
+     "options": {},
+     "original_device_class": null,
+     "original_icon": "mdi:moon-waning-crescent",
+     "original_name": " Phone Focus",
+     "platform": "mobile_app",
+     "suggested_object_id": null,
+     "supported_features": 0,
+     "translation_key": null,
+     "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_focus",
+     "previous_unique_id": null,
+     "unit_of_measurement": null
+    },
+    "sensor.phone_activity": {
+     "aliases": [],
+     "aliases_v2": [
+      null
+     ],
+     "area_id": null,
+     "categories": {},
+     "capabilities": null,
+     "config_entry_id": "01JFAKEMOBILEAPPENTRY00000",
+     "config_subentry_id": null,
+     "created_at": "<t:register_7_new_sensors#11>",
+     "device_class": null,
+     "device_id": "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0",
+     "disabled_by": "integration",
+     "entity_category": null,
+     "entity_id": "sensor.phone_activity",
+     "hidden_by": null,
+     "icon": null,
+     "id": "<uuid#5>",
+     "has_entity_name": false,
+     "labels": [],
+     "modified_at": "<t:register_7_new_sensors#12>",
+     "name": null,
+     "object_id_base": " Phone Activity",
+     "options": {},
+     "original_device_class": null,
+     "original_icon": "mdi:walk",
+     "original_name": " Phone Activity",
+     "platform": "mobile_app",
+     "suggested_object_id": null,
+     "supported_features": 0,
+     "translation_key": null,
+     "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_activity",
+     "previous_unique_id": null,
+     "unit_of_measurement": null
+    },
+    "sensor.phone_battery_level_2": {
+     "aliases": [],
+     "aliases_v2": [
+      null
+     ],
+     "area_id": null,
+     "categories": {},
+     "capabilities": null,
+     "config_entry_id": "01JFAKEMOBILEAPPENTRY00000",
+     "config_subentry_id": null,
+     "created_at": "<t:register_7_new_sensors#14>",
+     "device_class": null,
+     "device_id": "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0",
+     "disabled_by": null,
+     "entity_category": null,
+     "entity_id": "sensor.phone_battery_level_2",
+     "hidden_by": null,
+     "icon": null,
+     "id": "<uuid#6>",
+     "has_entity_name": false,
+     "labels": [],
+     "modified_at": "<t:register_7_new_sensors#15>",
+     "name": null,
+     "object_id_base": " Phone Battery Level",
+     "options": {},
+     "original_device_class": "battery",
+     "original_icon": "mdi:cellphone",
+     "original_name": " Phone Battery Level",
+     "platform": "mobile_app",
+     "suggested_object_id": null,
+     "supported_features": 0,
+     "translation_key": null,
+     "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_battery_level_2",
+     "previous_unique_id": null,
+     "unit_of_measurement": "%"
+    },
+    "sensor.phone_ghost_2": {
+     "aliases": [],
+     "aliases_v2": [
+      null
+     ],
+     "area_id": null,
+     "categories": {},
+     "capabilities": null,
+     "config_entry_id": "01JFAKEMOBILEAPPENTRY00000",
+     "config_subentry_id": null,
+     "created_at": "<t:register_7_new_sensors#17>",
+     "device_class": null,
+     "device_id": "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0",
+     "disabled_by": null,
+     "entity_category": null,
+     "entity_id": "sensor.phone_ghost_2",
+     "hidden_by": null,
+     "icon": null,
+     "id": "<uuid#7>",
+     "has_entity_name": false,
+     "labels": [],
+     "modified_at": "<t:register_7_new_sensors#18>",
+     "name": null,
+     "object_id_base": " Phone Ghost",
+     "options": {},
+     "original_device_class": null,
+     "original_icon": "mdi:cellphone",
+     "original_name": " Phone Ghost",
+     "platform": "mobile_app",
+     "suggested_object_id": null,
+     "supported_features": 0,
+     "translation_key": null,
+     "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_ghost",
+     "previous_unique_id": null,
+     "unit_of_measurement": null
+    },
+    "sensor.phone": {
+     "aliases": [],
+     "aliases_v2": [
+      null
+     ],
+     "area_id": null,
+     "categories": {},
+     "capabilities": null,
+     "config_entry_id": "01JFAKEMOBILEAPPENTRY00000",
+     "config_subentry_id": null,
+     "created_at": "<t:register_7_new_sensors#20>",
+     "device_class": null,
+     "device_id": "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0",
+     "disabled_by": null,
+     "entity_category": null,
+     "entity_id": "sensor.phone",
+     "hidden_by": null,
+     "icon": null,
+     "id": "<uuid#8>",
+     "has_entity_name": false,
+     "labels": [],
+     "modified_at": "<t:register_7_new_sensors#21>",
+     "name": null,
+     "object_id_base": " Phone ",
+     "options": {},
+     "original_device_class": null,
+     "original_icon": "mdi:cellphone",
+     "original_name": " Phone ",
+     "platform": "mobile_app",
+     "suggested_object_id": null,
+     "supported_features": 0,
+     "translation_key": null,
+     "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_noname",
+     "previous_unique_id": null,
+     "unit_of_measurement": null
+    }
+   },
+   "states_after": {
+    "binary_sensor.phone_focus": {
+     "state": "on",
+     "attributes": {
+      "icon": "mdi:moon-waning-crescent",
+      "friendly_name": " Phone Focus"
+     }
+    },
+    "sensor.phone": {
+     "state": "x",
+     "attributes": {
+      "icon": "mdi:cellphone",
+      "friendly_name": " Phone"
+     }
+    },
+    "sensor.phone_battery_level_2": {
+     "state": "5",
+     "attributes": {
+      "unit_of_measurement": "%",
+      "device_class": "battery",
+      "icon": "mdi:cellphone",
+      "friendly_name": " Phone Battery Level"
+     }
+    },
+    "sensor.phone_ghost_2": {
+     "state": "boo",
+     "attributes": {
+      "icon": "mdi:cellphone",
+      "friendly_name": " Phone Ghost"
+     }
+    },
+    "sensor.phone_pressure": {
+     "state": "101.3",
+     "attributes": {
+      "state_class": "measurement",
+      "unit_of_measurement": "kPa",
+      "device_class": "pressure",
+      "icon": "mdi:gauge",
+      "friendly_name": " Phone Pressure"
+     }
+    },
+    "sensor.phone_steps": {
+     "state": "1234",
+     "attributes": {
+      "state_class": "total_increasing",
+      "unit_of_measurement": "steps",
+      "icon": "mdi:walk",
+      "friendly_name": " Phone Steps"
+     }
+    }
+   },
+   "list_for_display_new_rows": [
+    {
+     "ei": "sensor.phone_steps",
+     "pl": "mobile_app",
+     "lb": [],
+     "di": "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0",
+     "en": "Steps"
+    },
+    {
+     "ei": "sensor.phone_pressure",
+     "pl": "mobile_app",
+     "lb": [],
+     "di": "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0",
+     "ec": 1,
+     "en": "Pressure",
+     "dp": 2
+    },
+    {
+     "ei": "binary_sensor.phone_focus",
+     "pl": "mobile_app",
+     "lb": [],
+     "di": "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0",
+     "en": "Focus"
+    },
+    {
+     "ei": "sensor.phone_battery_level_2",
+     "pl": "mobile_app",
+     "lb": [],
+     "di": "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0",
+     "en": "Battery Level"
+    },
+    {
+     "ei": "sensor.phone_ghost_2",
+     "pl": "mobile_app",
+     "lb": [],
+     "di": "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0",
+     "en": "Ghost"
+    },
+    {
+     "ei": "sensor.phone",
+     "pl": "mobile_app",
+     "lb": [],
+     "di": "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0",
+     "en": ""
+    }
+   ],
+   "list_for_display_entity_categories": {
+    "0": "config",
+    "1": "diagnostic"
+   }
+  }
+ ]
+}
