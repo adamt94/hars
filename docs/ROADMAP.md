@@ -209,7 +209,12 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
       (`scripts/gen-i18n.py` from HA's wheel), compiled in as ready-made JSON
       pieces, so an answer is joined, not parsed. Other languages get
       English, HA's fallback
-- [ ] `manifest/list`, `brands/access_token`, other languages
+- [x] Labs: `labs/list`, `labs/subscribe`, `labs/update` (admin) with HA's
+      generated preview features, `.storage/core.labs` (imported), and
+      `labs_updated`; `system_log.write`/`clear` (the frontend reports its
+      errors there; they go to the log)
+- [ ] `manifest/list`, `brands/access_token` (proxied brand images),
+      `system_log/list`, other languages
 - [x] WS registries: `config/entity_registry/list_for_display` (HA's display
       keys, legacy device-name prefix stripping),
       `config/{device,area,floor,label}_registry/list`

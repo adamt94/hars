@@ -5,14 +5,17 @@ mod auth;
 mod frontend;
 mod frontend_data;
 mod i18n;
+mod labs;
 #[rustfmt::skip]
 mod i18n_data;
 mod lovelace;
 mod rest;
+pub mod system_log;
 mod ws;
 
 pub use frontend::Frontend;
 pub use frontend_data::FrontendData;
+pub use labs::Labs;
 pub use lovelace::Lovelace;
 
 use axum::{
@@ -37,6 +40,8 @@ pub struct ApiConfig {
     pub config_source: ConfigSource,
     /// The frontend's per-user and system settings.
     pub frontend_data: Arc<FrontendData>,
+    /// Home Assistant Labs' preview features.
+    pub labs: Arc<Labs>,
     /// Entity, device, area, floor and label registries.
     pub registries: Arc<ha_registry::Registries>,
     /// Lovelace dashboards.
@@ -65,6 +70,7 @@ pub(crate) fn components(config: &ApiConfig) -> Vec<&'static str> {
         "api",
         "auth",
         "http",
+        "labs",
         "lovelace",
         "onboarding",
         "persistent_notification",

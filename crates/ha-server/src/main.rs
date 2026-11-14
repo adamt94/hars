@@ -99,6 +99,7 @@ async fn run(thp_disabled: std::io::Result<bool>) -> anyhow::Result<()> {
         let dir = config_dir.clone();
         tokio::task::spawn_blocking(move || ha_integrations::load_entries(&dir)).await?
     };
+    ha_api::system_log::register(&hass);
     let started = ha_integrations::start(&hass, api_config.registries.clone(), entries.as_deref());
     api_config.integrations = started.running;
     api_config.weather = started.weather;
@@ -113,6 +114,10 @@ async fn run(thp_disabled: std::io::Result<bool>) -> anyhow::Result<()> {
         std::sync::Arc::new(
             tokio::task::spawn_blocking(move || ha_api::FrontendData::load(&dir)).await?,
         )
+    };
+    api_config.labs = {
+        let dir = config_dir.clone();
+        std::sync::Arc::new(tokio::task::spawn_blocking(move || ha_api::Labs::load(&dir)).await?)
     };
     api_config.config_dir = std::path::absolute(&config_dir)?.display().to_string();
     api_config.config_source = config_source;

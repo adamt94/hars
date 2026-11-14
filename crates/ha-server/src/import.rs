@@ -33,6 +33,7 @@ const STORES: &[(&str, bool)] = &[
     ("frontend.system_data", false),
     // Integrations' settings (hosts, keys, tokens): owner-only, as in HA.
     ("core.config_entries", true),
+    ("core.labs", true),
     (ha_registry::ENTITY_KEY, false),
     (ha_registry::DEVICE_KEY, false),
     (ha_registry::AREA_KEY, false),

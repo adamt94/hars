@@ -1209,3 +1209,51 @@ async fn translations_and_icons_come_from_has_files() {
         .await;
     assert_eq!(r["error"]["code"], "invalid_format");
 }
+
+#[tokio::test]
+async fn labs_features_list_subscribe_and_update() {
+    let s = server().await;
+    let mut c = Client::authed(&s, &token(&s.auth).0).await;
+    // Only features of loaded integrations (`frontend` isn't loaded here).
+    let r = c.call(json!({"id": 2, "type": "labs/list"})).await;
+    assert_eq!(r["result"], json!({"features": []}));
+
+    let r = c
+        .call(json!({"id": 3, "type": "labs/subscribe", "domain": "frontend", "preview_feature": "nope"}))
+        .await;
+    assert_eq!(
+        r["error"],
+        json!({"code": "not_found", "message": "Preview feature frontend.nope not found"})
+    );
+    let r = c
+        .call(json!({"id": 4, "type": "labs/subscribe", "domain": "frontend", "preview_feature": "winter_mode"}))
+        .await;
+    assert_eq!(r["success"], true);
+    let ev = c.recv().await;
+    assert_eq!(ev["event"]["enabled"], false);
+    assert_eq!(ev["event"]["preview_feature"], "winter_mode");
+
+    let r = c
+        .call(json!({"id": 5, "type": "labs/update", "domain": "frontend", "preview_feature": "winter_mode", "enabled": true, "create_backup": true}))
+        .await;
+    assert_eq!(r["error"]["code"], "unknown_error");
+    let r = c
+        .call(json!({"id": 6, "type": "labs/update", "domain": "frontend", "preview_feature": "winter_mode", "enabled": true}))
+        .await;
+    // The subscriber hears of it (before or after the result).
+    let (result, event) = if r["type"] == "result" {
+        (r, c.recv().await)
+    } else {
+        (c.recv().await, r)
+    };
+    assert_eq!(result["success"], true);
+    assert_eq!(event["id"], 4);
+    assert_eq!(event["event"]["enabled"], true);
+    let r = c
+        .call(json!({"id": 7, "type": "labs/update", "domain": "frontend", "preview_feature": "winter_mode"}))
+        .await;
+    assert_eq!(
+        r["error"]["message"],
+        "required key not provided @ data['enabled']. Got None"
+    );
+}
