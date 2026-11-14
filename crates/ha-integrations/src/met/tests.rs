@@ -419,12 +419,13 @@ async fn refreshes_on_has_schedule_and_goes_unavailable_on_failure() {
     let id = EntityId::parse("weather.forecast_home").unwrap();
 
     tokio::time::sleep(Duration::from_secs(20)).await;
-    // Setup retried after ~5 s and ~10 s more.
+    // Setup retried after 5 s and 10 s more, each plus 0.05-0.5 s of
+    // jitter (tokio rounds timers up to the next millisecond).
     {
         let c = calls.lock();
         assert_eq!(c.len(), 3);
-        assert!((5.05..5.5).contains(&c[1].0), "{c:?}");
-        assert!((15.1..16.0).contains(&c[2].0), "{c:?}");
+        assert!((5.05..=5.501).contains(&c[1].0), "{c:?}");
+        assert!((15.1..=16.002).contains(&c[2].0), "{c:?}");
     }
     assert_eq!(hass.states().get(&id).unwrap().state, "partlycloudy");
     let mut sub = weather
@@ -566,6 +567,9 @@ fn sums_like_python() {
         (vec![I(10_000_000_000_000_000), F(1.0), F(-1e16)], F(0.0)),
         (vec![I(3), F(1e16), F(1.0), F(-1e16)], F(5.0)),
         (vec![I(1), I(2)], I(3)),
+        // Python's ints don't overflow.
+        (vec![I(i64::MAX), I(2), I(-i64::MAX), F(0.0)], F(2.0)),
+        (vec![I(i64::MAX), I(1), I(-i64::MAX)], I(1)),
     ] {
         assert_eq!(py_sum(&xs), want, "sum({xs:?})");
     }

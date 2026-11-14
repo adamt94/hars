@@ -42,7 +42,7 @@ pub struct Client {
     max_body: usize,
 }
 
-/// aiohttp's `max_redirects`.
+/// aiohttp's `max_redirects`: the 10th redirect is an error.
 const MAX_REDIRECTS: usize = 10;
 
 impl Client {
@@ -80,8 +80,9 @@ impl Client {
     }
 
     /// `GET url` with extra headers, following redirects as aiohttp does
-    /// (up to 10, never from a public host to a loopback one, as HA's
-    /// guard). The body is capped in size.
+    /// (the 10th is an error) and refusing one from a public host to a
+    /// loopback or unspecified address, as HA's SSRF guard. The body is
+    /// capped in size.
     pub async fn get(
         &self,
         url: &str,
@@ -91,7 +92,7 @@ impl Client {
         let headers_by = start + self.headers_timeout;
         let total_by = start + self.total_timeout;
         let mut uri: Uri = url.parse().map_err(|_| Error::Url(url.to_owned()))?;
-        let loopback = is_loopback(&uri);
+        let from_blocked = blocked(&uri).await;
         let mut redirects = 0;
         let res = loop {
             let mut req = Request::get(uri.clone())
@@ -116,14 +117,15 @@ impl Client {
                 break res;
             };
             redirects += 1;
-            if redirects > MAX_REDIRECTS {
-                return Err(Error::Request(format!(
-                    "more than {MAX_REDIRECTS} redirects"
-                )));
+            if redirects >= MAX_REDIRECTS {
+                return Err(Error::Request(format!("{MAX_REDIRECTS} redirects")));
             }
             let next = resolve(&uri, location).ok_or_else(|| Error::Url(location.to_owned()))?;
-            if !loopback && is_loopback(&next) {
-                return Err(Error::Request(format!("redirect to loopback {next}")));
+            if !from_blocked && blocked(&next).await {
+                return Err(Error::Request(format!(
+                    "redirect to a blocked address: {}",
+                    next.host().unwrap_or_default()
+                )));
             }
             uri = next;
         };
@@ -149,31 +151,89 @@ impl Client {
     }
 }
 
-/// A redirect's `Location`, against the URL that answered with it.
+/// A redirect's `Location`, resolved against the URL that answered with
+/// it (RFC 3986 section 5.2). The fragment is dropped: it is never sent.
 fn resolve(base: &Uri, location: &str) -> Option<Uri> {
-    if location.starts_with("http://") || location.starts_with("https://") {
-        return location.parse().ok();
+    let r = location.split('#').next().unwrap_or_default();
+    // A scheme: a letter, then letters, digits or `+-.`, then `:`.
+    let has_scheme = r.find(':').is_some_and(|i| {
+        r.as_bytes()[0].is_ascii_alphabetic()
+            && r[..i]
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '+' | '-' | '.'))
+    });
+    if has_scheme {
+        return r.parse().ok();
     }
     let scheme = base.scheme_str()?;
-    if let Some(rest) = location.strip_prefix("//") {
+    if let Some(rest) = r.strip_prefix("//") {
         return format!("{scheme}://{rest}").parse().ok();
     }
     let authority = base.authority()?;
-    let path = if location.starts_with('/') {
-        location.to_owned()
+    let (path, query) = match r.split_once('?') {
+        Some((p, q)) => (p, Some(q)),
+        None => (r, None),
+    };
+    let (path, query) = if path.is_empty() {
+        (base.path().to_owned(), query.or(base.query()))
+    } else if path.starts_with('/') {
+        (remove_dot_segments(path), query)
     } else {
         let dir = base.path().rsplit_once('/').map_or("", |(d, _)| d);
-        format!("{dir}/{location}")
+        (remove_dot_segments(&format!("{dir}/{path}")), query)
     };
-    format!("{scheme}://{authority}{path}").parse().ok()
+    let query = query.map_or(String::new(), |q| format!("?{q}"));
+    format!("{scheme}://{authority}{path}{query}").parse().ok()
 }
 
-fn is_loopback(uri: &Uri) -> bool {
-    let host = uri.host().unwrap_or_default().trim_matches(['[', ']']);
-    host.eq_ignore_ascii_case("localhost")
-        || host
-            .parse::<std::net::IpAddr>()
-            .is_ok_and(|ip| ip.is_loopback())
+/// RFC 3986 section 5.2.4, for an absolute path.
+fn remove_dot_segments(path: &str) -> String {
+    let segments: Vec<&str> = path.split('/').skip(1).collect();
+    let last = segments.len().saturating_sub(1);
+    let mut out: Vec<&str> = Vec::new();
+    for (i, seg) in segments.iter().enumerate() {
+        match *seg {
+            "." | ".." => {
+                if *seg == ".." {
+                    out.pop();
+                }
+                // A trailing dot segment leaves the path ending in `/`.
+                if i == last {
+                    out.push("");
+                }
+            }
+            s => out.push(s),
+        }
+    }
+    format!("/{}", out.join("/"))
+}
+
+/// HA's `_async_is_blocked_host`: `localhost` (or a `.localhost` name,
+/// trailing dot ignored), a loopback or unspecified address, or a name
+/// that resolves to one. A name that doesn't resolve isn't blocked.
+async fn blocked(uri: &Uri) -> bool {
+    let Some(host) = uri.host() else {
+        return false;
+    };
+    let host = host.trim_matches(['[', ']']);
+    let name = host.trim().trim_end_matches('.').to_ascii_lowercase();
+    if name == "localhost" || name.ends_with(".localhost") {
+        return true;
+    }
+    let bad = |ip: std::net::IpAddr| {
+        let ip = match ip {
+            std::net::IpAddr::V6(v6) => v6.to_ipv4_mapped().map_or(ip, Into::into),
+            v4 => v4,
+        };
+        ip.is_loopback() || ip.is_unspecified()
+    };
+    if let Ok(ip) = host.parse::<std::net::IpAddr>() {
+        return bad(ip);
+    }
+    match tokio::net::lookup_host((host, 0)).await {
+        Ok(mut addrs) => addrs.any(|a| bad(a.ip())),
+        Err(_) => false,
+    }
 }
 
 #[cfg(test)]
@@ -325,32 +385,99 @@ mod tests {
             ]
         );
 
-        // More than 10 is an error.
-        let (base, _server) = serve((0..11).map(|_| moved("/again")).collect()).await;
+        // 9 redirects are followed; the 10th is an error, as aiohttp.
+        let mut replies: Vec<String> = (0..9).map(|_| moved("/again")).collect();
+        replies
+            .push("HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\nok".to_owned());
+        let (base, _server) = serve(replies).await;
+        assert!(client.get(&format!("{base}/a"), &[]).await.is_ok());
+        let (base, _server) = serve((0..10).map(|_| moved("/again")).collect()).await;
         assert!(matches!(
             client.get(&format!("{base}/a"), &[]).await,
             Err(Error::Request(e)) if e.contains("redirects")
         ));
     }
 
-    #[test]
-    fn redirects_resolve_and_loopback_is_spotted() {
-        let base: Uri = "https://api.met.no/weatherapi/x/complete?lat=1"
-            .parse()
-            .unwrap();
-        let r = |l: &str| resolve(&base, l).unwrap().to_string();
-        assert_eq!(r("https://other.example/y"), "https://other.example/y");
-        assert_eq!(r("//cdn.example/z"), "https://cdn.example/z");
-        assert_eq!(r("/abs?q=2"), "https://api.met.no/abs?q=2");
-        assert_eq!(r("rel"), "https://api.met.no/weatherapi/x/rel");
-        for (u, lo) in [
-            ("http://localhost:8123/", true),
-            ("http://127.0.0.2/", true),
-            ("http://[::1]/", true),
-            ("https://api.met.no/", false),
-            ("http://10.0.0.2/", false),
+    #[tokio::test]
+    async fn redirects_resolve_and_blocked_hosts_are_spotted() {
+        // RFC 3986 section 5.4's examples.
+        let base: Uri = "http://a/b/c/d;p?q".parse().unwrap();
+        for (r, want) in [
+            ("g", "http://a/b/c/g"),
+            ("./g", "http://a/b/c/g"),
+            ("g/", "http://a/b/c/g/"),
+            ("/g", "http://a/g"),
+            ("//g", "http://g/"),
+            ("?y", "http://a/b/c/d;p?y"),
+            ("g?y", "http://a/b/c/g?y"),
+            ("#s", "http://a/b/c/d;p?q"),
+            ("", "http://a/b/c/d;p?q"),
+            (".", "http://a/b/c/"),
+            ("./", "http://a/b/c/"),
+            ("..", "http://a/b/"),
+            ("../", "http://a/b/"),
+            ("../g", "http://a/b/g"),
+            ("../..", "http://a/"),
+            ("../../g", "http://a/g"),
+            ("../../../g", "http://a/g"),
+            ("/./g", "http://a/g"),
+            ("/../g", "http://a/g"),
+            ("g.", "http://a/b/c/g."),
+            ("..g", "http://a/b/c/..g"),
+            ("./../g", "http://a/b/g"),
+            ("g/./h", "http://a/b/c/g/h"),
+            ("g/../h", "http://a/b/c/h"),
+            ("https://other.example/x?y", "https://other.example/x?y"),
         ] {
-            assert_eq!(is_loopback(&u.parse().unwrap()), lo, "{u}");
+            let got = resolve(&base, r).map(|u| u.to_string());
+            assert_eq!(got.as_deref(), Some(want), "{r:?}");
         }
+        for (u, is) in [
+            ("http://localhost:8123/", true),
+            ("http://LOCALHOST./", true),
+            ("http://foo.localhost/", true),
+            ("http://127.0.0.2/", true),
+            ("http://127.1/", true),
+            ("http://0.0.0.0/", true),
+            ("http://[::1]/", true),
+            ("http://[::ffff:127.0.0.1]/", true),
+            ("http://10.0.0.2/", false),
+            ("http://does-not-resolve.invalid/", false),
+        ] {
+            assert_eq!(blocked(&u.parse().unwrap()).await, is, "{u}");
+        }
+    }
+
+    #[tokio::test]
+    async fn a_public_host_may_not_redirect_to_loopback() {
+        // Served on a non-loopback address of this machine, if it has one.
+        let Some(ip) = std::net::UdpSocket::bind("0.0.0.0:0")
+            .and_then(|s| s.connect("192.0.2.1:9").map(|()| s))
+            .and_then(|s| s.local_addr())
+            .ok()
+            .map(|a| a.ip())
+            .filter(|ip| !ip.is_loopback() && !ip.is_unspecified())
+        else {
+            return;
+        };
+        let Ok(listener) = tokio::net::TcpListener::bind((ip, 0)).await else {
+            return;
+        };
+        let url = format!("http://{}/", listener.local_addr().unwrap());
+        tokio::spawn(async move {
+            let (mut s, _) = listener.accept().await.unwrap();
+            let mut buf = vec![0u8; 4096];
+            let _ = s.read(&mut buf).await.unwrap();
+            s.write_all(
+                b"HTTP/1.1 302 Found\r\nLocation: http://127.1:8123/\r\nContent-Length: 0\r\n\r\n",
+            )
+            .await
+            .unwrap();
+        });
+        let client = Client::new("t").unwrap();
+        assert!(matches!(
+            client.get(&url, &[]).await,
+            Err(Error::Request(e)) if e.contains("blocked")
+        ));
     }
 }

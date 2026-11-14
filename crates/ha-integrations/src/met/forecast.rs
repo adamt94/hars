@@ -45,15 +45,13 @@ impl Num {
 /// float, which is added plainly; everything after it is added with
 /// Neumaier's compensation, and the compensation is applied at the end.
 pub fn py_sum(values: &[Num]) -> Num {
+    // Python's ints don't overflow; a sum of i64s can't overflow i128.
     let mut it = values.iter();
-    let mut int: i64 = 0;
+    let mut int: i128 = 0;
     let mut f = loop {
         match it.next() {
-            None => return Num::Int(int),
-            Some(Num::Int(v)) => match int.checked_add(*v) {
-                Some(n) => int = n,
-                None => break int as f64 + *v as f64,
-            },
+            None => return i64::try_from(int).map_or(Num::Float(int as f64), Num::Int),
+            Some(Num::Int(v)) => int += i128::from(*v),
             Some(Num::Float(x)) => break int as f64 + x,
         }
     };
