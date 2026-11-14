@@ -1,11 +1,13 @@
 //! The WebSocket commands (`websocket_api/commands.py` and the components
 //! that register commands the frontend needs at start-up).
 
-use super::{Conn, Invalid, Subscription, entities, only_keys};
+use super::{Conn, Invalid, MAX_PENDING, Subscription, TaskSub, entities, only_keys};
 use crate::rest::service_description;
 use ha_auth::Permission;
 use ha_core::{Context, Event, EventKind, ServiceData, ServiceError};
 use serde_json::{Map, Value, json};
+use std::sync::Arc;
+use std::sync::atomic::Ordering;
 
 /// `core/auth/permissions/events.py`: what non-admins may subscribe to.
 const SUBSCRIBE_ALLOWLIST: &[&str] = &[
@@ -102,7 +104,10 @@ fn supported_features(conn: &mut Conn, id: u64, msg: &Map<String, Value>) -> Res
             "expected int for dictionary value @ data['features']['{k}']"
         ));
     }
-    conn.coalesce = features.contains_key("coalesce_messages");
+    conn.coalesce.store(
+        features.contains_key("coalesce_messages"),
+        Ordering::Relaxed,
+    );
     conn.out.result(id, Value::Null);
     Ok(())
 }
@@ -294,15 +299,15 @@ fn subscribe_events(conn: &mut Conn, id: u64, msg: &Map<String, Value>) -> Resul
         conn.out.error(json!(id), "unauthorized", "Unauthorized");
         return Ok(());
     }
-    // Listening before the result goes out, so nothing after it is missed.
+    // Listening before the result goes out, so nothing after it is missed;
+    // under the listener's lock, so no event for `id` precedes the result.
     conn.ensure_event_listener();
-    conn.events
-        .lock()
-        .entry(event_type.to_owned())
-        .or_default()
-        .push(id);
-    conn.subs.insert(id, Subscription::Events);
+    let events = conn.events.clone();
+    let mut events = events.lock();
+    events.entry(event_type.to_owned()).or_default().push(id);
     conn.out.result(id, Value::Null);
+    drop(events);
+    conn.subs.insert(id, Subscription::Events);
     Ok(())
 }
 
@@ -313,9 +318,12 @@ fn unsubscribe_events(conn: &mut Conn, id: u64, msg: &Map<String, Value>) -> Res
         Some(_) => return Err("expected int for dictionary value @ data['subscription']".into()),
         None => return Err("required key not provided @ data['subscription']".into()),
     };
-    if sub.is_some_and(|s| conn.unsubscribe(s)) {
-        conn.out.result(id, Value::Null);
-    } else {
+    let found = sub.is_some_and(|s| {
+        conn.unsubscribe(s, |out| {
+            out.result(id, Value::Null);
+        })
+    });
+    if !found {
         conn.out
             .error(json!(id), "not_found", "Subscription not found.");
     }
@@ -345,18 +353,25 @@ fn subscribe_entities(conn: &mut Conn, id: u64, msg: &Map<String, Value>) -> Res
     };
 
     let mut feed = conn.shared.hass.subscribe_state_changes();
-    let snapshot: Map<String, Value> = feed
-        .snapshot
+    // Taken out of the feed so the task doesn't keep every initial state alive.
+    let initial: Map<String, Value> = std::mem::take(&mut feed.snapshot)
         .iter()
         .filter(|s| keep(s.entity_id.as_str()))
         .map(|s| (s.entity_id.to_string(), entities::compressed(s)))
         .collect();
     conn.out.result(id, Value::Null);
-    conn.out.event(id, &json!({ "a": snapshot }));
+    conn.out.event(id, &json!({ "a": initial }));
 
     let out = conn.out.clone();
+    let live = Arc::new(parking_lot::Mutex::new(true));
+    let task_live = live.clone();
     let task = tokio::spawn(async move {
         while let Some(event) = feed.recv().await {
+            // The feed itself is unbounded: hold it to the outbox's limit.
+            if feed.backlog() > MAX_PENDING {
+                out.overflowed();
+                return;
+            }
             let EventKind::StateChanged { entity_id, .. } = &event.kind else {
                 continue;
             };
@@ -366,13 +381,19 @@ fn subscribe_entities(conn: &mut Conn, id: u64, msg: &Map<String, Value>) -> Res
             let Some(diff) = entities::diff_event(&event.kind) else {
                 continue;
             };
-            if !out.event(id, &diff) {
+            let live = task_live.lock();
+            if !*live || !out.event(id, &diff) {
                 return;
             }
         }
     });
-    conn.subs
-        .insert(id, Subscription::Task(task.abort_handle()));
+    conn.subs.insert(
+        id,
+        Subscription::Task(TaskSub {
+            abort: task.abort_handle(),
+            live,
+        }),
+    );
     Ok(())
 }
 

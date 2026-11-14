@@ -1,7 +1,7 @@
 //! `/api/websocket`: HA's WebSocket API (`components/websocket_api`).
 //!
-//! One task per connection. It reads client frames, and writes what the
-//! command handlers and subscriptions queue in a bounded outbox. A client
+//! Two tasks per connection: one reads client frames and runs commands, the
+//! other writes what commands and subscriptions queue in a bounded outbox. A client
 //! that falls 4096 messages behind is disconnected, as in HA; the frontend
 //! reconnects and gets a fresh snapshot. Once the client sends
 //! `supported_features` with `coalesce_messages`, queued messages go out
@@ -21,11 +21,14 @@ use axum::{
     response::Response,
     routing::get,
 };
+use futures_util::stream::SplitSink;
+use futures_util::{SinkExt, StreamExt};
 use ha_auth::{Permission, Principal, User};
 use serde_json::{Map, Value, json};
 use std::collections::HashMap;
 use std::net::IpAddr;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 use tokio::sync::{Notify, broadcast, mpsc};
 use tokio::task::AbortHandle;
@@ -62,17 +65,23 @@ async fn upgrade(
         .on_upgrade(move |socket| run(socket, shared, ip))
 }
 
+/// What the writer task sends.
+enum Frame {
+    Json(String),
+    Ping,
+    Close,
+}
+
 /// The connection's outgoing queue, shared with its subscription tasks.
 #[derive(Clone)]
 pub(crate) struct Outbox {
-    tx: mpsc::Sender<String>,
+    tx: mpsc::Sender<Frame>,
     overflow: Arc<Notify>,
 }
 
 impl Outbox {
-    /// Queue a message; `false` once the connection is gone or too far behind.
-    pub(crate) fn send(&self, msg: String) -> bool {
-        match self.tx.try_send(msg) {
+    fn queue(&self, frame: Frame) -> bool {
+        match self.tx.try_send(frame) {
             Ok(()) => true,
             Err(mpsc::error::TrySendError::Full(_)) => {
                 self.overflow.notify_one();
@@ -80,6 +89,11 @@ impl Outbox {
             }
             Err(mpsc::error::TrySendError::Closed(_)) => false,
         }
+    }
+
+    /// Queue a message; `false` once the connection is gone or too far behind.
+    pub(crate) fn send(&self, msg: String) -> bool {
+        self.queue(Frame::Json(msg))
     }
 
     pub(crate) fn result(&self, id: u64, result: Value) -> bool {
@@ -106,24 +120,37 @@ impl Outbox {
     }
 }
 
+/// A subscription served by its own task. `live` is held while the task
+/// queues an event and while unsubscribing flips it and queues the reply, so
+/// no event can follow the unsubscribe result.
+pub(crate) struct TaskSub {
+    pub abort: AbortHandle,
+    pub live: Arc<parking_lot::Mutex<bool>>,
+}
+
 /// What a subscription id refers to, for `unsubscribe_events`.
-enum Subscription {
+pub(crate) enum Subscription {
     /// Served by the connection's shared bus listener.
     Events,
-    Task(AbortHandle),
+    Task(TaskSub),
 }
+
+/// `subscribe_events` ids by event type. The bus listener holds the lock
+/// while it queues an event, and (un)subscribing holds it while it changes
+/// the map and queues its result, so results and events are ordered.
+pub(crate) type EventSubs = Arc<parking_lot::Mutex<HashMap<String, Vec<u64>>>>;
 
 pub(crate) struct Conn {
     shared: Shared,
     principal: Principal,
     user: User,
     out: Outbox,
-    coalesce: bool,
+    coalesce: Arc<AtomicBool>,
     last_id: u64,
     subs: HashMap<u64, Subscription>,
-    /// `subscribe_events` ids by event type, served by one bus listener so
-    /// each event wakes the connection once, however many types it wants.
-    events: Arc<parking_lot::Mutex<HashMap<String, Vec<u64>>>>,
+    /// Served by one bus listener, so each event wakes the connection once
+    /// however many types it wants. It runs only while the map is non-empty.
+    events: EventSubs,
     event_listener: Option<AbortHandle>,
 }
 
@@ -136,6 +163,8 @@ async fn run(mut socket: WebSocket, shared: Shared, ip: Option<IpAddr>) {
     {
         return;
     }
+    // Before the token is checked, so a revocation in between isn't missed.
+    let mut revocations = shared.auth.subscribe_revocations();
     let Some((principal, user)) = authenticate(&mut socket, &shared, ip).await else {
         let _ = socket.send(Message::Close(None)).await;
         return;
@@ -149,8 +178,12 @@ async fn run(mut socket: WebSocket, shared: Shared, ip: Option<IpAddr>) {
         return;
     }
 
-    let mut revocations = shared.auth.subscribe_revocations();
-    let (tx, mut rx) = mpsc::channel(MAX_PENDING);
+    // Writing has its own task, so a client that stops reading can't stall
+    // the overflow, heartbeat and revocation checks below.
+    let (sink, mut stream) = socket.split();
+    let (tx, rx) = mpsc::channel(MAX_PENDING);
+    let coalesce = Arc::new(AtomicBool::new(false));
+    let mut writer = tokio::spawn(write(sink, rx, coalesce.clone()));
     let overflow = Arc::new(Notify::new());
     let mut conn = Conn {
         shared,
@@ -160,7 +193,7 @@ async fn run(mut socket: WebSocket, shared: Shared, ip: Option<IpAddr>) {
             tx,
             overflow: overflow.clone(),
         },
-        coalesce: false,
+        coalesce,
         last_id: 0,
         subs: HashMap::new(),
         events: Default::default(),
@@ -171,78 +204,106 @@ async fn run(mut socket: WebSocket, shared: Shared, ip: Option<IpAddr>) {
         tokio::time::interval_at(tokio::time::Instant::now() + HEARTBEAT, HEARTBEAT);
     heartbeat.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
     let mut awaiting_pong = false;
-    loop {
+    let writer_done = loop {
         tokio::select! {
-            incoming = socket.recv() => match incoming {
+            incoming = stream.next() => match incoming {
                 Some(Ok(Message::Text(text))) => {
                     if !conn.handle_frame(&text) {
-                        break;
+                        break false;
                     }
                 }
                 Some(Ok(Message::Pong(_))) => awaiting_pong = false,
                 Some(Ok(Message::Ping(_))) => {}
                 // Close, an error, or a binary frame (no binary handlers exist).
-                _ => break,
+                _ => break false,
             },
-            Some(first) = rx.recv() => {
-                if flush(&mut socket, &mut rx, first, conn.coalesce).await.is_err() {
-                    break;
-                }
-            }
             _ = heartbeat.tick() => {
                 if awaiting_pong {
                     tracing::debug!("websocket client missed a heartbeat; disconnecting");
-                    break;
+                    break false;
                 }
-                if socket.send(Message::Ping(Default::default())).await.is_err() {
-                    break;
+                if !conn.out.queue(Frame::Ping) {
+                    break false;
                 }
                 awaiting_pong = true;
             }
             _ = overflow.notified() => {
                 tracing::error!("websocket client fell {MAX_PENDING} messages behind; disconnecting");
-                break;
+                break false;
             }
             revoked = revocations.recv() => match revoked {
-                Ok(id) if id == conn.principal.refresh_token_id => break,
+                Ok(id) if id == conn.principal.refresh_token_id => break false,
                 Ok(_) => {}
                 Err(broadcast::error::RecvError::Lagged(_)) => {
                     if !conn.shared.auth.is_token_live(&conn.principal.refresh_token_id) {
-                        break;
+                        break false;
                     }
                 }
-                Err(broadcast::error::RecvError::Closed) => break,
+                Err(broadcast::error::RecvError::Closed) => break false,
             },
+            _ = &mut writer => break true,
+        }
+    };
+    conn.close();
+    if !writer_done {
+        // Say goodbye if the writer can, but never wait on a stuck client.
+        let _ = conn.out.tx.try_send(Frame::Close);
+        if tokio::time::timeout(Duration::from_secs(1), &mut writer)
+            .await
+            .is_err()
+        {
+            writer.abort();
         }
     }
-    conn.close();
-    let _ = socket.send(Message::Close(None)).await;
 }
 
-/// Send the first queued message, and with coalescing everything else that
-/// is already queued, as one array.
-async fn flush(
-    socket: &mut WebSocket,
-    rx: &mut mpsc::Receiver<String>,
-    first: String,
-    coalesce: bool,
-) -> Result<(), axum::Error> {
-    if !coalesce {
-        return socket.send(Message::Text(first.into())).await;
-    }
-    let mut batch = vec![first];
-    while batch.len() < MAX_BATCH {
-        match rx.try_recv() {
-            Ok(m) => batch.push(m),
-            Err(_) => break,
+/// The writer task. With coalescing on, everything already queued (up to
+/// 256 messages) goes out as one JSON array.
+async fn write(
+    mut sink: SplitSink<WebSocket, Message>,
+    mut rx: mpsc::Receiver<Frame>,
+    coalesce: Arc<AtomicBool>,
+) {
+    let mut next = None;
+    loop {
+        let frame = match next.take() {
+            Some(f) => f,
+            None => match rx.recv().await {
+                Some(f) => f,
+                None => return,
+            },
+        };
+        let msg = match frame {
+            Frame::Ping => Message::Ping(Default::default()),
+            Frame::Close => {
+                let _ = sink.send(Message::Close(None)).await;
+                return;
+            }
+            Frame::Json(first) if !coalesce.load(Ordering::Relaxed) => Message::Text(first.into()),
+            Frame::Json(first) => {
+                let mut batch = vec![first];
+                while batch.len() < MAX_BATCH {
+                    match rx.try_recv() {
+                        Ok(Frame::Json(m)) => batch.push(m),
+                        Ok(other) => {
+                            next = Some(other);
+                            break;
+                        }
+                        Err(_) => break,
+                    }
+                }
+                let text = if batch.len() == 1 {
+                    batch.pop().expect("one message")
+                } else {
+                    format!("[{}]", batch.join(","))
+                };
+                Message::Text(text.into())
+            }
+        };
+        if sink.send(msg).await.is_err() {
+            return;
         }
     }
-    let text = if batch.len() == 1 {
-        batch.pop().expect("one message")
-    } else {
-        format!("[{}]", batch.join(","))
-    };
-    socket.send(Message::Text(text.into())).await
 }
 
 /// `ws/auth.py`: `{"type": "auth", "access_token": ...}` within 10 s.
@@ -349,7 +410,7 @@ impl Conn {
     }
 
     /// Start the shared bus listener if it isn't running.
-    fn ensure_event_listener(&mut self) {
+    pub(crate) fn ensure_event_listener(&mut self) {
         if self.event_listener.is_some() {
             return;
         }
@@ -361,17 +422,15 @@ impl Conn {
                 match rx.recv().await {
                     Ok(event) => {
                         let event_type = commands::event_type(&event.kind);
-                        let ids: Vec<u64> = {
-                            let subs = events.lock();
-                            let all = subs.get("*").into_iter().flatten();
-                            let typed = subs.get(event_type).into_iter().flatten();
-                            all.chain(typed).copied().collect()
-                        };
-                        if ids.is_empty() {
+                        let subs = events.lock();
+                        let all = subs.get("*").into_iter().flatten();
+                        let typed = subs.get(event_type).into_iter().flatten();
+                        let mut ids = all.chain(typed).peekable();
+                        if ids.peek().is_none() {
                             continue;
                         }
                         let json = commands::event_json(&event);
-                        for id in ids {
+                        for &id in ids {
                             if !out.event(id, &json) {
                                 return;
                             }
@@ -389,13 +448,28 @@ impl Conn {
         self.event_listener = Some(task.abort_handle());
     }
 
-    /// `unsubscribe_events` and connection close.
-    fn unsubscribe(&mut self, id: u64) -> bool {
+    /// End subscription `id`, running `reply` (the unsubscribe result) at the
+    /// point after which no more of its events can be queued.
+    pub(crate) fn unsubscribe(&mut self, id: u64, reply: impl FnOnce(&Outbox)) -> bool {
         match self.subs.remove(&id) {
-            Some(Subscription::Task(task)) => task.abort(),
+            Some(Subscription::Task(task)) => {
+                let mut live = task.live.lock();
+                *live = false;
+                task.abort.abort();
+                reply(&self.out);
+            }
             Some(Subscription::Events) => {
-                for ids in self.events.lock().values_mut() {
+                let mut events = self.events.lock();
+                for ids in events.values_mut() {
                     ids.retain(|&i| i != id);
+                }
+                events.retain(|_, ids| !ids.is_empty());
+                reply(&self.out);
+                if events.is_empty() {
+                    // Nothing left to listen for: stop waking on every event.
+                    if let Some(listener) = self.event_listener.take() {
+                        listener.abort();
+                    }
                 }
             }
             None => return false,
@@ -404,13 +478,12 @@ impl Conn {
     }
 
     fn close(&mut self) {
-        for (_, sub) in self.subs.drain() {
-            if let Subscription::Task(task) = sub {
-                task.abort();
-            }
+        let ids: Vec<u64> = self.subs.keys().copied().collect();
+        for id in ids {
+            self.unsubscribe(id, |_| {});
         }
-        if let Some(task) = self.event_listener.take() {
-            task.abort();
+        if let Some(listener) = self.event_listener.take() {
+            listener.abort();
         }
     }
 }

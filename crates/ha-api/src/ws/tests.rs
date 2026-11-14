@@ -532,3 +532,99 @@ async fn silent_clients_are_dropped_after_a_missed_heartbeat() {
     );
     keep_reading.abort();
 }
+
+/// A connection without a socket, to look at its internals.
+fn bare_conn(hass: &Hass) -> (super::Conn, tokio::sync::mpsc::Receiver<super::Frame>) {
+    let auth = crate::test_util::auth(true);
+    let (access, _) = token(&auth);
+    let principal = auth.validate_access_token(&access, None).unwrap();
+    let user = auth.user(&principal.user_id).unwrap();
+    let (tx, rx) = tokio::sync::mpsc::channel(super::MAX_PENDING);
+    let conn = super::Conn {
+        shared: crate::Shared {
+            hass: hass.clone(),
+            auth,
+            config: Default::default(),
+        },
+        principal,
+        user,
+        out: super::Outbox {
+            tx,
+            overflow: Default::default(),
+        },
+        coalesce: Default::default(),
+        last_id: 0,
+        subs: Default::default(),
+        events: Default::default(),
+        event_listener: None,
+    };
+    (conn, rx)
+}
+
+fn handle(conn: &mut super::Conn, msg: Value) {
+    conn.handle(msg);
+}
+
+#[tokio::test]
+async fn the_bus_listener_runs_only_while_events_are_subscribed() {
+    let hass = Hass::new();
+    let (mut conn, _rx) = bare_conn(&hass);
+    handle(
+        &mut conn,
+        json!({"id": 1, "type": "subscribe_events", "event_type": "a"}),
+    );
+    handle(
+        &mut conn,
+        json!({"id": 2, "type": "subscribe_events", "event_type": "b"}),
+    );
+    assert!(conn.event_listener.is_some());
+    handle(
+        &mut conn,
+        json!({"id": 3, "type": "unsubscribe_events", "subscription": 1}),
+    );
+    assert!(conn.event_listener.is_some());
+    assert!(
+        !conn.events.lock().contains_key("a"),
+        "empty types are pruned"
+    );
+    handle(
+        &mut conn,
+        json!({"id": 4, "type": "unsubscribe_events", "subscription": 2}),
+    );
+    assert!(conn.event_listener.is_none());
+    assert!(conn.events.lock().is_empty());
+}
+
+#[tokio::test]
+async fn the_entity_snapshot_is_not_kept() {
+    let hass = Hass::new();
+    let id = EntityId::parse("light.a").unwrap();
+    hass.set_state(id.clone(), "on", Attributes::new());
+    let (mut conn, _rx) = bare_conn(&hass);
+    handle(&mut conn, json!({"id": 1, "type": "subscribe_entities"}));
+    tokio::task::yield_now().await;
+    // The state machine's reference and ours; none held by the subscription.
+    assert_eq!(
+        std::sync::Arc::strong_count(&hass.states().get(&id).unwrap()),
+        2
+    );
+}
+
+#[tokio::test]
+async fn a_runaway_entity_feed_disconnects() {
+    let hass = Hass::new();
+    let (mut conn, _rx) = bare_conn(&hass);
+    handle(&mut conn, json!({"id": 1, "type": "subscribe_entities"}));
+    // More changes than the outbox holds, before the task gets to run.
+    for i in 0..=super::MAX_PENDING + 1 {
+        hass.set_state(
+            EntityId::parse("sensor.x").unwrap(),
+            i.to_string().as_str(),
+            Attributes::new(),
+        );
+    }
+    let notified = conn.out.overflow.clone();
+    tokio::time::timeout(Duration::from_secs(2), notified.notified())
+        .await
+        .expect("the subscription should report overflow");
+}
