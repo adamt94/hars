@@ -30,26 +30,60 @@ pub struct State {
 /// write that changes nothing moves it on the existing state, as HA
 /// mutates its `State` in place, so it is atomic (microseconds since the
 /// epoch) and needs no copy of the attributes.
-#[derive(Debug, Default)]
-pub struct Reported(AtomicI64);
+///
+/// HA caches a state's dict and JSON the first time they're made, and a
+/// report doesn't clear that cache: the `last_reported` its JSON shows is
+/// the one at the state's first serialization. `shown` keeps that, and
+/// [`Reported::get`] the live time.
+#[derive(Debug)]
+pub struct Reported {
+    live: AtomicI64,
+    /// `i64::MIN` until first serialized.
+    shown: AtomicI64,
+}
+
+const UNSET: i64 = i64::MIN;
 
 impl Reported {
     pub fn new(t: Timestamp) -> Self {
-        Self(AtomicI64::new(t.as_microsecond()))
+        Self {
+            live: AtomicI64::new(t.as_microsecond()),
+            shown: AtomicI64::new(UNSET),
+        }
     }
 
+    /// When the state was last written.
     pub fn get(&self) -> Timestamp {
-        Timestamp::from_microsecond(self.0.load(Ordering::Relaxed)).unwrap_or_default()
+        micros(self.live.load(Ordering::Relaxed))
     }
 
     fn set(&self, t: Timestamp) {
-        self.0.store(t.as_microsecond(), Ordering::Relaxed);
+        self.live.store(t.as_microsecond(), Ordering::Relaxed);
     }
+
+    /// What the state's JSON shows: fixed by the first serialization.
+    fn shown(&self) -> Timestamp {
+        let live = self.live.load(Ordering::Relaxed);
+        match self
+            .shown
+            .compare_exchange(UNSET, live, Ordering::Relaxed, Ordering::Relaxed)
+        {
+            Ok(_) => micros(live),
+            Err(shown) => micros(shown),
+        }
+    }
+}
+
+fn micros(us: i64) -> Timestamp {
+    Timestamp::from_microsecond(us).unwrap_or_default()
 }
 
 impl Clone for Reported {
     fn clone(&self) -> Self {
-        Self::new(self.get())
+        Self {
+            live: AtomicI64::new(self.live.load(Ordering::Relaxed)),
+            shown: AtomicI64::new(self.shown.load(Ordering::Relaxed)),
+        }
     }
 }
 
@@ -61,7 +95,7 @@ impl PartialEq for Reported {
 
 impl Serialize for Reported {
     fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
-        crate::clock::serialize_iso(&self.get(), s)
+        crate::clock::serialize_iso(&self.shown(), s)
     }
 }
 
@@ -500,14 +534,27 @@ mod tests {
         }
 
         // The same write later: same state object, only `last_reported`
-        // moves, and nothing fires.
+        // moves, and nothing fires. Its JSON keeps the time it was first
+        // serialized with, as HA's cached dict.
         let mut rx = hass.bus().subscribe();
         tokio::time::advance(std::time::Duration::from_secs(2)).await;
-        let again = hass.set_state(id.clone(), "20", attrs);
+        let again = hass.set_state(id.clone(), "20", attrs.clone());
         assert!(Arc::ptr_eq(&first, &again));
-        let json = serde_json::to_value(&*hass.states().get(&id).unwrap()).unwrap();
-        assert_eq!(json["last_reported"], "2026-11-14T13:29:31.778252+00:00");
-        assert_eq!(json["last_updated"], "2026-11-14T13:29:29.778252+00:00");
+        assert_eq!(
+            again.last_reported.get().to_string(),
+            "2026-11-14T13:29:31.778252Z"
+        );
+        let json = serde_json::to_value(&*again).unwrap();
+        assert_eq!(json["last_reported"], "2026-11-14T13:29:29.778252+00:00");
         assert!(rx.try_recv().is_err());
+
+        // Not yet serialized when reported: it shows the report.
+        let other = EntityId::parse("sensor.u").unwrap();
+        hass.set_state(other.clone(), "1", Attributes::new());
+        tokio::time::advance(std::time::Duration::from_secs(3)).await;
+        let reported = hass.set_state(other, "1", Attributes::new());
+        let json = serde_json::to_value(&*reported).unwrap();
+        assert_eq!(json["last_reported"], "2026-11-14T13:29:34.778252+00:00");
+        assert_eq!(json["last_updated"], "2026-11-14T13:29:31.778252+00:00");
     }
 }

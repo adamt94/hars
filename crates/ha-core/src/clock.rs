@@ -173,7 +173,8 @@ mod tests {
 
     #[test]
     fn system_clock_is_the_default() {
-        let before = Timestamp::now();
+        // `now` is whole microseconds, so the lower bound must be too.
+        let before = Timestamp::from_microsecond(Timestamp::now().as_microsecond()).unwrap();
         let now = Clock::default().now();
         assert!(now >= before && now <= Timestamp::now());
     }
