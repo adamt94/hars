@@ -211,6 +211,10 @@ fn lovelace_error(conn: &Conn, id: u64, e: crate::lovelace::ConfigError) {
             url.as_deref().unwrap_or("None")
         ),
         ConfigError::NoConfig => "No config found.".into(),
+        ConfigError::Save(e) => {
+            conn.out.error(json!(id), "error", &e);
+            return;
+        }
     };
     conn.out.error(json!(id), "config_not_found", &message);
 }
@@ -278,6 +282,10 @@ fn lovelace_save(
                         url.as_deref().unwrap_or("None")
                     ),
                     ConfigError::NoConfig => "No config found.".into(),
+                    ConfigError::Save(e) => {
+                        out.error(json!(id), "error", &e);
+                        return;
+                    }
                 };
                 out.error(json!(id), "config_not_found", &message);
             }
