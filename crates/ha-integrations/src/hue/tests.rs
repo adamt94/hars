@@ -42,8 +42,7 @@ fn registries() -> Registries {
 fn bridge(api: Api) -> Arc<Bridge> {
     let hass = Hass::new();
     let registries = Arc::new(registries());
-    let services = Arc::new(Lights::new(Profiles::default()));
-    services.register_services(&hass, registries.clone());
+    let platforms = Platforms::new(&hass, registries.clone(), Profiles::default());
     let resources = fixture("resource")["data"].as_array().unwrap().clone();
     let bridge = Arc::new(Bridge {
         hass,
@@ -53,8 +52,10 @@ fn bridge(api: Api) -> Arc<Bridge> {
         ignore_availability: Vec::new(),
         lights: RwLock::default(),
         groups: RwLock::default(),
-        services,
+        others: RwLock::default(),
+        platforms: platforms.clone(),
     });
+    platforms.bridges.write().push(Arc::downgrade(&bridge));
     bridge.add_entities();
     bridge.write_all();
     bridge
@@ -84,13 +85,10 @@ fn state_json(hass: &Hass, id: &str) -> Option<(String, Value)> {
 }
 
 #[tokio::test]
-async fn lights_and_groups_match_ha_on_the_real_bridge() {
+async fn every_entity_matches_ha_on_the_real_bridge() {
     let b = bridge(offline());
     let mut checked = 0;
     for e in fixture("snapshot").as_array().unwrap() {
-        if e["domain"] != "light" {
-            continue;
-        }
         let id = e["entity_id"].as_str().unwrap();
         let got = state_json(&b.hass, id);
         if !e["registry_disabled_by"].is_null() {
@@ -102,7 +100,7 @@ async fn lights_and_groups_match_ha_on_the_real_bridge() {
         assert_eq!(attrs, normalize(e["attributes"].clone()), "{id}");
         checked += 1;
     }
-    assert_eq!(checked, 8);
+    assert_eq!(checked, 19);
 }
 
 #[tokio::test]
@@ -129,9 +127,6 @@ async fn event_stream_items_write_what_ha_writes() {
         let mut want = Vec::new();
         for w in scenario["writes"].as_array().unwrap() {
             let id = w["entity_id"].as_str().unwrap();
-            if !id.starts_with("light.") {
-                continue;
-            }
             let new = (
                 w["state"].as_str().unwrap().to_owned(),
                 normalize(w["attributes"].clone()),
@@ -154,7 +149,6 @@ async fn event_stream_items_write_what_ha_writes() {
                 new_state: Some(s),
                 ..
             } = &e.kind
-                && entity_id.as_str().starts_with("light.")
             {
                 got.push((
                     entity_id.to_string(),
@@ -233,7 +227,7 @@ async fn fake_bridge() -> (
 }
 
 #[tokio::test]
-async fn light_services_send_what_aiohue_sends() {
+async fn services_send_what_aiohue_sends() {
     let (base, seen) = fake_bridge().await;
     let b = bridge(Api::at(&base, "key"));
     let mut checked = 0;
@@ -248,13 +242,13 @@ async fn light_services_send_what_aiohue_sends() {
             b.handle("update", &item);
             continue;
         }
-        let Some(name) = service.strip_prefix("light.") else {
-            continue; // scenes: the next change
-        };
+        let (domain, name) = service.split_once('.').unwrap();
         let mut data = case["data"].as_object().unwrap().clone();
-        data.insert("entity_id".into(), json!(id));
+        if !id.is_empty() {
+            data.insert("entity_id".into(), json!(id));
+        }
         b.hass
-            .call_service("light", name, data, None, false, None)
+            .call_service(domain, name, data, None, false, None)
             .await
             .unwrap_or_else(|e| panic!("#{}: {e}", i + 1));
         let mut got: Vec<Value> = seen
@@ -291,7 +285,7 @@ async fn light_services_send_what_aiohue_sends() {
             b.handle("update", &item);
         }
     }
-    assert_eq!(checked, 50);
+    assert_eq!(checked, 59);
 }
 
 /// aiohue sends a transition only with no effect or `no_effect`: a named

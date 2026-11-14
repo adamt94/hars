@@ -12,11 +12,15 @@
 //!   are read-only here); disabled registry entries get no state, as in HA.
 
 mod api;
+mod entities;
 mod light;
 mod store;
 
 use crate::light::Lights;
+use crate::scene::Scenes;
+use crate::switch::Switches;
 use api::{Api, ApiError};
+use entities::{HueEntity, Kind};
 use ha_core::{EntityId, Hass};
 use ha_registry::Registries;
 use light::{GroupLight, HueLight};
@@ -28,9 +32,6 @@ use store::{Change, Store};
 
 pub const DOMAIN: &str = "hue";
 
-/// A device's id and the lights on it.
-type DeviceLights = (String, Vec<Arc<HueLight>>);
-
 /// One bridge: its API, resources and entities.
 pub struct Bridge {
     hass: Hass,
@@ -41,7 +42,16 @@ pub struct Bridge {
     ignore_availability: Vec<String>,
     lights: RwLock<Vec<Arc<HueLight>>>,
     groups: RwLock<Vec<Arc<GroupLight>>>,
-    services: Arc<Lights>,
+    /// Sensors, binary sensors, switches and scenes, in HA's platform order.
+    others: RwLock<Vec<Arc<HueEntity>>>,
+    platforms: Arc<Platforms>,
+}
+
+/// What a deleted device takes with it.
+#[derive(Default, Clone)]
+struct Gone {
+    lights: Vec<Arc<HueLight>>,
+    others: Vec<Arc<HueEntity>>,
 }
 
 impl Bridge {
@@ -212,9 +222,120 @@ impl Bridge {
             new.push(g.clone());
             self.groups.write().push(g);
         }
+        let mut made: Vec<Arc<HueEntity>> = Vec::new();
+        for r in store.order() {
+            let (Some(rid), Some(ty)) = (r["id"].as_str(), r["type"].as_str()) else {
+                continue;
+            };
+            for &kind in Kind::for_type(ty) {
+                if !kind.wanted(r, &store)
+                    || self
+                        .others
+                        .read()
+                        .iter()
+                        .any(|e| e.rid == rid && e.kind == kind)
+                {
+                    continue;
+                }
+                let device = HueEntity::device(kind, rid, r, &store);
+                let Some(id) =
+                    self.entity_id_for(kind.domain(), rid, device, kind.name(r).as_deref())
+                else {
+                    continue;
+                };
+                let e = Arc::new(HueEntity::new(Arc::downgrade(self), kind, rid, id));
+                made.push(e.clone());
+                let mut others = self.others.write();
+                others.push(e);
+                others.sort_by_key(|e| e.kind.rank());
+            }
+        }
         drop(store);
         for l in new {
-            self.services.add(l);
+            self.platforms.lights.add(l);
+        }
+        for e in made {
+            match e.kind.domain() {
+                "switch" => self.platforms.switches.add(e),
+                "scene" => self.platforms.scenes.add(e),
+                _ => {}
+            }
+        }
+    }
+
+    fn write_entity(&self, e: &HueEntity) {
+        let rendered = e.render(self, &self.store.read());
+        if let Some((state, attrs)) = rendered {
+            self.hass.set_state(e.entity_id.clone(), state, attrs);
+        }
+    }
+
+    /// The other entities of a resource, in platform order.
+    fn others_of(&self, rid: &str) -> Vec<Arc<HueEntity>> {
+        self.others
+            .read()
+            .iter()
+            .filter(|e| e.rid == rid)
+            .cloned()
+            .collect()
+    }
+
+    /// Everything on a Hue device.
+    fn on_device(&self, device: &str) -> Gone {
+        let store = self.store.read();
+        let on = |rid: &str| store.device_of(rid).is_some_and(|d| d["id"] == device);
+        Gone {
+            lights: self
+                .lights
+                .read()
+                .iter()
+                .filter(|l| on(&l.rid))
+                .cloned()
+                .collect(),
+            others: self
+                .others
+                .read()
+                .iter()
+                .filter(|e| on(&e.rid))
+                .cloned()
+                .collect(),
+        }
+    }
+
+    /// Write a device's entities in HA's order: binary sensors, lights,
+    /// then scenes, sensors and switches.
+    fn write_device(&self, device: &str) {
+        let Gone { lights, others } = self.on_device(device);
+        for e in others.iter().filter(|e| e.kind.rank() < 2) {
+            self.write_entity(e);
+        }
+        for l in &lights {
+            self.write_light(l);
+        }
+        for e in others.iter().filter(|e| e.kind.rank() > 2) {
+            self.write_entity(e);
+        }
+    }
+
+    /// Drop entities: their states, and their place as service targets.
+    fn remove(&self, gone: &Gone) {
+        self.lights
+            .write()
+            .retain(|l| !gone.lights.iter().any(|g| g.rid == l.rid));
+        self.others.write().retain(|e| {
+            !gone
+                .others
+                .iter()
+                .any(|g| g.rid == e.rid && g.kind == e.kind)
+        });
+        for l in &gone.lights {
+            self.platforms.lights.remove(&l.entity_id);
+            self.hass.remove_state(&l.entity_id);
+        }
+        for e in &gone.others {
+            self.platforms.switches.remove(&e.entity_id);
+            self.platforms.scenes.remove(&e.entity_id);
+            self.hass.remove_state(&e.entity_id);
         }
     }
 
@@ -235,8 +356,12 @@ impl Bridge {
         }
     }
 
-    /// Write every entity (at start).
+    /// Write every entity (at start), in HA's platform order.
     fn write_all(&self) {
+        let others = self.others.read().clone();
+        for e in others.iter().filter(|e| e.kind.rank() < 2) {
+            self.write_entity(e);
+        }
         let lights = self.lights.read().clone();
         for l in &lights {
             self.write_light(l);
@@ -245,17 +370,9 @@ impl Bridge {
         for g in &groups {
             self.write_group(g);
         }
-    }
-
-    /// The lights on a Hue device.
-    fn lights_on_device(&self, device: &str) -> Vec<Arc<HueLight>> {
-        let store = self.store.read();
-        self.lights
-            .read()
-            .iter()
-            .filter(|l| store.device_of(&l.rid).is_some_and(|d| d["id"] == device))
-            .cloned()
-            .collect()
+        for e in others.iter().filter(|e| e.kind.rank() > 2) {
+            self.write_entity(e);
+        }
     }
 
     /// One event-stream item: merge it, then write what HA writes, in its
@@ -268,46 +385,58 @@ impl Bridge {
             .and_then(Value::as_str)
             .unwrap_or_default()
             .to_owned();
-        // Who hears of a deletion (and so must be found first).
-        let device_lights = if kind == "delete" && ty == "device" {
-            self.lights_on_device(&id)
+        // What a deleted device takes with it, found while it's known.
+        let gone = if kind == "delete" && ty == "device" {
+            self.on_device(&id)
         } else {
-            Vec::new()
+            Gone::default()
         };
         let change = self.store.write().apply(kind, item);
         let Some(change) = change else {
             return;
         };
-        self.after(change, &ty, &id, device_lights);
+        self.after(change, &ty, &id, gone);
     }
 
     /// The writes that follow a change to resource `id` of type `ty`.
-    fn after(
-        self: &Arc<Self>,
-        change: Change,
-        ty: &str,
-        id: &str,
-        device_lights: Vec<Arc<HueLight>>,
-    ) {
+    fn after(self: &Arc<Self>, change: Change, ty: &str, id: &str, gone: Gone) {
         match change {
             Change::Added => {
                 // A room or zone can arrive after its `grouped_light` (the
                 // race HA's `group.py` retries for): it makes that group.
-                if matches!(ty, "light" | "grouped_light" | "room" | "zone") {
-                    self.add_entities();
-                    let lights = self.lights.read().clone();
-                    for l in lights.iter().filter(|l| l.rid == id) {
-                        self.write_light(l);
-                    }
-                    let groups = self.groups.read().clone();
-                    for g in groups.iter().filter(|g| g.rid == id || g.group == id) {
-                        self.write_group(g);
-                    }
+                self.add_entities();
+                for e in self.others_of(id).iter().filter(|e| e.kind.rank() < 2) {
+                    self.write_entity(e);
+                }
+                let lights = self.lights.read().clone();
+                for l in lights.iter().filter(|l| l.rid == id) {
+                    self.write_light(l);
+                }
+                let groups = self.groups.read().clone();
+                for g in groups.iter().filter(|g| g.rid == id || g.group == id) {
+                    self.write_group(g);
+                }
+                for e in self.others_of(id).iter().filter(|e| e.kind.rank() > 2) {
+                    self.write_entity(e);
                 }
             }
-            Change::Deleted => match ty {
-                "grouped_light" => {
-                    let gone: Vec<_> = self
+            Change::Deleted => {
+                let mut gone = gone;
+                // Device-less entities go with their resource.
+                gone.others
+                    .extend(self.others_of(id).into_iter().filter(|e| {
+                        matches!(
+                            e.kind,
+                            Kind::Scene
+                                | Kind::SmartScene
+                                | Kind::GroupedMotion
+                                | Kind::GroupedLightLevel
+                                | Kind::Behavior
+                                | Kind::Entertainment
+                        )
+                    }));
+                if ty == "grouped_light" {
+                    let groups: Vec<_> = self
                         .groups
                         .read()
                         .iter()
@@ -315,22 +444,13 @@ impl Bridge {
                         .cloned()
                         .collect();
                     self.groups.write().retain(|g| g.rid != id);
-                    for g in gone {
-                        self.services.remove(&g.entity_id);
+                    for g in groups {
+                        self.platforms.lights.remove(&g.entity_id);
                         self.hass.remove_state(&g.entity_id);
                     }
                 }
-                "device" => {
-                    self.lights
-                        .write()
-                        .retain(|l| !device_lights.iter().any(|d| d.rid == l.rid));
-                    for l in device_lights {
-                        self.services.remove(&l.entity_id);
-                        self.hass.remove_state(&l.entity_id);
-                    }
-                }
-                _ => {}
-            },
+                self.remove(&gone);
+            }
             Change::Updated => match ty {
                 "light" => {
                     let lights = self.lights.read().clone();
@@ -361,25 +481,41 @@ impl Bridge {
                     for g in groups.iter().filter(|g| g.group == id) {
                         self.write_group(g);
                     }
-                }
-                "device" => {
-                    for l in self.lights_on_device(id) {
-                        self.write_light(&l);
+                    // Scenes show their group's name.
+                    let scenes: Vec<_> = {
+                        let store = self.store.read();
+                        self.others
+                            .read()
+                            .iter()
+                            .filter(|e| matches!(e.kind, Kind::Scene | Kind::SmartScene))
+                            .filter(|e| store.get(&e.rid).is_some_and(|r| r["group"]["rid"] == id))
+                            .cloned()
+                            .collect()
+                    };
+                    for e in &scenes {
+                        self.write_entity(e);
                     }
                 }
+                "device" => self.write_device(id),
                 "zigbee_connectivity" => {
                     let owner = self
                         .store
                         .read()
                         .get(id)
                         .and_then(|z| z["owner"]["rid"].as_str().map(str::to_owned));
+                    // Its own sensor, then everything on its device.
+                    for e in self.others_of(id) {
+                        self.write_entity(&e);
+                    }
                     if let Some(device) = owner {
-                        for l in self.lights_on_device(&device) {
-                            self.write_light(&l);
-                        }
+                        self.write_device(&device);
                     }
                 }
-                _ => {}
+                _ => {
+                    for e in self.others_of(id) {
+                        self.write_entity(&e);
+                    }
+                }
             },
         }
     }
@@ -413,53 +549,50 @@ impl Bridge {
     /// Apply a fresh snapshot: additions, changes and removals, each with
     /// the writes an event for it would make.
     fn apply_snapshot(self: &Arc<Self>, fresh: Vec<Value>) {
-        {
-            {
-                // What may be removed, known before the store forgets it:
-                // each resource's type, and each device's lights.
-                let (types, device_lights): (Vec<(String, String)>, Vec<DeviceLights>) = {
-                    let store = self.store.read();
-                    let types = ["device", "light", "grouped_light"]
-                        .into_iter()
-                        .flat_map(|t| store.of_type(t))
-                        .filter_map(|r| {
-                            Some((r["id"].as_str()?.to_owned(), r["type"].as_str()?.to_owned()))
-                        })
-                        .collect();
-                    let devices = store
-                        .of_type("device")
-                        .filter_map(|d| d["id"].as_str().map(str::to_owned))
-                        .collect::<Vec<_>>();
-                    drop(store);
-                    let lights = devices.into_iter().map(|d| {
-                        let l = self.lights_on_device(&d);
-                        (d, l)
-                    });
-                    (types, lights.collect())
-                };
-                let changes = self.store.write().reconcile(fresh);
-                for (change, id) in changes {
-                    let ty = match change {
-                        Change::Deleted => types
-                            .iter()
-                            .find(|(i, _)| *i == id)
-                            .map(|(_, t)| t.clone())
-                            .unwrap_or_default(),
-                        _ => self
-                            .store
-                            .read()
-                            .get(&id)
-                            .and_then(|r| r["type"].as_str().map(str::to_owned))
-                            .unwrap_or_default(),
-                    };
-                    let lights = device_lights
-                        .iter()
-                        .find(|(d, _)| *d == id)
-                        .map(|(_, l)| l.clone())
-                        .unwrap_or_default();
-                    self.after(change, &ty, &id, lights);
-                }
-            }
+        // What may be removed, known before the store forgets it: each
+        // resource's type, and what each device takes with it.
+        let (types, devices): (Vec<(String, String)>, Vec<String>) = {
+            let store = self.store.read();
+            let types = store
+                .order()
+                .filter_map(|r| {
+                    Some((r["id"].as_str()?.to_owned(), r["type"].as_str()?.to_owned()))
+                })
+                .collect();
+            let devices = store
+                .of_type("device")
+                .filter_map(|d| d["id"].as_str().map(str::to_owned))
+                .collect();
+            (types, devices)
+        };
+        let gone: Vec<(String, Gone)> = devices
+            .into_iter()
+            .map(|d| {
+                let g = self.on_device(&d);
+                (d, g)
+            })
+            .collect();
+        let changes = self.store.write().reconcile(fresh);
+        for (change, id) in changes {
+            let ty = match change {
+                Change::Deleted => types
+                    .iter()
+                    .find(|(i, _)| *i == id)
+                    .map(|(_, t)| t.clone())
+                    .unwrap_or_default(),
+                _ => self
+                    .store
+                    .read()
+                    .get(&id)
+                    .and_then(|r| r["type"].as_str().map(str::to_owned))
+                    .unwrap_or_default(),
+            };
+            let g = gone
+                .iter()
+                .find(|(d, _)| *d == id)
+                .map(|(_, g)| g.clone())
+                .unwrap_or_default();
+            self.after(change, &ty, &id, g);
         }
     }
 
@@ -502,6 +635,178 @@ impl Bridge {
     }
 }
 
+/// What every hue bridge shares: the entity services (`light`, `switch`,
+/// `scene`, `hue.*`) and the bridges, for `hue.hue_activate_scene`.
+pub struct Platforms {
+    hass: Hass,
+    registries: Arc<Registries>,
+    pub lights: Arc<Lights>,
+    pub switches: Arc<Switches>,
+    pub scenes: Arc<Scenes>,
+    bridges: RwLock<Vec<std::sync::Weak<Bridge>>>,
+}
+
+/// Python's `bool(x)` of a JSON value (`vol.Coerce(bool)`).
+fn truthy(v: &Value) -> bool {
+    match v {
+        Value::Null => false,
+        Value::Bool(b) => *b,
+        Value::Number(n) => n.as_f64() != Some(0.0),
+        Value::String(s) => !s.is_empty(),
+        Value::Array(a) => !a.is_empty(),
+        Value::Object(o) => !o.is_empty(),
+    }
+}
+
+impl Platforms {
+    /// Register the services the hue platforms provide.
+    pub fn new(
+        hass: &Hass,
+        registries: Arc<Registries>,
+        profiles: crate::light::Profiles,
+    ) -> Arc<Self> {
+        let p = Arc::new(Self {
+            hass: hass.clone(),
+            registries: registries.clone(),
+            lights: Arc::new(Lights::new(profiles)),
+            switches: Arc::new(Switches::default()),
+            scenes: Arc::new(Scenes::default()),
+            bridges: RwLock::default(),
+        });
+        p.lights.register_services(hass, registries.clone());
+        p.switches.register_services(hass, registries.clone());
+        p.scenes.register_services(hass, registries.clone());
+        p.register_hue_services();
+        p
+    }
+
+    fn bridges(&self) -> Vec<Arc<Bridge>> {
+        self.bridges
+            .read()
+            .iter()
+            .filter_map(std::sync::Weak::upgrade)
+            .collect()
+    }
+
+    fn scene_entities(&self) -> Vec<Arc<HueEntity>> {
+        self.bridges()
+            .iter()
+            .flat_map(|b| b.others.read().clone())
+            .filter(|e| matches!(e.kind, Kind::Scene | Kind::SmartScene))
+            .collect()
+    }
+
+    fn register_hue_services(self: &Arc<Self>) {
+        use ha_core::{Kind as K, Range, Schema, ServiceError, SupportsResponse};
+        let p = self.clone();
+        let schema = Schema::entity_service()
+            .optional("dynamic", K::Any)
+            .optional("speed", K::Int(Range::new(0.0, 100.0)))
+            .optional("transition", K::Float(Range::new(0.0, 3600.0)))
+            .optional("brightness", K::Int(Range::new(1.0, 255.0)));
+        self.hass.services().register_with_schema(
+            DOMAIN,
+            "activate_scene",
+            Some(schema),
+            SupportsResponse::None,
+            move |call| {
+                let p = p.clone();
+                async move {
+                    let target = call.entity_ids()?;
+                    let indirect = p.registries.target_entities(&call.data);
+                    let d = &call.data;
+                    let dynamic = d.get("dynamic").is_some_and(truthy);
+                    let (speed, brightness) = (
+                        d.get("speed").and_then(Value::as_i64),
+                        d.get("brightness").and_then(Value::as_i64),
+                    );
+                    let transition = d.get("transition").and_then(Value::as_f64);
+                    let scenes = p.scene_entities();
+                    let chosen = crate::switch::select(
+                        &scenes,
+                        |e| &e.entity_id,
+                        |_| true,
+                        &target,
+                        &indirect,
+                    );
+                    let calls = chosen
+                        .iter()
+                        .map(|e| e.activate(transition, dynamic, speed, brightness));
+                    crate::light::join_all(calls)
+                        .await
+                        .into_iter()
+                        .collect::<Result<Vec<()>, _>>()?;
+                    Ok(None)
+                }
+            },
+        );
+        let p = self.clone();
+        let schema = Schema::new()
+            .required("group_name", K::String)
+            .required("scene_name", K::String)
+            .optional(
+                "transition",
+                K::Int(Range {
+                    min: Some(0.0),
+                    max: None,
+                }),
+            )
+            .optional("dynamic", K::Boolean);
+        self.hass.services().register_with_schema(
+            DOMAIN,
+            "hue_activate_scene",
+            Some(schema),
+            SupportsResponse::None,
+            move |call| {
+                let p = p.clone();
+                async move {
+                    tracing::warn!(
+                        "Use of service_call 'hue_activate_scene' is deprecated and will be removed in a future release. Please use scene entities instead"
+                    );
+                    let d = &call.data;
+                    let text = |k: &str| d.get(k).and_then(Value::as_str).unwrap_or_default().to_lowercase();
+                    let (group, scene) = (text("group_name"), text("scene_name"));
+                    let transition = d.get("transition").and_then(Value::as_i64).filter(|t| *t != 0);
+                    let dynamic = d.get("dynamic").and_then(Value::as_bool).unwrap_or(false);
+                    for bridge in p.bridges() {
+                        // Regular scenes first, then smart ones; names match
+                        // case-insensitively.
+                        let found = {
+                            let store = bridge.store.read();
+                            ["scene", "smart_scene"].into_iter().find_map(|ty| {
+                                store.of_type(ty).find_map(|s| {
+                                    let name = s["metadata"]["name"].as_str()?.to_lowercase();
+                                    let g = store.get(s["group"]["rid"].as_str()?)?;
+                                    let gname = g["metadata"]["name"].as_str()?.to_lowercase();
+                                    (name == scene && gname == group)
+                                        .then(|| (ty, s["id"].as_str().unwrap_or_default().to_owned()))
+                                })
+                            })
+                        };
+                        let Some((ty, id)) = found else {
+                            continue;
+                        };
+                        if ty == "smart_scene" {
+                            // HA hands a smart scene arguments it doesn't take.
+                            return Err(ServiceError::Failed(
+                                "SmartScenesController.recall() got an unexpected keyword argument 'dynamic'".into(),
+                            ));
+                        }
+                        let mut recall = json!({"action": if dynamic { "dynamic_palette" } else { "active" }});
+                        if let Some(t) = transition {
+                            recall["duration"] = json!(t * 1000);
+                        }
+                        light::result(bridge.api.put("scene", &id, &json!({"recall": recall})).await)?;
+                        return Ok(None);
+                    }
+                    tracing::warn!("No bridge was able to activate scene {scene} in group {group}");
+                    Ok(None)
+                }
+            },
+        );
+    }
+}
+
 /// The parts of a `hue` config entry `hars` uses, or `None` (logged) for a
 /// v1 bridge or a malformed entry.
 fn entry_settings(entry: &Map<String, Value>) -> Option<(String, String, Vec<String>)> {
@@ -530,12 +835,8 @@ fn entry_settings(entry: &Map<String, Value>) -> Option<(String, String, Vec<Str
 /// Run a `hue` config entry until the task is dropped: set up (retrying as
 /// HA's `ConfigEntryNotReady` does), make the entities, then follow the
 /// event stream.
-pub async fn run(
-    hass: Hass,
-    registries: Arc<Registries>,
-    services: Arc<Lights>,
-    entry: Map<String, Value>,
-) {
+pub async fn run(platforms: Arc<Platforms>, entry: Map<String, Value>) {
+    let (hass, registries) = (platforms.hass.clone(), platforms.registries.clone());
     let Some((host, key, ignore)) = entry_settings(&entry) else {
         return;
     };
@@ -582,8 +883,10 @@ pub async fn run(
         ignore_availability: ignore,
         lights: RwLock::default(),
         groups: RwLock::default(),
-        services,
+        others: RwLock::default(),
+        platforms: platforms.clone(),
     });
+    platforms.bridges.write().push(Arc::downgrade(&bridge));
     bridge.add_entities();
     bridge.write_all();
     bridge.listen().await;

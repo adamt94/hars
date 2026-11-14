@@ -80,7 +80,7 @@ fn hue_mirek(k: i64, min: i64, max: i64) -> Result<i64, ServiceError> {
 }
 
 /// The bridge's answer to a command, as HA reports it.
-fn result(r: Result<(), super::api::ApiError>) -> Result<(), ServiceError> {
+pub(super) fn result(r: Result<(), super::api::ApiError>) -> Result<(), ServiceError> {
     match r {
         Ok(()) => Ok(()),
         Err(e) => match e.service_message() {

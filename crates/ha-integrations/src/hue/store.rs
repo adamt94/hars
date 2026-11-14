@@ -171,6 +171,17 @@ impl Store {
         out
     }
 
+    /// Every resource, in the bridge's order.
+    pub fn order(&self) -> impl Iterator<Item = &Value> {
+        self.order.iter().filter_map(|id| self.by_id.get(id))
+    }
+
+    /// The bridge's own device (the one with a `bridge` service).
+    pub fn bridge_device(&self) -> Option<&Value> {
+        self.of_type("device")
+            .find(|d| services(d).any(|s| s["rtype"] == "bridge"))
+    }
+
     /// The device whose services include `id` (aiohue's `get_device`).
     pub fn device_of(&self, id: &str) -> Option<&Value> {
         self.of_type("device").find(|d| has_service(d, id))

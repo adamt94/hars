@@ -281,10 +281,18 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
       TCP keepalive instead of aiohue's geofence-renaming keepalive. Matched
       against HA's own code on the real bridge: every light entity, 14
       event-stream scenarios, 50 service calls
-- [ ] `hue`: sensors, binary sensors, switches, scenes (`scene.turn_on`,
-      `hue.activate_scene`), events and `hue_event`; mDNS rediscovery if the
-      imported host moves; link-button re-pair (user-initiated) if the key
-      is rejected
+- [x] `hue`: sensors (temperature, illuminance and grouped illuminance,
+      battery, zigbee connectivity), binary sensors (motion, camera and
+      grouped motion, contact, tamper, entertainment), the enable and
+      behaviour-instance switches, scenes and smart scenes, through new
+      generic `switch` and `scene` components; `scene.turn_on`,
+      `hue.activate_scene`, `hue.hue_activate_scene`; HA's fan-out order
+      across platforms. Matched against HA's code on the real bridge: all 28
+      entities (19 with a state), 14 event-stream scenarios, 59 service calls
+- [ ] `hue`: button/rotary/bell events and `hue_event`, the motion-aware
+      sensor; scene state restored from `core.restore_state`; mDNS
+      rediscovery if the imported host moves; user-initiated re-pairing if
+      the key is rejected
 - [ ] `lifx`: imported host + broadcast rediscovery, source/sequence matching,
       bounded retries, offline → `unavailable`, re-read state after a
       transition (the ack is not the final state); on/off/brightness/kelvin/HSBK;

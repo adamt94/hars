@@ -5,7 +5,9 @@ pub mod hue;
 pub mod light;
 pub mod met;
 pub mod num;
+pub mod scene;
 pub mod sun;
+pub mod switch;
 pub mod weather;
 
 use ha_core::Hass;
@@ -99,17 +101,11 @@ pub fn start(
     }
     let hue: Vec<Map<String, Value>> = enabled(hue::DOMAIN).cloned().collect();
     if !hue.is_empty() {
-        let lights = Arc::new(light::Lights::new(profiles));
-        lights.register_services(hass, registries.clone());
+        let platforms = hue::Platforms::new(hass, registries.clone(), profiles);
         for entry in hue {
-            tokio::spawn(hue::run(
-                hass.clone(),
-                registries.clone(),
-                lights.clone(),
-                entry,
-            ));
+            tokio::spawn(hue::run(platforms.clone(), entry));
         }
-        running.extend(["hue", "light"]);
+        running.extend(["hue", "light", "sensor", "binary_sensor", "switch", "scene"]);
     }
     Started { running, weather }
 }
