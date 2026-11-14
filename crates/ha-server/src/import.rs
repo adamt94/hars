@@ -171,6 +171,8 @@ pub fn run(opts: &Options) -> anyhow::Result<Report> {
         .map_err(|e| anyhow::anyhow!("core.config doesn't load ({})", sanitized(&e)))?;
     ha_registry::Registries::load_strict(&staging.root)
         .map_err(|e| anyhow::anyhow!("the registries don't load ({})", sanitized(&e)))?;
+    ha_api::Lovelace::load(&staging.root)
+        .map_err(|e| anyhow::anyhow!("the dashboards don't load ({})", sanitized(&e)))?;
     for key in staging.keys()? {
         if key == "frontend.system_data" || key.starts_with(USER_DATA_PREFIX) {
             let store = Store::new(&staging.root, key.clone(), 1, 1, false);
@@ -245,6 +247,7 @@ fn supported(key: &str) -> Option<bool> {
         .find(|(k, _)| *k == key)
         .map(|&(_, private)| private)
         .or_else(|| key.starts_with(USER_DATA_PREFIX).then_some(false))
+        .or_else(|| ha_api::Lovelace::is_store(key).then_some(false))
 }
 
 fn unsupported_reason(key: &str) -> &'static str {

@@ -50,8 +50,11 @@ pub(super) fn dispatch(conn: &mut Conn, id: u64, ty: &str, msg: &Map<String, Val
             conn.out.result(id, services(conn));
         }),
         "get_panels" => only_keys(msg, &[]).map(|()| {
-            conn.out
-                .result(id, panels(conn.principal.permission == Permission::Admin));
+            let lovelace = conn.shared.config.lovelace.panels();
+            conn.out.result(
+                id,
+                panels(conn.principal.permission == Permission::Admin, lovelace),
+            );
         }),
         "auth/current_user" => only_keys(msg, &[]).map(|()| {
             conn.out.result(id, current_user(conn));
@@ -131,7 +134,7 @@ fn services(conn: &Conn) -> Value {
 /// The panels a default HA 2026.6.1 install registers that `hars` can
 /// serve. `home` is the frontend's default panel; `lovelace` without a
 /// config redirects there. `config` arrives with the settings commands.
-fn panels(is_admin: bool) -> Value {
+fn panels(is_admin: bool, dashboards: Vec<(String, Value)>) -> Value {
     let panel = |url: &str, title: Option<&str>, icon: Option<&str>, sidebar: bool, admin: bool| {
         (
             url.to_owned(),
@@ -176,8 +179,10 @@ fn panels(is_admin: bool) -> Value {
         panel("notfound", None, None, true, false),
         panel("lovelace", None, None, true, false),
     ];
+    // Each dashboard is a panel; one at `lovelace` replaces the default.
     let visible: Map<String, Value> = all
         .into_iter()
+        .chain(dashboards)
         .filter(|(_, p)| is_admin || p["require_admin"] == false)
         .collect();
     Value::Object(visible)

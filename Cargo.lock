@@ -420,6 +420,7 @@ dependencies = [
  "ha-registry",
  "jiff",
  "parking_lot",
+ "serde",
  "serde_json",
  "serde_urlencoded",
  "tokio",

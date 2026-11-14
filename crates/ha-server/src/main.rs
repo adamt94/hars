@@ -88,6 +88,12 @@ async fn run(thp_disabled: std::io::Result<bool>) -> anyhow::Result<()> {
             tokio::task::spawn_blocking(move || ha_registry::Registries::load(&dir)).await??,
         )
     };
+    api_config.lovelace = {
+        let dir = config_dir.clone();
+        std::sync::Arc::new(
+            tokio::task::spawn_blocking(move || ha_api::Lovelace::load(&dir)).await??,
+        )
+    };
     api_config.frontend_data = {
         let dir = config_dir.clone();
         std::sync::Arc::new(

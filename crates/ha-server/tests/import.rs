@@ -156,7 +156,7 @@ fn imports_an_ha_install_and_keeps_its_sessions() {
     // A dry run writes nothing.
     let out = hars(&dest, &["import", src.to_str().unwrap(), "--dry-run"]);
     assert!(out.status.success(), "{out:?}");
-    assert!(String::from_utf8_lossy(&out.stdout).contains("would import 6 store(s)"));
+    assert!(String::from_utf8_lossy(&out.stdout).contains("would import 7 store(s)"));
     assert!(!dest.join(".storage").exists() && !dest.join("import-report.json").exists());
 
     let out = hars(&dest, &["import", src.to_str().unwrap()]);
@@ -201,6 +201,7 @@ fn imports_an_ha_install_and_keeps_its_sessions() {
         "auth_provider.homeassistant",
         "core.config",
         "core.entity_registry",
+        "lovelace.map",
         "onboarding",
         user_data.as_str(),
     ];
@@ -212,7 +213,7 @@ fn imports_an_ha_install_and_keeps_its_sessions() {
         .iter()
         .map(|s| s["key"].as_str().unwrap())
         .collect();
-    assert_eq!(skipped, ["core.config_entries", "lovelace.map"]);
+    assert_eq!(skipped, ["core.config_entries"]);
     assert_eq!(
         report["config_entries"][0],
         json!({"entry_id": "e1", "domain": "hue", "title": "Hue Bridge", "disabled": false, "supported": false})

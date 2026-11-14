@@ -145,7 +145,8 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
         unique ids, disabled/hidden flags, names), read by `ha-registry`
   - [x] `core.config` (location, elevation, units, time zone)
   - [ ] `person`, zones
-  - [ ] Lovelace dashboards and the dashboards list (`url_path` identity)
+  - [x] Lovelace dashboards and the dashboards list (`url_path` identity),
+        resources; storage mode (YAML dashboards come with `configuration.yaml`)
   - [x] Auth: users, bcrypt hashes, **refresh tokens with ids, client ids and
         `jwt_key`s**, so the iPhone and browser sessions survive (tested: an
         imported HA refresh token refreshes against `hars`); frontend user
@@ -203,9 +204,11 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
       keys, legacy device-name prefix stripping),
       `config/{device,area,floor,label}_registry/list`
 - [ ] Registry `*_updated` events, once registries change at runtime
-- [ ] WS lovelace: `lovelace/info`, `lovelace/dashboards/list`,
+- [x] WS lovelace: `lovelace/info`, `lovelace/dashboards/list`,
       `lovelace/config` (`config_not_found` for Overview),
-      `lovelace/config/save`, `lovelace/resources`
+      `lovelace/config/save` + `/delete` (admin, fire `lovelace_updated`),
+      `lovelace/resources`; each dashboard is a panel and its URL loads the app
+- [ ] `lovelace/dashboards/create|update|delete`, resource editing
 - [ ] One serialised `Arc<str>` per state change, shared by all connections
 - [ ] Acceptance: replaying the frontend trace passes against `hars` with
       fixture entities (protocol smoke test; real data comes in M4/M5)

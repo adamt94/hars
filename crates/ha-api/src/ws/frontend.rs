@@ -59,8 +59,16 @@ pub(super) fn dispatch(
         }
         "lovelace/info" => empty(conn, json!({"resource_mode": "storage"})),
         "lovelace/config" => lovelace_config(conn, id, msg),
-        "lovelace/resources" | "lovelace/resources/list" => empty(conn, json!([])),
-        "lovelace/dashboards/list" => empty(conn, json!([])),
+        "lovelace/config/save" => lovelace_save(conn, id, msg, false),
+        "lovelace/config/delete" => lovelace_save(conn, id, msg, true),
+        "lovelace/resources" | "lovelace/resources/list" => {
+            let r = conn.shared.config.lovelace.resources_json();
+            empty(conn, r)
+        }
+        "lovelace/dashboards/list" => {
+            let r = conn.shared.config.lovelace.dashboards_json();
+            empty(conn, r)
+        }
         "repairs/list_issues" => empty(conn, json!({"issues": []})),
         "persistent_notification/subscribe" => only_keys(msg, &[]).map(|()| {
             // Result first, then the current notifications (none), as HA.
@@ -187,23 +195,93 @@ fn subscribe_data(
     Ok(())
 }
 
-/// `lovelace/config`: no dashboards are stored yet, so the default
-/// dashboard has no config and any other `url_path` is unknown.
+fn url_path(msg: &Map<String, Value>) -> Result<Option<String>, Invalid> {
+    match msg.get("url_path") {
+        None | Some(Value::Null) => Ok(None),
+        Some(Value::String(u)) => Ok(Some(u.clone())),
+        Some(_) => Err("expected str for dictionary value @ data['url_path']".into()),
+    }
+}
+
+fn lovelace_error(conn: &Conn, id: u64, e: crate::lovelace::ConfigError) {
+    use crate::lovelace::ConfigError;
+    let message = match e {
+        ConfigError::UnknownDashboard(url) => format!(
+            "Unknown config specified: {}",
+            url.as_deref().unwrap_or("None")
+        ),
+        ConfigError::NoConfig => "No config found.".into(),
+    };
+    conn.out.error(json!(id), "config_not_found", &message);
+}
+
+/// `lovelace/config`.
 fn lovelace_config(conn: &mut Conn, id: u64, msg: &Map<String, Value>) -> Result<(), Invalid> {
     only_keys(msg, &["force", "url_path"])?;
-    match msg.get("url_path") {
-        None | Some(Value::Null) => {
-            conn.out
-                .error(json!(id), "config_not_found", "No config found.");
+    let url = url_path(msg)?;
+    match conn.shared.config.lovelace.config(url.as_deref()) {
+        Ok(config) => {
+            conn.out.result(id, config);
         }
-        Some(Value::String(url)) => {
-            conn.out.error(
-                json!(id),
-                "config_not_found",
-                &format!("Unknown config specified: {url}"),
-            );
-        }
-        Some(_) => return Err("expected str for dictionary value @ data['url_path']".into()),
+        Err(e) => lovelace_error(conn, id, e),
     }
+    Ok(())
+}
+
+/// `lovelace/config/save` and `lovelace/config/delete` (admin only): store
+/// it, then fire `lovelace_updated` so open dashboards reload.
+fn lovelace_save(
+    conn: &mut Conn,
+    id: u64,
+    msg: &Map<String, Value>,
+    delete: bool,
+) -> Result<(), Invalid> {
+    let config = if delete {
+        only_keys(msg, &["url_path"])?;
+        None
+    } else {
+        only_keys(msg, &["config", "url_path"])?;
+        match msg.get("config") {
+            Some(c @ (Value::String(_) | Value::Object(_))) => Some(c.clone()),
+            Some(_) => return Err("expected dict for dictionary value @ data['config']".into()),
+            None => return Err("required key not provided @ data['config']".into()),
+        }
+    };
+    let url = url_path(msg)?;
+    if conn.principal.permission < Permission::Admin {
+        conn.out.error(json!(id), "unauthorized", "Unauthorized");
+        return Ok(());
+    }
+    let lovelace = conn.shared.config.lovelace.clone();
+    let hass = conn.shared.hass.clone();
+    let out = conn.out.clone();
+    let user = conn.user.id.clone();
+    tokio::spawn(async move {
+        match lovelace.save(url.as_deref(), config).await {
+            Ok(saved) => {
+                let now = hass.clock().now();
+                hass.bus().fire(ha_core::Event::new(
+                    ha_core::EventKind::Custom {
+                        name: "lovelace_updated".into(),
+                        data: json!({ "url_path": saved }),
+                    },
+                    now,
+                    ha_core::Context::at(now).with_user(user.as_str()),
+                ));
+                out.result(id, Value::Null);
+            }
+            Err(e) => {
+                use crate::lovelace::ConfigError;
+                let message = match e {
+                    ConfigError::UnknownDashboard(url) => format!(
+                        "Unknown config specified: {}",
+                        url.as_deref().unwrap_or("None")
+                    ),
+                    ConfigError::NoConfig => "No config found.".into(),
+                };
+                out.error(json!(id), "config_not_found", &message);
+            }
+        }
+    });
     Ok(())
 }

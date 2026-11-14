@@ -142,7 +142,7 @@ fn manifest() -> Value {
     })
 }
 
-pub(crate) fn routes(fe: Arc<Frontend>, auth: Auth) -> Router {
+pub(crate) fn routes(fe: Arc<Frontend>, auth: Auth, lovelace: Arc<crate::Lovelace>) -> Router {
     let root = fe.root.clone();
     let file = |name: &str| {
         ServeFile::new(root.join(name))
@@ -197,7 +197,11 @@ pub(crate) fn routes(fe: Arc<Frontend>, auth: Auth) -> Router {
     };
     let panel = move |Path(segments): Path<Vec<String>>| {
         let res = match segments.first() {
-            Some(first) if PANEL_PATHS.contains(&first.as_str()) => page(),
+            Some(first)
+                if PANEL_PATHS.contains(&first.as_str()) || lovelace.has_dashboard(first) =>
+            {
+                page()
+            }
             _ => StatusCode::NOT_FOUND.into_response(),
         };
         async move { res }
@@ -366,6 +370,33 @@ mod tests {
             .oneshot(req.body(Body::empty()).unwrap())
             .await
             .unwrap()
+    }
+
+    #[tokio::test]
+    async fn dashboard_urls_load_the_app() {
+        let dir = std::env::temp_dir().join(format!("hars-fe-dash-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join(".storage")).unwrap();
+        let items = json!({"version": 1, "minor_version": 1, "key": "lovelace_dashboards", "data": {"items": [
+            {"id": "map", "title": "Map", "url_path": "map", "mode": "storage"}
+        ]}});
+        std::fs::write(dir.join(".storage/lovelace_dashboards"), items.to_string()).unwrap();
+        let config = crate::ApiConfig {
+            frontend: Some(fake_frontend()),
+            lovelace: Arc::new(crate::Lovelace::load(&dir).unwrap()),
+            ..Default::default()
+        };
+        let get = |path: &'static str| {
+            crate::router(ha_core::Hass::new(), crate::test_util::auth(true), &config)
+                .oneshot(Request::get(path).body(Body::empty()).unwrap())
+        };
+        assert_eq!(get("/map").await.unwrap().status(), StatusCode::OK);
+        assert_eq!(get("/map/0").await.unwrap().status(), StatusCode::OK);
+        assert_eq!(
+            get("/not-a-dashboard").await.unwrap().status(),
+            StatusCode::NOT_FOUND
+        );
+        std::fs::remove_dir_all(dir).unwrap();
     }
 
     #[tokio::test]

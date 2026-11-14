@@ -868,3 +868,108 @@ async fn registry_lists_come_from_the_registries() {
         );
     }
 }
+
+#[tokio::test]
+async fn dashboards_are_served_saved_and_announced() {
+    let dir = std::env::temp_dir().join(format!("hars-ws-lovelace-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(dir.join(".storage")).unwrap();
+    let store = |key: &str, data: Value| {
+        let v = json!({"version": 1, "minor_version": 1, "key": key, "data": data});
+        std::fs::write(dir.join(".storage").join(key), v.to_string()).unwrap();
+    };
+    store(
+        "lovelace_dashboards",
+        json!({"items": [
+            {"id": "lovelace", "title": "Overview", "url_path": "lovelace", "require_admin": false, "show_in_sidebar": true, "mode": "storage"}
+        ]}),
+    );
+    store(
+        "lovelace.lovelace",
+        json!({"config": {"views": [{"title": "Home"}]}}),
+    );
+
+    let hass = Hass::new();
+    hass.start();
+    let auth = crate::test_util::auth(true);
+    let config = crate::ApiConfig {
+        lovelace: std::sync::Arc::new(crate::Lovelace::load(&dir).unwrap()),
+        ..Default::default()
+    };
+    let app = crate::router(hass.clone(), auth.clone(), &config)
+        .into_make_service_with_connect_info::<std::net::SocketAddr>();
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let url = format!("ws://{}/api/websocket", listener.local_addr().unwrap());
+    tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+    let s = Server { url, hass, auth };
+    let mut c = Client::authed(&s, &token(&s.auth).0).await;
+
+    // The dashboard at `lovelace` replaces the default panel, with a config,
+    // so the frontend shows it instead of redirecting to /home.
+    let panels = c.call(json!({"id": 2, "type": "get_panels"})).await["result"].clone();
+    assert_eq!(panels["lovelace"]["config"], json!({"mode": "storage"}));
+    assert_eq!(panels["lovelace"]["title"], "Overview");
+    let cfg = c
+        .call(json!({"id": 3, "type": "lovelace/config", "url_path": null, "force": false}))
+        .await;
+    assert_eq!(cfg["result"], json!({"views": [{"title": "Home"}]}));
+    let cfg = c
+        .call(json!({"id": 4, "type": "lovelace/config", "url_path": "nope"}))
+        .await;
+    assert_eq!(
+        cfg["error"],
+        json!({"code": "config_not_found", "message": "Unknown config specified: nope"})
+    );
+
+    let sub = c
+        .call(json!({"id": 5, "type": "subscribe_events", "event_type": "lovelace_updated"}))
+        .await;
+    assert_eq!(sub["success"], true);
+    let new = json!({"views": [{"title": "Kitchen"}]});
+    let first = c
+        .call(
+            json!({"id": 6, "type": "lovelace/config/save", "url_path": "lovelace", "config": new}),
+        )
+        .await;
+    let second = c.recv().await;
+    let (event, result) = if first["type"] == "event" {
+        (first, second)
+    } else {
+        (second, first)
+    };
+    assert_eq!(result["success"], true, "{result}");
+    assert_eq!(event["event"]["event_type"], "lovelace_updated");
+    assert_eq!(event["event"]["data"], json!({"url_path": "lovelace"}));
+    let cfg = c
+        .call(json!({"id": 7, "type": "lovelace/config", "url_path": "lovelace"}))
+        .await;
+    assert_eq!(cfg["result"], new);
+    let raw: Value =
+        serde_json::from_slice(&std::fs::read(dir.join(".storage/lovelace.lovelace")).unwrap())
+            .unwrap();
+    assert_eq!(raw["data"]["config"], new);
+
+    // Saving is admin-only.
+    s.auth.add_user("reader", "pw").unwrap();
+    let flow = s.auth.start_login_flow("http://127.0.0.1:8123/", None);
+    let code = s
+        .auth
+        .finish_login_flow(&flow, "http://127.0.0.1:8123/", "reader", None)
+        .unwrap();
+    let t = s
+        .auth
+        .exchange_code(Some("http://127.0.0.1:8123/"), Some(&code), None)
+        .unwrap();
+    let uid = s
+        .auth
+        .validate_access_token(&t.access_token, None)
+        .unwrap()
+        .user_id;
+    s.auth.set_user_groups(&uid, &[ha_auth::GROUP_ID_USER]);
+    let mut user = Client::authed(&s, &t.access_token).await;
+    let r = user
+        .call(json!({"id": 2, "type": "lovelace/config/save", "config": {}}))
+        .await;
+    assert_eq!(r["error"]["code"], "unauthorized");
+    std::fs::remove_dir_all(dir).unwrap();
+}

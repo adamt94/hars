@@ -18,6 +18,7 @@ ha-registry.workspace = true
 futures-util = { version = "0.3", default-features = false, features = ["sink"] }
 jiff = "0.2.43"
 parking_lot = "0.12.5"
+serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
 serde_urlencoded = "0.7.1"
 tokio = { version = "1.54.1", features = ["rt", "macros", "fs", "time"] }

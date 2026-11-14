@@ -4,11 +4,13 @@
 mod auth;
 mod frontend;
 mod frontend_data;
+mod lovelace;
 mod rest;
 mod ws;
 
 pub use frontend::Frontend;
 pub use frontend_data::FrontendData;
+pub use lovelace::Lovelace;
 
 use axum::{
     Router,
@@ -34,6 +36,8 @@ pub struct ApiConfig {
     pub frontend_data: Arc<FrontendData>,
     /// Entity, device, area, floor and label registries.
     pub registries: Arc<ha_registry::Registries>,
+    /// Lovelace dashboards.
+    pub lovelace: Arc<Lovelace>,
 }
 
 /// What the WebSocket and `/api/config` need.
@@ -136,7 +140,7 @@ pub fn router(hass: Hass, auth: Auth, config: &ApiConfig) -> Router {
         .merge(auth::routes(auth.clone()))
         .merge(ws::routes(shared));
     if let Some(fe) = &config.frontend {
-        router = router.merge(frontend::routes(fe.clone(), auth));
+        router = router.merge(frontend::routes(fe.clone(), auth, config.lovelace.clone()));
     }
     router.layer(axum::middleware::map_response(security_headers))
 }
