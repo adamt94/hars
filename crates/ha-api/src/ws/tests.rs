@@ -2105,10 +2105,36 @@ async fn history_stream_sends_the_past_then_follows() {
         "{live}"
     );
     assert!(live["event"].get("start_time").is_none());
+    let r = c
+        .call(json!({"id": 201, "type": "unsubscribe_events", "subscription": 200}))
+        .await;
+    assert_eq!(r["success"], true);
+
+    // After `end_time`, nothing more is sent, even a change that was
+    // still being grouped.
+    c.send(json!({"id": 202, "type": "history/stream", "start_time": minutes_ago(5),
+                  "end_time": (jiff::Timestamp::now() + jiff::SignedDuration::from_millis(900)).to_string(),
+                  "entity_ids": ["light.a"]})).await;
+    assert_eq!(c.recv().await["result"], Value::Null);
+    assert_eq!(c.recv().await["type"], "event");
+    s.hass.set_state(light.clone(), "off", Attributes::new());
+    assert_eq!(c.recv().await["event"]["states"]["light.a"][0]["s"], "off");
+    // (Read while waiting, so the heartbeat is answered.)
+    assert!(
+        tokio::time::timeout(Duration::from_millis(900), c.recv())
+            .await
+            .is_err()
+    );
+    s.hass.set_state(light.clone(), "on", Attributes::new());
+    assert!(
+        tokio::time::timeout(Duration::from_millis(800), c.recv())
+            .await
+            .is_err()
+    );
 
     // A finished window answers once, even when empty.
     c.send(
-        json!({"id": 201, "type": "history/stream", "start_time": minutes_ago(120),
+        json!({"id": 203, "type": "history/stream", "start_time": minutes_ago(120),
                   "end_time": minutes_ago(60), "entity_ids": ["light.a"]}),
     )
     .await;
@@ -2118,7 +2144,7 @@ async fn history_stream_sends_the_past_then_follows() {
     // A start in the future is an error for a stream.
     let r = c
         .call(
-            json!({"id": 202, "type": "history/stream", "start_time": minutes_ago(-5),
+            json!({"id": 204, "type": "history/stream", "start_time": minutes_ago(-5),
                      "entity_ids": ["light.a"]}),
         )
         .await;

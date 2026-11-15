@@ -9,6 +9,7 @@ use jiff::tz::TimeZone;
 use jiff::{Timestamp, ToSpan};
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
 /// HA's nightly purge time, local (`recorder/core.py`).
@@ -93,6 +94,9 @@ impl Settings {
 /// The recorder, once started.
 pub struct Recorder {
     store: Arc<Store>,
+    /// Events the bus has queued to the intake, and how many it has handled.
+    queued: Arc<AtomicU64>,
+    handled: tokio::sync::watch::Receiver<u64>,
 }
 
 impl std::fmt::Debug for Recorder {
@@ -120,14 +124,19 @@ impl Recorder {
         let mut feed = hass.bus().subscribe_lossless(recorded);
         let (drained, drained_rx) = tokio::sync::oneshot::channel::<()>();
         let mut intake = Intake::new(hass.clone());
+        let queued = feed.queued();
+        let (handled_tx, handled) = tokio::sync::watch::channel(0u64);
         {
             let store = store.clone();
             tokio::spawn(async move {
+                let mut count = 0u64;
                 while let Some(event) = feed.recv().await {
                     if matches!(event.kind, ha_core::EventKind::HomeassistantFinalWrite {}) {
                         break;
                     }
                     intake.record(&event, |row| store.record(row));
+                    count += 1;
+                    handled_tx.send_replace(count);
                 }
                 let _ = drained.send(());
             });
@@ -146,7 +155,11 @@ impl Recorder {
                 settings.purge_keep_days,
             ));
         }
-        Ok(Self { store })
+        Ok(Self {
+            store,
+            queued,
+            handled,
+        })
     }
 
     /// `recorder/info`'s live fields.
@@ -156,6 +169,18 @@ impl Recorder {
 
     pub fn store(&self) -> &Arc<Store> {
         &self.store
+    }
+
+    /// Wait until everything the bus fired before this call has been
+    /// recorded and written: the intake catches up, then the writer commits
+    /// (HA's `async_get_commit_future`). A read after it sees every state
+    /// change made before it was asked for.
+    pub async fn sync(&self) {
+        let target = self.queued.load(Ordering::Acquire);
+        let mut handled = self.handled.clone();
+        // `Err`: the intake has stopped (final write), nothing more comes.
+        let _ = handled.wait_for(|&n| n >= target).await;
+        self.store.flush().await;
     }
 }
 
@@ -236,6 +261,33 @@ mod tests {
             next_purge(t("2026-10-25T00:30:00Z"), &tz),
             t("2026-10-25T04:12:00Z")
         );
+    }
+
+    /// `sync` returns once every state change made before it is a row in
+    /// the store, with no waiting on the commit interval.
+    #[tokio::test]
+    async fn sync_waits_for_the_intake_and_the_writer() {
+        let dir = std::env::temp_dir().join(format!("hars-recorder-sync-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let settings = Settings {
+            commit_interval: Duration::from_secs(3600),
+            ..Settings::default()
+        };
+        let hass = Hass::new();
+        let recorder = Recorder::start(&hass, dir.clone(), &settings)
+            .await
+            .unwrap();
+        let id = ha_core::EntityId::parse("sensor.washer").unwrap();
+        for i in 0..200 {
+            hass.set_state(id.clone(), i.to_string(), Default::default());
+        }
+        recorder.sync().await;
+        let mut n = 0;
+        recorder.store().scan(i64::MIN, i64::MAX, |r| {
+            n += usize::from(matches!(r, crate::Rec::State(_)));
+        });
+        assert_eq!(n, 200);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     /// End to end: rows written before and during stop are all on disk

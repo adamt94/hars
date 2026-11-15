@@ -4,6 +4,7 @@ use parking_lot::Mutex;
 use serde::Serialize;
 use smol_str::SmolStr;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use tokio::sync::{broadcast, mpsc};
 
 /// Bounded so a slow subscriber can't grow memory without limit;
@@ -83,6 +84,14 @@ impl Event {
     }
 }
 
+/// A lossless subscriber: its filter, its queue, and how many events were
+/// ever queued to it.
+type Lossless = (
+    EventFilter,
+    mpsc::UnboundedSender<Arc<Event>>,
+    Arc<AtomicU64>,
+);
+
 /// Picks the events a lossless subscriber wants. It runs on the firing
 /// thread with the bus locked (and, for a state change, the states map),
 /// so it must look only at the event it is given: reading `Hass` or firing
@@ -95,7 +104,7 @@ pub struct EventBus {
     tx: broadcast::Sender<Arc<Event>>,
     /// Lossless subscribers ([`EventBus::subscribe_lossless`]). Held while
     /// firing, broadcast included, so they and the bus see one order.
-    lossless: Mutex<Vec<(EventFilter, mpsc::UnboundedSender<Arc<Event>>)>>,
+    lossless: Mutex<Vec<Lossless>>,
 }
 
 impl Default for EventBus {
@@ -117,8 +126,15 @@ impl EventBus {
         let mut lossless = self.lossless.lock();
         if !lossless.is_empty() {
             // A dropped feed goes before its filter runs, matching or not.
-            lossless.retain(|(wants, tx)| {
-                !tx.is_closed() && (!wants(&event) || tx.send(event.clone()).is_ok())
+            lossless.retain(|(wants, tx, queued)| {
+                !tx.is_closed()
+                    && (!wants(&event) || {
+                        let sent = tx.send(event.clone()).is_ok();
+                        if sent {
+                            queued.fetch_add(1, Ordering::Release);
+                        }
+                        sent
+                    })
             });
         }
         // No subscribers is not an error.
@@ -137,15 +153,17 @@ impl EventBus {
     /// Dropping the feed unsubscribes.
     pub fn subscribe_lossless(&self, wants: EventFilter) -> EventFeed {
         let (tx, rx) = mpsc::unbounded_channel();
+        let queued = Arc::new(AtomicU64::new(0));
         let mut lossless = self.lossless.lock();
-        lossless.push((wants, tx));
-        EventFeed { rx }
+        lossless.push((wants, tx, queued.clone()));
+        EventFeed { rx, queued }
     }
 }
 
 /// A lossless event feed, from [`EventBus::subscribe_lossless`].
 pub struct EventFeed {
     rx: mpsc::UnboundedReceiver<Arc<Event>>,
+    queued: Arc<AtomicU64>,
 }
 
 impl EventFeed {
@@ -162,6 +180,14 @@ impl EventFeed {
     /// Events queued and not yet received.
     pub fn backlog(&self) -> usize {
         self.rx.len()
+    }
+
+    /// How many events the bus has ever queued to this feed. A consumer
+    /// that counts what it has handled can tell when it has caught up with
+    /// everything fired before a moment: read this, then wait for its own
+    /// count to reach it.
+    pub fn queued(&self) -> Arc<AtomicU64> {
+        self.queued.clone()
     }
 }
 
@@ -225,6 +251,21 @@ mod tests {
         }
         let want: Vec<u64> = (0..10_000).filter(|i| i % 3 != 1).collect();
         assert_eq!(got, want);
+    }
+
+    /// The feed counts what was queued to it: filtered-out events don't count.
+    #[test]
+    fn the_feed_counts_what_was_queued() {
+        let bus = EventBus::default();
+        let feed = bus.subscribe_lossless(
+            |e| matches!(&e.kind, EventKind::Custom { name, .. } if name == "kept"),
+        );
+        let queued = feed.queued();
+        bus.fire(custom("kept", 1));
+        bus.fire(custom("other", 2));
+        bus.fire(custom("kept", 3));
+        assert_eq!(queued.load(Ordering::Acquire), 2);
+        assert_eq!(feed.backlog(), 2);
     }
 
     /// Concurrent firers: the feed's order is the bus's order.
