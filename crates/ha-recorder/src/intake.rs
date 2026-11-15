@@ -233,13 +233,17 @@ impl Intake {
                 old_state,
                 new_state,
             } => {
-                // A removal is HA's row with an empty state, so history
-                // ends the entity's line there (`States.from_event`); the
-                // entity is forgotten: a later one with this id starts over.
+                // A removal is HA's row with a NULL state (stored here as
+                // the empty state), so history ends the entity's line there.
+                // The entity may have a line from before this process
+                // started, so every removal writes one. The entity is
+                // forgotten: a later one with this id starts over.
                 let Some(new) = new_state.as_deref() else {
                     self.oversized.remove(entity_id);
-                    // Only an entity this process recorded has a line to end.
-                    self.last.remove(entity_id)?;
+                    self.last.remove(entity_id);
+                    if old_state.is_none() {
+                        return None;
+                    }
                     let row = Row::State(StateRow {
                         entity_id: entity_id.as_str().into(),
                         ts,

@@ -392,8 +392,9 @@ fn removals_forget_the_entity() {
         let row = state_row(intake.row(&gone));
         assert_eq!((&*row.state, &*row.attributes, row.ts), ("", "{}", T0 + 1));
         assert_eq!(row.flags, 0);
-        // An entity that was never recorded has no line to end.
-        assert!(intake.row(&gone).is_none());
+        // One that was recorded before this process started has a line to
+        // end too: the removal writes a row whatever the intake remembers.
+        assert_eq!(state_row(intake.row(&gone)).state, "");
     }
     assert!(intake.last.is_empty());
     assert!(intake.oversized.is_empty());
