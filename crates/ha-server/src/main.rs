@@ -91,6 +91,34 @@ async fn run(thp_disabled: std::io::Result<bool>) -> anyhow::Result<()> {
         tokio::task::spawn_blocking(move || ha_core::config::CoreConfig::load(&dir)).await??
     };
     hass.set_config(core_config);
+    // `configuration.yaml`, read once: the recorder's settings now, the
+    // automations later.
+    let config_yaml = {
+        let dir = config_dir.clone();
+        let loaded = tokio::task::spawn_blocking(move || {
+            let file = dir.join("configuration.yaml");
+            if !file.is_file() {
+                return Ok(None);
+            }
+            let secrets = ha_core::yaml::Secrets {
+                config_dir: dir.clone(),
+            };
+            ha_core::yaml::load_file(&file, Some(&secrets)).map(Some)
+        })
+        .await?;
+        loaded.unwrap_or_else(|e| {
+            tracing::error!("configuration.yaml: {e}");
+            None
+        })
+    };
+    // The recorder first, as HA's bootstrap sets it up first: every state
+    // written from here on, and `homeassistant_start`, is history.
+    let settings =
+        ha_recorder::Settings::from_yaml(config_yaml.as_ref().and_then(|c| c.get("recorder")));
+    match ha_recorder::Recorder::start(&hass, config_dir.join(".hars/recorder"), &settings).await {
+        Ok(recorder) => api_config.recorder = Some(std::sync::Arc::new(recorder)),
+        Err(e) => tracing::error!("the recorder could not start, so no history is kept: {e}"),
+    }
     let registry = {
         let dir = config_dir.clone();
         let loaded =
@@ -160,35 +188,10 @@ async fn run(thp_disabled: std::io::Result<bool>) -> anyhow::Result<()> {
     api_config.mobile_app = Some(std::sync::Arc::new(mobile_app));
     // `configuration.yaml`'s automations (written now; triggers attach at
     // `homeassistant_started`).
-    let automations = {
-        let dir = config_dir.clone();
-        let loaded = tokio::task::spawn_blocking(move || {
-            let file = dir.join("configuration.yaml");
-            if !file.is_file() {
-                return Ok(None);
-            }
-            let secrets = ha_core::yaml::Secrets {
-                config_dir: dir.clone(),
-            };
-            ha_core::yaml::load_file(&file, Some(&secrets)).map(Some)
-        })
-        .await?;
-        match loaded {
-            Ok(Some(config)) => {
-                let items = ha_automation::from_config_yaml(&config);
-                Some(ha_automation::Automations::setup_yaml(
-                    &hass,
-                    &registries,
-                    &items,
-                ))
-            }
-            Ok(None) => None,
-            Err(e) => {
-                tracing::error!("configuration.yaml: {e}");
-                None
-            }
-        }
-    };
+    let automations = config_yaml.as_ref().map(|config| {
+        let items = ha_automation::from_config_yaml(config);
+        ha_automation::Automations::setup_yaml(&hass, &registries, &items)
+    });
     if automations.is_some() {
         api_config.integrations.push("automation");
     }

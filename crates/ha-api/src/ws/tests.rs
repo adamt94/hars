@@ -1842,3 +1842,74 @@ async fn mobile_app_push_channel_as_ha() {
         .await;
     assert_eq!(r["error"]["code"], "invalid_format");
 }
+
+/// With the recorder running: `recorder/info` in HA's shape, and the
+/// statistics calls answer empty after HA's schema and time checks.
+#[tokio::test]
+async fn recorder_info_and_empty_statistics() {
+    let dir = std::env::temp_dir().join(format!("hars-ws-recorder-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let recorder =
+        ha_recorder::Recorder::start(&Hass::new(), dir.clone(), &ha_recorder::Settings::default())
+            .await
+            .unwrap();
+    let s = server_with(crate::ApiConfig {
+        recorder: Some(std::sync::Arc::new(recorder)),
+        ..Default::default()
+    })
+    .await;
+    let mut c = Client::authed(&s, &token(&s.auth).0).await;
+    let ok = |id: u64, result: Value| json!({"id": id, "type": "result", "success": true, "result": result});
+    let err = |id: u64, code: &str, message: &str| json!({"id": id, "type": "result", "success": false, "error": {"code": code, "message": message}});
+    assert_eq!(
+        c.call(json!({"id": 1, "type": "recorder/info"})).await,
+        ok(
+            1,
+            json!({"backlog": 0, "db_in_default_location": true, "max_backlog": 65000,
+                   "migration_in_progress": false, "migration_is_live": false,
+                   "recording": true, "thread_running": true})
+        )
+    );
+    assert_eq!(
+        c.call(json!({"id": 2, "type": "recorder/get_statistics_metadata",
+                      "statistic_ids": ["sensor.hall_temperature"]}))
+            .await,
+        ok(2, json!([]))
+    );
+    assert_eq!(
+        c.call(json!({"id": 3, "type": "recorder/list_statistic_ids", "statistic_type": "mean"}))
+            .await,
+        ok(3, json!([]))
+    );
+    let period = |id: u64, extra: Value| {
+        let mut m = json!({"id": id, "type": "recorder/statistics_during_period",
+                           "start_time": "2026-01-15T08:30:00.000Z",
+                           "statistic_ids": ["sensor.hall_temperature"], "period": "5minute",
+                           "types": ["mean", "min", "max"], "units": {"temperature": "°C"}});
+        for (k, v) in extra.as_object().unwrap() {
+            m[k] = v.clone();
+        }
+        m
+    };
+    assert_eq!(c.call(period(4, json!({}))).await, ok(4, json!({})));
+    assert_eq!(
+        c.call(period(5, json!({"start_time": "soon"}))).await,
+        err(5, "invalid_start_time", "Invalid start_time")
+    );
+    assert_eq!(
+        c.call(period(6, json!({"end_time": "later"}))).await,
+        err(6, "invalid_end_time", "Invalid end_time")
+    );
+    let r = c.call(period(7, json!({"statistic_ids": []}))).await;
+    assert_eq!(r["error"]["code"], "invalid_format");
+    assert!(
+        r["error"]["message"]
+            .as_str()
+            .unwrap()
+            .starts_with("length of value must be at least 1"),
+        "{r}"
+    );
+    let r = c.call(period(8, json!({"period": "decade"}))).await;
+    assert_eq!(r["error"]["code"], "invalid_format", "{r}");
+    let _ = std::fs::remove_dir_all(&dir);
+}

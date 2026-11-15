@@ -13,6 +13,7 @@ mod entities;
 mod frontend;
 mod manifest;
 mod mobile_app;
+mod recorder;
 mod sensor;
 mod weather;
 

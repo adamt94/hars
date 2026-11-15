@@ -64,6 +64,8 @@ pub struct ApiConfig {
     pub automations: Option<ha_automation::Automations>,
     /// The companion apps' registrations (`mobile_app`).
     pub mobile_app: Option<Arc<ha_integrations::mobile_app::MobileApp>>,
+    /// State and event history, when recording.
+    pub recorder: Option<Arc<ha_recorder::Recorder>>,
 }
 
 impl ApiConfig {

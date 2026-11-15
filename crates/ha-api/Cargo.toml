@@ -18,6 +18,7 @@ ha-components.workspace = true
 ha-integrations.workspace = true
 ha-core.workspace = true
 ha-http.workspace = true
+ha-recorder.workspace = true
 ha-registry.workspace = true
 futures-util = { version = "0.3", default-features = false, features = ["sink"] }
 jiff = "0.2.43"
