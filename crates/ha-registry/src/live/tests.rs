@@ -13,6 +13,7 @@ fn vector(name: &str) -> Value {
         "register_new" => include_str!("../vectors/register_new.json"),
         "update_registration" => include_str!("../vectors/update_registration.json"),
         "entity_ids" => include_str!("../vectors/entity_ids.json"),
+        "remove_entry" => include_str!("../vectors/remove_entry.json"),
         _ => unreachable!(),
     };
     serde_json::from_str(text).unwrap()
@@ -650,5 +651,158 @@ fn primary_config_entries_as_ha() {
             .primary_config_entry
             .as_deref(),
         Some(ENTRY)
+    );
+}
+
+/// HA's placeholders (`<t:…>`, `<ts:…>`, `<ulid#…>`, `<uuid#…>`) and ours,
+/// blanked in the given keys.
+fn mask(mut v: Value, keys: &[&str]) -> Value {
+    for k in keys {
+        if v.get(*k).is_some() {
+            v[*k] = json!("…");
+        }
+    }
+    v
+}
+
+fn frames(step: &Value) -> Vec<String> {
+    let mut out: Vec<String> = step["ws_event_frames"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|f| {
+            let f: Value = serde_json::from_str(f.as_str().unwrap()).unwrap();
+            json!([f["event"]["event_type"], f["event"]["data"]]).to_string()
+        })
+        .collect();
+    out.sort();
+    out
+}
+
+/// `config_entries_async_remove`: the device and its 21 entities go to the
+/// deleted lists, orphaned, as HA's files have them.
+#[tokio::test]
+async fn clearing_an_entry_as_ha() {
+    let hass = Hass::new();
+    let (_, r) = before();
+    let reg = Registry::in_memory(&hass, r);
+    let mut rx = hass.bus().subscribe();
+    reg.clear_config_entry(ENTRY);
+    let v = vector("remove_entry");
+    let step = &v["steps"][1];
+    let snap = reg.snapshot();
+    assert!(snap.devices.is_empty());
+    // Only rows of other entries stay (the fixture's `person.adam`).
+    let left: Vec<&str> = snap.entities.iter().map(|e| e.entity_id.as_str()).collect();
+    assert_eq!(left, ["person.adam"]);
+    let deleted: Value = serde_json::from_str(snap.device_file.deleted[0].get()).unwrap();
+    let stamps = ["modified_at", "orphaned_timestamp"];
+    assert_eq!(
+        mask(deleted, &stamps),
+        mask(step["deleted_devices"][0].clone(), &stamps)
+    );
+    // The deleted device row's keys in HA's order (`identifiers` before `id`).
+    let text = snap.device_file.deleted[0].get();
+    assert!(text.find("\"identifiers\"").unwrap() < text.find("\"id\"").unwrap());
+
+    // Every deleted entity row as HA's file has it.
+    let file: Value = serde_json::from_str(include_str!(
+        "../vectors/files/remove_entry__config_entries_async_remove__core.entity_registry"
+    ))
+    .unwrap();
+    let want = file["data"]["deleted_entities"].as_array().unwrap();
+    assert_eq!(snap.entity_file.deleted.len(), want.len());
+    for w in want {
+        let got = snap
+            .entity_file
+            .deleted
+            .iter()
+            .map(|raw| serde_json::from_str::<Value>(raw.get()).unwrap())
+            .find(|g| g["entity_id"] == w["entity_id"])
+            .unwrap();
+        assert_eq!(
+            mask(got, &stamps),
+            mask(w.clone(), &stamps),
+            "{}",
+            w["entity_id"]
+        );
+    }
+    let mut got: Vec<String> = events(&mut rx)
+        .into_iter()
+        .map(|(name, data)| json!([name, data]).to_string())
+        .collect();
+    got.sort();
+    // But person's own update of its row (its storage hash), not ours.
+    let want: Vec<String> = frames(step)
+        .into_iter()
+        .filter(|f| !f.contains("person.adam"))
+        .collect();
+    assert_eq!(got, want);
+}
+
+/// `post_registrations_same_device_again`: the tracker row and the device
+/// come back from the deleted lists with their ids, then the tracker moves
+/// to the new entry.
+#[tokio::test]
+async fn re_adding_restores_the_tracker_and_device() {
+    let hass = Hass::new();
+    let (_, r) = before();
+    let reg = Registry::in_memory(&hass, r);
+    reg.clear_config_entry(ENTRY);
+    let mut rx = hass.bus().subscribe();
+    const DEVICE: &str = "11111111-2222-4333-8444-555555555555";
+    const NEW: &str = "01JNEWENTRY000000000000000";
+    // The registration flow: no entry, no device yet.
+    let tracker = reg.get_or_create_entity(
+        "device_tracker",
+        "mobile_app",
+        DEVICE,
+        None,
+        EntityPatch {
+            object_id_base: Some(Some(" Phone".into())),
+            ..Default::default()
+        },
+    );
+    assert_eq!(tracker.entity_id, "device_tracker.phone");
+    let device = reg.get_or_create_device(DeviceInfo {
+        config_entry_id: NEW.into(),
+        identifiers: vec![json!(["mobile_app", DEVICE])],
+        manufacturer: Some("Apple".into()),
+        model: Some("iPhone17,1".into()),
+        name: Some(" Phone".into()),
+        sw_version: Some("27.0".into()),
+    });
+    assert_eq!(device.id, PHONE);
+    assert!(reg.snapshot().device_file.deleted.is_empty());
+    // The tracker platform attaches the row.
+    reg.get_or_create_entity(
+        "device_tracker",
+        "mobile_app",
+        DEVICE,
+        None,
+        EntityPatch {
+            config_entry_id: Some(Some(NEW.into())),
+            device_id: Some(Some(PHONE.into())),
+            entity_category: Some(Some("diagnostic".into())),
+            original_name: Some(Some(" Phone".into())),
+            ..Default::default()
+        },
+    );
+    let v = vector("remove_entry");
+    let step = &v["steps"][2];
+    let mut got: Vec<String> = events(&mut rx)
+        .into_iter()
+        .map(|(name, data)| json!([name, data]).to_string())
+        .collect();
+    got.sort();
+    assert_eq!(got, frames(step));
+    let row = reg
+        .entity_by_unique_id("device_tracker", "mobile_app", DEVICE)
+        .unwrap();
+    let mut want = step["tracker_row"]["device_tracker.phone"].clone();
+    want["config_entry_id"] = json!(NEW);
+    assert_eq!(
+        mask(serde_json::to_value(&*row).unwrap(), &["modified_at"]),
+        mask(want, &["modified_at"])
     );
 }

@@ -245,15 +245,42 @@ impl Registry {
             }
             let object_id_base = patch.object_id_base.clone().flatten();
             let device_id = patch.device_id.clone().flatten();
-            let entity_id = generate_entity_id(
-                &tx.r,
-                &self.hass,
-                domain,
-                platform,
-                unique_id,
-                device_id.as_deref(),
-                object_id_base.as_deref(),
-            );
+            // A deleted row for the same unique id comes back: its id,
+            // creation time and the user's settings (HA's `deleted_entities`).
+            let key = (domain.to_owned(), platform.to_owned(), json!(unique_id));
+            let deleted =
+                tx.r.entity_file
+                    .deleted
+                    .iter()
+                    .position(|d| DeletedEntity::parse(d).map(|d| d.key()).as_ref() == Some(&key));
+            let deleted = deleted.and_then(|i| {
+                let mut rows = (*tx.r.entity_file.deleted).clone();
+                let row = DeletedEntity::parse(&rows.remove(i));
+                tx.r.entity_file.deleted = Arc::new(rows);
+                row
+            });
+            let available = |id: &str| {
+                !tx.r.entities.iter().any(|e| e.entity_id == id)
+                    && ha_core::EntityId::parse(id)
+                        .ok()
+                        .is_none_or(|id| self.hass.states().get(&id).is_none())
+            };
+            let entity_id = match &deleted {
+                Some(d) if available(&d.entity_id) => d.entity_id.clone(),
+                _ => generate_entity_id(
+                    &tx.r,
+                    &self.hass,
+                    domain,
+                    platform,
+                    unique_id,
+                    device_id.as_deref(),
+                    // The user's name has priority.
+                    deleted
+                        .as_ref()
+                        .and_then(|d| d.name.as_deref())
+                        .or(object_id_base.as_deref()),
+                ),
+            };
             let row = Arc::new(Entity {
                 aliases: Vec::new(),
                 aliases_v2: vec![Value::Null],
@@ -283,6 +310,33 @@ impl Registry {
                 unit_of_measurement: patch.unit_of_measurement.clone().flatten(),
                 ..Default::default()
             });
+            let row = match deleted {
+                None => row,
+                Some(d) => {
+                    let mut r = (*row).clone();
+                    r.aliases = d.aliases;
+                    r.aliases_v2 = d.aliases_v2;
+                    r.area_id = d.area_id;
+                    r.categories = d.categories;
+                    r.created_at = d.created_at;
+                    r.device_class = d.device_class;
+                    r.icon = d.icon;
+                    r.id = d.id;
+                    r.labels = d.labels;
+                    r.name = d.name;
+                    if !d.options_undefined {
+                        r.options = d.options;
+                    }
+                    if !d.hidden_by_undefined {
+                        r.hidden_by = d.hidden_by;
+                    }
+                    // The deleted row's disable wins over the caller's.
+                    if !d.disabled_by_undefined {
+                        r.disabled_by = restored_disabled_by(d.disabled_by);
+                    }
+                    Arc::new(r)
+                }
+            };
             tracing::info!(
                 "Registered new {domain}.{platform} entity: {}",
                 row.entity_id
@@ -313,28 +367,122 @@ impl Registry {
     pub fn remove_entity(&self, entity_id: &str) {
         let now = self.hass.clock().now();
         self.write(|tx| {
-            let Some(i) = tx.r.entities.iter().position(|e| e.entity_id == entity_id) else {
-                return;
-            };
-            let row = tx.r.entities.remove(i);
-            let orphaned = row
-                .config_entry_id
-                .is_none()
-                .then(|| now.as_microsecond() as f64 / 1e6);
-            let deleted = DeletedEntity::of(&row, ha_core::isoformat(now), orphaned);
-            let key = deleted.key();
-            let mut kept: Vec<RawRow> =
-                tx.r.entity_file
-                    .deleted
+            if let Some(i) = tx.r.entities.iter().position(|e| e.entity_id == entity_id) {
+                remove_row(tx, i, now);
+            }
+        });
+    }
+
+    /// A config entry goes away (`async_clear_config_entry` in both
+    /// registries): devices lose it (one left with no entry is removed,
+    /// with its entities); its other entities are removed; its deleted
+    /// rows are orphaned now (purged by HA after 30 days).
+    pub fn clear_config_entry(&self, entry_id: &str) {
+        let now = self.hass.clock().now();
+        let now_iso = ha_core::isoformat(now);
+        let stamp = json!(now.as_microsecond() as f64 / 1e6);
+        self.write(|tx| {
+            let devices: Vec<Arc<Device>> =
+                tx.r.devices
                     .iter()
-                    .filter(|d| deleted_key(d).as_ref() != Some(&key))
+                    .filter(|d| d.config_entries.iter().any(|e| e == entry_id))
                     .cloned()
                     .collect();
-            if let Ok(raw) = serde_json::value::to_raw_value(&deleted) {
-                kept.push(raw);
+            for device in devices {
+                let Some(i) = tx.r.devices.iter().position(|d| d.id == device.id) else {
+                    continue;
+                };
+                if device.config_entries.len() == 1 {
+                    // `async_remove_device`.
+                    tx.r.devices.remove(i);
+                    let deleted = DeletedDevice {
+                        area_id: device.area_id.clone(),
+                        config_entries: device.config_entries.clone(),
+                        config_entries_subentries: device.config_entries_subentries.clone(),
+                        connections: device.connections.clone(),
+                        created_at: device.created_at.clone(),
+                        disabled_by: device.disabled_by.clone(),
+                        disabled_by_undefined: false,
+                        identifiers: device.identifiers.clone(),
+                        id: device.id.clone(),
+                        labels: device.labels.clone(),
+                        modified_at: Some(now_iso.clone()),
+                        name_by_user: device.name_by_user.clone(),
+                        orphaned_timestamp: None,
+                        extra: Map::new(),
+                    };
+                    let mut rows: Vec<RawRow> = tx
+                        .r
+                        .device_file
+                        .deleted
+                        .iter()
+                        .filter(|raw| DeletedDevice::parse(raw).is_none_or(|d| d.id != device.id))
+                        .cloned()
+                        .collect();
+                    rows.extend(deleted.raw());
+                    tx.r.device_file.deleted = Arc::new(rows);
+                    tx.device_event(json!({"action": "remove", "device_id": device.id,
+                                           "device": device.json()}));
+                    // The entity registry removes the device's entities.
+                    while let Some(e) = tx.r.entities.iter().position(|e| {
+                        e.device_id.as_deref() == Some(device.id.as_str())
+                            && e.config_entry_id
+                                .as_ref()
+                                .is_some_and(|c| device.config_entries.contains(c))
+                    }) {
+                        remove_row(tx, e, now);
+                    }
+                } else {
+                    let mut d = (*device).clone();
+                    let mut changes = Map::new();
+                    if d.primary_config_entry.as_deref() == Some(entry_id) {
+                        changes.insert("primary_config_entry".into(), json!(entry_id));
+                        d.primary_config_entry = None;
+                    }
+                    changes.insert("config_entries".into(), json!(d.config_entries));
+                    changes.insert(
+                        "config_entries_subentries".into(),
+                        Value::Object(d.config_entries_subentries.clone()),
+                    );
+                    d.config_entries.retain(|e| e != entry_id);
+                    d.config_entries_subentries.remove(entry_id);
+                    d.modified_at = Some(now_iso.clone());
+                    tx.r.devices[i] = Arc::new(d);
+                    tx.device_event(json!({"action": "update", "device_id": device.id,
+                                           "changes": changes}));
+                }
             }
-            tx.r.entity_file.deleted = Arc::new(kept);
-            tx.entity_event(json!({"action": "remove", "entity_id": entity_id}));
+            while let Some(e) =
+                tx.r.entities
+                    .iter()
+                    .position(|e| e.config_entry_id.as_deref() == Some(entry_id))
+            {
+                remove_row(tx, e, now);
+            }
+            // Orphan what's left of the entry, with one timestamp.
+            let rows = rewrite::<DeletedEntity>(&tx.r.entity_file.deleted, |d| {
+                if d.config_entry_id.as_deref() != Some(entry_id) {
+                    return false;
+                }
+                d.orphaned_timestamp = Some(stamp.clone());
+                d.config_entry_id = None;
+                true
+            });
+            tx.r.entity_file.deleted = Arc::new(rows);
+            let rows = rewrite::<DeletedDevice>(&tx.r.device_file.deleted, |d| {
+                if !d.config_entries.iter().any(|e| e == entry_id) {
+                    return false;
+                }
+                d.config_entries.retain(|e| e != entry_id);
+                d.config_entries_subentries.remove(entry_id);
+                if d.config_entries.is_empty() {
+                    d.orphaned_timestamp = Some(stamp.clone());
+                }
+                true
+            });
+            tx.r.device_file.deleted = Arc::new(rows);
+            tx.save_entities = true;
+            tx.save_devices = true;
         });
     }
 
@@ -353,9 +501,52 @@ impl Registry {
                 .devices
                 .iter()
                 .position(|d| d.identifiers.iter().any(|i| info.identifiers.contains(i)));
-            let (i, mut d, is_new) = match found {
-                Some(i) => (Some(i), (*r.devices[i]).clone(), false),
-                None => (
+            // A deleted device with one of the identifiers comes back
+            // (`to_device_entry`): its id, creation time and the user's
+            // settings, with this entry.
+            let restored = found.is_none().then(|| {
+                let rows = &r.device_file.deleted;
+                let i = rows.iter().position(|raw| {
+                    DeletedDevice::parse(raw)
+                        .is_some_and(|d| d.identifiers.iter().any(|x| info.identifiers.contains(x)))
+                })?;
+                let mut rows = (**rows).clone();
+                let d = DeletedDevice::parse(&rows.remove(i))?;
+                r.device_file.deleted = Arc::new(rows);
+                Some(d)
+            });
+            let (i, mut d, is_new) = match (found, restored.flatten()) {
+                (Some(i), _) => (Some(i), (*r.devices[i]).clone(), false),
+                (None, Some(old)) => {
+                    let mut subentries = Map::new();
+                    subentries.insert(info.config_entry_id.clone(), json!([null]));
+                    (
+                        None,
+                        Device {
+                            id: old.id,
+                            area_id: old.area_id,
+                            config_entries: vec![info.config_entry_id.clone()],
+                            config_entries_subentries: subentries,
+                            created_at: old.created_at,
+                            disabled_by: if old.disabled_by_undefined {
+                                None
+                            } else {
+                                restored_disabled_by(old.disabled_by)
+                            },
+                            identifiers: old
+                                .identifiers
+                                .into_iter()
+                                .filter(|x| info.identifiers.contains(x))
+                                .collect(),
+                            labels: old.labels,
+                            modified_at: Some(now.clone()),
+                            name_by_user: old.name_by_user,
+                            ..Default::default()
+                        },
+                        true,
+                    )
+                }
+                (None, None) => (
                     None,
                     Device {
                         id: random_id(),
@@ -433,6 +624,28 @@ impl Registry {
             device
         })
     }
+}
+
+/// `async_remove` for row `i`: into `deleted_entities` (replacing an older
+/// row for the same unique id), orphaned now if it has no config entry.
+fn remove_row(tx: &mut Tx, i: usize, now: jiff::Timestamp) {
+    let row = tx.r.entities.remove(i);
+    let orphaned = row
+        .config_entry_id
+        .is_none()
+        .then(|| now.as_microsecond() as f64 / 1e6);
+    let deleted = DeletedEntity::of(&row, ha_core::isoformat(now), orphaned);
+    let key = deleted.key();
+    let mut kept: Vec<RawRow> =
+        tx.r.entity_file
+            .deleted
+            .iter()
+            .filter(|d| DeletedEntity::parse(d).map(|d| d.key()).as_ref() != Some(&key))
+            .cloned()
+            .collect();
+    kept.extend(deleted.raw());
+    tx.r.entity_file.deleted = Arc::new(kept);
+    tx.entity_event(json!({"action": "remove", "entity_id": row.entity_id}));
 }
 
 fn is_unique(e: &Entity, domain: &str, platform: &str, unique_id: &str) -> bool {
@@ -659,60 +872,86 @@ pub fn available_entity_id(r: &Registries, hass: &Hass, domain: &str, object_id:
     test
 }
 
-/// `DeletedRegistryEntry.as_storage_fragment`, in HA's key order.
-#[derive(Serialize)]
-struct DeletedEntity<'a> {
-    aliases: &'a [Value],
-    aliases_v2: &'a [Value],
-    area_id: &'a Option<String>,
-    categories: &'a RawJson,
-    config_entry_id: &'a Option<String>,
-    config_subentry_id: &'a Option<String>,
-    created_at: &'a Option<String>,
-    device_class: &'a Option<String>,
-    disabled_by: &'a Option<String>,
+/// A `deleted_entities` row (`DeletedRegistryEntry.as_storage_fragment`),
+/// in HA's key order; nested blobs kept raw.
+#[derive(Debug, Clone, Serialize, serde::Deserialize)]
+struct DeletedEntity {
+    #[serde(default)]
+    aliases: Vec<Value>,
+    #[serde(default)]
+    aliases_v2: Vec<Value>,
+    #[serde(default)]
+    area_id: Option<String>,
+    #[serde(default)]
+    categories: RawJson,
+    #[serde(default)]
+    config_entry_id: Option<String>,
+    #[serde(default)]
+    config_subentry_id: Option<String>,
+    #[serde(default)]
+    created_at: Option<String>,
+    #[serde(default)]
+    device_class: Option<String>,
+    #[serde(default)]
+    disabled_by: Option<String>,
+    #[serde(default)]
     disabled_by_undefined: bool,
-    entity_id: &'a str,
-    hidden_by: &'a Option<String>,
+    entity_id: String,
+    #[serde(default)]
+    hidden_by: Option<String>,
+    #[serde(default)]
     hidden_by_undefined: bool,
-    icon: &'a Option<String>,
-    id: &'a Option<String>,
-    labels: &'a [String],
-    modified_at: String,
-    name: &'a Option<String>,
-    options: &'a RawJson,
+    #[serde(default)]
+    icon: Option<String>,
+    #[serde(default)]
+    id: Option<String>,
+    #[serde(default)]
+    labels: Vec<String>,
+    #[serde(default)]
+    modified_at: Option<String>,
+    #[serde(default)]
+    name: Option<String>,
+    #[serde(default)]
+    options: RawJson,
+    #[serde(default)]
     options_undefined: bool,
-    orphaned_timestamp: Option<f64>,
-    platform: &'a str,
-    unique_id: &'a Option<Value>,
+    #[serde(default)]
+    orphaned_timestamp: Option<Value>,
+    platform: String,
+    #[serde(default)]
+    unique_id: Option<Value>,
+    #[serde(flatten)]
+    extra: Map<String, Value>,
 }
 
-impl<'a> DeletedEntity<'a> {
-    fn of(e: &'a Entity, modified_at: String, orphaned_timestamp: Option<f64>) -> Self {
+impl DeletedEntity {
+    /// `async_remove`'s row for `e`.
+    fn of(e: &Entity, modified_at: String, orphaned_timestamp: Option<f64>) -> Self {
         Self {
-            aliases: &e.aliases,
-            aliases_v2: &e.aliases_v2,
-            area_id: &e.area_id,
-            categories: &e.categories,
-            config_entry_id: &e.config_entry_id,
-            config_subentry_id: &e.config_subentry_id,
-            created_at: &e.created_at,
-            device_class: &e.device_class,
-            disabled_by: &e.disabled_by,
+            aliases: e.aliases.clone(),
+            aliases_v2: e.aliases_v2.clone(),
+            area_id: e.area_id.clone(),
+            categories: e.categories.clone(),
+            config_entry_id: e.config_entry_id.clone(),
+            config_subentry_id: e.config_subentry_id.clone(),
+            created_at: e.created_at.clone(),
+            device_class: e.device_class.clone(),
+            disabled_by: e.disabled_by.clone(),
             disabled_by_undefined: false,
-            entity_id: &e.entity_id,
-            hidden_by: &e.hidden_by,
+            entity_id: e.entity_id.clone(),
+            hidden_by: e.hidden_by.clone(),
             hidden_by_undefined: false,
-            icon: &e.icon,
-            id: &e.id,
-            labels: &e.labels,
-            modified_at,
-            name: &e.name,
-            options: &e.options,
+            icon: e.icon.clone(),
+            id: e.id.clone(),
+            labels: e.labels.clone(),
+            modified_at: Some(modified_at),
+            name: e.name.clone(),
+            options: e.options.clone(),
             options_undefined: false,
-            orphaned_timestamp,
-            platform: &e.platform,
-            unique_id: &e.unique_id,
+            orphaned_timestamp: orphaned_timestamp.map(|t| json!(t)),
+            platform: e.platform.clone(),
+            unique_id: e.unique_id.clone(),
+            extra: Map::new(),
         }
     }
 
@@ -723,21 +962,86 @@ impl<'a> DeletedEntity<'a> {
                 .next()
                 .unwrap_or_default()
                 .to_owned(),
-            self.platform.to_owned(),
+            self.platform.clone(),
             self.unique_id.clone().unwrap_or(Value::Null),
         )
     }
+
+    fn parse(raw: &RawRow) -> Option<Self> {
+        serde_json::from_str(raw.get()).ok()
+    }
+
+    fn raw(&self) -> Option<RawRow> {
+        serde_json::value::to_raw_value(self).ok()
+    }
 }
 
-/// A deleted row's `(domain, platform, unique_id)`.
-fn deleted_key(raw: &RawRow) -> Option<(String, String, Value)> {
-    let v: Value = serde_json::from_str(raw.get()).ok()?;
-    let domain = v.get("entity_id")?.as_str()?.split('.').next()?.to_owned();
-    Some((
-        domain,
-        v.get("platform")?.as_str()?.to_owned(),
-        v.get("unique_id").cloned().unwrap_or(Value::Null),
-    ))
+/// A `deleted_devices` row (`DeletedDeviceEntry.as_storage_fragment`), in
+/// HA's key order (`identifiers` before `id`).
+#[derive(Debug, Clone, Serialize, serde::Deserialize)]
+struct DeletedDevice {
+    #[serde(default)]
+    area_id: Option<String>,
+    #[serde(default)]
+    config_entries: Vec<String>,
+    #[serde(default)]
+    config_entries_subentries: Map<String, Value>,
+    #[serde(default)]
+    connections: Vec<Value>,
+    #[serde(default)]
+    created_at: Option<String>,
+    #[serde(default)]
+    disabled_by: Option<String>,
+    #[serde(default)]
+    disabled_by_undefined: bool,
+    #[serde(default)]
+    identifiers: Vec<Value>,
+    id: String,
+    #[serde(default)]
+    labels: Vec<String>,
+    #[serde(default)]
+    modified_at: Option<String>,
+    #[serde(default)]
+    name_by_user: Option<String>,
+    #[serde(default)]
+    orphaned_timestamp: Option<Value>,
+    #[serde(flatten)]
+    extra: Map<String, Value>,
+}
+
+impl DeletedDevice {
+    fn parse(raw: &RawRow) -> Option<Self> {
+        serde_json::from_str(raw.get()).ok()
+    }
+
+    fn raw(&self) -> Option<RawRow> {
+        serde_json::value::to_raw_value(self).ok()
+    }
+}
+
+/// `disabled_by` from a deleted row for an enabled config entry: a
+/// `config_entry` disable doesn't come back.
+fn restored_disabled_by(by: Option<String>) -> Option<String> {
+    by.filter(|b| b != "config_entry")
+}
+
+/// Rewrite a deleted-row list, row by row (unparsable rows kept as they
+/// are).
+fn rewrite<T: serde::de::DeserializeOwned + Serialize>(
+    rows: &[RawRow],
+    mut f: impl FnMut(&mut T) -> bool,
+) -> Vec<RawRow> {
+    rows.iter()
+        .map(|raw| {
+            let Ok(mut row) = serde_json::from_str::<T>(raw.get()) else {
+                return raw.clone();
+            };
+            if !f(&mut row) {
+                return raw.clone();
+            }
+            serde_json::value::to_raw_value(&row).unwrap_or_else(|_| raw.clone())
+        })
+        .collect()
 }
 
 #[cfg(test)]

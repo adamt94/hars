@@ -1,0 +1,2364 @@
+{
+ "scenario": "remove_entry",
+ "steps": [
+  {
+   "step": "boot",
+   "pending_saves_after_boot": {
+    "core.entity_registry": {
+     "delay_s": 180
+    }
+   },
+   "what_the_boot_save_changed_vs_fixture": {
+    "core.entity_registry": {
+     "entities": {
+      "added": [
+       {
+        "aliases": [],
+        "aliases_v2": [
+         null
+        ],
+        "area_id": null,
+        "categories": {},
+        "capabilities": null,
+        "config_entry_id": null,
+        "config_subentry_id": null,
+        "created_at": "<t:boot#1>",
+        "device_class": null,
+        "device_id": null,
+        "disabled_by": null,
+        "entity_category": null,
+        "entity_id": "person.adam",
+        "hidden_by": null,
+        "icon": null,
+        "id": "<uuid#1>",
+        "has_entity_name": false,
+        "labels": [],
+        "modified_at": "<t:boot#2>",
+        "name": null,
+        "object_id_base": "adam",
+        "options": {},
+        "original_device_class": null,
+        "original_icon": null,
+        "original_name": "adam",
+        "platform": "person",
+        "suggested_object_id": null,
+        "supported_features": 0,
+        "translation_key": null,
+        "unique_id": "adam",
+        "previous_unique_id": null,
+        "unit_of_measurement": null
+       }
+      ],
+      "removed": [],
+      "changed": {}
+     },
+     "deleted_entities": {
+      "added": [],
+      "removed": [],
+      "changed": {}
+     }
+    }
+   }
+  },
+  {
+   "step": "config_entries_async_remove",
+   "result": {
+    "require_restart": false
+   },
+   "config_entry_signals_ws": [
+    "{\"id\":3,\"type\":\"event\",\"event\":[{\"type\":\"updated\",\"entry\":{\"created_at\":1783517756.373075,\"entry_id\":\"01JFAKEMOBILEAPPENTRY00000\",\"domain\":\"mobile_app\",\"modified_at\":1789506828.64292,\"title\":\" Phone\",\"source\":\"registration\",\"state\":\"unload_in_progress\",\"supports_options\":false,\"supports_remove_device\":false,\"supports_unload\":true,\"supports_reconfigure\":false,\"supported_subentry_types\":{},\"pref_disable_new_entities\":false,\"pref_disable_polling\":false,\"disabled_by\":null,\"reason\":null,\"error_reason_translation_key\":null,\"error_reason_translation_placeholders\":null,\"num_subentries\":0}}]}",
+    "{\"id\":3,\"type\":\"event\",\"event\":[{\"type\":\"updated\",\"entry\":{\"created_at\":1783517756.373075,\"entry_id\":\"01JFAKEMOBILEAPPENTRY00000\",\"domain\":\"mobile_app\",\"modified_at\":1789506828.64292,\"title\":\" Phone\",\"source\":\"registration\",\"state\":\"not_loaded\",\"supports_options\":false,\"supports_remove_device\":false,\"supports_unload\":true,\"supports_reconfigure\":false,\"supported_subentry_types\":{},\"pref_disable_new_entities\":false,\"pref_disable_polling\":false,\"disabled_by\":null,\"reason\":null,\"error_reason_translation_key\":null,\"error_reason_translation_placeholders\":null,\"num_subentries\":0}}]}",
+    "{\"id\":3,\"type\":\"event\",\"event\":[{\"type\":\"removed\",\"entry\":{\"created_at\":1783517756.373075,\"entry_id\":\"01JFAKEMOBILEAPPENTRY00000\",\"domain\":\"mobile_app\",\"modified_at\":\"<ts:config_entries_async_remove#1>\",\"title\":\" Phone\",\"source\":\"registration\",\"state\":\"not_loaded\",\"supports_options\":false,\"supports_remove_device\":false,\"supports_unload\":true,\"supports_reconfigure\":false,\"supported_subentry_types\":{},\"pref_disable_new_entities\":false,\"pref_disable_polling\":false,\"disabled_by\":null,\"reason\":null,\"error_reason_translation_key\":null,\"error_reason_translation_placeholders\":null,\"num_subentries\":0}}]}"
+   ],
+   "ws_event_frames": [
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"device_registry_updated\",\"data\":{\"action\":\"remove\",\"device_id\":\"d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0\",\"device\":{\"area_id\":null,\"configuration_url\":null,\"config_entries\":[\"01JFAKEMOBILEAPPENTRY00000\"],\"config_entries_subentries\":{\"01JFAKEMOBILEAPPENTRY00000\":[null]},\"connections\":[],\"created_at\":1783517756.37332,\"disabled_by\":null,\"entry_type\":null,\"hw_version\":null,\"id\":\"d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0\",\"identifiers\":[[\"mobile_app\",\"11111111-2222-4333-8444-555555555555\"]],\"labels\":[],\"manufacturer\":\"Apple\",\"model\":\"iPhone17,1\",\"model_id\":null,\"modified_at\":1789506828.636995,\"name_by_user\":null,\"name\":\" Phone\",\"primary_config_entry\":\"01JFAKEMOBILEAPPENTRY00000\",\"serial_number\":null,\"sw_version\":\"27.0\",\"via_device_id\":null}},\"origin\":\"LOCAL\",\"time_fired\":\"<t:config_entries_async_remove#4>\",\"context\":{\"id\":\"<ulid#2>\",\"parent_id\":null,\"user_id\":null}},\"id\":2}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"remove\",\"entity_id\":\"device_tracker.phone\"},\"origin\":\"LOCAL\",\"time_fired\":\"<t:config_entries_async_remove#6>\",\"context\":{\"id\":\"<ulid#3>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"remove\",\"entity_id\":\"notify.phone\"},\"origin\":\"LOCAL\",\"time_fired\":\"<t:config_entries_async_remove#8>\",\"context\":{\"id\":\"<ulid#4>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"remove\",\"entity_id\":\"sensor.phone_battery_level\"},\"origin\":\"LOCAL\",\"time_fired\":\"<t:config_entries_async_remove#10>\",\"context\":{\"id\":\"<ulid#5>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"remove\",\"entity_id\":\"sensor.phone_storage\"},\"origin\":\"LOCAL\",\"time_fired\":\"<t:config_entries_async_remove#12>\",\"context\":{\"id\":\"<ulid#6>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"remove\",\"entity_id\":\"sensor.phone_battery_state\"},\"origin\":\"LOCAL\",\"time_fired\":\"<t:config_entries_async_remove#14>\",\"context\":{\"id\":\"<ulid#7>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"remove\",\"entity_id\":\"sensor.phone_sim_1\"},\"origin\":\"LOCAL\",\"time_fired\":\"<t:config_entries_async_remove#16>\",\"context\":{\"id\":\"<ulid#8>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"remove\",\"entity_id\":\"sensor.phone_sim_2\"},\"origin\":\"LOCAL\",\"time_fired\":\"<t:config_entries_async_remove#18>\",\"context\":{\"id\":\"<ulid#9>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"remove\",\"entity_id\":\"sensor.phone_geocoded_location\"},\"origin\":\"LOCAL\",\"time_fired\":\"<t:config_entries_async_remove#20>\",\"context\":{\"id\":\"<ulid#10>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"remove\",\"entity_id\":\"sensor.phone_ssid\"},\"origin\":\"LOCAL\",\"time_fired\":\"<t:config_entries_async_remove#22>\",\"context\":{\"id\":\"<ulid#11>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"remove\",\"entity_id\":\"sensor.phone_bssid\"},\"origin\":\"LOCAL\",\"time_fired\":\"<t:config_entries_async_remove#24>\",\"context\":{\"id\":\"<ulid#12>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"remove\",\"entity_id\":\"sensor.phone_connection_type\"},\"origin\":\"LOCAL\",\"time_fired\":\"<t:config_entries_async_remove#26>\",\"context\":{\"id\":\"<ulid#13>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"remove\",\"entity_id\":\"sensor.phone_last_update_trigger\"},\"origin\":\"LOCAL\",\"time_fired\":\"<t:config_entries_async_remove#28>\",\"context\":{\"id\":\"<ulid#14>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"remove\",\"entity_id\":\"sensor.phone_kiosk_brightness\"},\"origin\":\"LOCAL\",\"time_fired\":\"<t:config_entries_async_remove#30>\",\"context\":{\"id\":\"<ulid#15>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"remove\",\"entity_id\":\"sensor.phone_location_permission\"},\"origin\":\"LOCAL\",\"time_fired\":\"<t:config_entries_async_remove#32>\",\"context\":{\"id\":\"<ulid#16>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"remove\",\"entity_id\":\"sensor.phone_audio_output\"},\"origin\":\"LOCAL\",\"time_fired\":\"<t:config_entries_async_remove#34>\",\"context\":{\"id\":\"<ulid#17>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"remove\",\"entity_id\":\"sensor.phone_app_version\"},\"origin\":\"LOCAL\",\"time_fired\":\"<t:config_entries_async_remove#36>\",\"context\":{\"id\":\"<ulid#18>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"remove\",\"entity_id\":\"binary_sensor.phone_kiosk_mode\"},\"origin\":\"LOCAL\",\"time_fired\":\"<t:config_entries_async_remove#38>\",\"context\":{\"id\":\"<ulid#19>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"remove\",\"entity_id\":\"sensor.phone_kiosk_volume\"},\"origin\":\"LOCAL\",\"time_fired\":\"<t:config_entries_async_remove#40>\",\"context\":{\"id\":\"<ulid#20>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"remove\",\"entity_id\":\"binary_sensor.phone_camera_motion\"},\"origin\":\"LOCAL\",\"time_fired\":\"<t:config_entries_async_remove#42>\",\"context\":{\"id\":\"<ulid#21>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"remove\",\"entity_id\":\"binary_sensor.phone_kiosk_screensaver\"},\"origin\":\"LOCAL\",\"time_fired\":\"<t:config_entries_async_remove#44>\",\"context\":{\"id\":\"<ulid#22>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"remove\",\"entity_id\":\"sensor.phone_camera_stream\"},\"origin\":\"LOCAL\",\"time_fired\":\"<t:config_entries_async_remove#46>\",\"context\":{\"id\":\"<ulid#23>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"update\",\"entity_id\":\"person.adam\",\"changes\":{\"options\":{}}},\"origin\":\"LOCAL\",\"time_fired\":\"<t:config_entries_async_remove#49>\",\"context\":{\"id\":\"<ulid#24>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}"
+   ],
+   "final_states": {
+    "binary_sensor.phone_kiosk_mode": null,
+    "binary_sensor.phone_kiosk_screensaver": null,
+    "device_tracker.phone": null,
+    "notify.phone": null,
+    "person.adam": {
+     "state": "unknown",
+     "attributes": {
+      "editable": true,
+      "id": "adam",
+      "device_trackers": [],
+      "in_zones": [],
+      "user_id": "00112233445566778899aabbccddeeff",
+      "friendly_name": "adam"
+     }
+    },
+    "sensor.phone_app_version": null,
+    "sensor.phone_audio_output": null,
+    "sensor.phone_battery_level": null,
+    "sensor.phone_battery_state": null,
+    "sensor.phone_bssid": null,
+    "sensor.phone_connection_type": null,
+    "sensor.phone_geocoded_location": null,
+    "sensor.phone_kiosk_brightness": null,
+    "sensor.phone_kiosk_volume": null,
+    "sensor.phone_last_update_trigger": null,
+    "sensor.phone_location_permission": null,
+    "sensor.phone_sim_1": null,
+    "sensor.phone_sim_2": null,
+    "sensor.phone_ssid": null,
+    "sensor.phone_storage": null
+   },
+   "pending_saves": {
+    "core.entity_registry": {
+     "delay_s": 10
+    },
+    "core.device_registry": {
+     "delay_s": 10
+    },
+    "core.config_entries": {
+     "delay_s": 1
+    }
+   },
+   "files_changed": [
+    "core.entity_registry",
+    "core.device_registry",
+    "core.config_entries",
+    "mobile_app"
+   ],
+   "file_diffs": {
+    "core.entity_registry": {
+     "entities": {
+      "added": [],
+      "removed": [
+       {
+        "aliases": [],
+        "aliases_v2": [
+         null
+        ],
+        "area_id": null,
+        "categories": {},
+        "capabilities": null,
+        "config_entry_id": "01JFAKEMOBILEAPPENTRY00000",
+        "config_subentry_id": null,
+        "created_at": "2026-07-08T13:35:56.371740+00:00",
+        "device_class": null,
+        "device_id": "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0",
+        "disabled_by": null,
+        "entity_category": "diagnostic",
+        "entity_id": "device_tracker.phone",
+        "hidden_by": null,
+        "icon": null,
+        "id": "00000000000000000000000000000000",
+        "has_entity_name": false,
+        "labels": [],
+        "modified_at": "2026-07-08T13:35:56.374652+00:00",
+        "name": null,
+        "object_id_base": " Phone",
+        "options": {
+         "conversation": {
+          "should_expose": false
+         }
+        },
+        "original_device_class": null,
+        "original_icon": null,
+        "original_name": " Phone",
+        "platform": "mobile_app",
+        "suggested_object_id": null,
+        "supported_features": 0,
+        "translation_key": null,
+        "unique_id": "11111111-2222-4333-8444-555555555555",
+        "previous_unique_id": null,
+        "unit_of_measurement": null
+       },
+       {
+        "aliases": [],
+        "aliases_v2": [
+         null
+        ],
+        "area_id": null,
+        "categories": {},
+        "capabilities": null,
+        "config_entry_id": "01JFAKEMOBILEAPPENTRY00000",
+        "config_subentry_id": null,
+        "created_at": "2026-07-08T13:35:56.375047+00:00",
+        "device_class": null,
+        "device_id": "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0",
+        "disabled_by": null,
+        "entity_category": null,
+        "entity_id": "notify.phone",
+        "hidden_by": null,
+        "icon": null,
+        "id": "00000000000000000000000000000001",
+        "has_entity_name": true,
+        "labels": [],
+        "modified_at": "2026-07-08T13:35:56.375260+00:00",
+        "name": null,
+        "object_id_base": null,
+        "options": {
+         "conversation": {
+          "should_expose": false
+         }
+        },
+        "original_device_class": null,
+        "original_icon": null,
+        "original_name": null,
+        "platform": "mobile_app",
+        "suggested_object_id": null,
+        "supported_features": 1,
+        "translation_key": "notify",
+        "unique_id": "11111111-2222-4333-8444-555555555555",
+        "previous_unique_id": null,
+        "unit_of_measurement": null
+       },
+       {
+        "aliases": [],
+        "aliases_v2": [
+         null
+        ],
+        "area_id": null,
+        "categories": {},
+        "capabilities": null,
+        "config_entry_id": "01JFAKEMOBILEAPPENTRY00000",
+        "config_subentry_id": null,
+        "created_at": "2026-07-08T13:35:56.519399+00:00",
+        "device_class": null,
+        "device_id": "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0",
+        "disabled_by": null,
+        "entity_category": null,
+        "entity_id": "sensor.phone_battery_level",
+        "hidden_by": null,
+        "icon": null,
+        "id": "00000000000000000000000000000002",
+        "has_entity_name": false,
+        "labels": [],
+        "modified_at": "2026-07-08T13:35:56.520017+00:00",
+        "name": null,
+        "object_id_base": " Phone Battery Level",
+        "options": {
+         "conversation": {
+          "should_expose": false
+         }
+        },
+        "original_device_class": "battery",
+        "original_icon": "mdi:battery-60",
+        "original_name": " Phone Battery Level",
+        "platform": "mobile_app",
+        "suggested_object_id": null,
+        "supported_features": 0,
+        "translation_key": null,
+        "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_battery_level",
+        "previous_unique_id": null,
+        "unit_of_measurement": "%"
+       },
+       {
+        "aliases": [],
+        "aliases_v2": [
+         null
+        ],
+        "area_id": null,
+        "categories": {},
+        "capabilities": null,
+        "config_entry_id": "01JFAKEMOBILEAPPENTRY00000",
+        "config_subentry_id": null,
+        "created_at": "2026-07-08T13:35:56.524032+00:00",
+        "device_class": null,
+        "device_id": "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0",
+        "disabled_by": null,
+        "entity_category": null,
+        "entity_id": "sensor.phone_storage",
+        "hidden_by": null,
+        "icon": null,
+        "id": "00000000000000000000000000000003",
+        "has_entity_name": false,
+        "labels": [],
+        "modified_at": "2026-07-08T13:35:56.524360+00:00",
+        "name": null,
+        "object_id_base": " Phone Storage",
+        "options": {
+         "conversation": {
+          "should_expose": false
+         }
+        },
+        "original_device_class": null,
+        "original_icon": "mdi:database",
+        "original_name": " Phone Storage",
+        "platform": "mobile_app",
+        "suggested_object_id": null,
+        "supported_features": 0,
+        "translation_key": null,
+        "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_storage",
+        "previous_unique_id": null,
+        "unit_of_measurement": "% available"
+       },
+       {
+        "aliases": [],
+        "aliases_v2": [
+         null
+        ],
+        "area_id": null,
+        "categories": {},
+        "capabilities": null,
+        "config_entry_id": "01JFAKEMOBILEAPPENTRY00000",
+        "config_subentry_id": null,
+        "created_at": "2026-07-08T13:35:56.524814+00:00",
+        "device_class": null,
+        "device_id": "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0",
+        "disabled_by": null,
+        "entity_category": null,
+        "entity_id": "sensor.phone_battery_state",
+        "hidden_by": null,
+        "icon": null,
+        "id": "00000000000000000000000000000004",
+        "has_entity_name": false,
+        "labels": [],
+        "modified_at": "2026-07-08T13:35:56.524975+00:00",
+        "name": null,
+        "object_id_base": " Phone Battery State",
+        "options": {
+         "conversation": {
+          "should_expose": false
+         }
+        },
+        "original_device_class": null,
+        "original_icon": "mdi:battery-60",
+        "original_name": " Phone Battery State",
+        "platform": "mobile_app",
+        "suggested_object_id": null,
+        "supported_features": 0,
+        "translation_key": null,
+        "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_battery_state",
+        "previous_unique_id": null,
+        "unit_of_measurement": null
+       },
+       {
+        "aliases": [],
+        "aliases_v2": [
+         null
+        ],
+        "area_id": null,
+        "categories": {},
+        "capabilities": null,
+        "config_entry_id": "01JFAKEMOBILEAPPENTRY00000",
+        "config_subentry_id": null,
+        "created_at": "2026-07-08T13:35:56.529116+00:00",
+        "device_class": null,
+        "device_id": "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0",
+        "disabled_by": null,
+        "entity_category": null,
+        "entity_id": "sensor.phone_sim_1",
+        "hidden_by": null,
+        "icon": null,
+        "id": "00000000000000000000000000000005",
+        "has_entity_name": false,
+        "labels": [],
+        "modified_at": "2026-07-08T13:35:56.529336+00:00",
+        "name": null,
+        "object_id_base": " Phone SIM 1",
+        "options": {
+         "conversation": {
+          "should_expose": false
+         }
+        },
+        "original_device_class": null,
+        "original_icon": "mdi:sim",
+        "original_name": " Phone SIM 1",
+        "platform": "mobile_app",
+        "suggested_object_id": null,
+        "supported_features": 0,
+        "translation_key": null,
+        "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_connectivity_sim_1",
+        "previous_unique_id": null,
+        "unit_of_measurement": null
+       },
+       {
+        "aliases": [],
+        "aliases_v2": [
+         null
+        ],
+        "area_id": null,
+        "categories": {},
+        "capabilities": null,
+        "config_entry_id": "01JFAKEMOBILEAPPENTRY00000",
+        "config_subentry_id": null,
+        "created_at": "2026-07-08T13:35:56.529675+00:00",
+        "device_class": null,
+        "device_id": "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0",
+        "disabled_by": null,
+        "entity_category": null,
+        "entity_id": "sensor.phone_sim_2",
+        "hidden_by": null,
+        "icon": null,
+        "id": "00000000000000000000000000000006",
+        "has_entity_name": false,
+        "labels": [],
+        "modified_at": "2026-07-08T13:35:56.529800+00:00",
+        "name": null,
+        "object_id_base": " Phone SIM 2",
+        "options": {
+         "conversation": {
+          "should_expose": false
+         }
+        },
+        "original_device_class": null,
+        "original_icon": "mdi:sim",
+        "original_name": " Phone SIM 2",
+        "platform": "mobile_app",
+        "suggested_object_id": null,
+        "supported_features": 0,
+        "translation_key": null,
+        "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_connectivity_sim_2",
+        "previous_unique_id": null,
+        "unit_of_measurement": null
+       },
+       {
+        "aliases": [],
+        "aliases_v2": [
+         null
+        ],
+        "area_id": null,
+        "categories": {},
+        "capabilities": null,
+        "config_entry_id": "01JFAKEMOBILEAPPENTRY00000",
+        "config_subentry_id": null,
+        "created_at": "2026-07-08T13:35:56.530111+00:00",
+        "device_class": null,
+        "device_id": "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0",
+        "disabled_by": null,
+        "entity_category": null,
+        "entity_id": "sensor.phone_geocoded_location",
+        "hidden_by": null,
+        "icon": null,
+        "id": "00000000000000000000000000000007",
+        "has_entity_name": false,
+        "labels": [],
+        "modified_at": "2026-07-08T13:35:56.530240+00:00",
+        "name": null,
+        "object_id_base": " Phone Geocoded Location",
+        "options": {
+         "conversation": {
+          "should_expose": false
+         }
+        },
+        "original_device_class": null,
+        "original_icon": "mdi:map",
+        "original_name": " Phone Geocoded Location",
+        "platform": "mobile_app",
+        "suggested_object_id": null,
+        "supported_features": 0,
+        "translation_key": null,
+        "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_geocoded_location",
+        "previous_unique_id": null,
+        "unit_of_measurement": null
+       },
+       {
+        "aliases": [],
+        "aliases_v2": [
+         null
+        ],
+        "area_id": null,
+        "categories": {},
+        "capabilities": null,
+        "config_entry_id": "01JFAKEMOBILEAPPENTRY00000",
+        "config_subentry_id": null,
+        "created_at": "2026-07-08T13:35:56.533696+00:00",
+        "device_class": null,
+        "device_id": "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0",
+        "disabled_by": null,
+        "entity_category": null,
+        "entity_id": "sensor.phone_ssid",
+        "hidden_by": null,
+        "icon": null,
+        "id": "00000000000000000000000000000008",
+        "has_entity_name": false,
+        "labels": [],
+        "modified_at": "2026-07-08T13:35:56.533911+00:00",
+        "name": null,
+        "object_id_base": " Phone SSID",
+        "options": {
+         "conversation": {
+          "should_expose": false
+         }
+        },
+        "original_device_class": null,
+        "original_icon": "mdi:wifi-off",
+        "original_name": " Phone SSID",
+        "platform": "mobile_app",
+        "suggested_object_id": null,
+        "supported_features": 0,
+        "translation_key": null,
+        "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_connectivity_ssid",
+        "previous_unique_id": null,
+        "unit_of_measurement": null
+       },
+       {
+        "aliases": [],
+        "aliases_v2": [
+         null
+        ],
+        "area_id": null,
+        "categories": {},
+        "capabilities": null,
+        "config_entry_id": "01JFAKEMOBILEAPPENTRY00000",
+        "config_subentry_id": null,
+        "created_at": "2026-07-08T13:35:56.536294+00:00",
+        "device_class": null,
+        "device_id": "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0",
+        "disabled_by": null,
+        "entity_category": null,
+        "entity_id": "sensor.phone_bssid",
+        "hidden_by": null,
+        "icon": null,
+        "id": "00000000000000000000000000000009",
+        "has_entity_name": false,
+        "labels": [],
+        "modified_at": "2026-07-08T13:35:56.536564+00:00",
+        "name": null,
+        "object_id_base": " Phone BSSID",
+        "options": {
+         "conversation": {
+          "should_expose": false
+         }
+        },
+        "original_device_class": null,
+        "original_icon": "mdi:wifi-off",
+        "original_name": " Phone BSSID",
+        "platform": "mobile_app",
+        "suggested_object_id": null,
+        "supported_features": 0,
+        "translation_key": null,
+        "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_connectivity_bssid",
+        "previous_unique_id": null,
+        "unit_of_measurement": null
+       },
+       {
+        "aliases": [],
+        "aliases_v2": [
+         null
+        ],
+        "area_id": null,
+        "categories": {},
+        "capabilities": null,
+        "config_entry_id": "01JFAKEMOBILEAPPENTRY00000",
+        "config_subentry_id": null,
+        "created_at": "2026-07-08T13:35:56.539508+00:00",
+        "device_class": null,
+        "device_id": "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0",
+        "disabled_by": null,
+        "entity_category": null,
+        "entity_id": "sensor.phone_connection_type",
+        "hidden_by": null,
+        "icon": null,
+        "id": "0000000000000000000000000000000a",
+        "has_entity_name": false,
+        "labels": [],
+        "modified_at": "2026-07-08T13:35:56.539720+00:00",
+        "name": null,
+        "object_id_base": " Phone Connection Type",
+        "options": {
+         "conversation": {
+          "should_expose": false
+         }
+        },
+        "original_device_class": null,
+        "original_icon": "mdi:wifi",
+        "original_name": " Phone Connection Type",
+        "platform": "mobile_app",
+        "suggested_object_id": null,
+        "supported_features": 0,
+        "translation_key": null,
+        "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_connectivity_connection_type",
+        "previous_unique_id": null,
+        "unit_of_measurement": null
+       },
+       {
+        "aliases": [],
+        "aliases_v2": [
+         null
+        ],
+        "area_id": null,
+        "categories": {},
+        "capabilities": null,
+        "config_entry_id": "01JFAKEMOBILEAPPENTRY00000",
+        "config_subentry_id": null,
+        "created_at": "2026-07-08T13:35:56.542433+00:00",
+        "device_class": null,
+        "device_id": "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0",
+        "disabled_by": null,
+        "entity_category": null,
+        "entity_id": "sensor.phone_last_update_trigger",
+        "hidden_by": null,
+        "icon": null,
+        "id": "0000000000000000000000000000000b",
+        "has_entity_name": false,
+        "labels": [],
+        "modified_at": "2026-07-08T13:35:56.542632+00:00",
+        "name": null,
+        "object_id_base": " Phone Last Update Trigger",
+        "options": {
+         "conversation": {
+          "should_expose": false
+         }
+        },
+        "original_device_class": null,
+        "original_icon": "mdi:cellphone-wireless",
+        "original_name": " Phone Last Update Trigger",
+        "platform": "mobile_app",
+        "suggested_object_id": null,
+        "supported_features": 0,
+        "translation_key": null,
+        "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_last_update_trigger",
+        "previous_unique_id": null,
+        "unit_of_measurement": null
+       },
+       {
+        "aliases": [],
+        "aliases_v2": [
+         null
+        ],
+        "area_id": null,
+        "categories": {},
+        "capabilities": null,
+        "config_entry_id": "01JFAKEMOBILEAPPENTRY00000",
+        "config_subentry_id": null,
+        "created_at": "2026-07-08T13:35:56.549089+00:00",
+        "device_class": null,
+        "device_id": "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0",
+        "disabled_by": null,
+        "entity_category": null,
+        "entity_id": "sensor.phone_kiosk_brightness",
+        "hidden_by": null,
+        "icon": null,
+        "id": "0000000000000000000000000000000c",
+        "has_entity_name": false,
+        "labels": [],
+        "modified_at": "2026-07-08T13:35:56.549354+00:00",
+        "name": null,
+        "object_id_base": " Phone Kiosk Brightness",
+        "options": {
+         "conversation": {
+          "should_expose": false
+         }
+        },
+        "original_device_class": null,
+        "original_icon": "mdi:dots-square",
+        "original_name": " Phone Kiosk Brightness",
+        "platform": "mobile_app",
+        "suggested_object_id": null,
+        "supported_features": 0,
+        "translation_key": null,
+        "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_kioskBrightness",
+        "previous_unique_id": null,
+        "unit_of_measurement": null
+       },
+       {
+        "aliases": [],
+        "aliases_v2": [
+         null
+        ],
+        "area_id": null,
+        "categories": {},
+        "capabilities": null,
+        "config_entry_id": "01JFAKEMOBILEAPPENTRY00000",
+        "config_subentry_id": null,
+        "created_at": "2026-07-08T13:35:56.550715+00:00",
+        "device_class": null,
+        "device_id": "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0",
+        "disabled_by": null,
+        "entity_category": null,
+        "entity_id": "sensor.phone_location_permission",
+        "hidden_by": null,
+        "icon": null,
+        "id": "0000000000000000000000000000000d",
+        "has_entity_name": false,
+        "labels": [],
+        "modified_at": "2026-07-08T13:35:56.550888+00:00",
+        "name": null,
+        "object_id_base": " Phone Location permission",
+        "options": {
+         "conversation": {
+          "should_expose": false
+         }
+        },
+        "original_device_class": null,
+        "original_icon": "mdi:map",
+        "original_name": " Phone Location permission",
+        "platform": "mobile_app",
+        "suggested_object_id": null,
+        "supported_features": 0,
+        "translation_key": null,
+        "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_location-permission",
+        "previous_unique_id": null,
+        "unit_of_measurement": null
+       },
+       {
+        "aliases": [],
+        "aliases_v2": [
+         null
+        ],
+        "area_id": null,
+        "categories": {},
+        "capabilities": null,
+        "config_entry_id": "01JFAKEMOBILEAPPENTRY00000",
+        "config_subentry_id": null,
+        "created_at": "2026-07-08T13:35:56.551195+00:00",
+        "device_class": null,
+        "device_id": "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0",
+        "disabled_by": null,
+        "entity_category": null,
+        "entity_id": "sensor.phone_audio_output",
+        "hidden_by": null,
+        "icon": null,
+        "id": "0000000000000000000000000000000e",
+        "has_entity_name": false,
+        "labels": [],
+        "modified_at": "2026-07-08T13:35:56.551341+00:00",
+        "name": null,
+        "object_id_base": " Phone Audio Output",
+        "options": {
+         "conversation": {
+          "should_expose": false
+         }
+        },
+        "original_device_class": null,
+        "original_icon": "mdi:volume-high",
+        "original_name": " Phone Audio Output",
+        "platform": "mobile_app",
+        "suggested_object_id": null,
+        "supported_features": 0,
+        "translation_key": null,
+        "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_iphone-audio-output",
+        "previous_unique_id": null,
+        "unit_of_measurement": null
+       },
+       {
+        "aliases": [],
+        "aliases_v2": [
+         null
+        ],
+        "area_id": null,
+        "categories": {},
+        "capabilities": null,
+        "config_entry_id": "01JFAKEMOBILEAPPENTRY00000",
+        "config_subentry_id": null,
+        "created_at": "2026-07-08T13:35:56.552121+00:00",
+        "device_class": null,
+        "device_id": "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0",
+        "disabled_by": null,
+        "entity_category": "diagnostic",
+        "entity_id": "sensor.phone_app_version",
+        "hidden_by": null,
+        "icon": null,
+        "id": "0000000000000000000000000000000f",
+        "has_entity_name": false,
+        "labels": [],
+        "modified_at": "2026-07-08T13:35:56.552256+00:00",
+        "name": null,
+        "object_id_base": " Phone App Version",
+        "options": {
+         "conversation": {
+          "should_expose": false
+         }
+        },
+        "original_device_class": null,
+        "original_icon": "mdi:cellphone",
+        "original_name": " Phone App Version",
+        "platform": "mobile_app",
+        "suggested_object_id": null,
+        "supported_features": 0,
+        "translation_key": null,
+        "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_app-version",
+        "previous_unique_id": null,
+        "unit_of_measurement": null
+       },
+       {
+        "aliases": [],
+        "aliases_v2": [
+         null
+        ],
+        "area_id": null,
+        "categories": {},
+        "capabilities": null,
+        "config_entry_id": "01JFAKEMOBILEAPPENTRY00000",
+        "config_subentry_id": null,
+        "created_at": "2026-07-08T13:35:56.554628+00:00",
+        "device_class": null,
+        "device_id": "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0",
+        "disabled_by": null,
+        "entity_category": null,
+        "entity_id": "binary_sensor.phone_kiosk_mode",
+        "hidden_by": null,
+        "icon": null,
+        "id": "00000000000000000000000000000010",
+        "has_entity_name": false,
+        "labels": [],
+        "modified_at": "2026-07-08T13:35:56.554781+00:00",
+        "name": null,
+        "object_id_base": " Phone Kiosk Mode",
+        "options": {
+         "conversation": {
+          "should_expose": false
+         }
+        },
+        "original_device_class": null,
+        "original_icon": "mdi:tablet",
+        "original_name": " Phone Kiosk Mode",
+        "platform": "mobile_app",
+        "suggested_object_id": null,
+        "supported_features": 0,
+        "translation_key": null,
+        "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_kioskMode",
+        "previous_unique_id": null,
+        "unit_of_measurement": null
+       },
+       {
+        "aliases": [],
+        "aliases_v2": [
+         null
+        ],
+        "area_id": null,
+        "categories": {},
+        "capabilities": null,
+        "config_entry_id": "01JFAKEMOBILEAPPENTRY00000",
+        "config_subentry_id": null,
+        "created_at": "2026-07-08T13:35:56.556215+00:00",
+        "device_class": null,
+        "device_id": "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0",
+        "disabled_by": null,
+        "entity_category": null,
+        "entity_id": "sensor.phone_kiosk_volume",
+        "hidden_by": null,
+        "icon": null,
+        "id": "00000000000000000000000000000011",
+        "has_entity_name": false,
+        "labels": [],
+        "modified_at": "2026-07-08T13:35:56.556339+00:00",
+        "name": null,
+        "object_id_base": " Phone Kiosk Volume",
+        "options": {
+         "conversation": {
+          "should_expose": false
+         }
+        },
+        "original_device_class": null,
+        "original_icon": "mdi:dots-square",
+        "original_name": " Phone Kiosk Volume",
+        "platform": "mobile_app",
+        "suggested_object_id": null,
+        "supported_features": 0,
+        "translation_key": null,
+        "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_kioskVolume",
+        "previous_unique_id": null,
+        "unit_of_measurement": null
+       },
+       {
+        "aliases": [],
+        "aliases_v2": [
+         null
+        ],
+        "area_id": null,
+        "categories": {},
+        "capabilities": null,
+        "config_entry_id": "01JFAKEMOBILEAPPENTRY00000",
+        "config_subentry_id": null,
+        "created_at": "2026-09-15T21:13:49.095318+00:00",
+        "device_class": null,
+        "device_id": "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0",
+        "disabled_by": "integration",
+        "entity_category": null,
+        "entity_id": "binary_sensor.phone_camera_motion",
+        "hidden_by": null,
+        "icon": null,
+        "id": "00000000000000000000000000000012",
+        "has_entity_name": false,
+        "labels": [],
+        "modified_at": "2026-09-15T21:13:49.097059+00:00",
+        "name": null,
+        "object_id_base": " Phone Camera Motion",
+        "options": {},
+        "original_device_class": null,
+        "original_icon": "mdi:dots-square",
+        "original_name": " Phone Camera Motion",
+        "platform": "mobile_app",
+        "suggested_object_id": null,
+        "supported_features": 0,
+        "translation_key": null,
+        "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_cameraMotion",
+        "previous_unique_id": null,
+        "unit_of_measurement": null
+       },
+       {
+        "aliases": [],
+        "aliases_v2": [
+         null
+        ],
+        "area_id": null,
+        "categories": {},
+        "capabilities": null,
+        "config_entry_id": "01JFAKEMOBILEAPPENTRY00000",
+        "config_subentry_id": null,
+        "created_at": "2026-09-15T21:13:49.101790+00:00",
+        "device_class": null,
+        "device_id": "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0",
+        "disabled_by": null,
+        "entity_category": null,
+        "entity_id": "binary_sensor.phone_kiosk_screensaver",
+        "hidden_by": null,
+        "icon": null,
+        "id": "00000000000000000000000000000013",
+        "has_entity_name": false,
+        "labels": [],
+        "modified_at": "2026-09-15T21:13:49.108532+00:00",
+        "name": null,
+        "object_id_base": " Phone Kiosk Screensaver",
+        "options": {
+         "conversation": {
+          "should_expose": false
+         }
+        },
+        "original_device_class": null,
+        "original_icon": "mdi:sleep-off",
+        "original_name": " Phone Kiosk Screensaver",
+        "platform": "mobile_app",
+        "suggested_object_id": null,
+        "supported_features": 0,
+        "translation_key": null,
+        "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_kioskScreensaver",
+        "previous_unique_id": null,
+        "unit_of_measurement": null
+       },
+       {
+        "aliases": [],
+        "aliases_v2": [
+         null
+        ],
+        "area_id": null,
+        "categories": {},
+        "capabilities": null,
+        "config_entry_id": "01JFAKEMOBILEAPPENTRY00000",
+        "config_subentry_id": null,
+        "created_at": "2026-09-15T21:13:49.117155+00:00",
+        "device_class": null,
+        "device_id": "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0",
+        "disabled_by": "integration",
+        "entity_category": null,
+        "entity_id": "sensor.phone_camera_stream",
+        "hidden_by": null,
+        "icon": null,
+        "id": "00000000000000000000000000000014",
+        "has_entity_name": false,
+        "labels": [],
+        "modified_at": "2026-09-15T21:13:49.118147+00:00",
+        "name": null,
+        "object_id_base": " Phone Camera Stream",
+        "options": {},
+        "original_device_class": null,
+        "original_icon": "mdi:dots-square",
+        "original_name": " Phone Camera Stream",
+        "platform": "mobile_app",
+        "suggested_object_id": null,
+        "supported_features": 0,
+        "translation_key": null,
+        "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_cameraStream",
+        "previous_unique_id": null,
+        "unit_of_measurement": null
+       }
+      ],
+      "changed": {
+       "<uuid#1>": {
+        "modified_at": [
+         "<t:boot#2>",
+         "<t:config_entries_async_remove#48>"
+        ],
+        "options": [
+         {},
+         {
+          "collection": {
+           "hash": "<uuid#2>"
+          }
+         }
+        ]
+       }
+      }
+     },
+     "deleted_entities": {
+      "added": [
+       {
+        "aliases": [],
+        "aliases_v2": [
+         null
+        ],
+        "area_id": null,
+        "categories": {},
+        "config_entry_id": null,
+        "config_subentry_id": null,
+        "created_at": "2026-07-08T13:35:56.371740+00:00",
+        "device_class": null,
+        "disabled_by": null,
+        "disabled_by_undefined": false,
+        "entity_id": "device_tracker.phone",
+        "hidden_by": null,
+        "hidden_by_undefined": false,
+        "icon": null,
+        "id": "00000000000000000000000000000000",
+        "labels": [],
+        "modified_at": "<t:config_entries_async_remove#5>",
+        "name": null,
+        "options": {
+         "conversation": {
+          "should_expose": false
+         }
+        },
+        "options_undefined": false,
+        "orphaned_timestamp": "<ts:config_entries_async_remove#47>",
+        "platform": "mobile_app",
+        "unique_id": "11111111-2222-4333-8444-555555555555"
+       },
+       {
+        "aliases": [],
+        "aliases_v2": [
+         null
+        ],
+        "area_id": null,
+        "categories": {},
+        "config_entry_id": null,
+        "config_subentry_id": null,
+        "created_at": "2026-07-08T13:35:56.375047+00:00",
+        "device_class": null,
+        "disabled_by": null,
+        "disabled_by_undefined": false,
+        "entity_id": "notify.phone",
+        "hidden_by": null,
+        "hidden_by_undefined": false,
+        "icon": null,
+        "id": "00000000000000000000000000000001",
+        "labels": [],
+        "modified_at": "<t:config_entries_async_remove#7>",
+        "name": null,
+        "options": {
+         "conversation": {
+          "should_expose": false
+         }
+        },
+        "options_undefined": false,
+        "orphaned_timestamp": "<ts:config_entries_async_remove#47>",
+        "platform": "mobile_app",
+        "unique_id": "11111111-2222-4333-8444-555555555555"
+       },
+       {
+        "aliases": [],
+        "aliases_v2": [
+         null
+        ],
+        "area_id": null,
+        "categories": {},
+        "config_entry_id": null,
+        "config_subentry_id": null,
+        "created_at": "2026-07-08T13:35:56.519399+00:00",
+        "device_class": null,
+        "disabled_by": null,
+        "disabled_by_undefined": false,
+        "entity_id": "sensor.phone_battery_level",
+        "hidden_by": null,
+        "hidden_by_undefined": false,
+        "icon": null,
+        "id": "00000000000000000000000000000002",
+        "labels": [],
+        "modified_at": "<t:config_entries_async_remove#9>",
+        "name": null,
+        "options": {
+         "conversation": {
+          "should_expose": false
+         }
+        },
+        "options_undefined": false,
+        "orphaned_timestamp": "<ts:config_entries_async_remove#47>",
+        "platform": "mobile_app",
+        "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_battery_level"
+       },
+       {
+        "aliases": [],
+        "aliases_v2": [
+         null
+        ],
+        "area_id": null,
+        "categories": {},
+        "config_entry_id": null,
+        "config_subentry_id": null,
+        "created_at": "2026-07-08T13:35:56.524032+00:00",
+        "device_class": null,
+        "disabled_by": null,
+        "disabled_by_undefined": false,
+        "entity_id": "sensor.phone_storage",
+        "hidden_by": null,
+        "hidden_by_undefined": false,
+        "icon": null,
+        "id": "00000000000000000000000000000003",
+        "labels": [],
+        "modified_at": "<t:config_entries_async_remove#11>",
+        "name": null,
+        "options": {
+         "conversation": {
+          "should_expose": false
+         }
+        },
+        "options_undefined": false,
+        "orphaned_timestamp": "<ts:config_entries_async_remove#47>",
+        "platform": "mobile_app",
+        "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_storage"
+       },
+       {
+        "aliases": [],
+        "aliases_v2": [
+         null
+        ],
+        "area_id": null,
+        "categories": {},
+        "config_entry_id": null,
+        "config_subentry_id": null,
+        "created_at": "2026-07-08T13:35:56.524814+00:00",
+        "device_class": null,
+        "disabled_by": null,
+        "disabled_by_undefined": false,
+        "entity_id": "sensor.phone_battery_state",
+        "hidden_by": null,
+        "hidden_by_undefined": false,
+        "icon": null,
+        "id": "00000000000000000000000000000004",
+        "labels": [],
+        "modified_at": "<t:config_entries_async_remove#13>",
+        "name": null,
+        "options": {
+         "conversation": {
+          "should_expose": false
+         }
+        },
+        "options_undefined": false,
+        "orphaned_timestamp": "<ts:config_entries_async_remove#47>",
+        "platform": "mobile_app",
+        "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_battery_state"
+       },
+       {
+        "aliases": [],
+        "aliases_v2": [
+         null
+        ],
+        "area_id": null,
+        "categories": {},
+        "config_entry_id": null,
+        "config_subentry_id": null,
+        "created_at": "2026-07-08T13:35:56.529116+00:00",
+        "device_class": null,
+        "disabled_by": null,
+        "disabled_by_undefined": false,
+        "entity_id": "sensor.phone_sim_1",
+        "hidden_by": null,
+        "hidden_by_undefined": false,
+        "icon": null,
+        "id": "00000000000000000000000000000005",
+        "labels": [],
+        "modified_at": "<t:config_entries_async_remove#15>",
+        "name": null,
+        "options": {
+         "conversation": {
+          "should_expose": false
+         }
+        },
+        "options_undefined": false,
+        "orphaned_timestamp": "<ts:config_entries_async_remove#47>",
+        "platform": "mobile_app",
+        "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_connectivity_sim_1"
+       },
+       {
+        "aliases": [],
+        "aliases_v2": [
+         null
+        ],
+        "area_id": null,
+        "categories": {},
+        "config_entry_id": null,
+        "config_subentry_id": null,
+        "created_at": "2026-07-08T13:35:56.529675+00:00",
+        "device_class": null,
+        "disabled_by": null,
+        "disabled_by_undefined": false,
+        "entity_id": "sensor.phone_sim_2",
+        "hidden_by": null,
+        "hidden_by_undefined": false,
+        "icon": null,
+        "id": "00000000000000000000000000000006",
+        "labels": [],
+        "modified_at": "<t:config_entries_async_remove#17>",
+        "name": null,
+        "options": {
+         "conversation": {
+          "should_expose": false
+         }
+        },
+        "options_undefined": false,
+        "orphaned_timestamp": "<ts:config_entries_async_remove#47>",
+        "platform": "mobile_app",
+        "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_connectivity_sim_2"
+       },
+       {
+        "aliases": [],
+        "aliases_v2": [
+         null
+        ],
+        "area_id": null,
+        "categories": {},
+        "config_entry_id": null,
+        "config_subentry_id": null,
+        "created_at": "2026-07-08T13:35:56.530111+00:00",
+        "device_class": null,
+        "disabled_by": null,
+        "disabled_by_undefined": false,
+        "entity_id": "sensor.phone_geocoded_location",
+        "hidden_by": null,
+        "hidden_by_undefined": false,
+        "icon": null,
+        "id": "00000000000000000000000000000007",
+        "labels": [],
+        "modified_at": "<t:config_entries_async_remove#19>",
+        "name": null,
+        "options": {
+         "conversation": {
+          "should_expose": false
+         }
+        },
+        "options_undefined": false,
+        "orphaned_timestamp": "<ts:config_entries_async_remove#47>",
+        "platform": "mobile_app",
+        "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_geocoded_location"
+       },
+       {
+        "aliases": [],
+        "aliases_v2": [
+         null
+        ],
+        "area_id": null,
+        "categories": {},
+        "config_entry_id": null,
+        "config_subentry_id": null,
+        "created_at": "2026-07-08T13:35:56.533696+00:00",
+        "device_class": null,
+        "disabled_by": null,
+        "disabled_by_undefined": false,
+        "entity_id": "sensor.phone_ssid",
+        "hidden_by": null,
+        "hidden_by_undefined": false,
+        "icon": null,
+        "id": "00000000000000000000000000000008",
+        "labels": [],
+        "modified_at": "<t:config_entries_async_remove#21>",
+        "name": null,
+        "options": {
+         "conversation": {
+          "should_expose": false
+         }
+        },
+        "options_undefined": false,
+        "orphaned_timestamp": "<ts:config_entries_async_remove#47>",
+        "platform": "mobile_app",
+        "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_connectivity_ssid"
+       },
+       {
+        "aliases": [],
+        "aliases_v2": [
+         null
+        ],
+        "area_id": null,
+        "categories": {},
+        "config_entry_id": null,
+        "config_subentry_id": null,
+        "created_at": "2026-07-08T13:35:56.536294+00:00",
+        "device_class": null,
+        "disabled_by": null,
+        "disabled_by_undefined": false,
+        "entity_id": "sensor.phone_bssid",
+        "hidden_by": null,
+        "hidden_by_undefined": false,
+        "icon": null,
+        "id": "00000000000000000000000000000009",
+        "labels": [],
+        "modified_at": "<t:config_entries_async_remove#23>",
+        "name": null,
+        "options": {
+         "conversation": {
+          "should_expose": false
+         }
+        },
+        "options_undefined": false,
+        "orphaned_timestamp": "<ts:config_entries_async_remove#47>",
+        "platform": "mobile_app",
+        "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_connectivity_bssid"
+       },
+       {
+        "aliases": [],
+        "aliases_v2": [
+         null
+        ],
+        "area_id": null,
+        "categories": {},
+        "config_entry_id": null,
+        "config_subentry_id": null,
+        "created_at": "2026-07-08T13:35:56.539508+00:00",
+        "device_class": null,
+        "disabled_by": null,
+        "disabled_by_undefined": false,
+        "entity_id": "sensor.phone_connection_type",
+        "hidden_by": null,
+        "hidden_by_undefined": false,
+        "icon": null,
+        "id": "0000000000000000000000000000000a",
+        "labels": [],
+        "modified_at": "<t:config_entries_async_remove#25>",
+        "name": null,
+        "options": {
+         "conversation": {
+          "should_expose": false
+         }
+        },
+        "options_undefined": false,
+        "orphaned_timestamp": "<ts:config_entries_async_remove#47>",
+        "platform": "mobile_app",
+        "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_connectivity_connection_type"
+       },
+       {
+        "aliases": [],
+        "aliases_v2": [
+         null
+        ],
+        "area_id": null,
+        "categories": {},
+        "config_entry_id": null,
+        "config_subentry_id": null,
+        "created_at": "2026-07-08T13:35:56.542433+00:00",
+        "device_class": null,
+        "disabled_by": null,
+        "disabled_by_undefined": false,
+        "entity_id": "sensor.phone_last_update_trigger",
+        "hidden_by": null,
+        "hidden_by_undefined": false,
+        "icon": null,
+        "id": "0000000000000000000000000000000b",
+        "labels": [],
+        "modified_at": "<t:config_entries_async_remove#27>",
+        "name": null,
+        "options": {
+         "conversation": {
+          "should_expose": false
+         }
+        },
+        "options_undefined": false,
+        "orphaned_timestamp": "<ts:config_entries_async_remove#47>",
+        "platform": "mobile_app",
+        "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_last_update_trigger"
+       },
+       {
+        "aliases": [],
+        "aliases_v2": [
+         null
+        ],
+        "area_id": null,
+        "categories": {},
+        "config_entry_id": null,
+        "config_subentry_id": null,
+        "created_at": "2026-07-08T13:35:56.549089+00:00",
+        "device_class": null,
+        "disabled_by": null,
+        "disabled_by_undefined": false,
+        "entity_id": "sensor.phone_kiosk_brightness",
+        "hidden_by": null,
+        "hidden_by_undefined": false,
+        "icon": null,
+        "id": "0000000000000000000000000000000c",
+        "labels": [],
+        "modified_at": "<t:config_entries_async_remove#29>",
+        "name": null,
+        "options": {
+         "conversation": {
+          "should_expose": false
+         }
+        },
+        "options_undefined": false,
+        "orphaned_timestamp": "<ts:config_entries_async_remove#47>",
+        "platform": "mobile_app",
+        "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_kioskBrightness"
+       },
+       {
+        "aliases": [],
+        "aliases_v2": [
+         null
+        ],
+        "area_id": null,
+        "categories": {},
+        "config_entry_id": null,
+        "config_subentry_id": null,
+        "created_at": "2026-07-08T13:35:56.550715+00:00",
+        "device_class": null,
+        "disabled_by": null,
+        "disabled_by_undefined": false,
+        "entity_id": "sensor.phone_location_permission",
+        "hidden_by": null,
+        "hidden_by_undefined": false,
+        "icon": null,
+        "id": "0000000000000000000000000000000d",
+        "labels": [],
+        "modified_at": "<t:config_entries_async_remove#31>",
+        "name": null,
+        "options": {
+         "conversation": {
+          "should_expose": false
+         }
+        },
+        "options_undefined": false,
+        "orphaned_timestamp": "<ts:config_entries_async_remove#47>",
+        "platform": "mobile_app",
+        "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_location-permission"
+       },
+       {
+        "aliases": [],
+        "aliases_v2": [
+         null
+        ],
+        "area_id": null,
+        "categories": {},
+        "config_entry_id": null,
+        "config_subentry_id": null,
+        "created_at": "2026-07-08T13:35:56.551195+00:00",
+        "device_class": null,
+        "disabled_by": null,
+        "disabled_by_undefined": false,
+        "entity_id": "sensor.phone_audio_output",
+        "hidden_by": null,
+        "hidden_by_undefined": false,
+        "icon": null,
+        "id": "0000000000000000000000000000000e",
+        "labels": [],
+        "modified_at": "<t:config_entries_async_remove#33>",
+        "name": null,
+        "options": {
+         "conversation": {
+          "should_expose": false
+         }
+        },
+        "options_undefined": false,
+        "orphaned_timestamp": "<ts:config_entries_async_remove#47>",
+        "platform": "mobile_app",
+        "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_iphone-audio-output"
+       },
+       {
+        "aliases": [],
+        "aliases_v2": [
+         null
+        ],
+        "area_id": null,
+        "categories": {},
+        "config_entry_id": null,
+        "config_subentry_id": null,
+        "created_at": "2026-07-08T13:35:56.552121+00:00",
+        "device_class": null,
+        "disabled_by": null,
+        "disabled_by_undefined": false,
+        "entity_id": "sensor.phone_app_version",
+        "hidden_by": null,
+        "hidden_by_undefined": false,
+        "icon": null,
+        "id": "0000000000000000000000000000000f",
+        "labels": [],
+        "modified_at": "<t:config_entries_async_remove#35>",
+        "name": null,
+        "options": {
+         "conversation": {
+          "should_expose": false
+         }
+        },
+        "options_undefined": false,
+        "orphaned_timestamp": "<ts:config_entries_async_remove#47>",
+        "platform": "mobile_app",
+        "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_app-version"
+       },
+       {
+        "aliases": [],
+        "aliases_v2": [
+         null
+        ],
+        "area_id": null,
+        "categories": {},
+        "config_entry_id": null,
+        "config_subentry_id": null,
+        "created_at": "2026-07-08T13:35:56.554628+00:00",
+        "device_class": null,
+        "disabled_by": null,
+        "disabled_by_undefined": false,
+        "entity_id": "binary_sensor.phone_kiosk_mode",
+        "hidden_by": null,
+        "hidden_by_undefined": false,
+        "icon": null,
+        "id": "00000000000000000000000000000010",
+        "labels": [],
+        "modified_at": "<t:config_entries_async_remove#37>",
+        "name": null,
+        "options": {
+         "conversation": {
+          "should_expose": false
+         }
+        },
+        "options_undefined": false,
+        "orphaned_timestamp": "<ts:config_entries_async_remove#47>",
+        "platform": "mobile_app",
+        "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_kioskMode"
+       },
+       {
+        "aliases": [],
+        "aliases_v2": [
+         null
+        ],
+        "area_id": null,
+        "categories": {},
+        "config_entry_id": null,
+        "config_subentry_id": null,
+        "created_at": "2026-07-08T13:35:56.556215+00:00",
+        "device_class": null,
+        "disabled_by": null,
+        "disabled_by_undefined": false,
+        "entity_id": "sensor.phone_kiosk_volume",
+        "hidden_by": null,
+        "hidden_by_undefined": false,
+        "icon": null,
+        "id": "00000000000000000000000000000011",
+        "labels": [],
+        "modified_at": "<t:config_entries_async_remove#39>",
+        "name": null,
+        "options": {
+         "conversation": {
+          "should_expose": false
+         }
+        },
+        "options_undefined": false,
+        "orphaned_timestamp": "<ts:config_entries_async_remove#47>",
+        "platform": "mobile_app",
+        "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_kioskVolume"
+       },
+       {
+        "aliases": [],
+        "aliases_v2": [
+         null
+        ],
+        "area_id": null,
+        "categories": {},
+        "config_entry_id": null,
+        "config_subentry_id": null,
+        "created_at": "2026-09-15T21:13:49.095318+00:00",
+        "device_class": null,
+        "disabled_by": "integration",
+        "disabled_by_undefined": false,
+        "entity_id": "binary_sensor.phone_camera_motion",
+        "hidden_by": null,
+        "hidden_by_undefined": false,
+        "icon": null,
+        "id": "00000000000000000000000000000012",
+        "labels": [],
+        "modified_at": "<t:config_entries_async_remove#41>",
+        "name": null,
+        "options": {},
+        "options_undefined": false,
+        "orphaned_timestamp": "<ts:config_entries_async_remove#47>",
+        "platform": "mobile_app",
+        "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_cameraMotion"
+       },
+       {
+        "aliases": [],
+        "aliases_v2": [
+         null
+        ],
+        "area_id": null,
+        "categories": {},
+        "config_entry_id": null,
+        "config_subentry_id": null,
+        "created_at": "2026-09-15T21:13:49.101790+00:00",
+        "device_class": null,
+        "disabled_by": null,
+        "disabled_by_undefined": false,
+        "entity_id": "binary_sensor.phone_kiosk_screensaver",
+        "hidden_by": null,
+        "hidden_by_undefined": false,
+        "icon": null,
+        "id": "00000000000000000000000000000013",
+        "labels": [],
+        "modified_at": "<t:config_entries_async_remove#43>",
+        "name": null,
+        "options": {
+         "conversation": {
+          "should_expose": false
+         }
+        },
+        "options_undefined": false,
+        "orphaned_timestamp": "<ts:config_entries_async_remove#47>",
+        "platform": "mobile_app",
+        "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_kioskScreensaver"
+       },
+       {
+        "aliases": [],
+        "aliases_v2": [
+         null
+        ],
+        "area_id": null,
+        "categories": {},
+        "config_entry_id": null,
+        "config_subentry_id": null,
+        "created_at": "2026-09-15T21:13:49.117155+00:00",
+        "device_class": null,
+        "disabled_by": "integration",
+        "disabled_by_undefined": false,
+        "entity_id": "sensor.phone_camera_stream",
+        "hidden_by": null,
+        "hidden_by_undefined": false,
+        "icon": null,
+        "id": "00000000000000000000000000000014",
+        "labels": [],
+        "modified_at": "<t:config_entries_async_remove#45>",
+        "name": null,
+        "options": {},
+        "options_undefined": false,
+        "orphaned_timestamp": "<ts:config_entries_async_remove#47>",
+        "platform": "mobile_app",
+        "unique_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f_cameraStream"
+       }
+      ],
+      "removed": [],
+      "changed": {}
+     }
+    },
+    "core.device_registry": {
+     "devices": {
+      "added": [],
+      "removed": [
+       {
+        "area_id": null,
+        "config_entries": [
+         "01JFAKEMOBILEAPPENTRY00000"
+        ],
+        "config_entries_subentries": {
+         "01JFAKEMOBILEAPPENTRY00000": [
+          null
+         ]
+        },
+        "configuration_url": null,
+        "connections": [],
+        "created_at": "2026-07-08T13:35:56.373320+00:00",
+        "disabled_by": null,
+        "entry_type": null,
+        "hw_version": null,
+        "id": "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0",
+        "identifiers": [
+         [
+          "mobile_app",
+          "11111111-2222-4333-8444-555555555555"
+         ]
+        ],
+        "labels": [],
+        "manufacturer": "Apple",
+        "model": "iPhone17,1",
+        "model_id": null,
+        "modified_at": "2026-09-15T21:13:48.636995+00:00",
+        "name_by_user": null,
+        "name": " Phone",
+        "primary_config_entry": "01JFAKEMOBILEAPPENTRY00000",
+        "serial_number": null,
+        "sw_version": "27.0",
+        "via_device_id": null
+       }
+      ],
+      "changed": {}
+     },
+     "deleted_devices": {
+      "added": [
+       {
+        "area_id": null,
+        "config_entries": [],
+        "config_entries_subentries": {},
+        "connections": [],
+        "created_at": "2026-07-08T13:35:56.373320+00:00",
+        "disabled_by": null,
+        "disabled_by_undefined": false,
+        "identifiers": [
+         [
+          "mobile_app",
+          "11111111-2222-4333-8444-555555555555"
+         ]
+        ],
+        "id": "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0",
+        "labels": [],
+        "modified_at": "<t:config_entries_async_remove#3>",
+        "name_by_user": null,
+        "orphaned_timestamp": "<ts:config_entries_async_remove#2>"
+       }
+      ],
+      "removed": [],
+      "changed": {}
+     }
+    },
+    "core.config_entries": {
+     "entries": {
+      "added": [],
+      "removed": [
+       {
+        "created_at": "2026-07-08T13:35:56.373075+00:00",
+        "data": {
+         "app_data": {
+          "push_token": "fake-push-token",
+          "push_url": "https://mobile-apps.home-assistant.io/api/sendPushNotification",
+          "start_live_activity_token": "abababababababab"
+         },
+         "app_id": "io.robbie.HomeAssistant",
+         "app_name": "Home Assistant",
+         "app_version": "2026.9.0 (2026.2874)",
+         "device_id": "11111111-2222-4333-8444-555555555555",
+         "device_name": " Phone",
+         "manufacturer": "Apple",
+         "model": "iPhone17,1",
+         "no_legacy_encryption": true,
+         "os_name": "iOS",
+         "os_version": "27.0",
+         "secret": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+         "supports_encryption": true,
+         "user_id": "00112233445566778899aabbccddeeff",
+         "webhook_id": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f"
+        },
+        "disabled_by": null,
+        "discovery_keys": {},
+        "domain": "mobile_app",
+        "entry_id": "01JFAKEMOBILEAPPENTRY00000",
+        "minor_version": 1,
+        "modified_at": "2026-09-15T21:13:48.642920+00:00",
+        "options": {},
+        "pref_disable_new_entities": false,
+        "pref_disable_polling": false,
+        "source": "registration",
+        "subentries": [],
+        "title": " Phone",
+        "unique_id": "io.robbie.HomeAssistant-11111111-2222-4333-8444-555555555555",
+        "version": 1
+       }
+      ],
+      "changed": {}
+     }
+    },
+    "mobile_app": {
+     "before": null,
+     "after": {
+      "version": 1,
+      "minor_version": 1,
+      "key": "mobile_app",
+      "data": {
+       "deleted_ids": [
+        "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f"
+       ]
+      }
+     }
+    }
+   },
+   "file_modes": {
+    "core.entity_registry": "0o644",
+    "core.device_registry": "0o644",
+    "core.config_entries": "0o644",
+    "mobile_app": "0o644"
+   },
+   "devices_left": 0,
+   "deleted_devices": [
+    {
+     "area_id": null,
+     "config_entries": [],
+     "config_entries_subentries": {},
+     "connections": [],
+     "created_at": "2026-07-08T13:35:56.373320+00:00",
+     "disabled_by": null,
+     "disabled_by_undefined": false,
+     "identifiers": [
+      [
+       "mobile_app",
+       "11111111-2222-4333-8444-555555555555"
+      ]
+     ],
+     "id": "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0",
+     "labels": [],
+     "modified_at": "<t:config_entries_async_remove#3>",
+     "name_by_user": null,
+     "orphaned_timestamp": "<ts:config_entries_async_remove#2>"
+    }
+   ],
+   "states_left": []
+  },
+  {
+   "step": "post_registrations_same_device_again",
+   "result": {
+    "status": 201,
+    "reply": {
+     "cloudhook_url": null,
+     "remote_ui_url": null,
+     "secret": "<new-secret-1>",
+     "webhook_id": "<new-webhook-1>"
+    }
+   },
+   "config_entry_signals_ws": [
+    "{\"id\":3,\"type\":\"event\",\"event\":[{\"type\":\"added\",\"entry\":{\"created_at\":\"<ts:post_registrations_same_device_again#2>\",\"entry_id\":\"<ulid#1>\",\"domain\":\"mobile_app\",\"modified_at\":\"<ts:post_registrations_same_device_again#3>\",\"title\":\" Phone\",\"source\":\"registration\",\"state\":\"not_loaded\",\"supports_options\":false,\"supports_remove_device\":false,\"supports_unload\":false,\"supports_reconfigure\":false,\"supported_subentry_types\":{},\"pref_disable_new_entities\":false,\"pref_disable_polling\":false,\"disabled_by\":null,\"reason\":null,\"error_reason_translation_key\":null,\"error_reason_translation_placeholders\":null,\"num_subentries\":0}}]}",
+    "{\"id\":3,\"type\":\"event\",\"event\":[{\"type\":\"updated\",\"entry\":{\"created_at\":\"<ts:post_registrations_same_device_again#2>\",\"entry_id\":\"<ulid#1>\",\"domain\":\"mobile_app\",\"modified_at\":\"<ts:post_registrations_same_device_again#3>\",\"title\":\" Phone\",\"source\":\"registration\",\"state\":\"setup_in_progress\",\"supports_options\":false,\"supports_remove_device\":false,\"supports_unload\":false,\"supports_reconfigure\":false,\"supported_subentry_types\":{},\"pref_disable_new_entities\":false,\"pref_disable_polling\":false,\"disabled_by\":null,\"reason\":null,\"error_reason_translation_key\":null,\"error_reason_translation_placeholders\":null,\"num_subentries\":0}}]}",
+    "{\"id\":3,\"type\":\"event\",\"event\":[{\"type\":\"updated\",\"entry\":{\"created_at\":\"<ts:post_registrations_same_device_again#2>\",\"entry_id\":\"<ulid#1>\",\"domain\":\"mobile_app\",\"modified_at\":\"<ts:post_registrations_same_device_again#3>\",\"title\":\" Phone\",\"source\":\"registration\",\"state\":\"loaded\",\"supports_options\":false,\"supports_remove_device\":false,\"supports_unload\":true,\"supports_reconfigure\":false,\"supported_subentry_types\":{},\"pref_disable_new_entities\":false,\"pref_disable_polling\":false,\"disabled_by\":null,\"reason\":null,\"error_reason_translation_key\":null,\"error_reason_translation_placeholders\":null,\"num_subentries\":0}}]}"
+   ],
+   "ws_event_frames": [
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"create\",\"entity_id\":\"device_tracker.phone\"},\"origin\":\"LOCAL\",\"time_fired\":\"<t:post_registrations_same_device_again#1>\",\"context\":{\"id\":\"<ulid#25>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"device_registry_updated\",\"data\":{\"action\":\"create\",\"device_id\":\"d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0\"},\"origin\":\"LOCAL\",\"time_fired\":\"<t:post_registrations_same_device_again#5>\",\"context\":{\"id\":\"<ulid#26>\",\"parent_id\":null,\"user_id\":null}},\"id\":2}",
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"update\",\"entity_id\":\"device_tracker.phone\",\"changes\":{\"config_entry_id\":null,\"device_id\":null,\"entity_category\":null,\"original_name\":null}},\"origin\":\"LOCAL\",\"time_fired\":\"<t:post_registrations_same_device_again#7>\",\"context\":{\"id\":\"<ulid#27>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}"
+   ],
+   "final_states": {
+    "device_tracker.phone": {
+     "state": "unknown",
+     "attributes": {
+      "in_zones": [],
+      "source_type": "gps",
+      "battery_level": 70,
+      "friendly_name": " Phone"
+     }
+    }
+   },
+   "pending_saves": {
+    "core.entity_registry": {
+     "delay_s": 10
+    },
+    "core.device_registry": {
+     "delay_s": 10
+    },
+    "core.config_entries": {
+     "delay_s": 1
+    }
+   },
+   "files_changed": [
+    "core.entity_registry",
+    "core.device_registry",
+    "core.config_entries"
+   ],
+   "file_diffs": {
+    "core.entity_registry": {
+     "entities": {
+      "added": [
+       {
+        "aliases": [],
+        "aliases_v2": [
+         null
+        ],
+        "area_id": null,
+        "categories": {},
+        "capabilities": null,
+        "config_entry_id": "<ulid#1>",
+        "config_subentry_id": null,
+        "created_at": "2026-07-08T13:35:56.371740+00:00",
+        "device_class": null,
+        "device_id": "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0",
+        "disabled_by": null,
+        "entity_category": "diagnostic",
+        "entity_id": "device_tracker.phone",
+        "hidden_by": null,
+        "icon": null,
+        "id": "00000000000000000000000000000000",
+        "has_entity_name": false,
+        "labels": [],
+        "modified_at": "<t:post_registrations_same_device_again#6>",
+        "name": null,
+        "object_id_base": " Phone",
+        "options": {
+         "conversation": {
+          "should_expose": false
+         }
+        },
+        "original_device_class": null,
+        "original_icon": null,
+        "original_name": " Phone",
+        "platform": "mobile_app",
+        "suggested_object_id": null,
+        "supported_features": 0,
+        "translation_key": null,
+        "unique_id": "11111111-2222-4333-8444-555555555555",
+        "previous_unique_id": null,
+        "unit_of_measurement": null
+       }
+      ],
+      "removed": [],
+      "changed": {}
+     },
+     "deleted_entities": {
+      "added": [],
+      "removed": [
+       {
+        "aliases": [],
+        "aliases_v2": [
+         null
+        ],
+        "area_id": null,
+        "categories": {},
+        "config_entry_id": null,
+        "config_subentry_id": null,
+        "created_at": "2026-07-08T13:35:56.371740+00:00",
+        "device_class": null,
+        "disabled_by": null,
+        "disabled_by_undefined": false,
+        "entity_id": "device_tracker.phone",
+        "hidden_by": null,
+        "hidden_by_undefined": false,
+        "icon": null,
+        "id": "00000000000000000000000000000000",
+        "labels": [],
+        "modified_at": "<t:config_entries_async_remove#5>",
+        "name": null,
+        "options": {
+         "conversation": {
+          "should_expose": false
+         }
+        },
+        "options_undefined": false,
+        "orphaned_timestamp": "<ts:config_entries_async_remove#47>",
+        "platform": "mobile_app",
+        "unique_id": "11111111-2222-4333-8444-555555555555"
+       }
+      ],
+      "changed": {}
+     }
+    },
+    "core.device_registry": {
+     "devices": {
+      "added": [
+       {
+        "area_id": null,
+        "config_entries": [
+         "<ulid#1>"
+        ],
+        "config_entries_subentries": {
+         "<ulid#1>": [
+          null
+         ]
+        },
+        "configuration_url": null,
+        "connections": [],
+        "created_at": "2026-07-08T13:35:56.373320+00:00",
+        "disabled_by": null,
+        "entry_type": null,
+        "hw_version": null,
+        "id": "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0",
+        "identifiers": [
+         [
+          "mobile_app",
+          "11111111-2222-4333-8444-555555555555"
+         ]
+        ],
+        "labels": [],
+        "manufacturer": "Apple",
+        "model": "iPhone17,1",
+        "model_id": null,
+        "modified_at": "<t:post_registrations_same_device_again#4>",
+        "name_by_user": null,
+        "name": " Phone",
+        "primary_config_entry": "<ulid#1>",
+        "serial_number": null,
+        "sw_version": "27.0",
+        "via_device_id": null
+       }
+      ],
+      "removed": [],
+      "changed": {}
+     },
+     "deleted_devices": {
+      "added": [],
+      "removed": [
+       {
+        "area_id": null,
+        "config_entries": [],
+        "config_entries_subentries": {},
+        "connections": [],
+        "created_at": "2026-07-08T13:35:56.373320+00:00",
+        "disabled_by": null,
+        "disabled_by_undefined": false,
+        "identifiers": [
+         [
+          "mobile_app",
+          "11111111-2222-4333-8444-555555555555"
+         ]
+        ],
+        "id": "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0",
+        "labels": [],
+        "modified_at": "<t:config_entries_async_remove#3>",
+        "name_by_user": null,
+        "orphaned_timestamp": "<ts:config_entries_async_remove#2>"
+       }
+      ],
+      "changed": {}
+     }
+    },
+    "core.config_entries": {
+     "entries": {
+      "added": [
+       {
+        "created_at": "<t:post_registrations_same_device_again#2>",
+        "data": {
+         "app_data": {},
+         "app_id": "io.robbie.HomeAssistant",
+         "app_name": "Home Assistant",
+         "app_version": "2026.9.0 (2026.2874)",
+         "device_id": "11111111-2222-4333-8444-555555555555",
+         "device_name": " Phone",
+         "manufacturer": "Apple",
+         "model": "iPhone17,1",
+         "os_name": "iOS",
+         "os_version": "27.0",
+         "secret": "<new-secret-1>",
+         "supports_encryption": true,
+         "user_id": "<test-user>",
+         "webhook_id": "<new-webhook-1>"
+        },
+        "disabled_by": null,
+        "discovery_keys": {},
+        "domain": "mobile_app",
+        "entry_id": "<ulid#1>",
+        "minor_version": 1,
+        "modified_at": "<t:post_registrations_same_device_again#3>",
+        "options": {},
+        "pref_disable_new_entities": false,
+        "pref_disable_polling": false,
+        "source": "registration",
+        "subentries": [],
+        "title": " Phone",
+        "unique_id": "io.robbie.HomeAssistant-11111111-2222-4333-8444-555555555555",
+        "version": 1
+       }
+      ],
+      "removed": [],
+      "changed": {}
+     }
+    },
+    "mobile_app": {
+     "before": {
+      "version": 1,
+      "minor_version": 1,
+      "key": "mobile_app",
+      "data": {
+       "deleted_ids": [
+        "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f"
+       ]
+      }
+     },
+     "after": {
+      "version": 1,
+      "minor_version": 1,
+      "key": "mobile_app",
+      "data": {
+       "deleted_ids": [
+        "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f"
+       ]
+      }
+     }
+    }
+   },
+   "file_modes": {
+    "core.entity_registry": "0o644",
+    "core.device_registry": "0o644",
+    "core.config_entries": "0o644",
+    "mobile_app": "0o644"
+   },
+   "device": [
+    {
+     "id": "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0",
+     "identifiers": [
+      [
+       "mobile_app",
+       "11111111-2222-4333-8444-555555555555"
+      ]
+     ],
+     "name": " Phone",
+     "manufacturer": "Apple",
+     "model": "iPhone17,1",
+     "sw_version": "27.0",
+     "config_entries": [
+      "<ulid#1>"
+     ]
+    }
+   ],
+   "deleted_devices_left": 0,
+   "tracker_row": {
+    "device_tracker.phone": {
+     "aliases": [],
+     "aliases_v2": [
+      null
+     ],
+     "area_id": null,
+     "categories": {},
+     "capabilities": null,
+     "config_entry_id": "<ulid#1>",
+     "config_subentry_id": null,
+     "created_at": "2026-07-08T13:35:56.371740+00:00",
+     "device_class": null,
+     "device_id": "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0",
+     "disabled_by": null,
+     "entity_category": "diagnostic",
+     "entity_id": "device_tracker.phone",
+     "hidden_by": null,
+     "icon": null,
+     "id": "00000000000000000000000000000000",
+     "has_entity_name": false,
+     "labels": [],
+     "modified_at": "<t:post_registrations_same_device_again#6>",
+     "name": null,
+     "object_id_base": " Phone",
+     "options": {
+      "conversation": {
+       "should_expose": false
+      }
+     },
+     "original_device_class": null,
+     "original_icon": null,
+     "original_name": " Phone",
+     "platform": "mobile_app",
+     "suggested_object_id": null,
+     "supported_features": 0,
+     "translation_key": null,
+     "unique_id": "11111111-2222-4333-8444-555555555555",
+     "previous_unique_id": null,
+     "unit_of_measurement": null
+    }
+   }
+  },
+  {
+   "step": "re_register_battery_level",
+   "result": {
+    "type": "register_sensor",
+    "status": 201,
+    "decrypted": "{\"success\":true}"
+   },
+   "config_entry_signals_ws": [
+    "{\"id\":3,\"type\":\"event\",\"event\":[{\"type\":\"updated\",\"entry\":{\"created_at\":\"<ts:post_registrations_same_device_again#2>\",\"entry_id\":\"<ulid#1>\",\"domain\":\"mobile_app\",\"modified_at\":\"<ts:re_register_battery_level#1>\",\"title\":\" Phone\",\"source\":\"registration\",\"state\":\"loaded\",\"supports_options\":false,\"supports_remove_device\":false,\"supports_unload\":true,\"supports_reconfigure\":false,\"supported_subentry_types\":{},\"pref_disable_new_entities\":false,\"pref_disable_polling\":false,\"disabled_by\":null,\"reason\":null,\"error_reason_translation_key\":null,\"error_reason_translation_placeholders\":null,\"num_subentries\":0}}]}"
+   ],
+   "ws_event_frames": [
+    "{\"type\":\"event\",\"event\":{\"event_type\":\"entity_registry_updated\",\"data\":{\"action\":\"create\",\"entity_id\":\"sensor.phone_battery_level\"},\"origin\":\"LOCAL\",\"time_fired\":\"<t:re_register_battery_level#4>\",\"context\":{\"id\":\"<ulid#28>\",\"parent_id\":null,\"user_id\":null}},\"id\":1}"
+   ],
+   "final_states": {
+    "sensor.phone_battery_level": {
+     "state": "80",
+     "attributes": {
+      "unit_of_measurement": "%",
+      "device_class": "battery",
+      "icon": "mdi:battery-80",
+      "friendly_name": " Phone Battery Level"
+     }
+    }
+   },
+   "pending_saves": {
+    "core.entity_registry": {
+     "delay_s": 10
+    },
+    "core.config_entries": {
+     "delay_s": 1
+    }
+   },
+   "files_changed": [
+    "core.entity_registry",
+    "core.config_entries"
+   ],
+   "file_diffs": {
+    "core.entity_registry": {
+     "entities": {
+      "added": [
+       {
+        "aliases": [],
+        "aliases_v2": [
+         null
+        ],
+        "area_id": null,
+        "categories": {},
+        "capabilities": null,
+        "config_entry_id": "<ulid#1>",
+        "config_subentry_id": null,
+        "created_at": "<t:re_register_battery_level#2>",
+        "device_class": null,
+        "device_id": "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0",
+        "disabled_by": null,
+        "entity_category": null,
+        "entity_id": "sensor.phone_battery_level",
+        "hidden_by": null,
+        "icon": null,
+        "id": "<uuid#3>",
+        "has_entity_name": false,
+        "labels": [],
+        "modified_at": "<t:re_register_battery_level#3>",
+        "name": null,
+        "object_id_base": " Phone Battery Level",
+        "options": {},
+        "original_device_class": "battery",
+        "original_icon": "mdi:battery-80",
+        "original_name": " Phone Battery Level",
+        "platform": "mobile_app",
+        "suggested_object_id": null,
+        "supported_features": 0,
+        "translation_key": null,
+        "unique_id": "<new-webhook-1>_battery_level",
+        "previous_unique_id": null,
+        "unit_of_measurement": "%"
+       }
+      ],
+      "removed": [],
+      "changed": {}
+     },
+     "deleted_entities": {
+      "added": [],
+      "removed": [],
+      "changed": {}
+     }
+    },
+    "core.device_registry": {
+     "devices": {
+      "added": [],
+      "removed": [],
+      "changed": {}
+     },
+     "deleted_devices": {
+      "added": [],
+      "removed": [],
+      "changed": {}
+     }
+    },
+    "core.config_entries": {
+     "entries": {
+      "added": [],
+      "removed": [],
+      "changed": {
+       "<ulid#1>": {
+        "data": [
+         {
+          "app_data": {},
+          "app_id": "io.robbie.HomeAssistant",
+          "app_name": "Home Assistant",
+          "app_version": "2026.9.0 (2026.2874)",
+          "device_id": "11111111-2222-4333-8444-555555555555",
+          "device_name": " Phone",
+          "manufacturer": "Apple",
+          "model": "iPhone17,1",
+          "os_name": "iOS",
+          "os_version": "27.0",
+          "secret": "<new-secret-1>",
+          "supports_encryption": true,
+          "user_id": "<test-user>",
+          "webhook_id": "<new-webhook-1>"
+         },
+         {
+          "app_data": {},
+          "app_id": "io.robbie.HomeAssistant",
+          "app_name": "Home Assistant",
+          "app_version": "2026.9.0 (2026.2874)",
+          "device_id": "11111111-2222-4333-8444-555555555555",
+          "device_name": " Phone",
+          "manufacturer": "Apple",
+          "model": "iPhone17,1",
+          "no_legacy_encryption": true,
+          "os_name": "iOS",
+          "os_version": "27.0",
+          "secret": "<new-secret-1>",
+          "supports_encryption": true,
+          "user_id": "<test-user>",
+          "webhook_id": "<new-webhook-1>"
+         }
+        ],
+        "modified_at": [
+         "<t:post_registrations_same_device_again#3>",
+         "<t:re_register_battery_level#1>"
+        ]
+       }
+      }
+     }
+    },
+    "mobile_app": {
+     "before": {
+      "version": 1,
+      "minor_version": 1,
+      "key": "mobile_app",
+      "data": {
+       "deleted_ids": [
+        "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f"
+       ]
+      }
+     },
+     "after": {
+      "version": 1,
+      "minor_version": 1,
+      "key": "mobile_app",
+      "data": {
+       "deleted_ids": [
+        "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f"
+       ]
+      }
+     }
+    }
+   },
+   "file_modes": {
+    "core.entity_registry": "0o644",
+    "core.device_registry": "0o644",
+    "core.config_entries": "0o644",
+    "mobile_app": "0o644"
+   },
+   "row": {
+    "sensor.phone_battery_level": {
+     "aliases": [],
+     "aliases_v2": [
+      null
+     ],
+     "area_id": null,
+     "categories": {},
+     "capabilities": null,
+     "config_entry_id": "<ulid#1>",
+     "config_subentry_id": null,
+     "created_at": "<t:re_register_battery_level#2>",
+     "device_class": null,
+     "device_id": "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0",
+     "disabled_by": null,
+     "entity_category": null,
+     "entity_id": "sensor.phone_battery_level",
+     "hidden_by": null,
+     "icon": null,
+     "id": "<uuid#3>",
+     "has_entity_name": false,
+     "labels": [],
+     "modified_at": "<t:re_register_battery_level#3>",
+     "name": null,
+     "object_id_base": " Phone Battery Level",
+     "options": {},
+     "original_device_class": "battery",
+     "original_icon": "mdi:battery-80",
+     "original_name": " Phone Battery Level",
+     "platform": "mobile_app",
+     "suggested_object_id": null,
+     "supported_features": 0,
+     "translation_key": null,
+     "unique_id": "<new-webhook-1>_battery_level",
+     "previous_unique_id": null,
+     "unit_of_measurement": "%"
+    }
+   },
+   "deleted_entities_left": 20
+  }
+ ]
+}
