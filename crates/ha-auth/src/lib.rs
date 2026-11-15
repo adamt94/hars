@@ -285,12 +285,15 @@ impl Auth {
                 (dirty & DIRTY_ONBOARDING != 0).then(|| serde_json::to_value(&s.onboarding)),
             )
         };
+        // The passwords before the users: if the second write fails, disk
+        // never has a user (an owner, after onboarding) without its
+        // password, only a login no user has yet.
         let result = (|| {
-            if let Some(v) = auth {
-                self.0.auth_store.save(&v?)?;
-            }
             if let Some(v) = provider {
                 self.0.provider_store.save(&v?)?;
+            }
+            if let Some(v) = auth {
+                self.0.auth_store.save(&v?)?;
             }
             if let Some(v) = onboarding {
                 self.0.onboarding_store.save(&v?)?;
@@ -377,12 +380,15 @@ impl Auth {
             .format_for_version(bcrypt::Version::TwoB);
         let mut s = self.0.state.lock();
         // Checked again: another login may have been added while hashing.
-        let legacy = s.legacy_usernames;
-        if s.provider.users.iter().any(|u| {
-            normalize_username(&u.username) == normalized || (legacy && u.username == username)
-        }) {
+        if taken(&s, username) {
             return Err(AddUserError::Exists);
         }
+        // A login no user has, left by an owner whose save failed half way
+        // (the passwords were written, the users weren't): replaced.
+        let legacy = s.legacy_usernames;
+        s.provider.users.retain(|u| {
+            normalize_username(&u.username) != normalized && !(legacy && u.username == username)
+        });
         s.provider.users.push(ProviderUser {
             username: username.into(),
             password: B64.encode(hash),
@@ -421,12 +427,18 @@ impl Auth {
     }
 
     fn username_taken(&self, username: &str) -> bool {
-        let s = self.0.state.lock();
-        let normalized = normalize_username(username);
-        s.provider.users.iter().any(|u| {
-            normalize_username(&u.username) == normalized
-                || (s.legacy_usernames && u.username == username)
-        })
+        taken(&self.0.state.lock(), username)
+    }
+
+    /// Take back a [`Auth::create_owner`] whose save failed: the user, its
+    /// credential and its login go, so the user step can run again and
+    /// make the owner afresh. [`Auth::save`] writes the result.
+    pub fn remove_owner(&self, owner: &Onboarded) {
+        let mut s = self.0.state.lock();
+        s.data.users.retain(|u| u.id != owner.user_id);
+        s.data.credentials.retain(|c| c.user_id != owner.user_id);
+        s.provider.users.retain(|u| u.username != owner.username);
+        s.dirty |= DIRTY_AUTH | DIRTY_PROVIDER;
     }
 
     /// The `homeassistant` username of the credential a refresh token was
@@ -811,6 +823,17 @@ impl Auth {
     fn now_f64(&self) -> f64 {
         self.0.clock.now().as_microsecond() as f64 / 1e6
     }
+}
+
+/// Whether a user has a login for `username` (during onboarding, only an
+/// owner can). A login without a user is left over from a failed save.
+fn taken(s: &State, username: &str) -> bool {
+    let normalized = normalize_username(username);
+    s.provider.users.iter().any(|u| {
+        let same = normalize_username(&u.username) == normalized
+            || (s.legacy_usernames && u.username == username);
+        same && user_for_username(&s.data, &u.username).is_some()
+    })
 }
 
 /// `_create_auth_code_store`'s `store_result`: codes expire after 10

@@ -403,7 +403,7 @@ fn update(conn: &mut Conn, id: u64, msg: &Map<String, Value>) -> Result<(), Inva
         // One update at a time: each reads what the last one wrote.
         let _turn = shared.core_config.lock().await;
         if let Some(tz) = &u.time_zone {
-            if !valid_time_zone(tz) {
+            if !time_zone_exists(tz.clone()).await {
                 out.error(
                     json!(id),
                     "invalid_info",
@@ -438,10 +438,38 @@ fn update(conn: &mut Conn, id: u64, msg: &Map<String, Value>) -> Result<(), Inva
     Ok(())
 }
 
-/// `dt_util.async_get_time_zone`: a name in the time zone database, as
-/// written there (HA's `zoneinfo` on Linux is case-sensitive; jiff's lookup
-/// isn't).
+/// `dt_util.async_get_time_zone`, which HA runs in its executor: a lookup
+/// that isn't cached reads the zoneinfo files, so it runs on a blocking
+/// thread (PERF.md rule 6).
+async fn time_zone_exists(name: String) -> bool {
+    tokio::task::spawn_blocking(move || {
+        #[cfg(test)]
+        ON_BLOCKING_THREAD.set(true);
+        let found = valid_time_zone(&name);
+        #[cfg(test)]
+        ON_BLOCKING_THREAD.set(false);
+        found
+    })
+    .await
+    .unwrap_or(false)
+}
+
+#[cfg(test)]
+thread_local! {
+    /// Set while [`time_zone_exists`] runs its lookup, so tests catch a
+    /// lookup made on an async worker.
+    static ON_BLOCKING_THREAD: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// A name in the time zone database, as written there (HA's `zoneinfo` on
+/// Linux is case-sensitive; jiff's lookup isn't). Blocking: call it through
+/// [`time_zone_exists`].
 fn valid_time_zone(name: &str) -> bool {
+    #[cfg(test)]
+    assert!(
+        ON_BLOCKING_THREAD.get(),
+        "time zone lookups must run on spawn_blocking"
+    );
     jiff::tz::TimeZone::get(name).is_ok_and(|tz| tz.iana_name() == Some(name))
 }
 
@@ -564,6 +592,24 @@ mod tests {
         validate(msg.as_object().unwrap()).unwrap_err()
     }
 
+    /// Exact names only, and looked up on a blocking thread: a direct call
+    /// from async code panics in tests.
+    #[tokio::test]
+    async fn time_zones_are_looked_up_off_the_async_threads() {
+        for (name, ok) in [
+            ("Europe/London", true),
+            ("UTC", true),
+            ("US/Eastern", true),
+            ("europe/london", false),
+            ("Mars/Phobos", false),
+            ("", false),
+        ] {
+            assert_eq!(time_zone_exists(name.into()).await, ok, "{name}");
+        }
+        let direct = std::panic::catch_unwind(|| valid_time_zone("UTC"));
+        assert!(direct.is_err());
+    }
+
     /// The generated tables are searched by bisection.
     #[test]
     fn generated_tables_are_sorted() {
@@ -645,12 +691,6 @@ mod tests {
             invalid(json!({"location_name": null})),
             "expected str for dictionary value @ data['location_name']"
         );
-        assert!(valid_time_zone("Europe/London"));
-        assert!(valid_time_zone("UTC"));
-        assert!(valid_time_zone("US/Eastern"));
-        assert!(!valid_time_zone("europe/london"));
-        assert!(!valid_time_zone("Mars/Phobos"));
-        assert!(!valid_time_zone(""));
         // Every error, one per line.
         assert_eq!(
             invalid(json!({"latitude": 91, "country": "XX"})),

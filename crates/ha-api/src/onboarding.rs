@@ -13,7 +13,10 @@
 //!    code for the page's own client, which then logs in on the dashboard.
 //!
 //! Each step has its own lock and refuses to run twice ("… already done",
-//! 403); the store is saved as each step is done. The views exist only
+//! 403); the store is saved as each step is done, and a save that fails is
+//! HA's 500 with no auth code. An owner whose logins can't be saved is
+//! taken back, so the user step can run again (logins are written before
+//! users, so disk never holds an owner without a password). The views exist only
 //! while a step was left when `hars` started: after a restart with all of
 //! them done they are 404s, as in HA (until then they answer as done).
 //!
@@ -36,7 +39,7 @@
 #![allow(clippy::result_large_err)]
 
 use crate::Shared;
-use crate::auth::{MAX_BODY, format_error, json_body, json_message, persist};
+use crate::auth::{MAX_BODY, format_error, json_body, json_message};
 use crate::onboarding_data::{AREA_KEYS, AREA_NAMES};
 use axum::{
     Extension, Json, Router,
@@ -175,11 +178,39 @@ fn text(status: StatusCode, body: &'static str) -> Response {
         .into_response()
 }
 
+/// HA's answer to an exception it doesn't handle, such as a store that
+/// can't be written.
+fn server_error() -> Response {
+    text(
+        StatusCode::INTERNAL_SERVER_ERROR,
+        "500 Internal Server Error\n\nServer got itself in trouble",
+    )
+}
+
+/// Write what changed in the auth stores now, off the async threads; the
+/// error is the caller's (HA awaits its saves here and an error becomes a
+/// 500).
+async fn save(shared: &Shared) -> Result<(), ()> {
+    let auth = shared.auth.clone();
+    match tokio::task::spawn_blocking(move || auth.save()).await {
+        Ok(Ok(())) => Ok(()),
+        Ok(Err(e)) => {
+            tracing::error!("onboarding: saving auth state: {e}");
+            Err(())
+        }
+        Err(e) => {
+            tracing::error!("onboarding: saving auth state: {e}");
+            Err(())
+        }
+    }
+}
+
 /// `_async_mark_done`: the step joins the store's `done` list, saved
-/// before answering.
-async fn mark_done(shared: &Shared, step: &str) {
+/// before answering. As in HA, a failed save leaves the step done in
+/// memory (the views then say so) and the request fails.
+async fn mark_done(shared: &Shared, step: &str) -> Result<(), ()> {
     shared.auth.mark_step_done(step);
-    persist(&shared.auth).await;
+    save(shared).await
 }
 
 /// `OnboardingStatusView`: each step and whether it's done.
@@ -257,12 +288,17 @@ async fn user_step(State(v): State<Views>, body: Bytes) -> Response {
         Ok(owner) => owner,
         Err(e) => {
             tracing::error!("onboarding: {e}");
-            return text(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "500 Internal Server Error\n\nServer got itself in trouble",
-            );
+            return server_error();
         }
     };
+    // HA awaits the login's save here (`async_add_auth`). If it fails, the
+    // owner is taken back, so a retry makes one owner, not a second user;
+    // the passwords are written first, so disk never has an owner without
+    // one.
+    if save(s).await.is_err() {
+        s.auth.remove_owner(&owner);
+        return server_error();
+    }
     let registry = s.config.registry.as_deref();
     s.config
         .components
@@ -273,7 +309,11 @@ async fn user_step(State(v): State<Views>, body: Bytes) -> Response {
             registry.create_area(name, Some(icon));
         }
     }
-    mark_done(s, "user").await;
+    if mark_done(s, "user").await.is_err() {
+        // The owner and their password are saved: the page's reload finds
+        // the step done and logs in, and so does a restart.
+        return server_error();
+    }
     let code = s.auth.create_auth_code(client_id, &owner.username);
     Json(json!({ "auth_code": code })).into_response()
 }
@@ -287,7 +327,9 @@ async fn core_config_step(State(v): State<Views>) -> Response {
     if s.auth.is_step_done("core_config") {
         return json_message(StatusCode::FORBIDDEN, "Core config step already done");
     }
-    mark_done(s, "core_config").await;
+    if mark_done(s, "core_config").await.is_err() {
+        return server_error();
+    }
     if let Some(flows) = &s.config.onboarding {
         flows.core_config_done();
     }
@@ -302,7 +344,9 @@ async fn analytics_step(State(v): State<Views>) -> Response {
     if s.auth.is_step_done("analytics") {
         return json_message(StatusCode::FORBIDDEN, "Analytics config step already done");
     }
-    mark_done(s, "analytics").await;
+    if mark_done(s, "analytics").await.is_err() {
+        return server_error();
+    }
     Json(json!({})).into_response()
 }
 
@@ -330,7 +374,9 @@ async fn integration_step(
     if s.auth.is_step_done("integration") {
         return json_message(StatusCode::FORBIDDEN, "Integration step already done");
     }
-    mark_done(s, "integration").await;
+    if mark_done(s, "integration").await.is_err() {
+        return server_error();
+    }
     if !indieauth::verify_redirect_uri(client_id, redirect_uri) {
         return json_message(StatusCode::BAD_REQUEST, "invalid client id or redirect uri");
     }

@@ -145,11 +145,11 @@ enum FetchError {
 /// apart) `hars` holds no TLS state at all.
 async fn fetch_once(
     user_agent: &'static str,
-    url: &str,
+    url: String,
     prev: Option<Fetched>,
 ) -> Result<Fetched, (FetchError, Option<Fetched>)> {
     match ha_http::Client::new(user_agent) {
-        Ok(client) => fetch(&client, url, prev).await,
+        Ok(client) => fetch(&client, &url, prev).await,
         Err(e) => Err((e.into(), prev)),
     }
 }
@@ -293,9 +293,10 @@ fn zones(config: &CoreConfig) -> (TimeZone, TimeZone) {
 /// entry with `pref_disable_polling` is fetched once, at setup, as HA.
 ///
 /// An entry that tracks the home (`track_home`, as onboarding makes) is
-/// fetched again at once for the new place when the home's latitude,
+/// refreshed at once for the new place when the home's latitude,
 /// longitude or elevation changes (`track_home` in HA's coordinator); the
-/// entity keeps its id and name.
+/// entity keeps its id and name, and a failed refresh makes it unavailable
+/// as any failed refresh does.
 pub async fn run(
     hass: Hass,
     registries: Arc<Registries>,
@@ -314,57 +315,105 @@ pub async fn run(
     let track_home = data.get("track_home").and_then(Value::as_bool) == Some(true);
     let mut watch = hass.watch_config();
     let config = watch.borrow_and_update().clone();
-    let Some(mut loc) = Location::new(data, &config) else {
+    let Some(loc) = Location::new(data, &config) else {
         tracing::warn!("Skip setting up met.no integration; No Home location has been set");
         return;
     };
     let Some(entity) = entity(&registries, &loc) else {
         return;
     };
-    let mut ready = Some(ready);
-    loop {
-        let url = format!(
-            "{base_url}?{}",
-            forecast::query(loc.latitude, loc.longitude, loc.elevation)
-        );
-        let refresh = schedule(&hass, &weather, &entity, polling, ready.take(), |prev| {
-            fetch_once(user_agent, &url, prev)
-        });
-        if !track_home {
-            return refresh.await;
+    let url = Arc::new(parking_lot::Mutex::new(forecast_url(
+        &base_url,
+        loc.latitude,
+        loc.longitude,
+        loc.elevation,
+    )));
+    let home = track_home.then(|| Home {
+        watch,
+        here: (loc.latitude, loc.longitude, loc.elevation),
+        url: url.clone(),
+        base_url,
+    });
+    schedule(
+        &hass,
+        &weather,
+        &entity,
+        polling,
+        Some(ready),
+        home,
+        |prev| {
+            let url = url.lock().clone();
+            fetch_once(user_agent, url, prev)
+        },
+    )
+    .await;
+}
+
+fn forecast_url(base_url: &str, latitude: f64, longitude: f64, elevation: f64) -> String {
+    format!(
+        "{base_url}?{}",
+        forecast::query(latitude, longitude, elevation)
+    )
+}
+
+/// Where a home-tracking entry fetches for (`set_coordinates`): the home,
+/// followed as `core_config_updated` moves it.
+struct Home {
+    watch: tokio::sync::watch::Receiver<Arc<CoreConfig>>,
+    /// HA compares `str()` of each, so an elevation change counts too.
+    here: (f64, f64, f64),
+    /// What the fetch asks for.
+    url: Arc<parking_lot::Mutex<String>>,
+    base_url: String,
+}
+
+impl Home {
+    /// Take the home as it is now; `true` if it moved.
+    fn sync(&mut self) -> bool {
+        let c = self.watch.borrow_and_update().clone();
+        let there = (c.latitude, c.longitude, c.elevation as f64);
+        if there == self.here {
+            return false;
         }
-        // `set_coordinates`: what is compared is `str()` of each, so a
-        // change of the elevation counts too.
-        let here = (loc.latitude, loc.longitude, loc.elevation);
-        let moved = async {
-            loop {
-                if watch.changed().await.is_err() {
-                    return std::future::pending().await;
-                }
-                let c = watch.borrow_and_update().clone();
-                let there = (c.latitude, c.longitude, c.elevation as f64);
-                if there != here {
-                    return there;
-                }
+        self.here = there;
+        *self.url.lock() = forecast_url(&self.base_url, there.0, there.1, there.2);
+        true
+    }
+
+    /// Until the home moves.
+    async fn moved(&mut self) {
+        loop {
+            if self.watch.changed().await.is_err() {
+                return std::future::pending().await;
             }
-        };
-        tokio::select! {
-            () = refresh => return,
-            (latitude, longitude, elevation) = moved => {
-                loc = Location { latitude, longitude, elevation, ..loc };
+            if self.sync() {
+                return;
             }
         }
     }
 }
 
+/// [`Home::moved`], or never for an entry with a fixed place.
+async fn moved(home: &mut Option<Home>) {
+    match home {
+        Some(h) => h.moved().await,
+        None => std::future::pending().await,
+    }
+}
+
 /// HA's coordinator schedule around `fetch`, which is handed the last good
-/// fetch (for `If-Modified-Since`) and gives it back on failure.
+/// fetch (for `If-Modified-Since`) and gives it back on failure. When the
+/// `home` moves, the set-up entity is refreshed at once for the new place
+/// (HA's `async_refresh` from `track_home`), with the same failure handling
+/// as a scheduled refresh: a failed one makes the entity and its forecast
+/// unavailable.
 async fn schedule<F, Fut>(
     hass: &Hass,
     weather: &Weather,
     entity: &Entity,
     polling: bool,
     mut ready: Option<ha_core::SetupGuard>,
+    mut home: Option<Home>,
     mut fetch: F,
 ) where
     F: FnMut(Option<Fetched>) -> Fut,
@@ -389,6 +438,10 @@ async fn schedule<F, Fut>(
                 tries += 1;
                 hass.setup_retry_wait(Duration::from_secs(wait) + jitter())
                     .await;
+                // A retried setup reads the home again.
+                if let Some(h) = &mut home {
+                    h.sync();
+                }
             }
         }
     };
@@ -408,9 +461,6 @@ async fn schedule<F, Fut>(
         if let Some(r) = ready.take() {
             r.done();
         }
-        if !polling {
-            return std::future::pending().await;
-        }
         if !available {
             tracing::info!("Fetching met data recovered");
         }
@@ -418,7 +468,11 @@ async fn schedule<F, Fut>(
         let mut kept = Some(last);
         // Refresh until one works; only the first failure is announced.
         last = loop {
-            tokio::time::sleep(every).await;
+            tokio::select! {
+                () = tokio::time::sleep(every), if polling => {}
+                // A new place: a new `MetWeatherData`, no `If-Modified-Since`.
+                () = moved(&mut home) => kept = None,
+            }
             match fetch(kept.take()).await {
                 Ok(f) => break f,
                 Err((e, prev)) => {

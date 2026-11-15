@@ -865,3 +865,146 @@ async fn analytics_preferences_survive_a_restart() {
     );
     let _ = std::fs::remove_dir_all(dir);
 }
+
+/// A store that can't be written (a directory in the file's place).
+fn block(dir: &Path, key: &str) -> PathBuf {
+    let path = dir.join(".storage").join(key);
+    std::fs::create_dir_all(path.join("blocked")).unwrap();
+    path
+}
+
+fn owner_body() -> Value {
+    json!({"client_id": "http://127.0.0.1:8123/", "name": "Owner", "username": "owner",
+           "password": "pw", "language": "en"})
+}
+
+const ERROR_500: &str = "500 Internal Server Error\n\nServer got itself in trouble";
+
+/// The logins can't be saved: HA's unhandled store error (a 500), no auth
+/// code, nothing left behind, and a retry makes the one owner.
+#[tokio::test(flavor = "multi_thread")]
+async fn an_unsaved_owner_is_a_500_and_can_be_retried() {
+    let dir = temp_dir("unsaved-owner");
+    let i = start(&dir, true).await;
+    let blocked = block(&dir, "auth_provider.homeassistant");
+    let r = http(
+        i.addr,
+        "POST",
+        "/api/onboarding/users",
+        Some(&owner_body()),
+        None,
+    )
+    .await;
+    assert_eq!((r.0, r.2), (500, json!(ERROR_500)));
+    assert!(!i.auth.is_step_done("user"));
+    assert!(
+        !dir.join(".storage/auth").exists(),
+        "no owner without a password on disk"
+    );
+    assert!(i.components.persons().is_empty());
+    assert!(i.registry.snapshot().areas.is_empty());
+
+    std::fs::remove_dir_all(&blocked).unwrap();
+    let r = http(
+        i.addr,
+        "POST",
+        "/api/onboarding/users",
+        Some(&owner_body()),
+        None,
+    )
+    .await;
+    assert_eq!(r.0, 200, "{:?}", r.2);
+    assert!(r.2["auth_code"].is_string());
+    let users = i.store("auth").unwrap()["data"]["users"].clone();
+    assert_eq!(users.as_array().unwrap().len(), 1, "{users}");
+    assert_eq!(users[0]["is_owner"], true);
+    let logins = i.store("auth_provider.homeassistant").unwrap()["data"]["users"].clone();
+    assert_eq!(logins.as_array().unwrap().len(), 1);
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+/// The login was saved but its user wasn't: after a restart the login is
+/// a leftover, and onboarding makes the owner with it.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_half_saved_owner_is_retried_after_a_restart() {
+    let dir = temp_dir("half-saved-owner");
+    let i = start(&dir, true).await;
+    let blocked = block(&dir, "auth");
+    let r = http(
+        i.addr,
+        "POST",
+        "/api/onboarding/users",
+        Some(&owner_body()),
+        None,
+    )
+    .await;
+    assert_eq!((r.0, r.2), (500, json!(ERROR_500)));
+    std::fs::remove_dir_all(&blocked).unwrap();
+
+    let again = start(&dir, true).await;
+    assert!(!again.auth.is_step_done("user"));
+    let r = http(
+        again.addr,
+        "POST",
+        "/api/onboarding/users",
+        Some(&owner_body()),
+        None,
+    )
+    .await;
+    assert_eq!(r.0, 200, "{:?}", r.2);
+    let logins = again.store("auth_provider.homeassistant").unwrap()["data"]["users"].clone();
+    assert_eq!(logins.as_array().unwrap().len(), 1, "{logins}");
+    let users = again.store("auth").unwrap()["data"]["users"].clone();
+    assert_eq!(users.as_array().unwrap().len(), 1, "{users}");
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+/// The owner was saved, the onboarding store wasn't: a 500 and no code, as
+/// HA; the step reads as done (in memory, and after a restart because an
+/// owner exists), so the page logs in with the password instead.
+#[tokio::test(flavor = "multi_thread")]
+async fn an_unsaved_step_is_a_500_without_a_code() {
+    let dir = temp_dir("unsaved-step");
+    let i = start(&dir, true).await;
+    let blocked = block(&dir, "onboarding");
+    let r = http(
+        i.addr,
+        "POST",
+        "/api/onboarding/users",
+        Some(&owner_body()),
+        None,
+    )
+    .await;
+    assert_eq!((r.0, r.2), (500, json!(ERROR_500)));
+    let r = http(
+        i.addr,
+        "POST",
+        "/api/onboarding/users",
+        Some(&owner_body()),
+        None,
+    )
+    .await;
+    assert_eq!(r.2, json!({"message": "User step already done"}));
+    std::fs::remove_dir_all(&blocked).unwrap();
+    let again = Auth::load_with_cost(&dir, ha_core::Clock::system(), 4).unwrap();
+    assert!(again.is_step_done("user"));
+    assert_eq!(
+        again.check_password("owner", "pw").as_deref(),
+        Some("owner")
+    );
+
+    // The other steps: the same 500.
+    let (token, _) = login(&i.auth, "owner");
+    let blocked = block(&dir, "onboarding");
+    let r = http(
+        i.addr,
+        "POST",
+        "/api/onboarding/analytics",
+        None,
+        Some(&token),
+    )
+    .await;
+    assert_eq!((r.0, r.2), (500, json!(ERROR_500)));
+    std::fs::remove_dir_all(&blocked).unwrap();
+    let _ = std::fs::remove_dir_all(dir);
+}
