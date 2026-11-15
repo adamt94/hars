@@ -388,7 +388,10 @@ fn fixture_a() -> Fetched {
 
 #[tokio::test(start_paused = true)]
 async fn refreshes_on_has_schedule_and_goes_unavailable_on_failure() {
-    let hass = Hass::new();
+    // The fixture's hour: the forecast's days are counted from "now", so
+    // the wall clock would change them from day to day.
+    let sim = ha_core::SimulatedClock::new("2026-11-14T10:00:00Z".parse().unwrap());
+    let hass = Hass::with_clock(sim.clock());
     // Running: a failed setup retries on the backoff (while starting it
     // would wait for `homeassistant_started`).
     hass.start();
