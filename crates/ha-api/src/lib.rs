@@ -17,7 +17,7 @@ mod mobile_app;
 mod manifests_data;
 mod rest;
 pub mod system_log;
-mod ws;
+pub(crate) mod ws;
 
 pub use frontend::Frontend;
 pub use frontend_data::FrontendData;

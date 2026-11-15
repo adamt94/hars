@@ -394,6 +394,13 @@ impl Components {
         let _ = self.person_save.set(save);
     }
 
+    /// Write the person store if a change is pending (at stop).
+    pub async fn flush(&self) {
+        if let Some(save) = self.person_save.get() {
+            save.flush().await;
+        }
+    }
+
     /// `person.async_add_user_device_tracker`: the tracker joins the
     /// person linked to `user_id` (if not already theirs), who follows it
     /// from now on; the store is saved.

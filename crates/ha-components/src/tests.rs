@@ -413,3 +413,56 @@ async fn zones_are_settled_when_start_returns() {
     assert!(feed.try_recv().is_none());
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// A new tracker joins the user's person, and the store is written (at
+/// the latest when flushed at stop).
+#[tokio::test]
+async fn trackers_join_the_users_person_and_are_saved() {
+    let dir = std::env::temp_dir().join(format!("hars-person-add-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let (hass, components) = tracking_setup(&dir);
+    components.save_to(&dir);
+    components.start(&hass);
+    components.add_user_device_tracker(
+        &hass,
+        "00112233445566778899aabbccddeeff",
+        "device_tracker.new",
+    );
+    // Again: no duplicate.
+    components.add_user_device_tracker(
+        &hass,
+        "00112233445566778899aabbccddeeff",
+        "device_tracker.new",
+    );
+    // Another user's id changes nothing.
+    components.add_user_device_tracker(&hass, "someone", "device_tracker.other");
+    assert_eq!(
+        components.persons()[0]["device_trackers"],
+        json!(["device_tracker.phone", "device_tracker.new"])
+    );
+    assert_eq!(
+        state_of(&hass, "person.adam")["attributes"]["device_trackers"],
+        json!(["device_tracker.phone", "device_tracker.new"])
+    );
+    // The person follows it now.
+    hass.set_state(
+        EntityId::parse("device_tracker.new").unwrap(),
+        "home",
+        json!({"source_type": "router"})
+            .as_object()
+            .unwrap()
+            .clone(),
+    );
+    settle().await;
+    assert_eq!(state_of(&hass, "person.adam")["state"], "home");
+    components.flush().await;
+    let saved: Value =
+        serde_json::from_str(&std::fs::read_to_string(dir.join(".storage/person")).unwrap())
+            .unwrap();
+    assert_eq!(saved["version"], 2);
+    assert_eq!(
+        saved["data"]["items"][0]["device_trackers"],
+        json!(["device_tracker.phone", "device_tracker.new"])
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+}

@@ -922,7 +922,7 @@ async fn registrations_as_ha() {
         ha_integrations::config_entries::ConfigEntries::in_memory(&hass, vec![owned.clone()]);
     let looked = entries.clone();
     registry.set_entry_lookup(Arc::new(move |id: &str| looked.info(id)));
-    let app = Arc::new(MobileApp::new(&[owned], Vec::new()));
+    let app = Arc::new(MobileApp::load(&dir, &[owned]));
     app.setup(
         &hass,
         registry.clone(),
@@ -1038,6 +1038,10 @@ async fn registrations_as_ha() {
             .is_some()
     );
 
+    // A request to the old webhook that is already past routing.
+    let Webhook::Registered(stale) = app.webhook(WEBHOOK) else {
+        panic!("registered");
+    };
     // Re-pair the imported phone (same app + device id): the old entry and
     // webhook go, the tracker moves to the new entry, the old sensors'
     // rows go.
@@ -1091,5 +1095,101 @@ async fn registrations_as_ha() {
         device.config_entries,
         [new_entry["entry_id"].as_str().unwrap()]
     );
+    // The old webhook id is saved as deleted at once (410 after a restart).
+    let store: Value =
+        serde_json::from_str(&std::fs::read_to_string(dir.join(".storage/mobile_app")).unwrap())
+            .unwrap();
+    assert_eq!(store["data"]["deleted_ids"], json!([WEBHOOK]));
+    let restarted = MobileApp::load(&dir, &[]);
+    assert!(matches!(restarted.webhook(WEBHOOK), Webhook::Deleted));
+    // Review regression: a request already past routing to the old webhook
+    // can't recreate anything for the removed entry.
+    let shared = Shared {
+        hass: hass.clone(),
+        auth: crate::test_util::auth(true),
+        config: Arc::new(config.clone()),
+    };
+    let sealed = Key::hex(SECRET).unwrap().seal(
+        json!({"name": "Ghost", "type": "sensor", "unique_id": "ghost", "state": 1})
+            .to_string()
+            .as_bytes(),
+    );
+    let body = json!({"type": "register_sensor", "encrypted": true, "encrypted_data": sealed});
+    let reply = handle(&shared, &stale, body.to_string().as_bytes()).await;
+    assert!(matches!(reply, Reply::Bare(StatusCode::OK)));
+    assert!(
+        hass.states()
+            .get(&EntityId::parse("sensor.phone_ghost").unwrap())
+            .is_none()
+    );
     let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// Review regression: an unload waits for a command already running.
+#[tokio::test]
+async fn retiring_waits_for_running_commands() {
+    let reg = Arc::new(Registration::from_entry(&entry()).unwrap());
+    let guard = reg.enter().await.unwrap();
+    let r = reg.clone();
+    let retiring = tokio::spawn(async move { r.retire().await });
+    tokio::task::yield_now().await;
+    assert!(!retiring.is_finished());
+    drop(guard);
+    retiring.await.unwrap();
+    assert!(reg.enter().await.is_none());
+}
+
+/// HA's `RequestDataValidator` messages (from HA's own schema).
+#[test]
+fn registration_errors_as_ha() {
+    let base = json!({"app_id": "a", "app_name": "a", "app_version": "1", "device_name": "d",
+                      "manufacturer": "m", "model": "x", "os_name": "iOS"});
+    let err = |extra: Value| {
+        let mut v = base.clone();
+        v.as_object_mut()
+            .unwrap()
+            .extend(extra.as_object().unwrap().clone());
+        registration_schema(&v).unwrap_err()
+    };
+    for (extra, want) in [
+        (
+            json!({"supports_encryption": "bogus"}),
+            "invalid boolean value bogus for dictionary value @ data['supports_encryption']",
+        ),
+        (
+            json!({"app_data": {"push_token": "x"}}),
+            "some but not all values in the same group of inclusion 'push_cloud' @ data['app_data'][<push_cloud>]",
+        ),
+        (
+            json!({"app_data": {"push_url": "ftp://x", "push_token": "t"}}),
+            "invalid url for dictionary value @ data['app_data']['push_url']",
+        ),
+        (
+            json!({"app_data": 5}),
+            "expected a dictionary for dictionary value @ data['app_data']",
+        ),
+        (
+            json!({"app_data": {"push_websocket_channel": "maybe"}}),
+            "invalid boolean value maybe for dictionary value @ data['app_data']['push_websocket_channel']",
+        ),
+        (
+            json!({"app_id": null}),
+            "string value is None for dictionary value @ data['app_id']",
+        ),
+        (
+            json!({"app_id": [1]}),
+            "value should be a string for dictionary value @ data['app_id']",
+        ),
+    ] {
+        assert_eq!(err(extra.clone()), want, "{extra}");
+    }
+    // Extra keys are dropped; defaults filled.
+    let mut v = base.clone();
+    v["extra"] = json!("dropped");
+    let ok = registration_schema(&v).unwrap();
+    assert!(ok.get("extra").is_none());
+    assert_eq!(
+        (ok["app_data"].clone(), ok["supports_encryption"].clone()),
+        (json!({}), json!(false))
+    );
 }

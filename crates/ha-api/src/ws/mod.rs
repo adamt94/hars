@@ -572,7 +572,7 @@ fn path_value<'a>(mut v: &'a Value, mut path: &str) -> Option<&'a Value> {
 }
 
 /// Python's `repr` of a JSON value.
-fn py_repr(out: &mut String, v: &Value) {
+pub(crate) fn py_repr(out: &mut String, v: &Value) {
     match v {
         Value::Null => out.push_str("None"),
         Value::Bool(true) => out.push_str("True"),

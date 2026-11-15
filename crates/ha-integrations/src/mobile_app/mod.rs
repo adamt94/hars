@@ -23,6 +23,10 @@ pub struct Registration {
     data: RwLock<Map<String, Value>>,
     /// Multi-step changes (`update_registration`) run one at a time.
     ops: parking_lot::Mutex<()>,
+    /// `false` once the entry is unloaded. Webhook commands hold a read
+    /// guard while they run, so an unload waits for them and none starts
+    /// after it.
+    live: tokio::sync::RwLock<bool>,
 }
 
 /// What opening a request's `encrypted_data` gave.
@@ -45,7 +49,20 @@ impl Registration {
             webhook_id,
             data: RwLock::new(data),
             ops: parking_lot::Mutex::new(()),
+            live: tokio::sync::RwLock::new(true),
         })
+    }
+
+    /// Hold while a webhook command runs: `None` once the registration
+    /// is unloaded (its webhook then answers as an unknown one).
+    pub async fn enter(&self) -> Option<tokio::sync::RwLockReadGuard<'_, bool>> {
+        let guard = self.live.read().await;
+        (*guard).then_some(guard)
+    }
+
+    /// Unload: wait for running commands, and let no other start.
+    pub async fn retire(&self) {
+        *self.live.write().await = false;
     }
 
     /// Hold while a change spans several steps (the data, the device,
@@ -398,8 +415,17 @@ impl MobileApp {
         let old = unique_id
             .as_deref()
             .and_then(|u| entries.find_unique(DOMAIN, u))
-            .and_then(|e| Registration::from_entry(&e));
+            .and_then(|e| Registration::from_entry(&e))
+            .map(|r| {
+                // The live registration, if loaded: its requests finish first.
+                self.registrations
+                    .read()
+                    .get(&*r.webhook_id)
+                    .cloned()
+                    .unwrap_or_else(|| Arc::new(r))
+            });
         if let Some(old) = &old {
+            old.retire().await;
             self.unload(ctx, old);
             entries.remove(&old.entry_id);
             self.save_deleted(&old.webhook_id).await;
