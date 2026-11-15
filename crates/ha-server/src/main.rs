@@ -124,21 +124,10 @@ async fn run(thp_disabled: std::io::Result<bool>) -> anyhow::Result<()> {
     };
     let entries = config_entries.list();
     {
-        // A device's primary config entry yields to a new one when its
-        // entry is gone or a low-priority integration's (HA).
-        let domains: std::collections::HashMap<String, String> = entries
-            .iter()
-            .flatten()
-            .filter_map(|e| {
-                Some((
-                    e.get("entry_id")?.as_str()?.to_owned(),
-                    e.get("domain")?.as_str()?.to_owned(),
-                ))
-            })
-            .collect();
-        registry.set_entry_domains(std::sync::Arc::new(move |id: &str| {
-            domains.get(id).cloned()
-        }));
+        // The registries ask about entries (a device's primary entry, and
+        // disables that follow an entry) as they are now.
+        let entries = config_entries.clone();
+        registry.set_entry_lookup(std::sync::Arc::new(move |id: &str| entries.info(id)));
     }
     ha_api::system_log::register(&hass);
     let profiles = {

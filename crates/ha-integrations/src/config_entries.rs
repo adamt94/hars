@@ -87,6 +87,19 @@ impl ConfigEntries {
         self.entries.read().clone()
     }
 
+    /// An entry's domain and whether it's disabled, for the registries.
+    pub fn info(&self, entry_id: &str) -> Option<ha_registry::EntryInfo> {
+        let guard = self.entries.read();
+        let entry = guard
+            .iter()
+            .flatten()
+            .find(|e| e.get("entry_id").and_then(Value::as_str) == Some(entry_id))?;
+        Some(ha_registry::EntryInfo {
+            domain: entry.get("domain")?.as_str()?.to_owned(),
+            disabled: entry.get("disabled_by").is_some_and(|d| !d.is_null()),
+        })
+    }
+
     /// `async_update_entry(entry, data=…)`: when the data differs it is
     /// replaced, `modified_at` moves and the save is scheduled. `false`
     /// for no change (or no such entry).

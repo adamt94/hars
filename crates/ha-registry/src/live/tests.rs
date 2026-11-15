@@ -628,9 +628,15 @@ fn primary_config_entries_as_ha() {
             .as_deref(),
         Some("mqtt-entry")
     );
-    reg.set_entry_domains(Arc::new(|id: &str| match id {
-        "mqtt-entry" => Some("mqtt".into()),
-        "hue-entry" => Some("hue".into()),
+    let entry = |domain: &str| {
+        Some(EntryInfo {
+            domain: domain.into(),
+            disabled: false,
+        })
+    };
+    reg.set_entry_lookup(Arc::new(move |id: &str| match id {
+        "mqtt-entry" => entry("mqtt"),
+        "hue-entry" => entry("hue"),
         _ => None,
     }));
     let mut rx = hass.bus().subscribe();
@@ -805,4 +811,145 @@ async fn re_adding_restores_the_tracker_and_device() {
         mask(serde_json::to_value(&*row).unwrap(), &["modified_at"]),
         mask(want, &["modified_at"])
     );
+}
+
+fn dev(id: &str, entries: &[&str]) -> Device {
+    let mut subentries = Map::new();
+    for e in entries {
+        subentries.insert((*e).into(), json!([null]));
+    }
+    Device {
+        id: id.into(),
+        identifiers: vec![json!(["test", id])],
+        config_entries: entries.iter().map(|e| (*e).into()).collect(),
+        config_entries_subentries: subentries,
+        primary_config_entry: entries.first().map(|e| (*e).into()),
+        ..Default::default()
+    }
+}
+
+fn ent(id: &str, entry: &str, device: Option<&str>) -> Entity {
+    Entity {
+        entity_id: id.into(),
+        platform: "test".into(),
+        unique_id: Some(json!(id)),
+        config_entry_id: Some(entry.into()),
+        device_id: device.map(str::to_owned),
+        ..Default::default()
+    }
+}
+
+/// Review regressions: removing a device unlinks other entries' entities
+/// and child devices; a shared device left with only disabled entries is
+/// disabled.
+#[tokio::test]
+async fn clearing_unlinks_and_disables_as_ha() {
+    let hass = Hass::new();
+    let mut child = dev("child", &["B"]);
+    child.via_device_id = Some("hub".into());
+    let reg = Registry::in_memory(
+        &hass,
+        Registries {
+            devices: crate::rows![dev("hub", &["A"]), child, dev("shared", &["A", "C"])],
+            entities: crate::rows![
+                ent("sensor.hub", "A", Some("hub")),
+                ent("sensor.foreign", "B", Some("hub")),
+            ],
+            ..Default::default()
+        },
+    );
+    reg.set_entry_lookup(Arc::new(|id: &str| {
+        Some(EntryInfo {
+            domain: "test".into(),
+            disabled: id == "C",
+        })
+    }));
+    let mut rx = hass.bus().subscribe();
+    reg.clear_config_entry("A");
+    let snap = reg.snapshot();
+    let find = |id: &str| snap.devices.iter().find(|d| d.id == id).cloned();
+    assert!(find("hub").is_none());
+    assert_eq!(find("child").unwrap().via_device_id, None);
+    let shared = find("shared").unwrap();
+    assert_eq!(shared.disabled_by.as_deref(), Some("config_entry"));
+    assert_eq!(shared.primary_config_entry, None);
+    let foreign = snap
+        .entities
+        .iter()
+        .find(|e| e.entity_id == "sensor.foreign")
+        .unwrap();
+    assert_eq!(foreign.device_id, None);
+    assert!(!snap.entities.iter().any(|e| e.entity_id == "sensor.hub"));
+    let got: Vec<Value> = events(&mut rx).into_iter().map(|(_, d)| d).collect();
+    // The child's update comes before the hub's removal.
+    let child_at = got.iter().position(|d| d["device_id"] == "child").unwrap();
+    let hub_at = got
+        .iter()
+        .position(|d| d["device_id"] == "hub" && d["action"] == "remove")
+        .unwrap();
+    assert!(child_at < hub_at);
+    assert_eq!(got[child_at]["changes"], json!({"via_device_id": "hub"}));
+    assert!(
+        got.contains(&json!({"action": "update", "entity_id": "sensor.foreign",
+                                 "changes": {"device_id": "hub"}}))
+    );
+    let shared_ev = got.iter().find(|d| d["device_id"] == "shared").unwrap();
+    assert_eq!(shared_ev["changes"]["disabled_by"], Value::Null);
+}
+
+/// Review regressions: a restore follows the target entry's disabled
+/// state, and a taken id falls back to the restored area + name.
+#[tokio::test]
+async fn restores_follow_the_entry_and_area() {
+    let hass = Hass::new();
+    let reg = Registry::in_memory(
+        &hass,
+        Registries {
+            areas: vec![crate::Area {
+                id: "kitchen".into(),
+                name: "Kitchen".into(),
+                ..Default::default()
+            }],
+            entities: crate::rows![
+                Entity {
+                    area_id: Some("kitchen".into()),
+                    name: Some("Temperature".into()),
+                    ..ent("sensor.taken", "A", None)
+                },
+                Entity {
+                    disabled_by: Some("config_entry".into()),
+                    ..ent("sensor.kept", "A", None)
+                },
+            ],
+            ..Default::default()
+        },
+    );
+    reg.remove_entity("sensor.taken");
+    reg.remove_entity("sensor.kept");
+    hass.set_state(
+        ha_core::EntityId::parse("sensor.taken").unwrap(),
+        "x",
+        Default::default(),
+    );
+    let patch = |entry: &str| EntityPatch {
+        config_entry_id: Some(Some(entry.into())),
+        ..Default::default()
+    };
+    // Into an enabled entry: the id is taken, so area + name.
+    let row = reg.get_or_create_entity("sensor", "test", "sensor.taken", None, patch("A"));
+    assert_eq!(row.entity_id, "sensor.kitchen_temperature");
+    assert_eq!(row.disabled_by, None);
+    // A `config_entry` disable lifts for an enabled entry; a disabled entry
+    // disables the restored row.
+    reg.set_entry_lookup(Arc::new(|id: &str| {
+        Some(EntryInfo {
+            domain: "test".into(),
+            disabled: id == "D",
+        })
+    }));
+    let row = reg.get_or_create_entity("sensor", "test", "sensor.kept", None, patch("A"));
+    assert_eq!(row.disabled_by, None);
+    reg.remove_entity("sensor.kept");
+    let row = reg.get_or_create_entity("sensor", "test", "sensor.kept", None, patch("D"));
+    assert_eq!(row.disabled_by.as_deref(), Some("config_entry"));
 }

@@ -30,7 +30,7 @@ pub struct Registry {
     /// One writer at a time, so no change is lost between copy and swap.
     writer: Mutex<()>,
     saves: Option<[Arc<DelayedSave>; 2]>,
-    entry_domains: RwLock<Option<EntryDomains>>,
+    entries: RwLock<Option<EntryLookup>>,
 }
 
 /// What an integration wants a row to have (HA's keyword arguments to
@@ -97,8 +97,15 @@ impl Tx {
     }
 }
 
-/// The domain of a config entry by id, if it exists.
-pub type EntryDomains = Arc<dyn Fn(&str) -> Option<String> + Send + Sync>;
+/// What the registries need to know of a config entry.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EntryInfo {
+    pub domain: String,
+    pub disabled: bool,
+}
+
+/// A config entry by id, if it exists.
+pub type EntryLookup = Arc<dyn Fn(&str) -> Option<EntryInfo> + Send + Sync>;
 
 /// `LOW_PRIO_CONFIG_ENTRY_DOMAINS`: their entries yield a device's primary
 /// entry to another integration's.
@@ -112,7 +119,7 @@ impl Registry {
             snap: RwLock::new(Arc::new(registries)),
             writer: Mutex::new(()),
             saves: None,
-            entry_domains: RwLock::new(None),
+            entries: RwLock::new(None),
         })
     }
 
@@ -143,15 +150,25 @@ impl Registry {
                 snap: RwLock::new(Arc::new(registries)),
                 writer: Mutex::new(()),
                 saves: Some([save(true), save(false)]),
-                entry_domains: RwLock::new(None),
+                entries: RwLock::new(None),
             }
         })
     }
 
-    /// How to find a config entry's domain (for a device's primary entry).
-    /// Without it, an existing primary entry is never replaced.
-    pub fn set_entry_domains(&self, f: EntryDomains) {
-        *self.entry_domains.write() = Some(f);
+    /// How to look up a config entry (a device's primary entry; disables
+    /// that follow the entry). Without it, an existing primary entry is
+    /// never replaced and entries count as enabled.
+    pub fn set_entry_lookup(&self, f: EntryLookup) {
+        *self.entries.write() = Some(f);
+    }
+
+    fn entry(&self, id: &str) -> Option<EntryInfo> {
+        let lookup = self.entries.read().clone()?;
+        lookup(id)
+    }
+
+    fn entry_disabled(&self, id: Option<&str>) -> bool {
+        id.and_then(|id| self.entry(id)).is_some_and(|e| e.disabled)
     }
 
     /// The registries as they are now.
@@ -270,10 +287,9 @@ impl Registry {
                 _ => generate_entity_id(
                     &tx.r,
                     &self.hass,
-                    domain,
-                    platform,
-                    unique_id,
+                    (domain, platform, unique_id),
                     device_id.as_deref(),
+                    deleted.as_ref().and_then(|d| d.area_id.as_deref()),
                     // The user's name has priority.
                     deleted
                         .as_ref()
@@ -332,7 +348,10 @@ impl Registry {
                     }
                     // The deleted row's disable wins over the caller's.
                     if !d.disabled_by_undefined {
-                        r.disabled_by = restored_disabled_by(d.disabled_by);
+                        r.disabled_by = restored_disabled_by(
+                            d.disabled_by,
+                            self.entry_disabled(r.config_entry_id.as_deref()),
+                        );
                     }
                     Arc::new(r)
                 }
@@ -421,9 +440,22 @@ impl Registry {
                         .collect();
                     rows.extend(deleted.raw());
                     tx.r.device_file.deleted = Arc::new(rows);
+                    // Devices connected via it lose the link first.
+                    for i in 0..tx.r.devices.len() {
+                        if tx.r.devices[i].via_device_id.as_deref() == Some(device.id.as_str()) {
+                            let mut child = (*tx.r.devices[i]).clone();
+                            child.via_device_id = None;
+                            child.modified_at = Some(now_iso.clone());
+                            let id = child.id.clone();
+                            tx.r.devices[i] = Arc::new(child);
+                            tx.device_event(json!({"action": "update", "device_id": id,
+                                                   "changes": {"via_device_id": device.id}}));
+                        }
+                    }
                     tx.device_event(json!({"action": "remove", "device_id": device.id,
                                            "device": device.json()}));
-                    // The entity registry removes the device's entities.
+                    // The entity registry removes the device's entities of
+                    // its entries, and unlinks any other.
                     while let Some(e) = tx.r.entities.iter().position(|e| {
                         e.device_id.as_deref() == Some(device.id.as_str())
                             && e.config_entry_id
@@ -431,6 +463,17 @@ impl Registry {
                                 .is_some_and(|c| device.config_entries.contains(c))
                     }) {
                         remove_row(tx, e, now);
+                    }
+                    let unlink = EntityPatch {
+                        device_id: Some(None),
+                        ..Default::default()
+                    };
+                    while let Some(e) =
+                        tx.r.entities
+                            .iter()
+                            .position(|e| e.device_id.as_deref() == Some(device.id.as_str()))
+                    {
+                        update_row(tx, e, &unlink, &now_iso);
                     }
                 } else {
                     let mut d = (*device).clone();
@@ -446,6 +489,15 @@ impl Registry {
                     );
                     d.config_entries.retain(|e| e != entry_id);
                     d.config_entries_subentries.remove(entry_id);
+                    // Every remaining entry disabled: so is the device.
+                    if d.disabled_by.is_none()
+                        && d.config_entries
+                            .iter()
+                            .all(|e| self.entry_disabled(Some(e)))
+                    {
+                        changes.insert("disabled_by".into(), Value::Null);
+                        d.disabled_by = Some("config_entry".into());
+                    }
                     d.modified_at = Some(now_iso.clone());
                     tx.r.devices[i] = Arc::new(d);
                     tx.device_event(json!({"action": "update", "device_id": device.id,
@@ -494,7 +546,7 @@ impl Registry {
     /// ripples into the device's legacy-named entities (`changes: {}`).
     pub fn get_or_create_device(&self, info: DeviceInfo) -> Arc<Device> {
         let now = now_iso(&self.hass);
-        let domains = self.entry_domains.read().clone();
+        let domains = self.entries.read().clone();
         self.write(|tx| {
             let r = &mut tx.r;
             let found = r
@@ -531,7 +583,10 @@ impl Registry {
                             disabled_by: if old.disabled_by_undefined {
                                 None
                             } else {
-                                restored_disabled_by(old.disabled_by)
+                                restored_disabled_by(
+                                    old.disabled_by,
+                                    self.entry_disabled(Some(&info.config_entry_id)),
+                                )
                             },
                             identifiers: old
                                 .identifiers
@@ -563,9 +618,8 @@ impl Registry {
             if d.primary_config_entry.as_ref() != Some(entry) {
                 let replace = match (&d.primary_config_entry, &domains) {
                     (None, _) => true,
-                    (Some(primary), Some(domains)) => {
-                        domains(primary).is_none_or(|dom| LOW_PRIO_DOMAINS.contains(&dom.as_str()))
-                    }
+                    (Some(primary), Some(domains)) => domains(primary)
+                        .is_none_or(|e| LOW_PRIO_DOMAINS.contains(&e.domain.as_str())),
                     (Some(_), None) => false,
                 };
                 if replace {
@@ -822,16 +876,16 @@ fn apply(row: &mut Entity, patch: &EntityPatch) -> Map<String, Value> {
 fn generate_entity_id(
     r: &Registries,
     hass: &Hass,
-    domain: &str,
-    platform: &str,
-    unique_id: &str,
+    (domain, platform, unique_id): (&str, &str, &str),
     device_id: Option<&str>,
+    area_id: Option<&str>,
     object_id_base: Option<&str>,
 ) -> String {
     let device = device_id.and_then(|id| r.devices.iter().find(|d| d.id == id));
     let device_name = device.and_then(|d| d.display_name());
-    let area_name = device
-        .and_then(|d| d.area_id.as_deref())
+    // The entity's own area, else its device's.
+    let area_name = area_id
+        .or_else(|| device.and_then(|d| d.area_id.as_deref()))
         .and_then(|a| r.areas.iter().find(|x| x.id == a))
         .map(|a| a.name.as_str());
     let entity_name = match (object_id_base, device_name) {
@@ -1019,10 +1073,15 @@ impl DeletedDevice {
     }
 }
 
-/// `disabled_by` from a deleted row for an enabled config entry: a
-/// `config_entry` disable doesn't come back.
-fn restored_disabled_by(by: Option<String>) -> Option<String> {
-    by.filter(|b| b != "config_entry")
+/// `disabled_by` from a deleted row, adjusted for the entry it comes back
+/// to: a disabled entry disables it (`config_entry`), an enabled one lifts
+/// a `config_entry` disable.
+fn restored_disabled_by(by: Option<String>, entry_disabled: bool) -> Option<String> {
+    match (by, entry_disabled) {
+        (None, true) => Some("config_entry".into()),
+        (Some(b), false) if b == "config_entry" => None,
+        (by, _) => by,
+    }
 }
 
 /// Rewrite a deleted-row list, row by row (unparsable rows kept as they
