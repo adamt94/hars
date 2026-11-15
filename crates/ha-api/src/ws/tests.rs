@@ -1911,5 +1911,34 @@ async fn recorder_info_and_empty_statistics() {
     );
     let r = c.call(period(8, json!({"period": "decade"}))).await;
     assert_eq!(r["error"]["code"], "invalid_format", "{r}");
+    // HA's unit schema: known converters, their units.
+    let r = c
+        .call(period(9, json!({"units": {"temperature": "bananas"}})))
+        .await;
+    assert_eq!(r["error"]["code"], "invalid_format", "{r}");
+    assert!(
+        r["error"]["message"].as_str().unwrap().starts_with(
+            "value must be one of [<UnitOfTemperature.KELVIN: 'K'>, <UnitOfTemperature.CELSIUS: '°C'>"
+        ),
+        "{r}"
+    );
+    let r = c
+        .call(period(10, json!({"units": {"colour": "red"}})))
+        .await;
+    assert!(
+        r["error"]["message"]
+            .as_str()
+            .unwrap()
+            .starts_with("extra keys not allowed @ data['units']['colour']"),
+        "{r}"
+    );
+    assert_eq!(
+        c.call(period(
+            11,
+            json!({"units": {"unitless": null, "energy": "kWh"}})
+        ))
+        .await,
+        ok(11, json!({}))
+    );
     let _ = std::fs::remove_dir_all(&dir);
 }

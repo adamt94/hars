@@ -81,10 +81,7 @@ fn statistics_during_period(
         &["5minute", "hour", "day", "week", "month", "year"],
         true,
     )?;
-    match msg.get("units") {
-        None | Some(Value::Object(_)) => {}
-        Some(_) => return Err("expected a dictionary for dictionary value @ data['units']".into()),
-    }
+    units(msg.get("units"))?;
     if let Some(types) = msg.get("types") {
         let Value::Array(types) = types else {
             return Err("expected list for dictionary value @ data['types']".into());
@@ -111,6 +108,39 @@ fn statistics_during_period(
         return Ok(());
     }
     conn.out.result(id, json!({}));
+    Ok(())
+}
+
+/// HA's `UNIT_SCHEMA`: per unit converter, the units it accepts and
+/// voluptuous's message for any other (generated from HA 2026.6.1).
+const UNITS: &str = include_str!("statistic_units.json");
+
+fn units(units: Option<&Value>) -> Result<(), Invalid> {
+    let Some(units) = units else { return Ok(()) };
+    let Value::Object(units) = units else {
+        return Err("expected a dictionary for dictionary value @ data['units']".into());
+    };
+    if units.is_empty() {
+        return Ok(());
+    }
+    // Parsed per call: the command is rare, and nothing stays in memory.
+    let table: Map<String, Value> = serde_json::from_str(UNITS).unwrap_or_default();
+    for (k, v) in units {
+        let Some(allowed) = table.get(k) else {
+            return Err(format!("extra keys not allowed @ data['units']['{k}']"));
+        };
+        let ok = match v {
+            Value::Null => allowed["null"] == true,
+            Value::String(u) => allowed["units"]
+                .as_array()
+                .is_some_and(|a| a.iter().any(|x| x == u)),
+            _ => false,
+        };
+        if !ok {
+            let msg = allowed["msg"].as_str().unwrap_or("not a valid value");
+            return Err(format!("{msg} for dictionary value @ data['units']['{k}']"));
+        }
+    }
     Ok(())
 }
 

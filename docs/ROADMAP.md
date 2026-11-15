@@ -391,8 +391,14 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
       controls work in the app
 
 ### M6: History
-- [ ] Recorder: SQLite (WAL), bounded writer queue, max batch delay 5 s,
-      10-day **and** byte-size retention, purge + checkpoint, sane behaviour on a full disk
+- [x] Recorder: an append-only segment log (`ha-recorder`, decision D7) in
+      place of SQLite: bounded writer queue, max batch delay 5 s, 10-day
+      **and** byte-size retention (nightly purge at 04:12), sane behaviour on
+      a full disk
+- [x] Recording: states with HA's recorded attributes and the logbook's
+      `old_state_id` rule, the logbook's events, write-time `context_*`
+      fields (D2–D4); started before anything writes states, and drained at
+      final write
 - [x] Stop waits for the final-write flush: `finish_stop` awaits the
       `homeassistant_final_write` (60 s) and `homeassistant_close` (30 s)
       handlers, as HA's `async_stop` does
@@ -402,10 +408,12 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
 - [ ] Crash test: kill -9 loses at most one batch window and never corrupts the DB
 - [x] WS `sensor/numeric_device_classes` and
       `sensor/device_class_convertible_units` (HA 2026.6.1's tables)
-- [ ] WS `history/stream`, `logbook/event_stream`,
-      `recorder/get_statistics_metadata` and
-      `recorder/statistics_during_period` (empty statistics, so the frontend
-      falls back to history), `recorder/info`
+- [x] WS `recorder/info`, and the statistics calls answering empty
+      (`recorder/get_statistics_metadata`, `recorder/list_statistic_ids`,
+      `recorder/statistics_during_period`), so the frontend falls back to
+      history (D1)
+- [ ] WS `history/stream`, `history/history_during_period`,
+      `logbook/event_stream`, `logbook/get_events`
 - [ ] Acceptance: more-info history graphs and the Map trail render
 
 ### M7: Cutover
@@ -437,3 +445,14 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
   lossless delivery; import auth sessions; mobile encryption is required;
   notify, remote access and history import are deferred; cutover is via a
   shadow-mode week; budget is ≤ 20 MiB idle RSS.
+- **2026-11-15**: History (M6). The recorder is an append-only segment log
+  under `<config>/.hars/recorder/`, not SQLite and never HA's DB (D7, D8),
+  capped at 64 MiB on top of 10 days (D9). Deliberate deviations from HA:
+  - D1: statistics answer empty, so state_class sensors show the history line;
+  - D2: attribute-only writes that repeat the previous row, outside HA's
+    significant domains, aren't recorded (−46 % rows on the live install);
+  - D3: only the logbook's event types are recorded;
+  - D4: the logbook's `context_*` fields are worked out at write time;
+  - D5: history reads flush the pending batch first.
+
+  HA's rule that the first row after a restart has no old state is kept (D6).

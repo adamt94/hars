@@ -127,9 +127,7 @@ impl Recorder {
                     if matches!(event.kind, ha_core::EventKind::HomeassistantFinalWrite {}) {
                         break;
                     }
-                    if let Some(row) = intake.row(&event) {
-                        store.record(row);
-                    }
+                    intake.record(&event, |row| store.record(row));
                 }
                 let _ = drained.send(());
             });

@@ -343,3 +343,93 @@ fn events_and_the_context_bound() {
     assert!(contexts.augment(&child).is_none(), "the oldest went");
     assert_eq!(contexts.map.len(), 2);
 }
+
+/// A row the store drops (backlog full) changes nothing the next rows are
+/// compared with.
+#[test]
+fn dropped_rows_leave_no_trace() {
+    let mut intake = Intake::new(Hass::new());
+    let c = ctx(1);
+    let off = state("light.a", "off", json!({}), T0, T0, &c);
+    assert!(intake.row(&changed(None, &off)).is_some());
+    let on = state("light.a", "on", json!({}), T0 + 1, T0 + 1, &ctx(2));
+    intake.record(&changed(Some(&off), &on), |_| false);
+    // Had the dropped `on` counted, this repeat would be skipped (D2).
+    let again = state("light.a", "on", json!({}), T0 + 2, T0 + 1, &ctx(3));
+    let row = state_row(intake.row(&changed(Some(&on), &again)));
+    assert_eq!(row.state, "on");
+    // And the dropped row's context isn't anyone's origin.
+    let child = ctx(4).with_parent(&ctx(2));
+    assert!(intake.contexts.augment(&child).is_none());
+}
+
+/// A removed entity is forgotten, so ids that come and go don't pile up.
+#[test]
+fn removals_forget_the_entity() {
+    let mut intake = Intake::new(Hass::new());
+    let c = ctx(1);
+    for i in 0..100 {
+        let id = format!("sensor.phone_{i}");
+        let s = state(
+            &id,
+            "1",
+            json!({"blob": "y".repeat(MAX_ATTRS_BYTES)}),
+            T0,
+            T0,
+            &c,
+        );
+        intake.row(&changed(None, &s));
+        let gone = Event::new(
+            EventKind::StateChanged {
+                entity_id: s.entity_id.clone(),
+                old_state: Some(s.clone()),
+                new_state: None,
+            },
+            ts(T0 + 1),
+            c.clone(),
+        );
+        assert!(intake.row(&gone).is_none());
+    }
+    assert!(intake.last.is_empty());
+    assert!(intake.oversized.is_empty());
+}
+
+/// An oversized attribute isn't encoded whole: the scratch buffer stays
+/// near the 16 KiB limit.
+#[test]
+fn oversized_attributes_stop_encoding_at_the_limit() {
+    let mut intake = Intake::new(Hass::new());
+    let huge = state(
+        "sensor.huge",
+        "x",
+        json!({"blob": "y".repeat(1 << 20)}),
+        T0,
+        T0,
+        &ctx(1),
+    );
+    assert_eq!(
+        &*state_row(intake.row(&changed(None, &huge))).attributes,
+        "{}"
+    );
+    assert!(
+        intake.buf.capacity() <= 2 * MAX_ATTRS_BYTES,
+        "{}",
+        intake.buf.capacity()
+    );
+    // Exactly at the limit still fits.
+    let pad = MAX_ATTRS_BYTES - r#"{"b":""}"#.len();
+    let edge = state(
+        "sensor.edge",
+        "x",
+        json!({"b": "y".repeat(pad)}),
+        T0,
+        T0,
+        &ctx(1),
+    );
+    assert_eq!(
+        state_row(intake.row(&changed(None, &edge)))
+            .attributes
+            .len(),
+        MAX_ATTRS_BYTES
+    );
+}

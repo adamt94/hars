@@ -23,6 +23,7 @@ use ha_core::{Context, ContextId, EntityId, Event, EventKind, Hass, State};
 use smol_str::SmolStr;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt::Write as _;
+use std::io::Write as _;
 use std::sync::Arc;
 
 /// HA's `MAX_STATE_ATTRS_BYTES`: recorded attributes past this are `{}`.
@@ -168,6 +169,12 @@ fn push_json_str(out: &mut String, s: &str) {
     }
 }
 
+/// What admitting a row changes for the rows after it.
+struct Effects {
+    see: Option<(Context, Origin)>,
+    last: Option<(EntityId, Last)>,
+}
+
 /// Turns the recorder's events into rows.
 pub(crate) struct Intake {
     hass: Hass,
@@ -189,8 +196,35 @@ impl Intake {
         }
     }
 
-    /// The row for `event`, if it is recorded.
+    /// Record `event`'s row, if it has one, through `admit`. What later
+    /// rows are compared with (the entity's previous row, the context's
+    /// first row) changes only if `admit` takes the row: a row the store
+    /// drops (its backlog full) leaves no trace.
+    pub(crate) fn record(&mut self, event: &Event, admit: impl FnOnce(Row) -> bool) {
+        if let Some((row, effects)) = self.prepare(event)
+            && admit(row)
+        {
+            if let Some((ctx, origin)) = effects.see {
+                self.contexts.see(&ctx, origin);
+            }
+            if let Some((entity_id, last)) = effects.last {
+                self.last.insert(entity_id, last);
+            }
+        }
+    }
+
+    /// The row `record` would admit (tests).
+    #[cfg(test)]
     pub(crate) fn row(&mut self, event: &Event) -> Option<Row> {
+        let mut out = None;
+        self.record(event, |row| {
+            out = Some(row);
+            true
+        });
+        out
+    }
+
+    fn prepare(&mut self, event: &Event) -> Option<(Row, Effects)> {
         let ts = event.time_fired.as_microsecond();
         let ctx = &event.context;
         match &event.kind {
@@ -199,9 +233,13 @@ impl Intake {
                 old_state,
                 new_state,
             } => {
-                // A removal (no new state) isn't recorded: hars doesn't
-                // remove entities at runtime.
-                let new = new_state.as_deref()?;
+                // A removal isn't recorded (no state to store), but the
+                // entity is forgotten: a later one with this id starts over.
+                let Some(new) = new_state.as_deref() else {
+                    self.last.remove(entity_id);
+                    self.oversized.remove(entity_id);
+                    return None;
+                };
                 self.state_row(entity_id, old_state.is_some(), new)
             }
             EventKind::CallService {
@@ -213,20 +251,21 @@ impl Intake {
                 field(&mut fields, "context_domain", domain);
                 field(&mut fields, "context_service", service);
                 field(&mut fields, "context_event_type", "call_service");
-                self.contexts.see(ctx, Origin::Fields(Arc::from(fields)));
+                let see = Some((ctx.clone(), Origin::Fields(Arc::from(fields))));
                 let mut data = String::new();
                 field(&mut data, "domain", domain);
                 field(&mut data, "service", service);
                 if let Some(ids) = service_data.get("entity_id") {
                     let _ = write!(data, ",\"entity_id\":{ids}");
                 }
-                Some(Row::Event(EventRow {
+                let row = Row::Event(EventRow {
                     event_type: "call_service".into(),
                     ts,
                     data: Some(Arc::from(format!("{{{data}}}"))),
                     context: ctx.id.to_bytes(),
                     aug: None,
-                }))
+                });
+                Some((row, Effects { see, last: None }))
             }
             EventKind::Custom { name, data } if name == "automation_triggered" => {
                 let aug = self.contexts.augment(ctx);
@@ -254,14 +293,15 @@ impl Intake {
                 if let Some(e) = text("entity_id") {
                     field(&mut fields, "context_entity_id", e);
                 }
-                self.contexts.see(ctx, Origin::Fields(Arc::from(fields)));
-                Some(Row::Event(EventRow {
+                let row = Row::Event(EventRow {
                     event_type: "automation_triggered".into(),
                     ts,
                     data: Some(Arc::from(data.to_string())),
                     context: ctx.id.to_bytes(),
                     aug,
-                }))
+                });
+                let see = Some((ctx.clone(), Origin::Fields(Arc::from(fields))));
+                Some((row, Effects { see, last: None }))
             }
             EventKind::HomeassistantStart {} | EventKind::HomeassistantStop {} => {
                 let (event_type, message) = match event.kind {
@@ -275,20 +315,26 @@ impl Intake {
                 field(&mut fields, "context_domain", "homeassistant");
                 field(&mut fields, "context_name", "Home Assistant");
                 field(&mut fields, "context_message", message);
-                self.contexts.see(ctx, Origin::Fields(Arc::from(fields)));
-                Some(Row::Event(EventRow {
+                let row = Row::Event(EventRow {
                     event_type: event_type.into(),
                     ts,
                     data: None,
                     context: ctx.id.to_bytes(),
                     aug,
-                }))
+                });
+                let see = Some((ctx.clone(), Origin::Fields(Arc::from(fields))));
+                Some((row, Effects { see, last: None }))
             }
             _ => None,
         }
     }
 
-    fn state_row(&mut self, entity_id: &EntityId, had_old: bool, new: &State) -> Option<Row> {
+    fn state_row(
+        &mut self,
+        entity_id: &EntityId,
+        had_old: bool,
+        new: &State,
+    ) -> Option<(Row, Effects)> {
         let ts = new.last_updated.as_microsecond();
         let last_changed = new.last_changed.as_microsecond();
         let (text, has_unit) = self.attributes(new);
@@ -317,14 +363,16 @@ impl Intake {
         } else {
             None
         };
-        self.contexts.see(&new.context, origin());
-        self.last.insert(
-            entity_id.clone(),
-            Last {
-                state: new.state.clone(),
-                attributes: attributes.clone(),
-            },
-        );
+        let effects = Effects {
+            see: Some((new.context.clone(), origin())),
+            last: Some((
+                entity_id.clone(),
+                Last {
+                    state: new.state.clone(),
+                    attributes: attributes.clone(),
+                },
+            )),
+        };
         let mut flags = 0;
         if visible {
             flags |= VISIBLE;
@@ -332,7 +380,7 @@ impl Intake {
         if has_unit {
             flags |= HAS_UNIT;
         }
-        Some(Row::State(StateRow {
+        let row = Row::State(StateRow {
             entity_id: entity_id.as_str().into(),
             ts,
             last_changed,
@@ -341,30 +389,36 @@ impl Intake {
             flags,
             context: new.context.id.to_bytes(),
             aug,
-        }))
+        });
+        Some((row, effects))
     }
 
     /// The recorded attributes as JSON text, and whether they have a unit.
     fn attributes(&mut self, state: &State) -> (String, bool) {
         let unrecorded = self.hass.unrecorded(&state.entity_id);
-        let buf = &mut self.buf;
-        buf.clear();
-        buf.push(b'{');
+        let mut out = Capped(&mut self.buf);
+        out.0.clear();
         let mut has_unit = false;
-        for (k, v) in &state.attributes {
-            if unrecorded.excludes(k) {
-                continue;
+        let mut first = true;
+        let fits = (|| -> std::io::Result<()> {
+            out.write_all(b"{")?;
+            for (k, v) in &state.attributes {
+                if unrecorded.excludes(k) {
+                    continue;
+                }
+                if !std::mem::take(&mut first) {
+                    out.write_all(b",")?;
+                }
+                has_unit |= k == "unit_of_measurement";
+                serde_json::to_writer(&mut out, k)?;
+                out.write_all(b":")?;
+                serde_json::to_writer(&mut out, v)?;
             }
-            if buf.len() > 1 {
-                buf.push(b',');
-            }
-            has_unit |= k == "unit_of_measurement";
-            let _ = serde_json::to_writer(&mut *buf, k);
-            buf.push(b':');
-            let _ = serde_json::to_writer(&mut *buf, v);
-        }
-        buf.push(b'}');
-        if buf.len() > MAX_ATTRS_BYTES {
+            out.write_all(b"}")
+        })()
+        .is_ok();
+        let buf = out.0;
+        if !fits {
             if self.oversized.insert(state.entity_id.clone()) {
                 tracing::warn!(
                     "State attributes for {} exceed maximum size of {MAX_ATTRS_BYTES} bytes. \
@@ -375,6 +429,24 @@ impl Intake {
             return ("{}".into(), false);
         }
         (String::from_utf8_lossy(buf).into_owned(), has_unit)
+    }
+}
+
+/// A writer that refuses to grow past [`MAX_ATTRS_BYTES`], so an
+/// oversized attribute is never encoded whole (or kept as capacity).
+struct Capped<'a>(&'a mut Vec<u8>);
+
+impl std::io::Write for Capped<'_> {
+    fn write(&mut self, data: &[u8]) -> std::io::Result<usize> {
+        if self.0.len() + data.len() > MAX_ATTRS_BYTES {
+            return Err(std::io::Error::other("over the attribute limit"));
+        }
+        self.0.extend_from_slice(data);
+        Ok(data.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
     }
 }
 
