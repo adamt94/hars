@@ -2132,9 +2132,22 @@ async fn history_stream_sends_the_past_then_follows() {
             .is_err()
     );
 
+    // A group still open when the window closes is dropped.
+    c.send(json!({"id": 203, "type": "history/stream", "start_time": minutes_ago(5),
+                  "end_time": (jiff::Timestamp::now() + jiff::SignedDuration::from_millis(250)).to_string(),
+                  "entity_ids": ["light.a"]})).await;
+    assert_eq!(c.recv().await["result"], Value::Null);
+    assert_eq!(c.recv().await["type"], "event");
+    s.hass.set_state(light.clone(), "off", Attributes::new());
+    assert!(
+        tokio::time::timeout(Duration::from_millis(900), c.recv())
+            .await
+            .is_err()
+    );
+
     // A finished window answers once, even when empty.
     c.send(
-        json!({"id": 203, "type": "history/stream", "start_time": minutes_ago(120),
+        json!({"id": 204, "type": "history/stream", "start_time": minutes_ago(120),
                   "end_time": minutes_ago(60), "entity_ids": ["light.a"]}),
     )
     .await;
@@ -2144,7 +2157,7 @@ async fn history_stream_sends_the_past_then_follows() {
     // A start in the future is an error for a stream.
     let r = c
         .call(
-            json!({"id": 204, "type": "history/stream", "start_time": minutes_ago(-5),
+            json!({"id": 205, "type": "history/stream", "start_time": minutes_ago(-5),
                      "entity_ids": ["light.a"]}),
         )
         .await;

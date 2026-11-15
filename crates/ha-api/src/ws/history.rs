@@ -267,6 +267,10 @@ fn start_stream(conn: &mut Conn, id: u64, recorder: &Arc<Recorder>, args: Args) 
     let mut feed = hass.subscribe_state_changes();
     feed.snapshot = Vec::new();
     let setup = hass.clock().now().as_microsecond();
+    // A write that timestamped its state before `setup` may still be
+    // publishing it: wait, so the read below finds it (the live side
+    // drops everything at or before `setup`).
+    hass.states().quiesce();
     out.result(id, Value::Null);
     let live = Arc::new(parking_lot::Mutex::new(true));
     let task_live = live.clone();
@@ -311,6 +315,9 @@ fn start_stream(conn: &mut Conn, id: u64, recorder: &Arc<Recorder>, args: Args) 
                 // Filtered as they arrive: the batch holds only what is sent.
                 while batch.is_empty() {
                     let Some(e) = feed.recv().await else { return };
+                    if feed.backlog() > MAX_PENDING_HISTORY_STATES {
+                        return;
+                    }
                     if forward(&e, &wanted, &args) && e.time_fired.as_microsecond() > setup {
                         batch.push(e);
                     }
@@ -323,6 +330,9 @@ fn start_stream(conn: &mut Conn, id: u64, recorder: &Arc<Recorder>, args: Args) 
                         () = &mut group => break,
                         e = feed.recv() => {
                             let Some(e) = e else { return };
+                            if feed.backlog() > MAX_PENDING_HISTORY_STATES {
+                                return;
+                            }
                             if forward(&e, &wanted, &args) {
                                 batch.push(e);
                                 if batch.len() > MAX_PENDING_HISTORY_STATES {
@@ -331,6 +341,11 @@ fn start_stream(conn: &mut Conn, id: u64, recorder: &Arc<Recorder>, args: Args) 
                             }
                         }
                     }
+                }
+                // `timeout_at` polls the loop first, so check the deadline
+                // here too: nothing is sent after `end`.
+                if deadline.is_some_and(|at| tokio::time::Instant::now() >= at) {
+                    return;
                 }
                 if let Some(states) = live_states(&batch, args.no_attributes)
                     && !emit(format!(

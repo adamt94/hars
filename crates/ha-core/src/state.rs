@@ -178,6 +178,14 @@ impl StateMachine {
         self.seq.load(std::sync::atomic::Ordering::Acquire)
     }
 
+    /// Wait for every write in flight to finish, bus delivery included. A
+    /// write timestamps its state and fires its event under one lock, so
+    /// after this returns every change timestamped before the call is
+    /// queued to every feed, and anything later is timestamped later.
+    pub fn quiesce(&self) {
+        drop(self.states.write());
+    }
+
     pub fn len(&self) -> usize {
         self.states.read().len()
     }
