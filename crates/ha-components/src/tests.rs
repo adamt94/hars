@@ -116,7 +116,7 @@ fn duplicate_names_get_suffixes_and_bad_stores_dont_stop_the_server() {
     std::fs::write(dir.join(".storage").join(PERSON_KEY), "{bad").unwrap();
     assert!(Components::load_strict(&dir).is_err());
     let components = Components::load(&dir);
-    assert!(components.persons.is_empty());
+    assert!(components.persons().is_empty());
     let hass = Hass::new();
     components.setup(&hass, &Registries::default());
     assert!(
@@ -184,8 +184,8 @@ fn old_person_stores_load_like_ha() {
         Components::load_strict(&dir).unwrap(),
         Components::load(&dir),
     ] {
-        assert_eq!(c.persons.len(), 1);
-        assert_eq!(c.persons[0]["device_trackers"], json!([]));
+        assert_eq!(c.persons().len(), 1);
+        assert_eq!(c.persons()[0]["device_trackers"], json!([]));
     }
     let hass = Hass::new();
     Components::load(&dir).setup(&hass, &Registries::default());

@@ -215,7 +215,7 @@ fn concurrent_persists_save_the_newest_data() {
     let entries = crate::config_entries::ConfigEntries::in_memory(&hass, vec![entry(true)]);
     let app = MobileApp::new(&[entry(true)], Vec::new());
     let registry = ha_registry::Registry::in_memory(&hass, Default::default());
-    app.setup(&hass, registry, entries.clone());
+    app.setup(&hass, registry, entries.clone(), None);
     let Webhook::Registered(reg) = app.webhook(WEBHOOK) else {
         panic!("registered");
     };

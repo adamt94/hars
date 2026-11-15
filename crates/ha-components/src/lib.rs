@@ -29,10 +29,16 @@ struct Collection {
 #[derive(Debug, Default)]
 pub struct Components {
     pub zones: Vec<Map<String, Value>>,
-    pub persons: Vec<Map<String, Value>>,
+    /// The person store's items (changed at runtime when an app registers).
+    persons: parking_lot::RwLock<Vec<Map<String, Value>>>,
     /// The entities [`Components::setup`] made, for tracking.
     entities: parking_lot::Mutex<Tracked>,
+    /// `.storage/person`'s delayed save, once [`Components::save_to`] ran.
+    person_save: std::sync::OnceLock<Arc<ha_core::storage::DelayedSave>>,
 }
+
+/// `StorageCollection`'s save delay.
+const PERSON_SAVE_DELAY: std::time::Duration = std::time::Duration::from_secs(10);
 
 #[derive(Debug, Default)]
 struct Tracked {
@@ -205,7 +211,7 @@ impl Components {
         });
         Self {
             zones: zones.unwrap_or_default().items,
-            persons,
+            persons: parking_lot::RwLock::new(persons),
             ..Default::default()
         }
     }
@@ -217,7 +223,7 @@ impl Components {
                 .load::<Collection>()?
                 .unwrap_or_default()
                 .items,
-            persons: load_persons(config_dir)?,
+            persons: parking_lot::RwLock::new(load_persons(config_dir)?),
             ..Default::default()
         })
     }
@@ -295,7 +301,7 @@ impl Components {
 
         let restore = hass.restore();
         let mut persons = Vec::new();
-        for person in &self.persons {
+        for person in self.persons.read().iter() {
             let (Some(id), Some(name)) = (str_of(person, "id"), str_of(person, "name")) else {
                 continue;
             };
@@ -369,6 +375,73 @@ impl Components {
         t.zones = tracked;
     }
 
+    /// The person store's items.
+    pub fn persons(&self) -> Vec<Map<String, Value>> {
+        self.persons.read().clone()
+    }
+
+    /// Save changes to the person store to `config_dir` (10 s after the
+    /// last, as HA's collections).
+    pub fn save_to(self: &Arc<Self>, config_dir: &Path) {
+        let (weak, dir) = (Arc::downgrade(self), config_dir.to_owned());
+        let save = ha_core::storage::DelayedSave::spawn(PERSON_KEY, move || {
+            let Some(this) = weak.upgrade() else {
+                return Ok(());
+            };
+            let items = this.persons();
+            person_store(&dir).save(&json!({ "items": items }))
+        });
+        let _ = self.person_save.set(save);
+    }
+
+    /// `person.async_add_user_device_tracker`: the tracker joins the
+    /// person linked to `user_id` (if not already theirs), who follows it
+    /// from now on; the store is saved.
+    pub fn add_user_device_tracker(&self, hass: &Hass, user_id: &str, tracker: &str) {
+        let person_id = {
+            let mut persons = self.persons.write();
+            let Some(p) = persons
+                .iter_mut()
+                .find(|p| p.get("user_id").and_then(Value::as_str) == Some(user_id))
+            else {
+                return;
+            };
+            let trackers = p.entry("device_trackers").or_insert_with(|| json!([]));
+            let Some(list) = trackers.as_array_mut() else {
+                return;
+            };
+            if list.iter().any(|t| t == tracker) {
+                return;
+            }
+            list.push(json!(tracker));
+            p.get("id").and_then(Value::as_str).map(str::to_owned)
+        };
+        if let Some(save) = self.person_save.get() {
+            save.schedule(PERSON_SAVE_DELAY);
+        }
+        let Some(person_id) = person_id else {
+            return;
+        };
+        // `async_update_config`: the entity follows the new list now.
+        let mut t = self.entities.lock();
+        let Some(i) = t.persons.iter().position(|p| p.id == person_id) else {
+            return;
+        };
+        let mut p = Person {
+            entity_id: t.persons[i].entity_id.clone(),
+            id: t.persons[i].id.clone(),
+            device_trackers: t.persons[i].device_trackers.clone(),
+            user_id: t.persons[i].user_id.clone(),
+            base: t.persons[i].base.clone(),
+        };
+        p.device_trackers.push(tracker.to_owned());
+        t.persons[i] = Arc::new(p);
+        t.trackers.insert(tracker.to_owned());
+        if t.started {
+            t.update(hass, i);
+        }
+    }
+
     /// `homeassistant_start`: people read their trackers, and follow them
     /// from now on.
     pub fn start(&self, hass: &Hass) {
@@ -420,7 +493,7 @@ impl Components {
     /// `person/list`: stored people, and (none yet) YAML ones.
     pub fn persons_json(&self) -> Value {
         json!({
-            "storage": self.persons.iter().cloned().map(Value::Object).collect::<Vec<_>>(),
+            "storage": self.persons.read().iter().cloned().map(Value::Object).collect::<Vec<_>>(),
             "config": [],
         })
     }

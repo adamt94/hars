@@ -208,6 +208,33 @@ impl Sensors {
         this
     }
 
+    /// The registration's entry unloads: its sensors go (their last
+    /// states kept for restore), and their pending updates with them.
+    pub fn unload(&self, webhook_id: &str) {
+        let _turn = self.ops.lock();
+        let prefix = format!("{webhook_id}_");
+        let keys: Vec<(Key, EntityId)> = self
+            .inner
+            .lock()
+            .sensors
+            .iter()
+            .filter(|(k, _)| k.1.starts_with(&prefix))
+            .map(|(k, s)| (k.clone(), s.entity_id.clone()))
+            .collect();
+        for (key, entity_id) in keys {
+            // Unregistering reads the restore data, which takes the lock.
+            self.hass
+                .restore()
+                .unregister(&self.hass, entity_id.as_str());
+            self.inner.lock().sensors.remove(&key);
+            self.hass.remove_state(&entity_id);
+        }
+        self.inner
+            .lock()
+            .pending
+            .retain(|k, _| !k.1.starts_with(&prefix));
+    }
+
     /// An entity for an enabled row (`async_added_to_hass`): the config
     /// from the row, any pending update applied, then the last state
     /// restored if it has none; then written.

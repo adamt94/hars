@@ -30,6 +30,114 @@ pub(crate) fn routes(shared: Shared) -> Router {
         .with_state(shared)
 }
 
+/// `POST /api/mobile_app/registrations` (behind `require_auth`).
+pub(crate) fn registration_routes(shared: Shared) -> Router {
+    Router::new()
+        .route(
+            "/api/mobile_app/registrations",
+            axum::routing::post(register),
+        )
+        .with_state(shared)
+}
+
+/// `RegistrationsView.post`: HA's schema (`RequestDataValidator`, extra
+/// keys dropped), then the registration flow; `201` with the new webhook
+/// id and secret.
+async fn register(
+    State(shared): State<Shared>,
+    axum::Extension(principal): axum::Extension<ha_auth::Principal>,
+    body: axum::body::Bytes,
+) -> Response {
+    let message = |status: StatusCode, msg: String| {
+        (status, axum::Json(json!({"message": msg}))).into_response()
+    };
+    let Ok(v) = serde_json::from_slice::<Value>(&body) else {
+        return message(StatusCode::BAD_REQUEST, "Invalid JSON.".into());
+    };
+    let data = match registration_schema(&v) {
+        Ok(d) => d,
+        Err(why) => {
+            return message(
+                StatusCode::BAD_REQUEST,
+                format!("Message format incorrect: {why}"),
+            );
+        }
+    };
+    let Some(app) = &shared.config.mobile_app else {
+        return StatusCode::NOT_FOUND.into_response();
+    };
+    match app.register(&principal.user_id, data).await {
+        Some((webhook_id, secret)) => (
+            StatusCode::CREATED,
+            axum::Json(json!({
+                "cloudhook_url": null,
+                "remote_ui_url": null,
+                "secret": secret,
+                "webhook_id": webhook_id,
+            })),
+        )
+            .into_response(),
+        None => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    }
+}
+
+/// The registration schema. The error is the first voluptuous reports
+/// (`str(MultipleInvalid)`): a bad value, else a missing key in schema
+/// order.
+fn registration_schema(v: &Value) -> Result<Map<String, Value>, String> {
+    let Some(m) = v.as_object() else {
+        return Err("expected a dictionary".into());
+    };
+    const STRINGS: [(&str, bool); 9] = [
+        ("app_id", true),
+        ("app_name", true),
+        ("app_version", true),
+        ("device_name", true),
+        ("manufacturer", true),
+        ("model", true),
+        ("device_id", false),
+        ("os_name", true),
+        ("os_version", false),
+    ];
+    let mut out = Map::new();
+    let mut bad = None;
+    for (k, v) in m {
+        let checked = match k.as_str() {
+            "app_data" => schema_app_data(v)
+                .map(Value::Object)
+                .ok_or_else(|| format!("invalid app_data @ data['{k}']")),
+            "supports_encryption" => crate::cv::boolean(v)
+                .map(Value::Bool)
+                .ok_or_else(|| format!("invalid boolean value for dictionary value @ data['{k}']")),
+            k if STRINGS.iter().any(|(s, _)| *s == k) => crate::cv::string(v)
+                .map(Value::String)
+                .map_err(|why| format!("{why} for dictionary value @ data['{k}']")),
+            // `REMOVE_EXTRA`.
+            _ => continue,
+        };
+        match checked {
+            Ok(v) => {
+                out.insert(k.clone(), v);
+            }
+            Err(e) => {
+                bad.get_or_insert(e);
+            }
+        }
+    }
+    if let Some(e) = bad {
+        return Err(e);
+    }
+    for (k, required) in STRINGS {
+        if required && !out.contains_key(k) {
+            return Err(format!("required key not provided @ data['{k}']"));
+        }
+    }
+    out.entry("app_data").or_insert_with(|| json!({}));
+    out.entry("supports_encryption")
+        .or_insert(Value::Bool(false));
+    Ok(out)
+}
+
 /// What a command answers.
 #[derive(Debug)]
 pub(crate) enum Reply {

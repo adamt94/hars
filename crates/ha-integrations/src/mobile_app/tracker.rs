@@ -148,46 +148,67 @@ impl Trackers {
             registry,
             inner: Arc::default(),
         };
-        let restore = hass.restore();
         for reg in registrations {
-            let Some(device_id) = reg.device_id() else {
-                continue;
-            };
-            let Some(row) = this
-                .registry
-                .entity_by_unique_id("device_tracker", DOMAIN, &device_id)
-                .filter(|r| r.disabled_by.is_none())
-            else {
-                continue;
-            };
-            let Ok(entity_id) = EntityId::parse(&row.entity_id) else {
-                continue;
-            };
-            // `MobileAppDeviceTrackerExtraStoredData.from_dict`.
-            let data = restore
-                .last_extra_data(entity_id.as_str())
-                .and_then(|e| e.get("data").cloned())
-                .and_then(|d| location_schema(&d))
-                .unwrap_or_default();
-            let inner = Arc::downgrade(&this.inner);
-            let entry = reg.entry_id.clone();
-            restore.register(
-                entity_id.as_str(),
-                Some(Arc::new(move || {
-                    let inner = inner.upgrade()?;
-                    let inner = inner.lock();
-                    Some(json!({"data": inner.get(&entry)?.data}))
-                })),
-            );
-            let tracker = Tracker {
-                entity_id,
-                reg: reg.clone(),
-                data,
-            };
-            this.write(&tracker, false);
-            this.inner.lock().insert(reg.entry_id.clone(), tracker);
+            this.add(reg);
         }
         this
+    }
+
+    /// A registration's tracker (its registry row keyed by the device id),
+    /// restored from its extra data and written.
+    pub fn add(&self, reg: &Arc<Registration>) {
+        let restore = self.hass.restore();
+        let Some(device_id) = reg.device_id() else {
+            return;
+        };
+        let Some(row) = self
+            .registry
+            .entity_by_unique_id("device_tracker", DOMAIN, &device_id)
+            .filter(|r| r.disabled_by.is_none())
+        else {
+            return;
+        };
+        let Ok(entity_id) = EntityId::parse(&row.entity_id) else {
+            return;
+        };
+        // `MobileAppDeviceTrackerExtraStoredData.from_dict`.
+        let data = restore
+            .last_extra_data(entity_id.as_str())
+            .and_then(|e| e.get("data").cloned())
+            .and_then(|d| location_schema(&d))
+            .unwrap_or_default();
+        let inner = Arc::downgrade(&self.inner);
+        let entry = reg.entry_id.clone();
+        restore.register(
+            entity_id.as_str(),
+            Some(Arc::new(move || {
+                let inner = inner.upgrade()?;
+                let inner = inner.lock();
+                Some(json!({"data": inner.get(&entry)?.data}))
+            })),
+        );
+        let tracker = Tracker {
+            entity_id,
+            reg: reg.clone(),
+            data,
+        };
+        self.write(&tracker, false);
+        self.inner.lock().insert(reg.entry_id.clone(), tracker);
+    }
+
+    /// The entry unloads: the tracker goes (its last state kept for
+    /// restore).
+    pub fn unload(&self, entry_id: &str) {
+        let entity_id = self.inner.lock().get(entry_id).map(|t| t.entity_id.clone());
+        let Some(entity_id) = entity_id else {
+            return;
+        };
+        // Unregistering reads the restore data, which takes the lock.
+        self.hass
+            .restore()
+            .unregister(&self.hass, entity_id.as_str());
+        self.inner.lock().remove(entry_id);
+        self.hass.remove_state(&entity_id);
     }
 
     /// `update_location`: the data replaced whole and written (always:
@@ -338,28 +359,7 @@ fn state_name(s: &ha_core::State) -> String {
 pub fn setup_notify(hass: &Hass, registry: &Registry, registrations: &[Arc<Registration>]) {
     let restore = hass.restore();
     for reg in registrations {
-        let data = reg.data();
-        // `supports_push`: cloud push, or the local push channel.
-        let push = data
-            .get("app_data")
-            .and_then(Value::as_object)
-            .is_some_and(|a| {
-                (a.contains_key("push_token") && a.contains_key("push_url"))
-                    || a.contains_key("push_websocket_channel")
-            });
-        let Some(device_id) = reg.device_id() else {
-            continue;
-        };
-        let Some(row) = registry
-            .entity_by_unique_id("notify", DOMAIN, &device_id)
-            .filter(|r| r.disabled_by.is_none())
-        else {
-            continue;
-        };
-        if !push {
-            continue;
-        }
-        let Ok(entity_id) = EntityId::parse(&row.entity_id) else {
+        let Some(entity_id) = notify_entity(registry, reg) else {
             continue;
         };
         restore.register(entity_id.as_str(), None);
@@ -370,11 +370,52 @@ pub fn setup_notify(hass: &Hass, registry: &Registry, registrations: &[Arc<Regis
             .unwrap_or_else(|| "unknown".into());
         let mut a = Map::new();
         // `has_entity_name` with no name: the device's name.
-        let name = row.name.clone().or_else(|| reg.device_name());
+        let row =
+            registry.entity_by_unique_id("notify", DOMAIN, &reg.device_id().unwrap_or_default());
+        let name = row
+            .and_then(|r| r.name.clone())
+            .or_else(|| reg.device_name());
         if let Some(name) = name {
             a.insert("friendly_name".into(), json!(name));
         }
         a.insert("supported_features".into(), json!(1));
         hass.set_state(entity_id, state, a);
+    }
+}
+
+/// Whether the app can receive push (`supports_push`): cloud push, or the
+/// local push channel.
+pub fn supports_push(reg: &Registration) -> bool {
+    reg.with_data(|data| {
+        data.get("app_data")
+            .and_then(Value::as_object)
+            .is_some_and(|a| {
+                (a.contains_key("push_token") && a.contains_key("push_url"))
+                    || a.contains_key("push_websocket_channel")
+            })
+    })
+}
+
+/// The registration's enabled notify row's entity, when it supports push.
+fn notify_entity(registry: &Registry, reg: &Registration) -> Option<EntityId> {
+    if !supports_push(reg) {
+        return None;
+    }
+    let device_id = reg.device_id()?;
+    let row = registry
+        .entity_by_unique_id("notify", DOMAIN, &device_id)
+        .filter(|r| r.disabled_by.is_none())?;
+    EntityId::parse(&row.entity_id).ok()
+}
+
+/// The entry unloads: its notify entity goes (its state kept for restore).
+pub fn unload_notify(hass: &Hass, registry: &Registry, reg: &Registration) {
+    if let Some(entity_id) = reg
+        .device_id()
+        .and_then(|d| registry.entity_by_unique_id("notify", DOMAIN, &d))
+        .and_then(|r| EntityId::parse(&r.entity_id).ok())
+    {
+        hass.restore().unregister(hass, entity_id.as_str());
+        hass.remove_state(&entity_id);
     }
 }

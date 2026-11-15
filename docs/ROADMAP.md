@@ -377,7 +377,9 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
   - [x] persist entry changes (`update_registration`, `no_legacy_encryption`,
         `enable_encryption`) to `core.config_entries` (1 s after, HA's layout,
         mode 0600), and `update_registration`'s device update
-- [ ] `/api/mobile_app/registrations` for fresh registrations (re-pair fallback)
+- [x] `/api/mobile_app/registrations` for fresh registrations (re-pair fallback):
+      HA's flow (tracker row, the user's person, a re-pair replaces the old
+      entry and saves its webhook id as deleted); plus the push-channel WS stubs
 - [x] WS `subscribe_entities` `include`/`exclude` filters (HA's `entityfilter`
       cases 1-6, `fnmatch` globs, `cv.entity_ids`): the app subscribes to
       zones and persons only

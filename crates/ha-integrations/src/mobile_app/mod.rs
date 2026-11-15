@@ -215,10 +215,30 @@ pub fn truthy(v: &Value) -> bool {
 
 /// Every registration, by webhook id, and the ids of entries removed
 /// before this run (`.storage/mobile_app` `deleted_ids`), which answer 410.
+struct Ctx {
+    hass: ha_core::Hass,
+    registry: Arc<ha_registry::Registry>,
+    components: Option<Arc<ha_components::Components>>,
+}
+
+impl std::fmt::Debug for Ctx {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Ctx").finish_non_exhaustive()
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct MobileApp {
     registrations: RwLock<HashMap<Arc<str>, Arc<Registration>>>,
+    /// Removed before this run: they answer 410.
     deleted_ids: HashSet<String>,
+    /// Every removed id, as `.storage/mobile_app` keeps them.
+    stored_deleted: parking_lot::Mutex<Vec<String>>,
+    dir: Option<std::path::PathBuf>,
+    /// What registering at runtime needs, from [`MobileApp::setup`].
+    ctx: std::sync::OnceLock<Ctx>,
+    /// One registration at a time.
+    registering: tokio::sync::Mutex<()>,
     sensors: std::sync::OnceLock<sensor::Sensors>,
     trackers: std::sync::OnceLock<tracker::Trackers>,
     entries: std::sync::OnceLock<Arc<crate::config_entries::ConfigEntries>>,
@@ -249,7 +269,9 @@ impl MobileApp {
                 Vec::new()
             }
         };
-        Self::new(entries, deleted_ids)
+        let mut app = Self::new(entries, deleted_ids);
+        app.dir = Some(config_dir.to_owned());
+        app
     }
 
     pub fn new(entries: &[Map<String, Value>], deleted_ids: Vec<String>) -> Self {
@@ -262,6 +284,10 @@ impl MobileApp {
             .collect();
         Self {
             registrations: RwLock::new(registrations),
+            stored_deleted: parking_lot::Mutex::new(deleted_ids.clone()),
+            dir: None,
+            ctx: std::sync::OnceLock::new(),
+            registering: tokio::sync::Mutex::new(()),
             deleted_ids: deleted_ids.into_iter().collect(),
             sensors: std::sync::OnceLock::new(),
             trackers: std::sync::OnceLock::new(),
@@ -276,8 +302,14 @@ impl MobileApp {
         hass: &ha_core::Hass,
         registry: Arc<ha_registry::Registry>,
         entries: Arc<crate::config_entries::ConfigEntries>,
+        components: Option<Arc<ha_components::Components>>,
     ) {
         let _ = self.entries.set(entries);
+        let _ = self.ctx.set(Ctx {
+            hass: hass.clone(),
+            registry: registry.clone(),
+            components,
+        });
         let regs: Vec<Arc<Registration>> = self.registrations.read().values().cloned().collect();
         let _ = self
             .sensors
@@ -287,6 +319,185 @@ impl MobileApp {
             .set(tracker::Trackers::setup(hass, registry.clone(), &regs));
         tracker::setup_notify(hass, &registry, &regs);
         register_notify_services(hass, &regs);
+    }
+
+    /// `POST /api/mobile_app/registrations` after its schema: HA's
+    /// registration flow. The device tracker row is made (and given to
+    /// the user's person); an entry for the same app and device is
+    /// replaced (re-pair: its id is saved as deleted, its entities go,
+    /// the tracker moves over); the new entry is set up. Returns the new
+    /// webhook id and secret.
+    pub async fn register(
+        &self,
+        user_id: &str,
+        mut data: Map<String, Value>,
+    ) -> Option<(String, Option<String>)> {
+        let _turn = self.registering.lock().await;
+        let ctx = self.ctx.get()?;
+        let entries = self.entries.get()?;
+        let hex = || -> String {
+            rand::random::<[u8; 32]>()
+                .iter()
+                .map(|b| format!("{b:02x}"))
+                .collect()
+        };
+        let webhook_id = hex();
+        data.insert("webhook_id".into(), Value::String(webhook_id.clone()));
+        let secret = data
+            .get("supports_encryption")
+            .and_then(Value::as_bool)
+            .unwrap_or(false)
+            .then(hex);
+        if let Some(secret) = &secret {
+            data.insert("secret".into(), Value::String(secret.clone()));
+        }
+        data.insert("user_id".into(), Value::String(user_id.to_owned()));
+        let str_of =
+            |d: &Map<String, Value>, k: &str| d.get(k).and_then(Value::as_str).map(str::to_owned);
+        // An empty slug falls back to the device id.
+        if ha_core::slugify(&str_of(&data, "device_name").unwrap_or_default()).is_empty()
+            && let Some(id) = data.get("device_id").cloned()
+        {
+            data.insert("device_name".into(), id);
+        }
+        // `async_step_registration`.
+        let unique_id = match str_of(&data, "device_id") {
+            Some(device) => Some(format!(
+                "{}-{device}",
+                str_of(&data, "app_id").unwrap_or_default()
+            )),
+            None => {
+                let id = format!("{:032x}", rand::random::<u128>());
+                data.insert("device_id".into(), Value::String(id));
+                None
+            }
+        };
+        let device_id = str_of(&data, "device_id")?;
+        let device_name = str_of(&data, "device_name").unwrap_or_default();
+        let tracker = ctx.registry.get_or_create_entity(
+            "device_tracker",
+            DOMAIN,
+            &device_id,
+            None,
+            ha_registry::EntityPatch {
+                object_id_base: Some(Some(device_name.clone())),
+                ..Default::default()
+            },
+        );
+        if let Some(components) = &ctx.components {
+            components.add_user_device_tracker(&ctx.hass, user_id, &tracker.entity_id);
+        }
+        let entry = entries.new_entry(
+            DOMAIN,
+            "registration",
+            &device_name,
+            unique_id.as_deref(),
+            data,
+        );
+        // Re-pair: the old entry unloads and is removed first.
+        let old = unique_id
+            .as_deref()
+            .and_then(|u| entries.find_unique(DOMAIN, u))
+            .and_then(|e| Registration::from_entry(&e));
+        if let Some(old) = &old {
+            self.unload(ctx, old);
+            entries.remove(&old.entry_id);
+            self.save_deleted(&old.webhook_id).await;
+        }
+        entries.add(entry.clone());
+        let reg = Arc::new(Registration::from_entry(&entry)?);
+        self.registrations
+            .write()
+            .insert(reg.webhook_id.clone(), reg.clone());
+        self.set_up(ctx, &reg, &device_id, &device_name);
+        if let Some(old) = &old {
+            ctx.registry.clear_config_entry(&old.entry_id);
+        }
+        Some((webhook_id, secret))
+    }
+
+    /// `async_setup_entry` for a registration added at runtime.
+    fn set_up(&self, ctx: &Ctx, reg: &Arc<Registration>, device_id: &str, device_name: &str) {
+        let field =
+            |k: &str| reg.with_data(|d| d.get(k).and_then(Value::as_str).map(str::to_owned));
+        let device = ctx.registry.get_or_create_device(ha_registry::DeviceInfo {
+            config_entry_id: reg.entry_id.clone(),
+            identifiers: vec![serde_json::json!([DOMAIN, device_id])],
+            manufacturer: field("manufacturer"),
+            model: field("model"),
+            name: Some(device_name.to_owned()),
+            sw_version: field("os_version"),
+        });
+        // The tracker platform attaches the row.
+        ctx.registry.get_or_create_entity(
+            "device_tracker",
+            DOMAIN,
+            device_id,
+            None,
+            ha_registry::EntityPatch {
+                config_entry_id: Some(Some(reg.entry_id.clone())),
+                device_id: Some(Some(device.id.clone())),
+                entity_category: Some(Some("diagnostic".into())),
+                has_entity_name: Some(false),
+                original_name: Some(Some(device_name.to_owned())),
+                ..Default::default()
+            },
+        );
+        if let Some(t) = self.trackers.get() {
+            t.add(reg);
+        }
+        if tracker::supports_push(reg) {
+            ctx.registry.get_or_create_entity(
+                "notify",
+                DOMAIN,
+                device_id,
+                None,
+                ha_registry::EntityPatch {
+                    config_entry_id: Some(Some(reg.entry_id.clone())),
+                    device_id: Some(Some(device.id.clone())),
+                    has_entity_name: Some(true),
+                    original_name: Some(None),
+                    supported_features: Some(1),
+                    translation_key: Some(Some("notify".into())),
+                    ..Default::default()
+                },
+            );
+            tracker::setup_notify(&ctx.hass, &ctx.registry, std::slice::from_ref(reg));
+            register_notify_services(&ctx.hass, std::slice::from_ref(reg));
+        }
+    }
+
+    /// `async_unload_entry`: the entities go and the webhook stops
+    /// answering (an unknown id until a restart, then 410).
+    fn unload(&self, ctx: &Ctx, reg: &Registration) {
+        if let Some(s) = self.sensors.get() {
+            s.unload(&reg.webhook_id);
+        }
+        if let Some(t) = self.trackers.get() {
+            t.unload(&reg.entry_id);
+        }
+        tracker::unload_notify(&ctx.hass, &ctx.registry, reg);
+        self.registrations.write().remove(&*reg.webhook_id);
+    }
+
+    /// `async_remove_entry`: the webhook id joins `deleted_ids`, saved now.
+    async fn save_deleted(&self, webhook_id: &str) {
+        let ids = {
+            let mut ids = self.stored_deleted.lock();
+            ids.push(webhook_id.to_owned());
+            ids.clone()
+        };
+        let Some(dir) = self.dir.clone() else {
+            return;
+        };
+        let res = tokio::task::spawn_blocking(move || {
+            ha_core::storage::Store::new(&dir, DOMAIN, 1, 1, false)
+                .save(&serde_json::json!({ "deleted_ids": ids }))
+        })
+        .await;
+        if let Ok(Err(e)) | Err(e) = res.map_err(std::io::Error::other) {
+            tracing::error!("saving {DOMAIN}: {e}");
+        }
     }
 
     /// Save a registration's data to its config entry (HA's

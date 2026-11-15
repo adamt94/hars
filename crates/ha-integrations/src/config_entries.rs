@@ -87,6 +87,85 @@ impl ConfigEntries {
         self.entries.read().clone()
     }
 
+    /// `async_add`: a new entry, saved.
+    pub fn add(&self, entry: Map<String, Value>) {
+        self.entries
+            .write()
+            .get_or_insert_with(Vec::new)
+            .push(entry);
+        self.schedule();
+    }
+
+    /// `async_remove`: the entry, if it was there; saved.
+    pub fn remove(&self, entry_id: &str) -> Option<Map<String, Value>> {
+        let removed = {
+            let mut guard = self.entries.write();
+            let list = guard.as_mut()?;
+            let i = list
+                .iter()
+                .position(|e| e.get("entry_id").and_then(Value::as_str) == Some(entry_id))?;
+            list.remove(i)
+        };
+        self.schedule();
+        Some(removed)
+    }
+
+    /// The entry of `domain` with this `unique_id`.
+    pub fn find_unique(&self, domain: &str, unique_id: &str) -> Option<Map<String, Value>> {
+        let guard = self.entries.read();
+        guard
+            .iter()
+            .flatten()
+            .find(|e| {
+                e.get("domain").and_then(Value::as_str) == Some(domain)
+                    && e.get("unique_id").and_then(Value::as_str) == Some(unique_id)
+            })
+            .cloned()
+    }
+
+    /// A new entry as `ConfigEntry(…)` and `as_dict` make it (a ULID id).
+    pub fn new_entry(
+        &self,
+        domain: &str,
+        source: &str,
+        title: &str,
+        unique_id: Option<&str>,
+        data: Map<String, Value>,
+    ) -> Map<String, Value> {
+        let now = self.hass.clock().now();
+        let iso = ha_core::isoformat(now);
+        let mut e = Map::new();
+        e.insert("created_at".into(), Value::String(iso.clone()));
+        e.insert("data".into(), Value::Object(data));
+        e.insert("discovery_keys".into(), Value::Object(Map::new()));
+        e.insert("disabled_by".into(), Value::Null);
+        e.insert("domain".into(), Value::String(domain.into()));
+        e.insert(
+            "entry_id".into(),
+            Value::String(ha_core::ContextId::at(now).to_string()),
+        );
+        e.insert("minor_version".into(), Value::from(1));
+        e.insert("modified_at".into(), Value::String(iso));
+        e.insert("options".into(), Value::Object(Map::new()));
+        e.insert("pref_disable_new_entities".into(), Value::Bool(false));
+        e.insert("pref_disable_polling".into(), Value::Bool(false));
+        e.insert("source".into(), Value::String(source.into()));
+        e.insert("subentries".into(), Value::Array(Vec::new()));
+        e.insert("title".into(), Value::String(title.into()));
+        e.insert(
+            "unique_id".into(),
+            unique_id.map_or(Value::Null, |u| Value::String(u.into())),
+        );
+        e.insert("version".into(), Value::from(1));
+        e
+    }
+
+    fn schedule(&self) {
+        if let Some(save) = &self.save {
+            save.schedule(SAVE_DELAY);
+        }
+    }
+
     /// An entry's domain and whether it's disabled, for the registries.
     pub fn info(&self, entry_id: &str) -> Option<ha_registry::EntryInfo> {
         let guard = self.entries.read();
@@ -122,9 +201,7 @@ impl ConfigEntries {
                 Value::String(ha_core::isoformat(self.hass.clock().now())),
             );
         }
-        if let Some(save) = &self.save {
-            save.schedule(SAVE_DELAY);
-        }
+        self.schedule();
         true
     }
 

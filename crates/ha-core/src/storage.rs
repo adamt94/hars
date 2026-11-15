@@ -296,6 +296,15 @@ pub struct DelayedSave {
     name: String,
 }
 
+impl std::fmt::Debug for DelayedSave {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DelayedSave")
+            .field("name", &self.name)
+            .field("pending", &self.pending())
+            .finish()
+    }
+}
+
 impl DelayedSave {
     /// `write` serialises the current data and saves it (blocking; it runs
     /// on the blocking pool). Spawns the task.

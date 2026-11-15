@@ -1,0 +1,299 @@
+{
+ "cases": [
+  {
+   "case": "no auth",
+   "status": 401,
+   "body": "401: Unauthorized"
+  },
+  {
+   "case": "missing fields",
+   "status": 400,
+   "body": "{\"message\":\"Message format incorrect: required key not provided @ data['model']\"}",
+   "content_type": "application/json"
+  },
+  {
+   "case": "iOS registration",
+   "request": {
+    "app_data": {
+     "push_token": "fake-push-token-2",
+     "push_url": "https://mobile-apps.home-assistant.io/api/sendPushNotification"
+    },
+    "app_id": "io.robbie.HomeAssistant",
+    "app_name": "Home Assistant",
+    "app_version": "2026.9.0 (2026.2874)",
+    "device_id": "99999999-8888-4777-8666-555555555555",
+    "device_name": " Phone",
+    "manufacturer": "Apple",
+    "model": "iPhone17,1",
+    "os_name": "iOS",
+    "os_version": "27.0",
+    "supports_encryption": true,
+    "extra": "dropped"
+   },
+   "status": 201,
+   "content_type": "application/json",
+   "body_shape": {
+    "cloudhook_url": null,
+    "remote_ui_url": null,
+    "secret": "str",
+    "webhook_id": "str"
+   },
+   "body_key_order": [
+    "cloudhook_url",
+    "remote_ui_url",
+    "secret",
+    "webhook_id"
+   ]
+  },
+  {
+   "new_entry": {
+    "title": " Phone",
+    "unique_id": "io.robbie.HomeAssistant-99999999-8888-4777-8666-555555555555",
+    "source": "registration",
+    "version": 1,
+    "minor_version": 1,
+    "data_keys_in_order": [
+     "app_data",
+     "app_id",
+     "app_name",
+     "app_version",
+     "device_id",
+     "device_name",
+     "manufacturer",
+     "model",
+     "os_name",
+     "os_version",
+     "supports_encryption",
+     "webhook_id",
+     "secret",
+     "user_id"
+    ],
+    "data": {
+     "app_data": {
+      "push_token": "fake-push-token-2",
+      "push_url": "https://mobile-apps.home-assistant.io/api/sendPushNotification"
+     },
+     "app_id": "io.robbie.HomeAssistant",
+     "app_name": "Home Assistant",
+     "app_version": "2026.9.0 (2026.2874)",
+     "device_id": "99999999-8888-4777-8666-555555555555",
+     "device_name": " Phone",
+     "manufacturer": "Apple",
+     "model": "iPhone17,1",
+     "os_name": "iOS",
+     "os_version": "27.0",
+     "supports_encryption": true,
+     "webhook_id": "<64 hex>",
+     "secret": "<64 hex>",
+     "user_id": "d7a7e4b55d6e41f393ca78e3bb1e659b"
+    }
+   },
+   "registry": {
+    "device_tracker.phone_2": {
+     "unique_id": "99999999-8888-4777-8666-555555555555",
+     "original_name": " Phone",
+     "original_icon": null,
+     "device_class": null,
+     "original_device_class": null,
+     "unit_of_measurement": null,
+     "entity_category": "diagnostic",
+     "disabled_by": null,
+     "capabilities": null,
+     "has_entity_name": false,
+     "config_entry_id": "01M7DT43KV2FKTCTYZ5GWMYYJ7"
+    },
+    "notify.phone_2": {
+     "unique_id": "99999999-8888-4777-8666-555555555555",
+     "original_name": null,
+     "original_icon": null,
+     "device_class": null,
+     "original_device_class": null,
+     "unit_of_measurement": null,
+     "entity_category": null,
+     "disabled_by": null,
+     "capabilities": null,
+     "has_entity_name": true,
+     "config_entry_id": "01M7DT43KV2FKTCTYZ5GWMYYJ7"
+    }
+   },
+   "person": {
+    "state": "unknown",
+    "attributes": {
+     "editable": true,
+     "id": "adam",
+     "device_trackers": [
+      "device_tracker.phone"
+     ],
+     "in_zones": [],
+     "user_id": "00112233445566778899aabbccddeeff",
+     "friendly_name": "adam"
+    }
+   },
+   "states": {
+    "device_tracker.legacy": {
+     "state": "unknown",
+     "attributes": {
+      "in_zones": [],
+      "source_type": "gps",
+      "friendly_name": "Legacy"
+     }
+    },
+    "device_tracker.phone": {
+     "state": "unknown",
+     "attributes": {
+      "in_zones": [],
+      "source_type": "gps",
+      "battery_level": 70,
+      "friendly_name": " Phone"
+     }
+    },
+    "device_tracker.phone_2": {
+     "state": "unknown",
+     "attributes": {
+      "in_zones": [],
+      "source_type": "gps",
+      "friendly_name": " Phone"
+     }
+    },
+    "device_tracker.plain": {
+     "state": "unknown",
+     "attributes": {
+      "in_zones": [],
+      "source_type": "gps",
+      "friendly_name": "Plain"
+     }
+    },
+    "notify.legacy": {
+     "state": "unknown",
+     "attributes": {
+      "friendly_name": "Legacy",
+      "supported_features": 1
+     }
+    },
+    "notify.phone": {
+     "state": "unknown",
+     "attributes": {
+      "friendly_name": " Phone",
+      "supported_features": 1
+     }
+    },
+    "notify.phone_2": {
+     "state": "unknown",
+     "attributes": {
+      "friendly_name": " Phone",
+      "supported_features": 1
+     }
+    }
+   },
+   "devices": [
+    {
+     "id": "4cc41b84ddabc458ef7c93b0e60b496a",
+     "identifiers": [
+      [
+       "mobile_app",
+       "99999999-8888-4777-8666-555555555555"
+      ]
+     ],
+     "name": " Phone",
+     "manufacturer": "Apple",
+     "model": "iPhone17,1",
+     "sw_version": "27.0",
+     "config_entries": [
+      "01M7DT43KV2FKTCTYZ5GWMYYJ7"
+     ]
+    },
+    {
+     "id": "742596e4d27d30b8ab367d42561a0c7f",
+     "identifiers": [
+      [
+       "mobile_app",
+       "LEGACY"
+      ]
+     ],
+     "name": "Legacy",
+     "manufacturer": "Apple",
+     "model": "iPhone17,1",
+     "sw_version": "27.0",
+     "config_entries": [
+      "01JFAKEMOBILEAPPLEGACY0000"
+     ]
+    },
+    {
+     "id": "9c2e0c26a1882a11f7b47546cab0c83c",
+     "identifiers": [
+      [
+       "mobile_app",
+       "PLAIN"
+      ]
+     ],
+     "name": "Plain",
+     "manufacturer": "Apple",
+     "model": "iPhone17,1",
+     "sw_version": "27.0",
+     "config_entries": [
+      "01JFAKEMOBILEAPPPLAIN00000"
+     ]
+    },
+    {
+     "id": "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0",
+     "identifiers": [
+      [
+       "mobile_app",
+       "11111111-2222-4333-8444-555555555555"
+      ]
+     ],
+     "name": " Phone",
+     "manufacturer": "Apple",
+     "model": "iPhone17,1",
+     "sw_version": "27.0",
+     "config_entries": [
+      "01JFAKEMOBILEAPPENTRY00000"
+     ]
+    }
+   ]
+  },
+  {
+   "type": "update_registration",
+   "request": {
+    "data_plaintext": "{\"app_data\":{\"push_token\":\"fake-push-token-2\",\"push_url\":\"https:\\/\\/mobile-apps.home-assistant.io\\/api\\/sendPushNotification\"},\"app_version\":\"2026.9.0 (2026.2874)\",\"device_name\":\" Phone\",\"manufacturer\":\"Apple\",\"model\":\"iPhone17,1\",\"os_version\":\"27.0\"}",
+    "nonce_hex": "4150502d4e4f4e43457570646174655f7265676973747261",
+    "body": "<encrypted with the new secret>"
+   },
+   "response": {
+    "status": 200,
+    "headers": {
+     "Content-Type": "application/json"
+    },
+    "body": "<encrypted with the new secret>",
+    "decrypted": "{\"app_data\":{\"push_token\":\"fake-push-token-2\",\"push_url\":\"https://mobile-apps.home-assistant.io/api/sendPushNotification\"},\"app_id\":\"io.robbie.HomeAssistant\",\"app_name\":\"Home Assistant\",\"app_version\":\"2026.9.0 (2026.2874)\",\"device_name\":\" Phone\",\"manufacturer\":\"Apple\",\"model\":\"iPhone17,1\",\"os_version\":\"27.0\",\"supports_encryption\":true}",
+    "nonce_hex": "48412d4e4f4e434500000000000000000000000000000016"
+   },
+   "effects": {
+    "state_writes": [],
+    "events": [],
+    "service_calls": []
+   },
+   "no_legacy_encryption_after": true
+  },
+  {
+   "case": "device_name with empty slug",
+   "title": "!!!",
+   "device_name": "!!!",
+   "tracker": [
+    "device_tracker.unknown",
+    "notify.unknown"
+   ]
+  },
+  {
+   "case": "same app_id+device_id registered twice",
+   "status": 201,
+   "entries_for_device": 1,
+   "returned_webhook_registered": true
+  }
+ ],
+ "logs": [
+  "ERROR homeassistant.components.http.data_validator: Data does not match schema: required key not provided @ data['model']",
+  "DEBUG homeassistant.components.mobile_app.helpers: Successfully decrypted mobile_app payload",
+  "DEBUG homeassistant.components.mobile_app.webhook: Received webhook payload from  Phone for type update_registration: {'app_data': {'push_token': 'fake-push-token-2', 'push_url': 'https://mobile-apps.home-assistant.io/api/sendPushNotification'}, 'app_version': '2026.9.0 (2026.2874)', 'device_name': ' Phone', 'manufacturer': 'Apple', 'model': 'iPhone17,1', 'os_version': '27.0'}"
+ ]
+}

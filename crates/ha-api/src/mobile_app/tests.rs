@@ -24,6 +24,7 @@ fn vector(name: &str) -> Value {
         "startup" => include_str!("vectors/startup.json"),
         "restore" => include_str!("vectors/restore_state_phone.json"),
         "location" => include_str!("vectors/location.json"),
+        "registration" => include_str!("vectors/registration.json"),
         _ => unreachable!(),
     };
     serde_json::from_str(text).unwrap()
@@ -112,7 +113,7 @@ fn app_with(entries: &[Map<String, Value>]) -> App {
     let mobile_app = Arc::new(MobileApp::new(entries, vec![DELETED.into()]));
     let config_entries =
         ha_integrations::config_entries::ConfigEntries::in_memory(&hass, entries.to_vec());
-    mobile_app.setup(&hass, registry.clone(), config_entries.clone());
+    mobile_app.setup(&hass, registry.clone(), config_entries.clone(), None);
     let config = crate::ApiConfig {
         registry: Some(registry.clone()),
         mobile_app: Some(mobile_app),
@@ -868,4 +869,227 @@ async fn a_sealed_null_still_saves_the_flag() {
         app.entries.list().unwrap()[0]["data"]["no_legacy_encryption"],
         true
     );
+}
+
+/// An access token for the test owner, and their user id.
+fn owner_token(auth: &ha_auth::Auth) -> (String, String) {
+    const CLIENT: &str = "http://127.0.0.1:8123/";
+    let flow = auth.start_login_flow(CLIENT, None);
+    let user = auth.check_password("adam", "secret").unwrap();
+    let code = auth.finish_login_flow(&flow, CLIENT, &user, None).unwrap();
+    let t = auth.exchange_code(Some(CLIENT), Some(&code), None).unwrap();
+    let user_id = auth
+        .validate_access_token(&t.access_token, None)
+        .unwrap()
+        .user_id;
+    (t.access_token, user_id)
+}
+
+/// `POST /api/mobile_app/registrations` through the whole router: HA's
+/// `registration.json` and `repair.json` outcomes.
+#[tokio::test]
+async fn registrations_as_ha() {
+    let hass = Hass::new();
+    hass.start();
+    let auth = crate::test_util::auth(true);
+    let (token, user_id) = owner_token(&auth);
+    // The user's person, who gets the new tracker.
+    let dir = std::env::temp_dir().join(format!("hars-reg-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(dir.join(".storage")).unwrap();
+    std::fs::write(
+        dir.join(".storage/person"),
+        json!({"version": 2, "minor_version": 1, "key": "person", "data": {"items": [
+            {"id": "adam", "name": "adam", "user_id": user_id, "device_trackers": []}]}})
+        .to_string(),
+    )
+    .unwrap();
+    let components = Arc::new(ha_components::Components::load_strict(&dir).unwrap());
+    components.setup(&hass, &Default::default());
+    let mut owned = entry();
+    owned["data"]["user_id"] = json!(user_id);
+    owned.insert(
+        "unique_id".into(),
+        json!("io.robbie.HomeAssistant-11111111-2222-4333-8444-555555555555"),
+    );
+    let registries = ha_registry::Registries {
+        entities: serde_json::from_value(vector("entities")).unwrap(),
+        devices: ha_registry::rows![serde_json::from_value(vector("device")).unwrap()],
+        ..Default::default()
+    };
+    let registry = ha_registry::Registry::in_memory(&hass, registries);
+    let entries =
+        ha_integrations::config_entries::ConfigEntries::in_memory(&hass, vec![owned.clone()]);
+    let looked = entries.clone();
+    registry.set_entry_lookup(Arc::new(move |id: &str| looked.info(id)));
+    let app = Arc::new(MobileApp::new(&[owned], Vec::new()));
+    app.setup(
+        &hass,
+        registry.clone(),
+        entries.clone(),
+        Some(components.clone()),
+    );
+    let config = crate::ApiConfig {
+        config_dir: "/config".into(),
+        registry: Some(registry.clone()),
+        mobile_app: Some(app.clone()),
+        components: components.clone(),
+        ..Default::default()
+    };
+    let router = crate::router(hass.clone(), auth, &config);
+    let post = |body: Value, auth: bool| {
+        let router = router.clone();
+        let token = token.clone();
+        async move {
+            let mut req = Request::post("/api/mobile_app/registrations")
+                .header("content-type", "application/json");
+            if auth {
+                req = req.header("authorization", format!("Bearer {token}"));
+            }
+            let req = req
+                .extension(axum::extract::ConnectInfo(std::net::SocketAddr::from((
+                    [127, 0, 0, 1],
+                    1,
+                ))))
+                .body(Body::from(body.to_string()))
+                .unwrap();
+            let res = router.oneshot(req).await.unwrap();
+            let status = res.status().as_u16();
+            let body = axum::body::to_bytes(res.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            (status, String::from_utf8(body.to_vec()).unwrap())
+        }
+    };
+    let v = vector("registration");
+    let iphone = v["cases"][2]["request"].clone();
+
+    let (status, body) = post(iphone.clone(), false).await;
+    assert_eq!((status, body.as_str()), (401, "401: Unauthorized"));
+    let mut missing = iphone.clone();
+    missing.as_object_mut().unwrap().remove("model");
+    let (status, body) = post(missing, true).await;
+    assert_eq!(status, 400);
+    assert_eq!(body, v["cases"][1]["body"].as_str().unwrap());
+
+    // A new phone: a new entry, its tracker on the user's person, and a
+    // webhook that answers with the new secret.
+    let (status, body) = post(iphone, true).await;
+    assert_eq!(status, 201);
+    let reply: Value = serde_json::from_str(&body).unwrap();
+    assert_eq!(
+        reply.as_object().unwrap().keys().collect::<Vec<_>>(),
+        ["cloudhook_url", "remote_ui_url", "secret", "webhook_id"]
+    );
+    let (webhook, secret) = (
+        reply["webhook_id"].as_str().unwrap().to_owned(),
+        reply["secret"].as_str().unwrap().to_owned(),
+    );
+    let all = entries.list().unwrap();
+    assert_eq!(all.len(), 2);
+    let new = all
+        .iter()
+        .find(|e| e["data"]["webhook_id"] == webhook.as_str())
+        .unwrap();
+    let want = &v["cases"][3]["new_entry"];
+    assert_eq!(new["title"], want["title"]);
+    assert_eq!(new["unique_id"], want["unique_id"]);
+    assert_eq!(new["source"], "registration");
+    let mut keys: Vec<&str> = new["data"]
+        .as_object()
+        .unwrap()
+        .keys()
+        .map(String::as_str)
+        .collect();
+    keys.sort();
+    let mut want_keys: Vec<&str> = want["data_keys_in_order"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|k| k.as_str().unwrap())
+        .collect();
+    want_keys.sort();
+    assert_eq!(keys, want_keys);
+    assert_eq!(
+        components.persons()[0]["device_trackers"],
+        json!(["device_tracker.phone_2"])
+    );
+    let sealed = Key::hex(&secret).unwrap().seal(b"{}");
+    let shared_router = crate::router(hass.clone(), crate::test_util::auth(true), &config);
+    let res = shared_router
+        .oneshot(
+            Request::post(format!("/api/webhook/{webhook}"))
+                .body(Body::from(
+                    json!({"type": "get_zones", "encrypted": true, "encrypted_data": sealed})
+                        .to_string(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let body = axum::body::to_bytes(res.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let env: Value = serde_json::from_slice(&body).unwrap();
+    assert!(
+        Key::hex(&secret)
+            .unwrap()
+            .open(env["encrypted_data"].as_str().unwrap())
+            .is_some()
+    );
+
+    // Re-pair the imported phone (same app + device id): the old entry and
+    // webhook go, the tracker moves to the new entry, the old sensors'
+    // rows go.
+    let mut same = v["cases"][2]["request"].clone();
+    same["device_id"] = json!("11111111-2222-4333-8444-555555555555");
+    same["app_data"] = json!({});
+    let (status, body) = post(same, true).await;
+    assert_eq!(status, 201);
+    let new_webhook = serde_json::from_str::<Value>(&body).unwrap()["webhook_id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let all = entries.list().unwrap();
+    assert_eq!(all.len(), 2);
+    assert!(
+        !all.iter()
+            .any(|e| e["entry_id"] == "01JFAKEMOBILEAPPENTRY00000")
+    );
+    assert!(matches!(app.webhook(WEBHOOK), Webhook::Unknown));
+    let new_entry = all
+        .iter()
+        .find(|e| e["data"]["webhook_id"] == new_webhook.as_str())
+        .unwrap();
+    let snap = registry.snapshot();
+    let tracker = snap
+        .entities
+        .iter()
+        .find(|e| e.entity_id == "device_tracker.phone")
+        .unwrap();
+    assert_eq!(
+        tracker.config_entry_id.as_ref(),
+        new_entry["entry_id"].as_str().map(str::to_owned).as_ref()
+    );
+    assert!(
+        !snap
+            .entities
+            .iter()
+            .any(|e| e.entity_id == "sensor.phone_battery_level")
+    );
+    assert!(
+        hass.states()
+            .get(&EntityId::parse("sensor.phone_battery_level").unwrap())
+            .is_none()
+    );
+    let device = snap
+        .devices
+        .iter()
+        .find(|d| d.id == "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0")
+        .unwrap();
+    assert_eq!(
+        device.config_entries,
+        [new_entry["entry_id"].as_str().unwrap()]
+    );
+    let _ = std::fs::remove_dir_all(&dir);
 }
