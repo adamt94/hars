@@ -1326,12 +1326,21 @@
   "log": []
  },
  {
-  "template": "{{ [] | first }}x{{ [] | last }}",
+  "template": "{% set e = [] %}{{ e | first }}x{{ e | last }}",
   "strict": false,
   "result": {
    "json": "x"
   },
-  "log": []
+  "log": [
+   [
+    "WARNING",
+    "No first item, sequence was empty."
+   ],
+   [
+    "WARNING",
+    "No last item, sequence was empty."
+   ]
+  ]
  },
  {
   "template": "{{ '%s-%d' | format('a', 3) }}",

@@ -603,7 +603,7 @@
     "send": {
      "id": 1,
      "type": "render_template",
-     "template": "{% for i in range(100000) %}{% for j in range(10) %}{% endfor %}{% endfor %}x",
+     "template": "{% for i in range(100000) %}{% endfor %}x",
      "timeout": 1e-09
     },
     "replies": [
@@ -627,7 +627,7 @@
     "send": {
      "id": 1,
      "type": "render_template",
-     "template": "{% for i in range(100000) %}{% for j in range(10) %}{% endfor %}{% endfor %}x",
+     "template": "{% for i in range(100000) %}{% endfor %}x",
      "timeout": "0.000000001",
      "report_errors": true
     },
@@ -720,7 +720,7 @@
     "send": {
      "id": 1,
      "type": "render_template",
-     "template": "{% for i in range(100000) %}{% for j in range(10) %}{% endfor %}{% endfor %}x",
+     "template": "{% for i in range(100000) %}{% endfor %}x",
      "timeout": 0
     },
     "replies": [
@@ -1115,7 +1115,7 @@
     "send": {
      "id": 1,
      "type": "render_template",
-     "template": "{% for i in range(100000) %}{% for j in range(10) %}{% endfor %}{% endfor %}x",
+     "template": "{% for i in range(100000) %}{% endfor %}x",
      "timeout": 1e-09
     },
     "replies": [

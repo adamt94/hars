@@ -273,6 +273,10 @@ How it is kept:
   loaders.
 - **Deliberate differences** are written in the module's doc comment and in
   the [roadmap](ROADMAP.md).
+- **One patched dependency.** `vendor/minijinja` is minijinja 3.1.0 with a
+  change to its fuel accounting, so a template's budget covers everything
+  it makes ([`vendor/minijinja/HARS.md`](../vendor/minijinja/HARS.md));
+  `[patch.crates-io]` in `Cargo.toml` points at it.
 
 ## Where new code goes
 

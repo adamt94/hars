@@ -24,7 +24,7 @@ backlog.
 
 | Script | Writes | Runs |
 |---|---|---|
-| `render_template.py` | `ha-core/src/template/vectors/` (renders, `_parse_result`, the environment's names) and `ha-api/src/ws/vectors/render_template.json` (whole `render_template` conversations) | HA 2026.6.1's `helpers/template` and `websocket_api` `handle_render_template` on Jinja 3.1.6, on a fresh `HomeAssistant` per case |
+| `render_template.py` | `ha-core/src/template/vectors/` (renders, `_parse_result`, the environment's names, and Jinja's filters and tests over values of every kind) and `ha-api/src/ws/vectors/render_template.json` (whole `render_template` conversations) | HA 2026.6.1's `helpers/template` and `websocket_api` `handle_render_template` on Jinja 3.1.6, on a fresh `HomeAssistant` per case |
 
 `render_template.py` writes two crates' vectors because they are two halves
 of one behaviour: the engine's answers and the command's messages around

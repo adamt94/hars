@@ -20,6 +20,11 @@ ha-integrations = { path = "crates/ha-integrations" }
 ha-recorder = { path = "crates/ha-recorder" }
 ha-registry = { path = "crates/ha-registry" }
 
+# minijinja 3.1.0 with one change: fuel charges a value's deep size when
+# it is made (vendor/minijinja/HARS.md).
+[patch.crates-io]
+minijinja = { path = "vendor/minijinja" }
+
 [workspace.lints.rust]
 unsafe_code = "deny"
 

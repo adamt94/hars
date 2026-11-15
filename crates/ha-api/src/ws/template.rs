@@ -5,24 +5,35 @@
 //! `report_errors` the template's errors and warnings as `{error, level}`
 //! events, in HA's order. Any authenticated user may call it (HA has no
 //! admin check). Templates are compiled once and kept, 128 at most, as
-//! HA's `_cached_template` LRU does; a `report_errors` call compiles its
-//! own. A `timeout` renders once on a blocking thread first and answers
-//! `template_error` if that takes longer.
+//! HA's `_cached_template` LRU does (up to 8 KiB each; longer ones and a
+//! `report_errors` call compile their own). A `timeout` renders once first
+//! and answers `template_error` if that takes longer.
+//!
+//! Template input is hostile: any logged-in user can send it. Compiling
+//! and rendering run on blocking threads, never on the async runtime, at
+//! most [`RENDERS_AT_ONCE`] at a time across every connection, each render
+//! within its fuel budget ([`ha_core::template::FUEL`]). A connection
+//! handles its messages in order, so what follows a `render_template` waits
+//! for its replies: HA does the same for a render without `timeout`, but
+//! serves other commands while a `timeout` check runs. A timed-out render
+//! keeps its permit and thread until it reaches its budget (HA raises an
+//! exception into its thread; minijinja can't be interrupted). Closing the
+//! connection drops a render that hasn't started.
 //!
 //! Templates can't read states or the clock yet ([`ha_core::template`]),
 //! so `listeners` is always empty and nothing re-renders: a subscription
 //! costs no timer, no listener and no wakeup until it is unsubscribed.
-//! A timed-out render keeps its blocking thread until it ends (HA raises
-//! an exception into its thread; minijinja can't be interrupted).
 
 use super::commands::{Bad, cv_entity_ids};
-use super::{Conn, Invalid, Outbox, Subscription};
+use super::{Conn, Invalid, Outbox};
 use ha_core::template::{Level, Log, Render, Template, TemplateError};
 use parking_lot::Mutex;
 use serde_json::{Map, Value, json};
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 use std::time::Duration;
+use tokio::sync::Semaphore;
+use tokio::task::JoinHandle;
 
 /// `functools.lru_cache`'s default `maxsize`.
 const CACHE_SIZE: usize = 128;
@@ -52,7 +63,12 @@ struct Lru {
 }
 
 impl Cache {
-    fn get(&self, source: &str) -> Arc<Template> {
+    #[cfg(test)]
+    pub(crate) fn len(&self) -> usize {
+        self.inner.lock().templates.len()
+    }
+
+    pub(crate) fn get(&self, source: &str) -> Arc<Template> {
         let mut lru = self.inner.lock();
         lru.clock += 1;
         let now = lru.clock;
@@ -159,90 +175,164 @@ fn render_template(conn: &mut Conn, id: u64, msg: &Map<String, Value>) -> Result
             return Ok(());
         }
     };
-    let template = if args.report_errors {
+    let template = if args.report_errors || args.template.len() > CACHE_MAX_SOURCE {
         Arc::new(Template::new(&args.template))
     } else {
         conn.shared.templates.get(&args.template)
     };
     // `if timeout:` and `async_render_will_timeout`'s static shortcut.
     let timeout = args.timeout.filter(|t| *t != 0.0 && !template.is_static());
-    let Some(timeout) = timeout else {
-        // No awaiting in HA either: everything is queued now, in order.
-        let reply = Reply {
-            out: &conn.out,
-            id,
-            report: args.report_errors,
-            deferred: false,
-        };
-        reply.subscribe(&template, args.variables.as_ref(), args.strict);
-        conn.subs.insert(id, Subscription::Idle);
-        return Ok(());
-    };
-
-    // The check runs in the background, as HA's `async_response` does, so
-    // the connection keeps serving other commands meanwhile. Until it ends
-    // the id isn't subscribed (`unsubscribe_events` says not found), and
-    // after a timeout it never is.
-    let state = Arc::new(Mutex::new(Later::Pending));
-    conn.subs.insert(id, Subscription::Later(state.clone()));
     let out = conn.out.clone();
-    tokio::spawn(async move {
+    let task = tokio::spawn(async move {
         let variables = args.variables.map(Arc::new);
-        let strict = args.strict;
+        let (strict, report) = (args.strict, args.report_errors);
         let mut deferred = false;
-        // Compiled on the loop; a template that doesn't compile skips the
-        // check (`except TemplateError: timed_out = False`).
-        if template.compile(strict).is_ok() {
-            let (t, v) = (template.clone(), variables.clone());
-            let job =
-                tokio::task::spawn_blocking(move || t.render_discarding(v.as_deref(), strict));
-            let finished = match Duration::try_from_secs_f64(timeout) {
-                Ok(limit) => tokio::time::timeout(limit, job).await.ok(),
-                // Negative: already over. Infinite or NaN: never.
-                Err(_) if timeout < 0.0 => None,
-                Err(_) => Some(job.await),
-            };
-            let Some(finished) = finished else {
-                *state.lock() = Later::Never;
-                let message = format!(
-                    "Exceeded maximum execution time of {}s",
-                    ha_core::py::repr_float(timeout)
-                );
-                out.error(json!(id), "template_error", &message);
-                return;
-            };
-            // The template now logs through the thread-safe listener it
-            // was compiled with: what it logs arrives a step late.
-            deferred = args.report_errors;
-            if let (true, Ok(Render { log, .. })) = (args.report_errors, finished) {
-                report(&out, id, &log);
+        if let Some(timeout) = timeout {
+            match timed(&template, &variables, strict, timeout).await {
+                Timed::Over => {
+                    let message = format!(
+                        "Exceeded maximum execution time of {}s",
+                        ha_core::py::repr_float(timeout)
+                    );
+                    out.error(json!(id), "template_error", &message);
+                    return None;
+                }
+                // A template that doesn't compile skips the check
+                // (`except TemplateError: timed_out = False`).
+                Timed::NotCompiled => {}
+                Timed::Done(log) => {
+                    // The template now logs through the thread-safe
+                    // listener it was compiled with: what it logs arrives
+                    // a step late.
+                    deferred = report;
+                    if report {
+                        send_log(&out, id, &log);
+                    }
+                }
             }
         }
-        let mut state = state.lock();
-        if *state == Later::Never {
-            return;
-        }
-        *state = Later::Live;
+        // `async_track_template_result`'s setup render and its first
+        // refresh. Nothing a template reads changes yet, so without
+        // `report_errors` (where only the second is seen) it renders once.
+        let t = template.clone();
+        let (setup, refresh) = blocking(move || {
+            let setup = t.render(variables.as_deref(), strict);
+            let refresh = report.then(|| t.render(variables.as_deref(), strict));
+            (setup, refresh)
+        })
+        .await?;
         let reply = Reply {
             out: &out,
             id,
-            report: args.report_errors,
+            report,
             deferred,
         };
-        reply.subscribe(&template, variables.as_deref(), strict);
+        reply.send(&template, setup, refresh);
+        Some(id)
     });
+    conn.busy = Some(Busy { task });
     Ok(())
 }
 
-/// A subscription whose start is decided in the background.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum Later {
-    /// Not subscribed yet.
-    Pending,
-    /// Subscribed: `unsubscribe_events` ends it.
-    Live,
-    /// Ended, or never started.
-    Never,
+/// Templates longer than this aren't kept: 128 of them stay under 1 MiB.
+const CACHE_MAX_SOURCE: usize = 8 * 1024;
+
+/// Renders running at once, across every connection. A permit is taken
+/// before a render starts and given back when its thread is done with it,
+/// even if nobody waits for the answer any more (a timed-out render runs
+/// on to its fuel budget). When they are all taken, the next render waits
+/// for one, and its connection reads nothing more until then: at most one
+/// waiting render per connection.
+pub(crate) const RENDERS_AT_ONCE: usize = 2;
+
+static RENDERS: LazyLock<Arc<Semaphore>> =
+    LazyLock::new(|| Arc::new(Semaphore::new(RENDERS_AT_ONCE)));
+
+/// Run template work on a blocking thread, holding a render permit until
+/// it returns. `None` if it panicked.
+async fn blocking<T: Send + 'static>(work: impl FnOnce() -> T + Send + 'static) -> Option<T> {
+    let permit = RENDERS.clone().acquire_owned().await.ok()?;
+    tokio::task::spawn_blocking(move || {
+        let _permit = permit;
+        work()
+    })
+    .await
+    .ok()
+}
+
+/// Render permits free now.
+#[cfg(test)]
+pub(crate) fn renders_free() -> usize {
+    RENDERS.available_permits()
+}
+
+/// Take every render permit (until dropped).
+#[cfg(test)]
+pub(crate) async fn take_all_renders() -> tokio::sync::OwnedSemaphorePermit {
+    RENDERS
+        .clone()
+        .acquire_many_owned(RENDERS_AT_ONCE as u32)
+        .await
+        .expect("open")
+}
+
+enum Timed {
+    Over,
+    NotCompiled,
+    Done(Log),
+}
+
+/// `async_render_will_timeout`: one render on a blocking thread, timed
+/// from when it starts (a wait for a permit doesn't count).
+async fn timed(
+    template: &Arc<Template>,
+    variables: &Option<Arc<Map<String, Value>>>,
+    strict: bool,
+    timeout: f64,
+) -> Timed {
+    let Ok(permit) = RENDERS.clone().acquire_owned().await else {
+        return Timed::NotCompiled;
+    };
+    let (t, v) = (template.clone(), variables.clone());
+    let job = tokio::task::spawn_blocking(move || {
+        let _permit = permit;
+        t.compile(strict)
+            .ok()
+            .map(|()| t.render_discarding(v.as_deref(), strict).log)
+    });
+    let finished = match Duration::try_from_secs_f64(timeout) {
+        Ok(limit) => tokio::time::timeout(limit, job).await.ok(),
+        // Negative: already over. Infinite or NaN: never.
+        Err(_) if timeout < 0.0 => None,
+        Err(_) => Some(job.await),
+    };
+    match finished {
+        None => Timed::Over,
+        Some(Ok(Some(log))) => Timed::Done(log),
+        Some(_) => Timed::NotCompiled,
+    }
+}
+
+/// The `render_template` a connection is waiting on.
+pub(crate) struct Busy {
+    task: JoinHandle<Option<u64>>,
+}
+
+impl Busy {
+    /// The connection is gone: stop sending, and stop any render not yet
+    /// started.
+    pub(crate) fn abort(self) {
+        self.task.abort();
+    }
+}
+
+/// When the busy command ends: the id it subscribed, if any. Never, while
+/// nothing is busy.
+pub(crate) async fn finished(busy: &mut Option<Busy>) -> Option<u64> {
+    match busy {
+        Some(b) => (&mut b.task).await.ok().flatten(),
+        None => std::future::pending().await,
+    }
 }
 
 /// Where the replies for one `render_template` go.
@@ -261,14 +351,11 @@ fn listeners() -> Value {
 }
 
 impl Reply<'_> {
-    /// `async_track_template_result`'s setup render, the result, and the
-    /// first refresh's render and event.
-    fn subscribe(&self, template: &Template, variables: Option<&Map<String, Value>>, strict: bool) {
-        let setup = template.render(variables, strict);
-        if !self.report {
-            // Nothing is reported: HA logs, and its refresh renders the
-            // same thing again (a template can't read anything that
-            // changes yet), so render once.
+    /// The setup render's log and error, the result, then the refresh's
+    /// log and event (`async_track_template_result`).
+    fn send(&self, template: &Template, setup: Render, refresh: Option<Render>) {
+        let Some(refresh) = refresh.filter(|_| self.report) else {
+            // Nothing is reported: HA logs.
             if let Err(e) = &setup.result {
                 tracing::error!(
                     "Error while processing template: {}: {e}",
@@ -290,27 +377,24 @@ impl Reply<'_> {
             self.out.result(self.id, Value::Null);
             self.send_result(setup);
             return;
-        }
-        let late = if self.deferred {
-            setup.log
-        } else {
-            report(self.out, self.id, &setup.log);
-            Log::new()
         };
+        if !self.deferred {
+            send_log(self.out, self.id, &setup.log);
+        }
         if let Err(e) = &setup.result {
             self.error(e);
         }
         self.out.result(self.id, Value::Null);
-        report(self.out, self.id, &late);
-        let refresh = template.render(variables, strict);
-        let late = if self.deferred {
-            refresh.log.clone()
+        if self.deferred {
+            send_log(self.out, self.id, &setup.log);
         } else {
-            report(self.out, self.id, &refresh.log);
-            Log::new()
-        };
+            send_log(self.out, self.id, &refresh.log);
+        }
+        let late = self.deferred.then(|| refresh.log.clone());
         self.send_result(refresh);
-        report(self.out, self.id, &late);
+        if let Some(late) = late {
+            send_log(self.out, self.id, &late);
+        }
     }
 
     /// `_template_listener`.
@@ -343,7 +427,7 @@ impl Reply<'_> {
 }
 
 /// `_error_listener` for each logged message.
-fn report(out: &Outbox, id: u64, log: &Log) {
+fn send_log(out: &Outbox, id: u64, log: &Log) {
     for (level, message) in log {
         out.event(id, &json!({"error": message, "level": level.as_str()}));
     }

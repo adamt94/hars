@@ -70,6 +70,20 @@ const DIFFERENT: &[(&str, &str)] = &[
         "{{ [1, 2] | pprint }}",
         "NotImplementedError: hars does not support Home Assistant's template filter 'pprint' yet",
     ),
+    // Left out of the first slice: `namespace` can make a reference cycle;
+    // `format` is Python's `%`; `indent` raises on non-strings.
+    (
+        "{% set ns = namespace(n=0) %}{% for i in [1, 2, 3] %}{% set ns.n = ns.n + i %}{% endfor %}{{ ns.n }}",
+        "NotImplementedError: hars does not support Home Assistant's template function 'namespace' yet",
+    ),
+    (
+        "{{ '%s-%d' | format('a', 3) }}",
+        "NotImplementedError: hars does not support Home Assistant's template filter 'format' yet",
+    ),
+    (
+        "{{ 'a\nb' | indent(2) }}",
+        "NotImplementedError: hars does not support Home Assistant's template filter 'indent' yet",
+    ),
     // minijinja's wording.
     (
         "{% for %}",
@@ -134,6 +148,65 @@ fn renders_as_ha() {
         if want != got_out {
             failures.push(format!(
                 "{source:?} strict={strict}\n  want {want}\n  got  {got_out}"
+            ));
+        }
+    }
+    assert!(
+        failures.is_empty(),
+        "{} differ:\n{}",
+        failures.len(),
+        failures.join("\n")
+    );
+}
+
+const UNSUPPORTED: &str = "NotImplementedError: hars does not support";
+
+/// Templates HA renders and hars refuses (an error, not a value):
+/// minijinja's `dictsort` takes its options by name only.
+const ERRORS_INSTEAD: &[&str] = &["{{ {'b': 1, 'a': 2} | dictsort(false, 'value', true) }}"];
+
+/// Every Jinja filter and test hars serves, over values of every kind
+/// (`kept.json`). Where HA answers, hars gives the same answer and log;
+/// where HA raises, hars fails too (its message may differ): no filter or
+/// test that hars keeps can give a value HA wouldn't.
+#[test]
+fn kept_filters_and_tests_answer_as_ha() {
+    let vars = json!({
+        "users": [{"g": 1, "n": "b"}, {"g": 1, "n": "a"}, {"g": 2, "n": "c"}],
+        "config": {"type": "markdown"},
+    });
+    let mut failures = Vec::new();
+    let cases = vectors("kept.json");
+    assert!(cases.len() > 3000);
+    for case in cases {
+        let source = case["template"].as_str().unwrap();
+        let strict = case["strict"].as_bool().unwrap();
+        let got = Template::new(source).render(vars.as_object(), strict);
+        let log: Vec<Json> = got
+            .log
+            .iter()
+            .map(|(level, m)| json!([level.as_str(), m]))
+            .collect();
+        let ok = match (&got.result, case.get("error")) {
+            (Err(_), Some(_)) => true,
+            // Not supported yet: an error, never a wrong value.
+            (Err(e), None) if e.0.starts_with(UNSUPPORTED) => true,
+            (Err(_), None) if ERRORS_INSTEAD.contains(&source) => true,
+            // Jinja prints a generator as `<generator object … at 0x…>`;
+            // hars has lists there (or fails sooner, on what isn't
+            // iterable).
+            (_, None) if case["result"]["repr_with_address"] == true => true,
+            (Ok(r), None) => sent(r) == case["result"] && json!(log) == case["log"],
+            _ => false,
+        };
+        if !ok {
+            let got = match &got.result {
+                Ok(r) => json!({"result": sent(r), "log": log}),
+                Err(e) => json!({"error": e.0}),
+            };
+            failures.push(format!(
+                "{source:?} strict={strict}\n  want {}\n  got  {got}",
+                json!({"result": case.get("result"), "error": case.get("error"), "log": case["log"]})
             ));
         }
     }
@@ -265,5 +338,91 @@ fn renders_on_threads_are_independent() {
         let r = h.join().unwrap();
         assert_eq!(r.result.unwrap().to_json(), Ok(json!(i)));
         assert_eq!(r.log, vec![(Level::Warning, "'b' is undefined".to_owned())]);
+    }
+}
+
+/// Any logged-in user can send a template: each of these would run for
+/// hours or allocate gigabytes without the fuel budget. Each stops at it,
+/// quickly, with the budget's message.
+#[test]
+fn hostile_templates_stop_at_the_budget() {
+    let x100k = "{% set s = 'x' * 100000 %}";
+    for source in [
+        // 10^15 loop turns.
+        "{% for i in range(100000) %}{% for j in range(100000) %}{% for k in range(100000) %}{% endfor %}{% endfor %}{% endfor %}",
+        // A gigabyte by repetition, by doubling, and by printing one long
+        // string many times (into a capture, past the output limit).
+        "{{ ('x' * 1000000000) | length }}",
+        "{% macro d(s, n) %}{% if n %}{{ d(s ~ s, n - 1) }}{% else %}{{ s | length }}{% endif %}{% endmacro %}{{ d('x', 40) }}",
+        &format!("{x100k}{{% set y %}}{{{{ [s] * 2000 }}}}{{% endset %}}{{{{ y | length }}}}"),
+        &format!("{x100k}{{{{ ([s] * 2000) | string | length }}}}"),
+        &format!("{x100k}{{{{ ([s] * 2000) | e | length }}}}"),
+        &format!("{x100k}{{{{ ([s] * 2000) | join | length }}}}"),
+        &format!("{x100k}{{{{ (s | replace('x', s)) | length }}}}"),
+        &format!("{x100k}{{{{ (([s] * 2000) ~ '') | length }}}}"),
+        // CPU: deep walks of a list built by doubling or repetition.
+        "{{ 'y' in ([1] * 100000000) }}",
+        "{{ ([1] * 100000000) == ([1] * 100000000) }}",
+        "{% set a = [1] * 30000 %}{% set b = [a] * 30000 %}{% set c = [a] * 30000 %}{{ b == c }}",
+        "{% set a = ['x' * 1000] %}{% set a = [a, a] %}{% set a = [a, a] %}{% set a = [a, a] %}{% set a = [a, a] %}{% set a = [a, a] %}{% set a = [a, a] %}{% set a = [a, a] %}{% set a = [a, a] %}{% set a = [a, a] %}{% set a = [a, a] %}{% set a = [a, a] %}{% set a = [a, a] %}{% set a = [a, a] %}{% set a = [a, a] %}{% set a = [a, a] %}{% set a = [a, a] %}{% set a = [a, a] %}{% set a = [a, a] %}{% set a = [a, a] %}{% set a = [a, a] %}{% set a = [a, a] %}{{ (a ~ '') | length }}",
+        &format!("{x100k}{{{{ ([s] * 2000) | lower | length }}}}"),
+        &format!(
+            "{x100k}{{{{ ([s] * 2000) | unique | list | length }}}}{{{{ ([s] * 2000) | sort | length }}}}"
+        ),
+        &format!("{x100k}{{{{ ([s] * 2000) | items | list | length }}}}"),
+        &format!("{x100k}{{{{ (([s] * 2000) | map('upper') | list) | length }}}}"),
+        &format!(
+            "{x100k}{{% autoescape true %}}{{% set y %}}{{{{ [s] * 2000 }}}}{{% endset %}}{{% endautoescape %}}{{{{ y | length }}}}"
+        ),
+        "{{ range(100000) | list | list | list | map('string') | join | length }}{{ range(100000) | map('string') | join | length }}{{ range(100000) | map('string') | join | length }}{{ range(100000) | map('string') | join | length }}{{ range(100000) | map('string') | join | length }}",
+    ] {
+        let started = std::time::Instant::now();
+        let err = Template::new(source)
+            .render(None, false)
+            .result
+            .unwrap_err();
+        assert!(err.0.contains("budget"), "{source}: {err}");
+        assert!(
+            started.elapsed() < std::time::Duration::from_secs(5),
+            "{source}"
+        );
+    }
+    // `format` builds its padding before anything can check it.
+    let err = Template::new("{{ '%1000000000s' | format('x') }}").render(None, false);
+    assert!(err.result.unwrap_err().0.starts_with("NotImplementedError"));
+}
+
+/// `namespace` is the only mutable value Jinja has: it could hold itself
+/// and outlive the render. Not served until that is safe.
+#[test]
+fn namespaces_are_not_served() {
+    let t = "{% set n = namespace(p='x' * 1000) %}{% set n.me = n %}{{ n | string }}";
+    let err = Template::new(t).render(None, false).result.unwrap_err();
+    assert_eq!(
+        err.0,
+        "NotImplementedError: hars does not support Home Assistant's template function 'namespace' yet"
+    );
+}
+
+/// `str()` of a value nested deeper than `MAX_REPR_DEPTH` stops instead
+/// of exhausting the stack.
+#[test]
+fn printing_a_deep_value_stops() {
+    let mut deep = json!(1);
+    for _ in 0..150 {
+        deep = json!([deep]);
+    }
+    let vars = json!({ "v": deep });
+    for source in [
+        "{{ v }}",
+        "{{ v | string }}",
+        "{{ v | e }}",
+        "{{ [v] | join }}",
+    ] {
+        let err = Template::new(source)
+            .render(vars.as_object(), true)
+            .result
+            .unwrap_err();
+        assert!(err.0.starts_with("RecursionError"), "{source}: {err}");
     }
 }

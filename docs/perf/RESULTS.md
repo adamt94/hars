@@ -223,3 +223,21 @@ write, so size wins. The growth is over the 256 KiB note threshold: it
 buys Jinja itself, which the frontend uses for markdown cards and the
 default dashboard's heading, and which automations and template entities
 will need. Within every budget.
+
+#### Review round: fuel, Python-semantics filters, render threads
+
+The same command and container after the review fixes: minijinja's `fuel`
+and `preserve_order` features, the deep-size fuel patch
+(`vendor/minijinja`), Jinja's filters and tests with Python's rules
+(`template/jinja.rs`), and renders on blocking threads behind two permits.
+
+| build | binary | start→/api/ | idle RSS | idle PSS | idle CPU | wakeups/s | threads | run |
+|---|---|---|---|---|---|---|---|---|
+| branch, first version | 8.46 MiB (8,869,888 B) | 10 ms | 9.9 MiB | 9.0 MiB | 0.000 % | 0.00 | 4 | 10s warm-up, 30s quiet |
+| branch, after review | 8.58 MiB (9,001,024 B) | 11 ms | 9.9 MiB | 9.0 MiB | 0.000 % | 0.00 | 4 | 10s warm-up, 30s quiet |
+
++131,136 bytes for the fixes (macOS: 7,813,776 → 7,929,824, +116,048);
+721,728 bytes over main in all. Idle RSS is unchanged: file-backed PSS
+6,973 kB, anonymous 2,272 kB. A render now costs 1.2 µs cached and 6.2 µs
+with compiling (was 1.1 and 5.8), and a template that runs to its whole
+budget stops after 27 ms (Apple M4, release).

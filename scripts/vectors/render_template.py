@@ -28,6 +28,7 @@ import importlib.metadata
 import json
 import logging
 import pathlib
+import re
 import sys
 import tempfile
 
@@ -36,9 +37,10 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 CORE = ROOT / "crates/ha-core/src/template/vectors"
 API = ROOT / "crates/ha-api/src/ws/vectors"
 
-# A template that takes HA long enough (a million loop turns) that a
-# nanosecond `timeout` always runs out first.
-SLOW = "{% for i in range(100000) %}{% for j in range(10) %}{% endfor %}{% endfor %}x"
+# A template that takes long enough (a hundred thousand loop turns) that
+# a nanosecond `timeout` always runs out first, and that stays inside
+# hars's render budget.
+SLOW = "{% for i in range(100000) %}{% endfor %}x"
 
 # (template, variables, strict). Variables are what `render_template`
 # passes; `None` is no `variables` key.
@@ -178,7 +180,7 @@ RENDER = [
     ("{{ 'aaa' | replace('a', 'b', 2) }}", None, False),
     ("{{ users | join(', ', attribute='n') }}", {"users": [{"n": "a"}, {"n": "b"}]}, False),
     ("{{ '' | default('d') }} {{ '' | default('d', true) }}", None, False),
-    ("{{ [] | first }}x{{ [] | last }}", None, False),
+    ("{% set e = [] %}{{ e | first }}x{{ e | last }}", None, False),
     ("{{ '%s-%d' | format('a', 3) }}", None, False),
     ("{{ [1, 2] | pprint }}", None, False),
     ("{{ users | groupby('g') | list }}", {"users": [{"g": 1, "n": "a"}, {"g": 1, "n": "b"}]}, False),
@@ -267,6 +269,122 @@ PARSE = [
 ]
 
 
+# Every Jinja filter and test hars serves, over values of every kind
+# (`x` is undefined). Where HA answers, hars must give the same answer;
+# where HA raises, hars must fail too.
+VALUES = [
+    "'abc'", "''", "'aBc dEf'", "0", "1", "2", "-3", "1.5", "true", "false", "none",
+    "[]", "[3, 1, 2]", "['b', 'A', 'a']", "{}", "{'b': 1, 'a': 2}", "(1, 2)", "range(3)", "x",
+]
+TESTS = [
+    "boolean", "defined", "undefined", "even", "odd", "false", "true", "float", "integer",
+    "iterable", "lower", "upper", "mapping", "none", "number", "sequence", "string",
+    "escaped", "divisibleby 2", "eq 1", "equalto 1", "ne 1", "lt 2", "lessthan 2", "le 1",
+    "gt 1", "greaterthan 1", "ge 1", "in [1, 'abc', none]", "in 'abcd'", "sameas none",
+    "sameas true",
+]
+OPERATOR_TESTS = ["==", "!=", "<", "<=", ">", ">="]
+FILTERS = [
+    "abs", "capitalize", "count", "first", "last", "length", "list", "lower", "upper",
+    "max", "min", "reverse", "sort", "sum", "title", "trim", "unique", "items",
+    "dictsort", "e", "escape", "string", "safe", "d('D')", "default('D', true)",
+    "join", "join('-')", "batch(2)", "slice(2)", "replace('a', 'X')", "indent(2)",
+    "map('string')", "select('odd')", "reject('odd')", "attr('a')", "sort(reverse=true)",
+    "sort(case_sensitive=true)", "unique(case_sensitive=true)", "dictsort(by='value')",
+    "max(case_sensitive=true)", "first | string", "replace('a', 'X', 1)",
+    "trim('a')", "indent(2, true)", "batch(2, 0)", "slice(2, 0)",
+]
+# The value goes through `set` first: Jinja folds a filter or test on a
+# literal at compile time, in HA's lenient environment whatever the
+# strictness, which no template with real data sees.
+KEPT = (
+    [f"{{% set v = {v} %}}{{{{ v is {t} }}}}" for t in TESTS for v in VALUES]
+    + [f"{{% set v = {v} %}}{{{{ [v] | select('{t}', 1) | list }}}}" for t in OPERATOR_TESTS for v in VALUES]
+    + [f"{{% set v = {v} %}}{{{{ v | {f} }}}}" for f in FILTERS for v in VALUES]
+    + [
+        "{{ users | map(attribute='n') | list }}",
+        "{{ users | map(attribute='n', default='-') | list }}",
+        "{{ users | selectattr('n', 'eq', 'a') | list }}",
+        "{{ users | rejectattr('n') | list }}",
+        "{{ users | sort(attribute='n') | map(attribute='n') | list }}",
+        "{{ users | sort(attribute='n,g') | map(attribute='n') | list }}",
+        "{{ users | unique(attribute='g') | list }}",
+        "{{ users | min(attribute='n') }}",
+        "{{ users | max(attribute='n') }}",
+        "{{ users | sum(attribute='g') }}",
+        "{{ users | sum(attribute='g', start=10) }}",
+        "{{ users | join(',', attribute='n') }}",
+        "{{ users | groupby('g') | list }}",
+        "{{ users | groupby('g', default=0) | list }}",
+        "{{ users | groupby('g') | map(attribute='grouper') | list }}",
+        "{{ users | groupby('g') | map(attribute='list') | list }}",
+        "{{ users | dictsort }}",
+        "{{ users[0] | dictsort }}",
+        "{{ users[0] | items | list }}",
+        "{{ users[0] | attr('n') }}",
+        "{{ users[0] | length }}",
+        "{{ users | first }}",
+        "{{ 'a\n\nb' | indent(2, blank=true) }}",
+        "{{ 'a\nb' | indent('> ') }}",
+        "{{ [1.5, 2] | sum }}",
+        "{{ [1, 'a'] | sort }}",
+        "{{ [[2], [1]] | sort }}",
+        "{{ 'b,a' | list | sort }}",
+        "{{ [none, 1] | join }}",
+        "{{ [true, 1.0, 1e20] | join(' ') }}",
+        "{{ [1, 2, 3, 4, 5] | slice(3) | list }}",
+        "{{ [1, 2, 3, 4] | batch(3, 'x') | list }}",
+        "{{ 'aaa' | replace('a', 'b', 0) }}",
+        "{{ 123 | replace('2', 'x') }}",
+        "{{ none | replace('o', '0') }}",
+        "{{ '  a  ' | trim(' a') }}",
+        "{{ 'HELLO' | capitalize }}",
+        "{{ \"it's-a_b c\" | title }}",
+        "{{ 'ÉCOLE ß' | lower }} {{ 'straße' | upper }}",
+        "{{ 3 | abs }} {{ -1.5 | abs }} {{ -0 | abs }}",
+        "{{ 5 | string ~ 'x' }}",
+        "{{ {'a': none} | string }}",
+        "{{ [1, 2] | map('abs') | list }}",
+        "{{ ['a', 'B'] | map('upper') | join }}",
+        "{{ [1, 2, 3] | select('>', 1) | list }}",
+        "{{ [1, 2, 3] | select('in', [1, 3]) | list }}",
+        "{{ [1, 2, 3] | select('divisibleby', 3) | list }}",
+        "{{ [1, none, 0, 'a'] | select | list }}",
+        "{{ [1, none, 0, 'a'] | reject | list }}",
+        "{{ {'b': 1, 'a': 2} | dictsort(reverse=true) }}",
+        "{{ {'b': 1, 'a': 2} | dictsort(false, 'value', true) }}",
+        "{{ [1, 2, 3] | reverse }}",
+        "{{ 'abc' | reverse }}",
+        "{{ range(3) | reverse | list }}",
+        "{{ [3, 1] | first }}{{ [3, 1] | last }}",
+        "{{ 'abc' | first }}{{ 'abc' | last }}",
+        "{{ {'a': 1} | first }}",
+        "{% set e = [] %}{{ e | max }}x{{ e | min }}",
+        "{% set e = [] %}{{ e | sum }}",
+        "{% set e = [] %}{{ e | first is defined }}",
+        "{{ x | default }}",
+        "{{ x | d }}",
+        "{{ none | default('d') }}",
+        "{{ x is string }}",
+        "{{ 1 is in [1] }}",
+        "{% autoescape true %}{{ '<x>' }}{{ '<y>' | safe }}{{ none }}{{ ['<'] }}{% endautoescape %}",
+        "{% autoescape true %}{{ x }}{{ '&' | e }}{% endautoescape %}{{ '<z>' }}",
+        "{% autoescape false %}{{ '<x>' }}{% endautoescape %}",
+        "{{ x | string }}",
+        "{{ x | e }}",
+        "{{ x | escape }}",
+        "{{ x | string | length }}",
+        "{{ config.missing | string }}",
+    ]
+)
+KEPT_VARIABLES = {
+    # Keys in sorted order: hars's JSON objects are sorted, HA's keep
+    # their order, and that difference is documented, not tested.
+    "users": [{"g": 1, "n": "b"}, {"g": 1, "n": "a"}, {"g": 2, "n": "c"}],
+    "config": {"type": "markdown"},
+}
+
+
 def check_versions():
     for pkg, want in PINNED.items():
         have = importlib.metadata.version(pkg)
@@ -289,6 +407,9 @@ def as_sent(value):
         sent = json.loads(json_bytes(value))
     except (TypeError, ValueError):
         return {"unserializable": True}
+    if isinstance(sent, str) and re.search(r"<[^<>]* at 0x[0-9a-f]+>", sent):
+        # A generator's or iterator's repr: its address changes every run.
+        return {"repr_with_address": True}
     if isinstance(sent, str) and len(sent) > 1024:
         return {"long_string": {"length": len(sent), "starts": sent[:16]}}
     return {"json": sent}
@@ -317,6 +438,34 @@ async def render_vectors():
         case["log"] = log
         out.append(case)
         await hass.async_stop(force=True)
+    return out
+
+
+async def kept_vectors():
+    """Each `KEPT` template, lenient and strict."""
+    from homeassistant.core import HomeAssistant
+    from homeassistant.exceptions import TemplateError
+    from homeassistant.helpers import template
+
+    hass = HomeAssistant(tempfile.mkdtemp())
+    out = []
+    for source in KEPT:
+        for strict in (False, True):
+            log = []
+            tpl = template.Template(source, hass)
+            info = tpl.async_render_to_info(
+                KEPT_VARIABLES,
+                strict=strict,
+                log_fn=lambda level, msg: log.append([logging.getLevelName(level), msg]),
+            )
+            case = {"template": source, "strict": strict}
+            try:
+                case["result"] = as_sent(info.result())
+            except TemplateError as err:
+                case["error"] = str(err)
+            case["log"] = log
+            out.append(case)
+    await hass.async_stop(force=True)
     return out
 
 
@@ -450,6 +599,7 @@ def main():
     logging.disable(logging.CRITICAL)
     write(CORE, "render.json", asyncio.run(render_vectors()))
     write(CORE, "parse_result.json", parse_vectors())
+    write(CORE, "kept.json", asyncio.run(kept_vectors()))
     write(CORE, "names.json", asyncio.run(names()))
     write(API, "render_template.json", asyncio.run(conversations()))
 

@@ -265,11 +265,15 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
       `{result, listeners}`, `{error, level}` events with `report_errors`
       in HA's order, `template_error` for a `timeout`, strict and lenient
       undefined with Jinja's messages, results parsed as HA's
-      `literal_eval` does, 128 compiled templates kept. The default
+      `literal_eval` does, 128 compiled templates kept, Jinja's own filters
+      and tests checked against HA over every kind of value. Templates are
+      untrusted: each render has a fuel budget (steps and data), runs on a
+      blocking thread, two at a time. The default
       dashboard's "Welcome {{ user }}" heading now renders. Vectors from
       `scripts/vectors/render_template.py`. Not yet: HA's own functions,
-      filters and tests (`states`, `is_state`, `now`, `float`, …), which
-      fail with "not supported yet" instead of rendering, and so
+      filters and tests (`states`, `is_state`, `now`, `float`, …) and
+      Jinja's `namespace`, `attr`, `indent` and `format`, which fail with
+      "not supported yet" instead of rendering, and so
       re-rendering on state or time changes; see post-MVP
 - [ ] One serialised `Arc<str>` per state change, shared by all connections
 - [ ] Acceptance: replaying the frontend trace passes against `hars` with

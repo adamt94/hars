@@ -155,9 +155,6 @@ pub(crate) enum Subscription {
     /// Registered so it can be unsubscribed, but nothing ever fires it
     /// (`persistent_notification/subscribe` while there are none).
     Idle,
-    /// Decided in the background (`render_template` with a `timeout`):
-    /// not found until it is live, and gone if it never starts.
-    Later(Arc<parking_lot::Mutex<template::Later>>),
 }
 
 /// `subscribe_events` ids by event type. The bus listener holds the lock
@@ -177,6 +174,11 @@ pub(crate) struct Conn {
     /// however many types it wants. It runs only while the map is non-empty.
     events: EventSubs,
     event_listener: Option<AbortHandle>,
+    /// A command still at work (`render_template`): the connection reads
+    /// nothing more until it ends, as HA handles it before the next
+    /// message. Messages already read wait in `queue`.
+    busy: Option<template::Busy>,
+    queue: std::collections::VecDeque<Value>,
 }
 
 async fn run(mut socket: WebSocket, shared: Shared, ip: Option<IpAddr>) {
@@ -224,15 +226,27 @@ async fn run(mut socket: WebSocket, shared: Shared, ip: Option<IpAddr>) {
         subs: HashMap::new(),
         events: Default::default(),
         event_listener: None,
+        busy: None,
+        queue: Default::default(),
     };
 
     let mut heartbeat =
         tokio::time::interval_at(tokio::time::Instant::now() + HEARTBEAT, HEARTBEAT);
     heartbeat.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
     let mut awaiting_pong = false;
+    // The command at work, moved out of `conn` so the loop can wait on it.
+    let mut busy = None;
     let writer_done = loop {
+        if busy.is_none() {
+            busy = conn.busy.take();
+        }
         tokio::select! {
-            incoming = stream.next() => match incoming {
+            done = template::finished(&mut busy) => {
+                busy = None;
+                conn.done(done);
+                conn.drain();
+            }
+            incoming = stream.next(), if busy.is_none() => match incoming {
                 Some(Ok(Message::Text(text))) => {
                     if !conn.handle_frame(&text) {
                         break false;
@@ -270,6 +284,9 @@ async fn run(mut socket: WebSocket, shared: Shared, ip: Option<IpAddr>) {
             _ = &mut writer => break true,
         }
     };
+    if let Some(busy) = busy {
+        busy.abort();
+    }
     conn.close();
     if !writer_done {
         // Say goodbye if the writer can, but never wait on a stuck client. The
@@ -403,11 +420,30 @@ impl Conn {
     /// `false` means disconnect: invalid JSON gets no reply in HA either.
     fn handle_frame(&mut self, text: &str) -> bool {
         match serde_json::from_str::<Value>(text) {
-            Ok(Value::Array(msgs)) => msgs.into_iter().for_each(|m| self.handle(m)),
-            Ok(msg) => self.handle(msg),
+            Ok(Value::Array(msgs)) => self.queue.extend(msgs),
+            Ok(msg) => self.queue.push_back(msg),
             Err(_) => return false,
         }
+        self.drain();
         true
+    }
+
+    /// Handle queued messages until one leaves the connection busy.
+    fn drain(&mut self) {
+        while self.busy.is_none() {
+            let Some(msg) = self.queue.pop_front() else {
+                return;
+            };
+            self.handle(msg);
+        }
+    }
+
+    /// The busy command ended: keep its subscription, if it made one.
+    fn done(&mut self, subscribed: Option<u64>) {
+        self.busy = None;
+        if let Some(id) = subscribed {
+            self.subs.insert(id, Subscription::Idle);
+        }
     }
 
     /// `ActiveConnection.async_handle`.
@@ -511,29 +547,18 @@ impl Conn {
                 reply(&self.out);
             }
             Some(Subscription::Idle) => reply(&self.out),
-            Some(Subscription::Later(state)) => {
-                let mut now = state.lock();
-                match *now {
-                    template::Later::Live => {
-                        *now = template::Later::Never;
-                        reply(&self.out);
-                    }
-                    // HA hasn't registered it yet: not found, and it may
-                    // still start.
-                    template::Later::Pending => {
-                        drop(now);
-                        self.subs.insert(id, Subscription::Later(state));
-                        return false;
-                    }
-                    template::Later::Never => return false,
-                }
-            }
             None => return false,
         }
         true
     }
 
     fn close(&mut self) {
+        // Work for a connection that is gone: stop it, and drop what it
+        // holds (a render already running ends at its fuel budget).
+        if let Some(busy) = self.busy.take() {
+            busy.abort();
+        }
+        self.queue.clear();
         let ids: Vec<u64> = self.subs.keys().copied().collect();
         for id in ids {
             self.unsubscribe(id, |_| {});
