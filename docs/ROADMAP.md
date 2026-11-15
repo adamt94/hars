@@ -405,7 +405,11 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
 - [x] A lossless feed for the recorder: state changes and the logbook's event
       types in the bus's order (`EventBus::subscribe_lossless`); HA's
       unrecorded-attribute sets by domain, plus `sun.sun`'s own
-- [ ] Crash test: kill -9 loses at most one batch window and never corrupts the DB
+- [x] Crash test: `kill -9` of a writer (a child process, killed at six
+      different points, mid-batch included) loses nothing that was
+      committed, and what survives is the rows in order with no gap and
+      no corrupt row (`crates/ha-recorder/tests/crash.rs`; a process kill, not
+      power loss: the store `fdatasync`s when a segment closes)
 - [x] WS `sensor/numeric_device_classes` and
       `sensor/device_class_convertible_units` (HA 2026.6.1's tables)
 - [x] WS `recorder/info`, and the statistics calls answering empty
