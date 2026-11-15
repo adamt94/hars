@@ -152,12 +152,19 @@ manifest. Add the domain to `DOMAINS` in `scripts/gen-i18n.py` and
 # HA 2026.6.1 needs Python 3.14.2+; --python-version lets an older pip fetch it.
 pip download homeassistant==2026.6.1 --no-deps --only-binary=:all: \
     --python-version 3.14.2 -d /tmp/ha-wheel
-scripts/gen-i18n.py /tmp/ha-wheel/homeassistant-2026.6.1-py3-none-any.whl
-scripts/gen-manifests.py /tmp/ha-wheel/homeassistant-2026.6.1-py3-none-any.whl
+python3 scripts/gen-i18n.py /tmp/ha-wheel/homeassistant-2026.6.1-py3-none-any.whl \
+    > crates/ha-api/src/i18n_data.rs
+python3 scripts/gen-manifests.py /tmp/ha-wheel/homeassistant-2026.6.1-py3-none-any.whl
+cargo fmt --all
+scripts/check.sh
 ```
 
-They rewrite `crates/ha-api/src/i18n_data.rs` and `manifests_data.rs`.
-Don't edit those by hand. Note the binary size change (rule 9 in
+`gen-i18n.py` writes translations and icons to stdout; the redirection
+updates `crates/ha-api/src/i18n_data.rs`. `gen-manifests.py` takes the same
+wheel argument and writes `crates/ha-api/src/manifests_data.rs` itself,
+including `default_config`'s dependencies as well as `DOMAINS`. Run these
+commands from the repository root. Don't edit the generated tables by hand.
+Note the binary size change (rule 9 in
 [PERF.md](../PERF.md#rules)).
 
 ## 7. Tests and vectors

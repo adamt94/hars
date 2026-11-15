@@ -242,7 +242,11 @@ How to add a command or a view:
 hars matches one pinned release of each thing it talks to. Moving a pin is a
 deliberate change: remake each vector set with its generator at the new
 release (the existing sets need their generators written first; see below),
-then run the browser and companion-app checks.
+refresh every compatibility table in the
+[vector and table inventory](../scripts/vectors/README.md), review its inline
+HA/Python expectations, run `scripts/check.sh`, then run the browser and
+companion-app checks. Missing vector generators and table extractors must
+first reproduce the current pin before being updated to the new one.
 
 | Thing | Pinned version |
 |---|---|
@@ -260,7 +264,10 @@ How it is kept:
   [scripts/vectors/README.md](../scripts/vectors/README.md#vector-sets-made-before-this-rule)
   ([ADR 0008](adr/0008-vectors-from-home-assistant.md)).
 - **Generated tables.** Translations, icons and manifests are generated from
-  HA's wheel by `scripts/gen-i18n.py` and `scripts/gen-manifests.py`.
+  HA's wheel by `scripts/gen-i18n.py` and `scripts/gen-manifests.py`. Sensor
+  units, statistic units and the Labs feature list are also compiled in;
+  the [inventory](../scripts/vectors/README.md#generated-compatibility-tables)
+  records their sources and missing extractors, plus Python's case-fold table.
 - **Same files.** hars reads and writes HA's `.storage` files, so
   `hars import` copies them byte for byte after checking them with hars's own
   loaders.

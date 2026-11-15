@@ -106,9 +106,13 @@ data: about 20.7k state rows, 1,128 `automation_triggered` and 1,387
 
 Fixtures are sanitised (no tokens, coordinates rounded) before they are committed.
 
-- [ ] Generators for the vector sets made before scripts were kept (the
-      table in `scripts/vectors/README.md`), each rerun to confirm it
-      reproduces what is committed. Needed before the pinned HA version moves.
+- [ ] Generators for every legacy vector set and inline HA/Python expectation,
+      plus extractors for the compatibility tables without one (sensor units,
+      statistic units, Labs features and Python case folding). The
+      [inventory](../scripts/vectors/README.md#vector-sets-made-before-this-rule)
+      lists sources and status. Each must reproduce the current data before
+      the pinned HA version moves; rerun the existing translation/icon and
+      manifest generators too.
 
 ---
 
@@ -224,7 +228,7 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
       waits for (test replays it)
 - [x] Bundle translations and icons (`frontend/get_translations`,
       `frontend/get_icons`): HA 2026.6.1's generated English strings and
-      `icons.json` for the 37 integrations `hars` runs or will run
+      `icons.json` for the 38 integrations `hars` runs or will run
       (`scripts/gen-i18n.py` from HA's wheel), compiled in as ready-made JSON
       pieces, so an answer is joined, not parsed. Other languages get
       English, HA's fallback
