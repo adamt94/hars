@@ -514,7 +514,12 @@ async fn read_only_users_are_limited() {
     let flow = s.auth.start_login_flow("http://127.0.0.1:8123/", None);
     let code = s
         .auth
-        .finish_login_flow(&flow, "http://127.0.0.1:8123/", "reader", None)
+        .finish_login_flow(
+            &flow,
+            "http://127.0.0.1:8123/",
+            &s.auth.check_password("reader", "pw").unwrap(),
+            None,
+        )
         .unwrap();
     let t = s
         .auth
@@ -1040,7 +1045,12 @@ async fn dashboards_are_served_saved_and_announced() {
     let flow = s.auth.start_login_flow("http://127.0.0.1:8123/", None);
     let code = s
         .auth
-        .finish_login_flow(&flow, "http://127.0.0.1:8123/", "reader", None)
+        .finish_login_flow(
+            &flow,
+            "http://127.0.0.1:8123/",
+            &s.auth.check_password("reader", "pw").unwrap(),
+            None,
+        )
         .unwrap();
     let t = s
         .auth

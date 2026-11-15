@@ -341,6 +341,12 @@ async fn login_flow_step(
         Err(LoginError::Blocked(reason)) => {
             json_message(StatusCode::FORBIDDEN, &format!("Login blocked: {reason}"))
         }
+        // The login was taken back or made again while the password was
+        // checked: as a wrong password, on the same flow.
+        Err(LoginError::InvalidAuth) => {
+            log_invalid(ip, "invalid username or password");
+            login_form(&flow_id, json!({"base": "invalid_auth"}))
+        }
     }
 }
 

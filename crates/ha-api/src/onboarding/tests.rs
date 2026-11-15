@@ -1008,3 +1008,43 @@ async fn an_unsaved_step_is_a_500_without_a_code() {
     std::fs::remove_dir_all(&blocked).unwrap();
     let _ = std::fs::remove_dir_all(dir);
 }
+
+/// An owner on disk with an onboarding file that doesn't list the user
+/// step (its save failed, or an older file): no anonymous account can be
+/// made, after a restart or in memory.
+#[tokio::test(flavor = "multi_thread")]
+async fn an_owner_closes_the_user_step() {
+    let dir = temp_dir("owner-closes");
+    {
+        let auth = Auth::load_with_cost(&dir, ha_core::Clock::system(), 4).unwrap();
+        auth.create_owner("Owner", "owner", "pw").unwrap();
+        auth.save().unwrap();
+    }
+    std::fs::write(
+        dir.join(".storage/onboarding"),
+        json!({"version": 4, "minor_version": 1, "key": "onboarding", "data": {"done": []}})
+            .to_string(),
+    )
+    .unwrap();
+    let i = start(&dir, true).await;
+    let other = json!({"client_id": "http://127.0.0.1:8123/", "name": "Mallory",
+                       "username": "mallory", "password": "pw", "language": "en"});
+    let r = http(i.addr, "POST", "/api/onboarding/users", Some(&other), None).await;
+    assert_eq!(
+        (r.0, r.2),
+        (403, json!({"message": "User step already done"}))
+    );
+    let r = http(i.addr, "GET", "/api/onboarding", None, None).await;
+    assert_eq!(r.2[0], json!({"step": "user", "done": true}));
+    assert!(i.auth.check_password("mallory", "pw").is_none());
+
+    // In memory: an owner the store doesn't list yet still closes it.
+    let dir2 = temp_dir("owner-closes-memory");
+    let j = start(&dir2, true).await;
+    j.auth.create_owner("Owner", "owner", "pw").unwrap();
+    assert!(!j.auth.is_step_done("user"));
+    let r = http(j.addr, "POST", "/api/onboarding/users", Some(&other), None).await;
+    assert_eq!(r.0, 403);
+    let _ = std::fs::remove_dir_all(dir);
+    let _ = std::fs::remove_dir_all(dir2);
+}

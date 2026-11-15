@@ -16,7 +16,10 @@
 //! 403); the store is saved as each step is done, and a save that fails is
 //! HA's 500 with no auth code. An owner whose logins can't be saved is
 //! taken back, so the user step can run again (logins are written before
-//! users, so disk never holds an owner without a password). The views exist only
+//! users, so disk never holds an owner without a password). An owner closes
+//! the user step whatever the store says, and auth codes are bound to the
+//! login they were issued for, so a login taken back or made again
+//! invalidates them. The views exist only
 //! while a step was left when `hars` started: after a restart with all of
 //! them done they are 404s, as in HA (until then they answer as done).
 //!
@@ -263,7 +266,9 @@ async fn user_step(State(v): State<Views>, body: Bytes) -> Response {
     };
     let s = &v.0.shared;
     let _step = v.0.user.lock().await;
-    if s.auth.is_step_done("user") {
+    // An owner closes the step even if the store doesn't say so (HA infers
+    // it at start; `Auth::load` does too).
+    if s.auth.is_step_done("user") || s.auth.has_owner() {
         return json_message(StatusCode::FORBIDDEN, "User step already done");
     }
     // The person's schema (`vol.Length(min=1)`), checked first.
@@ -314,7 +319,11 @@ async fn user_step(State(v): State<Views>, body: Bytes) -> Response {
         // the step done and logs in, and so does a restart.
         return server_error();
     }
-    let code = s.auth.create_auth_code(client_id, &owner.username);
+    // The login was just saved; it can only be gone if something else
+    // took it back, and then there's nothing to log in to.
+    let Some(code) = s.auth.create_auth_code(client_id, &owner.username) else {
+        return server_error();
+    };
     Json(json!({ "auth_code": code })).into_response()
 }
 
@@ -383,7 +392,9 @@ async fn integration_step(
     let Some(username) = s.auth.refresh_token_username(&principal.refresh_token_id) else {
         return json_message(StatusCode::FORBIDDEN, "Credentials for user not available");
     };
-    let code = s.auth.create_auth_code(client_id, &username);
+    let Some(code) = s.auth.create_auth_code(client_id, &username) else {
+        return json_message(StatusCode::FORBIDDEN, "Credentials for user not available");
+    };
     Json(json!({ "auth_code": code })).into_response()
 }
 

@@ -28,6 +28,11 @@ fn setup(name: &str) -> (Auth, SimulatedClock, PathBuf) {
     (auth, sim, dir)
 }
 
+/// `adam`'s login, password checked.
+fn adam(auth: &Auth) -> Login {
+    auth.check_password("adam", "secret").unwrap()
+}
+
 fn login(auth: &Auth) -> Tokens {
     let flow = auth.start_login_flow(REDIRECT, lan());
     let user = auth.check_password("adam", "secret").unwrap();
@@ -146,7 +151,7 @@ fn codes_are_single_use_bound_to_the_client_and_short_lived() {
     let (auth, sim, dir) = setup("codes");
     let code = |auth: &Auth| {
         let flow = auth.start_login_flow(REDIRECT, lan());
-        auth.finish_login_flow(&flow, CLIENT, "adam", lan())
+        auth.finish_login_flow(&flow, CLIENT, &adam(auth), lan())
             .unwrap()
     };
 
@@ -201,7 +206,7 @@ fn login_flows_check_redirect_and_expire() {
     let flow = auth.start_login_flow("http://evil.example/", lan());
     assert_eq!(auth.login_flow_ip(&flow), Some(lan()));
     assert_eq!(
-        auth.finish_login_flow(&flow, CLIENT, "adam", lan())
+        auth.finish_login_flow(&flow, CLIENT, &adam(&auth), lan())
             .unwrap_err(),
         LoginError::InvalidRedirectUri
     );
@@ -287,7 +292,7 @@ fn inactive_and_local_only_users_are_blocked() {
     );
     let flow = auth.start_login_flow(REDIRECT, internet);
     assert_eq!(
-        auth.finish_login_flow(&flow, CLIENT, "adam", internet)
+        auth.finish_login_flow(&flow, CLIENT, &adam(&auth), internet)
             .unwrap_err(),
         LoginError::Blocked("User cannot authenticate remotely")
     );
@@ -391,7 +396,7 @@ fn reads_and_preserves_has_files() {
     // An existing user logs in through their linked credential.
     let flow = auth.start_login_flow(REDIRECT, lan());
     let code = auth
-        .finish_login_flow(&flow, CLIENT, "adam", lan())
+        .finish_login_flow(&flow, CLIENT, &adam(&auth), lan())
         .unwrap();
     let t = auth
         .exchange_code(Some(CLIENT), Some(&code), lan())
@@ -536,7 +541,7 @@ fn onboarding_creates_the_owner_and_records_steps() {
     assert!(auth.is_user_onboarded() && !auth.is_onboarded());
 
     const CLIENT: &str = "http://127.0.0.1:8123/";
-    let code = auth.create_auth_code(CLIENT, &owner.username);
+    let code = auth.create_auth_code(CLIENT, &owner.username).unwrap();
     let t = auth.exchange_code(Some(CLIENT), Some(&code), None).unwrap();
     let p = auth.validate_access_token(&t.access_token, None).unwrap();
     assert_eq!(p.user_id, owner.user_id);
@@ -565,5 +570,106 @@ fn onboarding_creates_the_owner_and_records_steps() {
         file.contains("\"done\": [\n      \"user\",\n      \"integration\"\n    ]"),
         "{file}"
     );
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+/// HA's `onboarding.async_setup`: an owner means the user step is done,
+/// also when the onboarding file exists without it (a step whose save
+/// failed, or an older file); the step is appended and saved.
+#[test]
+fn an_owner_closes_the_user_step_whatever_the_file_says() {
+    let dir = temp_dir("owner-file-without-user");
+    let auth = Auth::load_with_cost(&dir, Clock::system(), 4).unwrap();
+    auth.create_owner("Owner", "owner", "pw").unwrap();
+    auth.mark_step_done("core_config");
+    auth.save().unwrap();
+    assert!(!auth.is_step_done("user"));
+    let again = Auth::load_with_cost(&dir, Clock::system(), 4).unwrap();
+    assert!(again.is_step_done("user") && again.has_owner());
+    assert!(again.needs_save());
+    again.save().unwrap();
+    let file: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(dir.join(".storage/onboarding")).unwrap())
+            .unwrap();
+    assert_eq!(file["data"]["done"], json!(["core_config", "user"]));
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+const ONBOARDING_CLIENT: &str = "http://127.0.0.1:8123/";
+
+fn code_for(auth: &Auth, login: &Login) -> String {
+    let flow = auth.start_login_flow(ONBOARDING_CLIENT, None);
+    auth.finish_login_flow(&flow, ONBOARDING_CLIENT, login, None)
+        .unwrap()
+}
+
+/// A code issued for an owner onboarding then took back logs nobody in,
+/// nor the owner made again with the same username.
+#[test]
+fn codes_die_with_a_taken_back_owner() {
+    let dir = temp_dir("codes-rollback");
+    let auth = Auth::load_with_cost(&dir, Clock::system(), 4).unwrap();
+    let first = auth.create_owner("Owner", "owner", "pw").unwrap();
+    // Logged into while the owner wasn't saved yet.
+    let early = code_for(&auth, &auth.check_password("owner", "pw").unwrap());
+    let early2 = code_for(&auth, &auth.check_password("owner", "pw").unwrap());
+    auth.remove_owner(&first);
+    let exchange = |code: &str| auth.exchange_code(Some(ONBOARDING_CLIENT), Some(code), None);
+    assert_eq!(exchange(&early).unwrap_err(), TokenError::InvalidCode);
+    assert!(!auth.has_owner());
+    // Made again (same username, another password): the old code still
+    // doesn't log in, as the new owner or anyone.
+    auth.create_owner("Owner", "owner", "other").unwrap();
+    assert_eq!(exchange(&early2).unwrap_err(), TokenError::InvalidCode);
+    let fresh = code_for(&auth, &auth.check_password("owner", "other").unwrap());
+    assert!(exchange(&fresh).is_ok());
+    assert_eq!(
+        auth.create_auth_code(ONBOARDING_CLIENT, "nobody"),
+        None,
+        "no login, no code"
+    );
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+/// A login left by a half-saved owner (its user never written) is replaced
+/// by onboarding; a code issued for the leftover doesn't survive that, and
+/// a password checked before the replacement can't finish a login flow.
+#[test]
+fn codes_die_with_a_replaced_leftover_login() {
+    let dir = temp_dir("codes-leftover");
+    {
+        let auth = Auth::load_with_cost(&dir, Clock::system(), 4).unwrap();
+        auth.create_owner("Owner", "owner", "pw").unwrap();
+        auth.save().unwrap();
+    }
+    // The users' write was lost: only the login is on disk.
+    std::fs::remove_file(dir.join(".storage/auth")).unwrap();
+    let auth = Auth::load_with_cost(&dir, Clock::system(), 4).unwrap();
+    assert!(!auth.has_owner() && !auth.is_step_done("user"));
+    let leftover = auth.check_password("owner", "pw").unwrap();
+    let kept = code_for(&auth, &leftover);
+    let flow = auth.start_login_flow(ONBOARDING_CLIENT, None);
+
+    auth.create_owner("Owner", "owner", "pw").unwrap();
+    assert_eq!(
+        auth.exchange_code(Some(ONBOARDING_CLIENT), Some(&kept), None)
+            .unwrap_err(),
+        TokenError::InvalidCode
+    );
+    assert_eq!(
+        auth.finish_login_flow(&flow, ONBOARDING_CLIENT, &leftover, None)
+            .unwrap_err(),
+        LoginError::InvalidAuth
+    );
+    // The flow is still there for the right password.
+    let now = auth.check_password("owner", "pw").unwrap();
+    let code = auth
+        .finish_login_flow(&flow, ONBOARDING_CLIENT, &now, None)
+        .unwrap();
+    let t = auth
+        .exchange_code(Some(ONBOARDING_CLIENT), Some(&code), None)
+        .unwrap();
+    let p = auth.validate_access_token(&t.access_token, None).unwrap();
+    assert!(auth.user(&p.user_id).unwrap().is_owner);
     let _ = std::fs::remove_dir_all(dir);
 }

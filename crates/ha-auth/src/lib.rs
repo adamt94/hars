@@ -116,6 +116,8 @@ pub enum LoginError {
     UnknownFlow,
     InvalidRedirectUri,
     Blocked(&'static str),
+    /// The login was removed or made again since its password was checked.
+    InvalidAuth,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -162,7 +164,34 @@ struct LoginFlow {
 struct AuthCode {
     client_id: String,
     username: String,
+    /// What the code was issued for: the login's password hash (a login
+    /// made again, with any password, has another salt) and the linked
+    /// credential, if there was one. The exchange refuses the code once
+    /// either is gone or replaced.
+    login: Bound,
     created: Timestamp,
+}
+
+/// A login's identity when a code is issued for it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct Bound {
+    hash: String,
+    credential_id: Option<String>,
+}
+
+/// A username whose password was checked ([`Auth::check_password`]), and
+/// which stored password it matched. It reads as the stored username.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Login {
+    username: String,
+    hash: String,
+}
+
+impl std::ops::Deref for Login {
+    type Target = str;
+    fn deref(&self) -> &str {
+        &self.username
+    }
 }
 
 const DIRTY_AUTH: u8 = 1;
@@ -228,18 +257,14 @@ impl Auth {
             );
         }
         let mut dirty = 0;
-        let onboarding = match onboarding_store.load::<OnboardingData>()? {
-            Some(o) => o,
-            // HA: no onboarding file but an owner exists means the user step is done.
-            None if data.users.iter().any(|u| u.is_owner) => {
-                dirty |= DIRTY_ONBOARDING;
-                OnboardingData {
-                    done: vec!["user".into()],
-                    ..Default::default()
-                }
-            }
-            None => OnboardingData::default(),
-        };
+        let mut onboarding: OnboardingData = onboarding_store.load()?.unwrap_or_default();
+        // HA's `onboarding.async_setup`: whenever `user` isn't done but an
+        // owner exists (made on the command line, or a step whose save
+        // failed), the user step is done, and saved so.
+        if !onboarding.done.iter().any(|d| d == "user") && data.users.iter().any(|u| u.is_owner) {
+            onboarding.done.push("user".into());
+            dirty |= DIRTY_ONBOARDING;
+        }
         Ok(Self(Arc::new(Inner {
             clock,
             auth_store,
@@ -334,6 +359,12 @@ impl Auth {
             .iter()
             .map(|step| (*step, s.onboarding.done.iter().any(|d| d == step)))
             .collect()
+    }
+
+    /// Whether an owner exists. Onboarding's user step refuses to run
+    /// then, whatever its store says (HA infers the step from it).
+    pub fn has_owner(&self) -> bool {
+        self.0.state.lock().data.users.iter().any(|u| u.is_owner)
     }
 
     /// Whether `step` is done.
@@ -526,7 +557,7 @@ impl Auth {
 
     /// Check a username and password (blocking: bcrypt). Returns the stored
     /// username on success.
-    pub fn check_password(&self, username: &str, password: &str) -> Option<String> {
+    pub fn check_password(&self, username: &str, password: &str) -> Option<Login> {
         let stored = {
             let s = self.0.state.lock();
             let wanted = normalize_username(username);
@@ -541,14 +572,16 @@ impl Auth {
         };
         let password = truncate72(password);
         match stored {
-            Some((name, hash)) => {
+            Some((name, stored)) => {
                 let hash = B64
-                    .decode(hash)
+                    .decode(&stored)
                     .ok()
                     .and_then(|h| String::from_utf8(h).ok())?;
-                bcrypt::verify(password, &hash)
-                    .unwrap_or(false)
-                    .then_some(name)
+                let ok = bcrypt::verify(password, &hash).unwrap_or(false);
+                ok.then_some(Login {
+                    username: name,
+                    hash: stored,
+                })
             }
             None => {
                 let _ = bcrypt::verify(password, DUMMY_HASH);
@@ -605,11 +638,19 @@ impl Auth {
         &self,
         flow_id: &str,
         client_id: &str,
-        username: &str,
+        login: &Login,
         ip: Option<IpAddr>,
     ) -> Result<String, LoginError> {
         let now = self.0.clock.now();
         let mut s = self.0.state.lock();
+        let username = login.username.as_str();
+        // Checked again under the lock: the login may have been taken back
+        // or made again (onboarding) while the password was hashed. The
+        // flow stays, as after a wrong password.
+        let bound = bound(&s, username).filter(|b| b.hash == login.hash);
+        let Some(bound) = bound else {
+            return Err(LoginError::InvalidAuth);
+        };
         let flow = s.flows.remove(flow_id).ok_or(LoginError::UnknownFlow)?;
         if !indieauth::verify_redirect_uri(client_id, &flow.redirect_uri) {
             return Err(LoginError::InvalidRedirectUri);
@@ -619,15 +660,18 @@ impl Auth {
         {
             return Err(LoginError::Blocked(reason));
         }
-        Ok(store_code(&mut s, client_id, username, now))
+        Ok(store_code(&mut s, client_id, username, bound, now))
     }
 
     /// `create_auth_code`: a single-use code `/auth/token` exchanges for
     /// tokens of the user `username` logs in as (onboarding's user and
     /// integration steps).
-    pub fn create_auth_code(&self, client_id: &str, username: &str) -> String {
+    /// `None` if `username` has no login.
+    pub fn create_auth_code(&self, client_id: &str, username: &str) -> Option<String> {
         let now = self.0.clock.now();
-        store_code(&mut self.0.state.lock(), client_id, username, now)
+        let mut s = self.0.state.lock();
+        let bound = bound(&s, username)?;
+        Some(store_code(&mut s, client_id, username, bound, now))
     }
 
     // ----- tokens -----
@@ -649,6 +693,16 @@ impl Auth {
             .and_then(|c| s.codes.remove(c))
             .filter(|c| c.client_id == client_id && now.duration_since(c.created) < AUTH_CODE_TTL)
             .ok_or(TokenError::InvalidCode)?;
+        // HA's code holds the `Credentials` object it was issued for: one
+        // whose login was since removed or made again logs nobody in.
+        let still = bound(&s, &code.username).is_some_and(|now| {
+            now.hash == code.login.hash
+                && (code.login.credential_id.is_none()
+                    || now.credential_id == code.login.credential_id)
+        });
+        if !still {
+            return Err(TokenError::InvalidCode);
+        }
 
         let (user_id, credential_id) = get_or_create_user(&mut s.data, &code.username);
         let user = s
@@ -838,7 +892,13 @@ fn taken(s: &State, username: &str) -> bool {
 
 /// `_create_auth_code_store`'s `store_result`: codes expire after 10
 /// minutes; `hars` also keeps at most [`MAX_PENDING`].
-fn store_code(s: &mut State, client_id: &str, username: &str, now: Timestamp) -> String {
+fn store_code(
+    s: &mut State,
+    client_id: &str,
+    username: &str,
+    login: Bound,
+    now: Timestamp,
+) -> String {
     s.codes
         .retain(|_, c| now.duration_since(c.created) < AUTH_CODE_TTL);
     if s.codes.len() >= MAX_PENDING {
@@ -855,10 +915,37 @@ fn store_code(s: &mut State, client_id: &str, username: &str, now: Timestamp) ->
         AuthCode {
             client_id: client_id.into(),
             username: username.into(),
+            login,
             created: now,
         },
     );
     code
+}
+
+/// The login stored for `username` exactly (as codes and credentials keep
+/// it), and the credential linked to a user for it, if any.
+fn bound(s: &State, username: &str) -> Option<Bound> {
+    let hash = s
+        .provider
+        .users
+        .iter()
+        .find(|u| u.username == username)?
+        .password
+        .clone();
+    let credential_id = s
+        .data
+        .credentials
+        .iter()
+        .find(|c| {
+            c.auth_provider_type == PROVIDER_TYPE
+                && c.username() == Some(username)
+                && s.data.users.iter().any(|u| u.id == c.user_id)
+        })
+        .map(|c| c.id.clone());
+    Some(Bound {
+        hash,
+        credential_id,
+    })
 }
 
 /// `normalize_username`: `str.strip().casefold()`.
