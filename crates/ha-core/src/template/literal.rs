@@ -19,6 +19,8 @@
 //! JSON objects come out with sorted keys, as everywhere in hars.
 
 use serde_json::{Map, Number, Value};
+use std::collections::hash_map::Entry;
+use std::collections::{HashMap, HashSet};
 
 /// A Python literal.
 #[derive(Debug, Clone)]
@@ -772,16 +774,18 @@ fn hex(chars: &mut std::iter::Peekable<std::str::Chars<'_>>, n: usize) -> Option
 }
 
 /// `dict(...)`: later values win, the first key stays; unhashable keys
-/// are a `TypeError`.
+/// are a `TypeError`. Keys are found by hash, so building stays linear.
 fn dict(pairs: Vec<(Py, Py)>) -> Option<Paren> {
     let mut out: Vec<(Py, Py)> = Vec::with_capacity(pairs.len());
+    let mut index: HashMap<Key, usize> = HashMap::with_capacity(pairs.len());
+    let mut unique = 0;
     for (k, v) in pairs {
-        if !hashable(&k) {
-            return None;
-        }
-        match out.iter_mut().find(|(have, _)| py_eq(have, &k)) {
-            Some(slot) => slot.1 = v,
-            None => out.push((k, v)),
+        match index.entry(key(&k, &mut unique)?) {
+            Entry::Occupied(slot) => out[*slot.get()].1 = v,
+            Entry::Vacant(slot) => {
+                slot.insert(out.len());
+                out.push((k, v));
+            }
         }
     }
     Some(Paren::Built(Py::Dict(out)))
@@ -789,52 +793,63 @@ fn dict(pairs: Vec<(Py, Py)>) -> Option<Paren> {
 
 fn set(items: Vec<Py>) -> Option<Paren> {
     let mut out: Vec<Py> = Vec::with_capacity(items.len());
+    let mut seen: HashSet<Key> = HashSet::with_capacity(items.len());
+    let mut unique = 0;
     for item in items {
-        if !hashable(&item) {
-            return None;
-        }
-        if !out.iter().any(|have| py_eq(have, &item)) {
+        if seen.insert(key(&item, &mut unique)?) {
             out.push(item);
         }
     }
     Some(Paren::Built(Py::Set(out)))
 }
 
-fn hashable(v: &Py) -> bool {
-    match v {
-        Py::List(_) | Py::Set(_) | Py::Dict(_) => false,
-        Py::Tuple(items) => items.iter().all(hashable),
-        _ => true,
-    }
+/// A hashable literal in a form where Python's `==` is Rust's: `1`, `1.0`,
+/// `True` and `1+0j` are one key. `None` for an unhashable value (a
+/// `TypeError` in Python).
+#[derive(PartialEq, Eq, Hash)]
+enum Key {
+    None,
+    Ellipsis,
+    Int(i128),
+    /// A float that isn't a whole number, by its bits.
+    Float(u64),
+    Complex(u64, u64),
+    Str(String),
+    Bytes(Vec<u8>),
+    Tuple(Vec<Key>),
+    /// Equal only to itself here (an integer past `i128`, a string with a
+    /// lone surrogate: neither ever parsed twice in practice).
+    Unique(usize),
 }
 
-/// Python's `==` between hashable literals (`1 == 1.0 == True`).
-fn py_eq(a: &Py, b: &Py) -> bool {
-    fn int(v: &Py) -> Option<i128> {
-        match v {
-            Py::Bool(b) => Some(i128::from(*b)),
-            Py::Int(Int::Small(i)) => Some(*i),
-            _ => None,
+fn key(v: &Py, unique: &mut usize) -> Option<Key> {
+    fn real(f: f64) -> Key {
+        if f.fract() == 0.0 && f.abs() < 1.7e38 {
+            Key::Int(f as i128)
+        } else {
+            Key::Float(f.to_bits())
         }
     }
-    /// (real, imaginary).
-    fn number(v: &Py) -> Option<(f64, f64)> {
-        match v {
-            Py::Float(f) => Some((*f, 0.0)),
-            Py::Complex(r, i) => Some((*r, *i)),
-            v => int(v).map(|i| (i as f64, 0.0)),
+    Some(match v {
+        Py::List(_) | Py::Set(_) | Py::Dict(_) => return None,
+        Py::None => Key::None,
+        Py::Ellipsis => Key::Ellipsis,
+        Py::Bool(b) => Key::Int(i128::from(*b)),
+        Py::Int(Int::Small(i)) => Key::Int(*i),
+        Py::Float(f) => real(*f),
+        Py::Complex(r, i) if *i == 0.0 => real(*r),
+        Py::Complex(r, i) => Key::Complex(r.to_bits(), i.to_bits()),
+        Py::Str(Some(s)) => Key::Str(s.clone()),
+        Py::Bytes(b) => Key::Bytes(b.clone()),
+        Py::Tuple(items) => Key::Tuple(
+            items
+                .iter()
+                .map(|i| key(i, unique))
+                .collect::<Option<_>>()?,
+        ),
+        Py::Int(Int::Huge) | Py::Str(None) => {
+            *unique += 1;
+            Key::Unique(*unique)
         }
-    }
-    match (a, b) {
-        (Py::None, Py::None) | (Py::Ellipsis, Py::Ellipsis) => true,
-        (Py::Str(Some(x)), Py::Str(Some(y))) => x == y,
-        (Py::Bytes(x), Py::Bytes(y)) => x == y,
-        (Py::Tuple(x), Py::Tuple(y)) => {
-            x.len() == y.len() && x.iter().zip(y).all(|(a, b)| py_eq(a, b))
-        }
-        _ => match (int(a), int(b)) {
-            (Some(x), Some(y)) => x == y,
-            _ => number(a).is_some_and(|x| number(b) == Some(x)),
-        },
-    }
+    })
 }

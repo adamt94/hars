@@ -512,6 +512,20 @@ impl<'template, 'env> State<'template, 'env> {
         Ok(())
     }
 
+    /// Charges fuel for comparing two values deeply (hars patch, see
+    /// `deep_compare_cost`).
+    #[inline]
+    pub(crate) fn charge_compare(&self, _a: &Value, _b: &Value) -> Result<(), Error> {
+        #[cfg(feature = "fuel")]
+        {
+            if let Some(ref tracker) = self.fuel_tracker {
+                let limit = tracker.remaining_units();
+                return tracker.consume(crate::vm::fuel::deep_compare_cost(_a, _b, limit));
+            }
+        }
+        Ok(())
+    }
+
     /// Charges fuel for the size of a value.
     #[inline(always)]
     pub(crate) fn charge_value(&self, _value: &Value) -> Result<(), Error> {

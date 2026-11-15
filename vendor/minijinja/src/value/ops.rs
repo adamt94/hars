@@ -303,7 +303,9 @@ pub fn slice(
     let step = if step.is_none() {
         1i64
     } else {
-        ok!(i64::try_from(step))
+        // hars patch: `-step` below can't overflow; no sequence is long
+        // enough to tell a step of `i64::MIN` from one more.
+        ok!(i64::try_from(step)).max(-i64::MAX)
     };
     if step == 0 {
         return Err(Error::new(
@@ -940,11 +942,17 @@ pub(crate) fn charge_fuel_for_compare(
     #[cfg(feature = "fuel")]
     {
         if _state.fuel_tracker().is_some() {
+            // hars patch: comparing two strings reads the shorter.
+            if let (Some(a), Some(b)) = (_lhs.as_str(), _rhs.as_str()) {
+                return _state.charge_fuel(a.len().min(b.len()) as u64);
+            }
             if let (Some(a), Some(b)) = (_lhs.as_object(), _rhs.as_object()) {
                 if !a.is_same_object(b) {
                     if let (Some(a_len), Some(b_len)) = (a.enumerator_len(), b.enumerator_len()) {
-                        return _state.charge_items(a_len.min(b_len));
+                        ok!(_state.charge_items(a_len.min(b_len)));
                     }
+                    // hars patch: and every item below the top level.
+                    return _state.charge_compare(_lhs, _rhs);
                 }
             }
         }
@@ -1009,6 +1017,8 @@ pub fn contains(state: Option<&State>, container: &Value, value: &Value) -> Resu
                     for item in iter {
                         if let Some(state) = state {
                             ok!(state.charge_items(1));
+                            // hars patch: the comparison walks both deeply.
+                            ok!(state.charge_compare(&item, value));
                         }
                         ok!(item.check());
                         if item == *value {

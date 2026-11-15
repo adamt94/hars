@@ -522,7 +522,9 @@ mod builtins {
         })
     }
 
-    pub(crate) fn length_checked(state: &State, v: &Value) -> Result<usize, Error> {
+    /// hars patch: public, so a wrapper keeps the fuel accounting.
+    #[doc(hidden)]
+    pub fn length_checked(state: &State, v: &Value) -> Result<usize, Error> {
         ok!(state.undefined_behavior().assert_iterable(v));
         length(v)
     }
@@ -594,7 +596,9 @@ mod builtins {
         dictsort_impl(None, v, kwargs)
     }
 
-    pub(crate) fn dictsort_fueled(
+    /// hars patch: public, so a wrapper keeps the fuel accounting.
+    #[doc(hidden)]
+    pub fn dictsort_fueled(
         state: &State,
         v: &Value,
         kwargs: Kwargs,
@@ -691,7 +695,9 @@ mod builtins {
         }
     }
 
-    pub(crate) fn items_checked(state: &State, v: &Value) -> Result<Value, Error> {
+    /// hars patch: public, so a wrapper keeps the fuel accounting.
+    #[doc(hidden)]
+    pub fn items_checked(state: &State, v: &Value) -> Result<Value, Error> {
         ok!(state.undefined_behavior().assert_iterable(v));
         items(v)
     }
@@ -711,7 +717,9 @@ mod builtins {
         reverse_impl(None, value)
     }
 
-    pub(crate) fn reverse_fueled(state: &State, value: &Value) -> Result<Value, Error> {
+    /// hars patch: public, so a wrapper keeps the fuel accounting.
+    #[doc(hidden)]
+    pub fn reverse_fueled(state: &State, value: &Value) -> Result<Value, Error> {
         reverse_impl(Some(state), value)
     }
 
@@ -1451,7 +1459,9 @@ mod builtins {
         }
     }
 
-    pub(crate) fn first_checked(state: &State, value: &Value) -> Result<Value, Error> {
+    /// hars patch: public, so a wrapper keeps the fuel accounting.
+    #[doc(hidden)]
+    pub fn first_checked(state: &State, value: &Value) -> Result<Value, Error> {
         ok!(state.undefined_behavior().assert_iterable(value));
         first(value)
     }
@@ -1478,7 +1488,9 @@ mod builtins {
         last_impl(None, value)
     }
 
-    pub(crate) fn last_fueled(state: &State, value: Value) -> Result<Value, Error> {
+    /// hars patch: public, so a wrapper keeps the fuel accounting.
+    #[doc(hidden)]
+    pub fn last_fueled(state: &State, value: Value) -> Result<Value, Error> {
         last_impl(Some(state), value)
     }
 
@@ -2355,7 +2367,9 @@ mod builtins {
         groupby_impl(None, value, attribute, kwargs)
     }
 
-    pub(crate) fn groupby_fueled(
+    /// hars patch: public, so a wrapper keeps the fuel accounting.
+    #[doc(hidden)]
+    pub fn groupby_fueled(
         state: &State,
         value: Value,
         attribute: Option<&str>,

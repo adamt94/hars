@@ -56,6 +56,11 @@ const MAX_PENDING: usize = 4096;
 const MAX_BATCH: usize = 256;
 /// aiohttp's default `max_msg_size`, which HA keeps.
 const MAX_MESSAGE: usize = 4 * 1024 * 1024;
+/// Messages that may wait while a command (`render_template`) is busy. The
+/// frontend's start-up burst is a few dozen.
+const MAX_QUEUED: usize = 1024;
+/// The frames behind them, at most two of the largest.
+const MAX_QUEUED_BYTES: usize = 2 * MAX_MESSAGE;
 /// `WebSocketResponse(heartbeat=55)`: a WebSocket ping this often. A client
 /// that hasn't answered the previous ping by the next one is gone (a phone
 /// that lost its network), and its subscriptions are dropped.
@@ -184,6 +189,8 @@ pub(crate) struct Conn {
     /// message. Messages already read wait in `queue`.
     busy: Option<template::Busy>,
     queue: std::collections::VecDeque<Value>,
+    /// Frame bytes behind the queue since it was last empty.
+    queued_bytes: usize,
 }
 
 async fn run(mut socket: WebSocket, shared: Shared, ip: Option<IpAddr>) {
@@ -233,6 +240,7 @@ async fn run(mut socket: WebSocket, shared: Shared, ip: Option<IpAddr>) {
         event_listener: None,
         busy: None,
         queue: Default::default(),
+        queued_bytes: 0,
     };
 
     let mut heartbeat =
@@ -251,10 +259,15 @@ async fn run(mut socket: WebSocket, shared: Shared, ip: Option<IpAddr>) {
                 conn.done(done);
                 conn.drain();
             }
-            incoming = stream.next(), if busy.is_none() => match incoming {
+            // Read even while a command is busy, so a close, the end of the
+            // stream or a pong is seen at once; messages wait in the queue.
+            incoming = stream.next() => match incoming {
                 Some(Ok(Message::Text(text))) => {
-                    if !conn.handle_frame(&text) {
+                    if !conn.enqueue(&text) {
                         break false;
+                    }
+                    if busy.is_none() {
+                        conn.drain();
                     }
                 }
                 Some(Ok(Message::Pong(_))) => awaiting_pong = false,
@@ -423,13 +436,36 @@ fn auth_token(msg: &Value) -> Result<&str, String> {
 impl Conn {
     /// One client frame: a message, or (clients may batch) an array of them.
     /// `false` means disconnect: invalid JSON gets no reply in HA either.
+    #[cfg(test)]
     fn handle_frame(&mut self, text: &str) -> bool {
+        if !self.enqueue(text) {
+            return false;
+        }
+        self.drain();
+        true
+    }
+
+    /// Queue a frame's messages. `false` means disconnect: invalid JSON
+    /// (no reply in HA either), or more waiting behind a busy command than
+    /// [`MAX_QUEUED`] messages or [`MAX_QUEUED_BYTES`].
+    fn enqueue(&mut self, text: &str) -> bool {
+        let before = self.queue.len();
         match serde_json::from_str::<Value>(text) {
             Ok(Value::Array(msgs)) => self.queue.extend(msgs),
             Ok(msg) => self.queue.push_back(msg),
             Err(_) => return false,
         }
-        self.drain();
+        if before == 0 {
+            self.queued_bytes = 0;
+        }
+        self.queued_bytes += text.len();
+        if self.queue.len() > MAX_QUEUED || self.queued_bytes > MAX_QUEUED_BYTES {
+            tracing::error!(
+                "websocket client sent {} messages while one was busy; disconnecting",
+                self.queue.len()
+            );
+            return false;
+        }
         true
     }
 

@@ -651,6 +651,7 @@ fn bare_conn(hass: &Hass) -> (super::Conn, tokio::sync::mpsc::Receiver<super::Fr
         event_listener: None,
         busy: None,
         queue: Default::default(),
+        queued_bytes: 0,
     };
     (conn, rx)
 }
@@ -2752,6 +2753,7 @@ async fn logbook_stream_windows_and_checks() {
 /// with every message it sent back, in order.
 #[tokio::test]
 async fn render_template_as_ha() {
+    let _alone = RENDER_PERMITS.lock().await;
     let path = concat!(
         env!("CARGO_MANIFEST_DIR"),
         "/src/ws/vectors/render_template.json"
@@ -2779,6 +2781,7 @@ async fn render_template_as_ha() {
 /// timer once rendered; only the id, so `unsubscribe_events` finds it.
 #[tokio::test]
 async fn a_rendered_template_holds_nothing() {
+    let _alone = RENDER_PERMITS.lock().await;
     let hass = Hass::new();
     let (mut conn, mut rx) = bare_conn(&hass);
     handle(
@@ -2799,6 +2802,7 @@ async fn a_rendered_template_holds_nothing() {
 /// until its replies are out, as in HA when it renders straight away.
 #[tokio::test]
 async fn messages_after_a_render_wait_for_it() {
+    let _alone = RENDER_PERMITS.lock().await;
     let hass = Hass::new();
     let (mut conn, mut rx) = bare_conn(&hass);
     let frame = json!([
@@ -2938,6 +2942,7 @@ async fn renders_leave_the_runtime_free() {
 /// Only short templates are kept: 128 long ones would hold megabytes.
 #[tokio::test]
 async fn long_templates_are_not_kept() {
+    let _alone = RENDER_PERMITS.lock().await;
     let hass = Hass::new();
     let (mut conn, mut rx) = bare_conn(&hass);
     let long = format!("{{{{ 1 }}}}{}", " ".repeat(9 * 1024));
@@ -2952,12 +2957,89 @@ async fn long_templates_are_not_kept() {
     assert_eq!(conn.shared.templates.len(), 1);
 }
 
+/// A client that sends a render and goes away while every render permit
+/// is taken: the connection still reads the close (it reads while busy),
+/// so the waiting render is dropped and never runs once permits come back.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_client_that_closes_while_its_render_waits_drops_it() {
+    let _alone = RENDER_PERMITS.lock().await;
+    let s = server().await;
+    let held = super::template::take_all_renders().await;
+    let mut c = Client::authed(&s, &token(&s.auth).0).await;
+    // Runs to its fuel budget, holding a permit, if it ever starts.
+    let heavy = "{% for i in range(100000) %}{% for j in range(100000) %}{% endfor %}{% endfor %}";
+    c.send(json!({"id": 2, "type": "render_template", "template": heavy}))
+        .await;
+    tokio::time::sleep(Duration::from_millis(20)).await;
+    c.ws.close(None).await.unwrap();
+    drop(c);
+    // Well before a missed heartbeat (400 ms in tests) would end it anyway.
+    tokio::time::sleep(Duration::from_millis(50)).await;
+    drop(held);
+    let until = tokio::time::Instant::now() + Duration::from_millis(500);
+    while tokio::time::Instant::now() < until {
+        assert_eq!(
+            super::template::renders_free(),
+            super::template::RENDERS_AT_ONCE,
+            "the render of a closed connection started"
+        );
+        tokio::time::sleep(Duration::from_millis(5)).await;
+    }
+}
+
+/// A connection waiting for a render still answers heartbeats, so it isn't
+/// dropped as dead while the render waits for a permit.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_busy_connection_keeps_its_heartbeat() {
+    let _alone = RENDER_PERMITS.lock().await;
+    let s = server().await;
+    let held = super::template::take_all_renders().await;
+    let mut c = Client::authed(&s, &token(&s.auth).0).await;
+    c.send(json!({"id": 2, "type": "render_template", "template": "{{ 6 * 7 }}"}))
+        .await;
+    // Several heartbeats (200 ms in tests) pass before a permit is free;
+    // the client answers each ping as it waits.
+    tokio::spawn(async move {
+        tokio::time::sleep(Duration::from_millis(1000)).await;
+        drop(held);
+    });
+    assert_eq!(c.recv().await["success"], true);
+    assert_eq!(c.recv().await["event"]["result"], 42);
+}
+
+/// What waits behind a busy command is bounded: past it the client is
+/// cut off, as one that falls behind is.
+#[tokio::test]
+async fn the_queue_behind_a_busy_command_is_bounded() {
+    let _alone = RENDER_PERMITS.lock().await;
+    let hass = Hass::new();
+    let (mut conn, _rx) = bare_conn(&hass);
+    let held = super::template::take_all_renders().await;
+    assert!(conn.handle_frame(
+        &json!({"id": 1, "type": "render_template", "template": "{{ 1 }}"}).to_string()
+    ));
+    assert!(conn.busy.is_some());
+    let pings: Vec<Value> = (2..=super::MAX_QUEUED as u64 + 1)
+        .map(|id| json!({"id": id, "type": "ping"}))
+        .collect();
+    assert!(
+        conn.handle_frame(&Value::Array(pings).to_string()),
+        "up to the limit"
+    );
+    assert!(
+        !conn.handle_frame(&json!({"id": 5000, "type": "ping"}).to_string()),
+        "one more is too many"
+    );
+    drop(held);
+}
+
 /// The tests that take or count render permits run one at a time.
 static RENDER_PERMITS: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
 /// HA has no admin or permission check on `render_template`.
 #[tokio::test]
 async fn read_only_users_render_templates() {
+    let _alone = RENDER_PERMITS.lock().await;
     let s = server().await;
     s.auth.add_user("reader", "pw").unwrap();
     let client = "http://127.0.0.1:8123/";

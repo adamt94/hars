@@ -14,7 +14,8 @@
 //! most [`RENDERS_AT_ONCE`] at a time across every connection, each render
 //! within its fuel budget ([`ha_core::template::FUEL`]). A connection
 //! handles its messages in order, so what follows a `render_template` waits
-//! for its replies: HA does the same for a render without `timeout`, but
+//! for its replies (in a bounded queue; the connection keeps reading, so a
+//! close or a heartbeat's pong is seen at once): HA does the same for a render without `timeout`, but
 //! serves other commands while a `timeout` check runs. A timed-out render
 //! keeps its permit and thread until it reaches its budget (HA raises an
 //! exception into its thread; minijinja can't be interrupted). Closing the

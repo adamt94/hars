@@ -192,6 +192,81 @@ pub(crate) fn lookup_cost(n: usize) -> u64 {
     COMPARE_COST.saturating_mul(log as u64)
 }
 
+/// Values nested deeper than this are refused (hars patch): the engine's
+/// own walks over a value (printing it, comparing it) recurse, and a
+/// template could otherwise nest a list a hundred thousand levels deep
+/// one `{% set a = [a] %}` at a time and exhaust the stack.
+pub(crate) const MAX_VALUE_DEPTH: usize = 256;
+
+/// A depth-first walk over a value and everything it holds, one value per
+/// step: its string bytes, plus a slot for each value held by a container.
+/// Each step is constant work (containers are walked through iterators,
+/// never copied), so stopping a walk early stops its work too.
+pub(crate) struct DeepWalk {
+    first: Option<Value>,
+    stack: Vec<(Box<dyn Iterator<Item = Value> + Send + Sync>, usize)>,
+}
+
+impl DeepWalk {
+    pub(crate) fn new(value: &Value) -> DeepWalk {
+        DeepWalk {
+            first: Some(value.clone()),
+            stack: Vec::new(),
+        }
+    }
+
+    /// The cost of the next value, `None` when the walk is done, `u64::MAX`
+    /// for a value nested too deep.
+    pub(crate) fn step(&mut self) -> Option<u64> {
+        let (v, depth, held) = match self.first.take() {
+            Some(v) => (v, 0, 0),
+            None => loop {
+                let (iter, depth) = self.stack.last_mut()?;
+                match iter.next() {
+                    Some(v) => break (v, *depth + 1, SLOT_COST),
+                    None => {
+                        self.stack.pop();
+                    }
+                }
+            },
+        };
+        if depth > MAX_VALUE_DEPTH {
+            self.stack.clear();
+            return Some(u64::MAX);
+        }
+        let own = match v.0 {
+            ValueRepr::String(ref s, _) => cost_of(s.len(), BYTE_COST),
+            ValueRepr::SmallStr(ref s) => cost_of(s.as_str().len(), BYTE_COST),
+            ValueRepr::Bytes(ref b) => cost_of(b.len(), BYTE_COST),
+            ValueRepr::Object(ref obj) => {
+                match obj.repr() {
+                    crate::value::ObjectRepr::Seq | crate::value::ObjectRepr::Iterable => {
+                        if let Some(iter) = obj.try_iter() {
+                            self.stack.push((iter, depth));
+                        }
+                    }
+                    crate::value::ObjectRepr::Map => {
+                        if let Some(keys) = obj.try_iter() {
+                            let map = obj.clone();
+                            self.stack.push((
+                                Box::new(keys.flat_map(move |key| {
+                                    let item = map.get_value(&key);
+                                    std::iter::once(key).chain(item)
+                                })),
+                                depth,
+                            ));
+                        }
+                    }
+                    crate::value::ObjectRepr::Plain => {}
+                }
+                0
+            }
+            _ => 0,
+        };
+        Some(held.saturating_add(own))
+    }
+}
+
 /// Returns the size cost of a value and of everything it holds, up to
 /// `limit` (anything over it is as bad as `limit + 1`).
 ///
@@ -200,54 +275,42 @@ pub(crate) fn lookup_cost(n: usize) -> u64 {
 /// `[b, b]` nested) costs almost nothing while operations that walk it
 /// deeply (`~`, `==`, `in`, printing) do work in proportion to its full
 /// size, without fuel.  Charging the deep size when a value is made keeps
-/// every later walk within the budget.  The walk stops at `limit`.
+/// every later walk within the budget.  The walk stops at `limit`, and a
+/// value nested deeper than [`MAX_VALUE_DEPTH`] costs more than any limit.
 pub(crate) fn deep_value_cost(value: &Value, limit: u64) -> u64 {
+    let mut walk = DeepWalk::new(value);
     let mut total = 0u64;
-    let mut pending = vec![value.clone()];
-    while let Some(v) = pending.pop() {
+    while let Some(cost) = walk.step() {
+        total = total.saturating_add(cost);
         if total > limit {
             break;
         }
-        total = total.saturating_add(match v.0 {
-            ValueRepr::String(ref s, _) => cost_of(s.len(), BYTE_COST),
-            ValueRepr::SmallStr(ref s) => cost_of(s.as_str().len(), BYTE_COST),
-            ValueRepr::Bytes(ref b) => cost_of(b.len(), BYTE_COST),
-            ValueRepr::Object(ref obj) => match obj.repr() {
-                crate::value::ObjectRepr::Seq | crate::value::ObjectRepr::Iterable => {
-                    let mut n = 0u64;
-                    if let Some(iter) = obj.try_iter() {
-                        for item in iter {
-                            n = n.saturating_add(SLOT_COST);
-                            if total.saturating_add(n) > limit {
-                                break;
-                            }
-                            pending.push(item);
-                        }
-                    }
-                    n
-                }
-                crate::value::ObjectRepr::Map => {
-                    let mut n = 0u64;
-                    if let Some(iter) = obj.try_iter() {
-                        for key in iter {
-                            n = n.saturating_add(2 * SLOT_COST);
-                            if total.saturating_add(n) > limit {
-                                break;
-                            }
-                            if let Some(item) = obj.get_value(&key) {
-                                pending.push(item);
-                            }
-                            pending.push(key);
-                        }
-                    }
-                    n
-                }
-                crate::value::ObjectRepr::Plain => 0,
-            },
-            _ => 0,
-        });
     }
     total
+}
+
+/// The cost of comparing two values deeply: the deep size of the smaller
+/// (an equality check stops where the shorter runs out), found by walking
+/// both in step so the larger is never walked further than the smaller.
+///
+/// hars patch: comparing walks both values every time, so charging their
+/// size once, when they were made, doesn't cover comparing them in a loop.
+pub(crate) fn deep_compare_cost(a: &Value, b: &Value, limit: u64) -> u64 {
+    let (mut wa, mut wb) = (DeepWalk::new(a), DeepWalk::new(b));
+    let (mut ca, mut cb) = (0u64, 0u64);
+    loop {
+        match (wa.step(), wb.step()) {
+            (None, _) => return ca,
+            (_, None) => return cb,
+            (Some(x), Some(y)) => {
+                ca = ca.saturating_add(x);
+                cb = cb.saturating_add(y);
+                if ca.min(cb) > limit {
+                    return ca.min(cb);
+                }
+            }
+        }
+    }
 }
 
 /// An iterator adapter that charges fuel for every item.
