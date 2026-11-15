@@ -466,3 +466,58 @@ async fn trackers_join_the_users_person_and_are_saved() {
     );
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// Onboarding's person (`async_create_person`), and `zone.home` following
+/// the location settings (`core_config_updated`).
+#[tokio::test]
+async fn a_new_person_and_a_moved_home() {
+    let dir = std::env::temp_dir().join(format!("hars-new-person-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let hass = Hass::new();
+    hass.start();
+    let registry = ha_registry::Registry::in_memory(&hass, Registries::default());
+    let components = Arc::new(Components::load(&dir));
+    components.setup(&hass, &registry.snapshot());
+    components.track(&hass);
+    components.save_to(&dir);
+    assert!(
+        components
+            .create_person(&hass, Some(&registry), "", None)
+            .is_none()
+    );
+    let id = components
+        .create_person(&hass, Some(&registry), "Test Name", Some("u1"))
+        .unwrap();
+    assert_eq!(id.as_str(), "person.test_name");
+    // A second "Test Name" gets the next id, as `IDManager` gives.
+    let id2 = components
+        .create_person(&hass, Some(&registry), "Test Name", None)
+        .unwrap();
+    assert_eq!(id2.as_str(), "person.test_name_2");
+    assert_eq!(
+        components.persons()[1],
+        json!({"id": "test_name_2", "name": "Test Name", "user_id": null, "device_trackers": []})
+            .as_object()
+            .unwrap()
+            .clone()
+    );
+    assert_eq!(state_of(&hass, "person.test_name")["state"], "unknown");
+    let row = registry
+        .entity_by_unique_id("person", "person", "test_name")
+        .unwrap();
+    assert_eq!(row.entity_id, "person.test_name");
+
+    let home = state_of(&hass, "zone.home");
+    let mut config = (*hass.config()).clone();
+    config.latitude = 51.5;
+    config.radius = 150;
+    config.location_name = "Flat".into();
+    hass.set_config(config);
+    settle().await;
+    let moved = state_of(&hass, "zone.home");
+    assert_ne!(moved, home);
+    assert_eq!(moved["attributes"]["latitude"], 51.5);
+    assert_eq!(moved["attributes"]["radius"], 150);
+    assert_eq!(moved["attributes"]["friendly_name"], "Flat");
+    let _ = std::fs::remove_dir_all(dir);
+}

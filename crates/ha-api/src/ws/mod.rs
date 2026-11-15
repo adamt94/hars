@@ -7,8 +7,11 @@
 //! `supported_features` with `coalesce_messages`, queued messages go out
 //! together as one JSON array per frame.
 
+mod analytics;
 mod automation;
 mod commands;
+mod config;
+mod config_entries;
 mod entities;
 mod frontend;
 mod history;
@@ -19,6 +22,8 @@ mod recorder;
 mod sensor;
 pub(crate) mod template;
 mod weather;
+
+pub use config::WHOAMI_URL;
 
 use crate::Shared;
 use crate::auth::RemoteIp;

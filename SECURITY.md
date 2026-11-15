@@ -26,9 +26,21 @@ well.
   owner only, as Home Assistant does. Backups contain them too.
 - REST state, config, service and mobile registration routes require an
   `Authorization: Bearer` access token. `/auth/*` provides login and token
-  exchange; `/api/onboarding` and `/api/onboarding/installation_type` are
-  anonymous status views. `/api/websocket` authenticates inside the WebSocket
+  exchange. Until onboarding is finished, as in Home Assistant, these are
+  anonymous: `/api/onboarding` and `/api/onboarding/installation_type`
+  (status), `/api/onboarding/integration/wait`, and
+  `/api/onboarding/users`, which creates the owner. Anyone who reaches a
+  fresh install before you can make themselves its owner, so onboard it
+  right after the first start. Once the owner exists, the user step refuses
+  to run again; after a restart with onboarding finished, none of these
+  routes exist. `/api/websocket` authenticates inside the WebSocket
   protocol. Brands routes use their own access token.
+- hars never sends analytics. Onboarding's analytics choice is stored in
+  `.storage/core.analytics` (Home Assistant's file) and nothing else.
+  Location detection during onboarding asks Home Assistant's own service
+  (`services.home-assistant.io/whoami`) only when you agree to it in the
+  page, as Home Assistant does; the met forecast asks `api.met.no` for your
+  home's coordinates.
 - Companion app webhooks use the secret webhook id as their credential.
   Encryption is required when the registration has `supports_encryption`
   enabled; registrations without that flag can send plaintext. Treat webhook

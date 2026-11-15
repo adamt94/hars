@@ -953,3 +953,49 @@ async fn restores_follow_the_entry_and_area() {
     let row = reg.get_or_create_entity("sensor", "test", "sensor.kept", None, patch("D"));
     assert_eq!(row.disabled_by.as_deref(), Some("config_entry"));
 }
+
+/// Onboarding's default areas (`async_create`, guarded by name): ids from
+/// the name with `_2` when taken, names compared case-folded without
+/// spaces, `area_registry_updated` per area, and HA's file layout.
+#[tokio::test]
+async fn areas_are_created_once_by_name() {
+    let dir = std::env::temp_dir().join(format!("hars-areas-{}", rand::random::<u32>()));
+    let hass = Hass::new();
+    hass.start();
+    let mut events = hass.bus().subscribe();
+    let registry = Registry::new(&hass, &dir, Registries::default());
+    let a = registry
+        .create_area("Living Room", Some("mdi:sofa"))
+        .unwrap();
+    assert_eq!(
+        (a.id.as_str(), a.icon.as_deref()),
+        ("living_room", Some("mdi:sofa"))
+    );
+    assert!(registry.create_area("living room", None).is_none());
+    assert!(registry.create_area("LivingRoom", None).is_none());
+    let b = registry.create_area("Living_Room", None).unwrap();
+    assert_eq!(b.id, "living_room_2");
+    let e = events.recv().await.unwrap();
+    let EventKind::Custom { name, data } = &e.kind else {
+        panic!("{e:?}")
+    };
+    assert_eq!(name, "area_registry_updated");
+    assert_eq!(*data, json!({"action": "create", "area_id": "living_room"}));
+    registry.flush().await;
+    let file: Value = serde_json::from_str(
+        &std::fs::read_to_string(dir.join(".storage/core.area_registry")).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(
+        (&file["version"], &file["minor_version"]),
+        (&json!(1), &json!(9))
+    );
+    let keys: Vec<&String> = file["data"]["areas"][0]
+        .as_object()
+        .unwrap()
+        .keys()
+        .collect();
+    assert_eq!(keys.len(), 11);
+    assert_eq!(file["data"]["areas"][1]["id"], "living_room_2");
+    let _ = std::fs::remove_dir_all(dir);
+}

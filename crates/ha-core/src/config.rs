@@ -24,7 +24,12 @@ pub struct CoreConfig {
     pub language: String,
     /// Home zone radius in meters.
     pub radius: i64,
-    /// Fields `hars` doesn't use, written back unchanged.
+    /// Where this came from (`config_source`): `storage` once loaded from
+    /// or saved to `.storage/core.config`.
+    #[serde(skip)]
+    pub source: ConfigSource,
+    /// Fields `hars` doesn't use. Not written back: HA's `_async_store`
+    /// writes its twelve keys and nothing else.
     #[serde(flatten)]
     pub extra: Map<String, Value>,
 }
@@ -44,6 +49,7 @@ impl Default for CoreConfig {
             country: None,
             language: "en".into(),
             radius: 100,
+            source: ConfigSource::Default,
             extra: Map::new(),
         }
     }
@@ -72,10 +78,47 @@ pub fn store(config_dir: &Path) -> Store {
 
 impl CoreConfig {
     /// Load `.storage/core.config`; HA's defaults if there is none.
-    pub fn load(config_dir: &Path) -> Result<(Self, ConfigSource), StoreError> {
+    pub fn load(config_dir: &Path) -> Result<Self, StoreError> {
         Ok(match store(config_dir).load::<Self>()? {
-            Some(c) => (c, ConfigSource::Storage),
-            None => (Self::default(), ConfigSource::Default),
+            Some(c) => Self {
+                source: ConfigSource::Storage,
+                ..c
+            },
+            None => Self::default(),
+        })
+    }
+
+    /// `_async_store`: write `.storage/core.config` (blocking) with HA's
+    /// keys in HA's order.
+    pub fn save(&self, config_dir: &Path) -> std::io::Result<()> {
+        #[derive(Serialize)]
+        struct Stored<'a> {
+            latitude: f64,
+            longitude: f64,
+            elevation: i64,
+            unit_system_v2: &'a str,
+            location_name: &'a str,
+            time_zone: &'a str,
+            external_url: &'a Option<String>,
+            internal_url: &'a Option<String>,
+            currency: &'a str,
+            country: &'a Option<String>,
+            language: &'a str,
+            radius: i64,
+        }
+        store(config_dir).save(&Stored {
+            latitude: self.latitude,
+            longitude: self.longitude,
+            elevation: self.elevation,
+            unit_system_v2: &self.unit_system_v2,
+            location_name: &self.location_name,
+            time_zone: &self.time_zone,
+            external_url: &self.external_url,
+            internal_url: &self.internal_url,
+            currency: &self.currency,
+            country: &self.country,
+            language: &self.language,
+            radius: self.radius,
         })
     }
 
@@ -103,11 +146,9 @@ mod tests {
     fn loads_has_file_and_defaults() {
         let dir = std::env::temp_dir().join(format!("hars-core-config-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
-        let (c, source) = CoreConfig::load(&dir).unwrap();
-        assert_eq!(
-            (c.clone(), source),
-            (CoreConfig::default(), ConfigSource::Default)
-        );
+        let c = CoreConfig::load(&dir).unwrap();
+        assert_eq!(c, CoreConfig::default());
+        assert_eq!(c.source, ConfigSource::Default);
         assert_eq!(c.unit_system()["temperature"], "°C");
 
         std::fs::create_dir_all(dir.join(".storage")).unwrap();
@@ -121,17 +162,45 @@ mod tests {
             .to_string(),
         )
         .unwrap();
-        let (c, source) = CoreConfig::load(&dir).unwrap();
-        assert_eq!(source, ConfigSource::Storage);
+        let c = CoreConfig::load(&dir).unwrap();
+        assert_eq!(c.source, ConfigSource::Storage);
         assert_eq!(
             (c.latitude, c.time_zone.as_str()),
             (52.37, "Europe/Amsterdam")
         );
         assert_eq!(c.unit_system()["temperature"], "°F");
-        // Unknown fields survive a save.
-        store(&dir).save(&c).unwrap();
-        let (again, _) = CoreConfig::load(&dir).unwrap();
-        assert_eq!(again.extra["future"], true);
+        // A save writes HA's twelve keys, as `_async_store` does.
+        c.save(&dir).unwrap();
+        let again = CoreConfig::load(&dir).unwrap();
+        assert!(again.extra.is_empty());
+        assert_eq!(
+            CoreConfig {
+                extra: c.extra.clone(),
+                ..again
+            },
+            c
+        );
         std::fs::remove_dir_all(dir).unwrap();
+    }
+}
+
+#[cfg(test)]
+mod watch_tests {
+    use super::*;
+
+    /// What follows the home wakes on a change, and only then.
+    #[tokio::test]
+    async fn watchers_wake_on_each_change() {
+        let hass = crate::Hass::new();
+        let mut watch = hass.watch_config();
+        assert!(!watch.has_changed().unwrap());
+        hass.set_config(CoreConfig {
+            latitude: 51.5,
+            ..Default::default()
+        });
+        watch.changed().await.unwrap();
+        assert_eq!(watch.borrow_and_update().latitude, 51.5);
+        assert_eq!(hass.config().latitude, 51.5);
+        assert!(!watch.has_changed().unwrap());
     }
 }

@@ -124,6 +124,7 @@ fn app_with(entries: &[Map<String, Value>]) -> App {
         auth: crate::test_util::auth(true),
         config: Arc::new(config),
         templates: Default::default(),
+        core_config: Default::default(),
     };
     App {
         hass,
@@ -1110,6 +1111,7 @@ async fn registrations_as_ha() {
         auth: crate::test_util::auth(true),
         config: Arc::new(config.clone()),
         templates: Default::default(),
+        core_config: Default::default(),
     };
     let sealed = Key::hex(SECRET).unwrap().seal(
         json!({"name": "Ghost", "type": "sensor", "unique_id": "ghost", "state": 1})

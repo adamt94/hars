@@ -12,6 +12,7 @@ pub mod met;
 pub mod mobile_app;
 pub mod naming;
 pub mod num;
+pub mod onboarding;
 pub mod scene;
 pub mod sun;
 pub mod switch;
@@ -45,6 +46,17 @@ pub struct Started {
     pub running: Vec<&'static str>,
     /// The weather entities, for the forecast APIs.
     pub weather: Arc<weather::Weather>,
+}
+
+/// A fresh install (no `core.config_entries` file) gets the entries HA's
+/// default configuration imports at its first start: `sun`'s (`sun`'s
+/// `async_setup` runs its import flow when it has no entry). Saved like
+/// any new entry.
+pub fn import_default_entries(entries: &config_entries::ConfigEntries) {
+    if entries.list().is_none() {
+        let sun = entries.new_entry(sun::DOMAIN, "import", "Sun", None, Map::new());
+        entries.add(sun);
+    }
 }
 
 /// Start the integrations for these config entries (each a

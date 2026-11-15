@@ -410,7 +410,10 @@ pub const UNRECORDED: &[&str] = &[
 /// Run the integration for config entry `entry_id` until the task is
 /// dropped: work out the events, refresh the position on the phase's
 /// schedule, and start again when the phase changes. Each step sleeps until
-/// its time on the hass clock; nothing polls.
+/// its time on the hass clock; nothing polls. When the location or time
+/// zone changes (`core_config_updated`), everything is worked out again at
+/// once, as HA's `update_location` does; an elevation change alone waits
+/// for the next phase, as in HA (astral's `Location` doesn't include it).
 /// `ready` is done after the first write.
 pub async fn run(
     hass: Hass,
@@ -419,7 +422,39 @@ pub async fn run(
     ready: ha_core::SetupGuard,
 ) {
     let mut ready = Some(ready);
-    let config = hass.config();
+    let entities = Entities::new(&registries, &entry_id);
+    hass.set_unrecorded(EntityId::parse("sun.sun").expect("valid"), UNRECORDED);
+    let mut watch = hass.watch_config();
+    let mut config = watch.borrow_and_update().clone();
+    loop {
+        let here = |c: &ha_core::config::CoreConfig| (c.latitude, c.longitude, c.time_zone.clone());
+        let current = here(&config);
+        let moved = async {
+            loop {
+                if watch.changed().await.is_err() {
+                    return std::future::pending().await;
+                }
+                let c = watch.borrow_and_update().clone();
+                if here(&c) != current {
+                    return c;
+                }
+            }
+        };
+        tokio::select! {
+            () = follow(&hass, &entities, &config, &mut ready) => {}
+            c = moved => config = c,
+        }
+    }
+}
+
+/// [`run`] at one location, until the task is dropped or the location
+/// changes.
+async fn follow(
+    hass: &Hass,
+    entities: &Entities,
+    config: &ha_core::config::CoreConfig,
+    ready: &mut Option<ha_core::SetupGuard>,
+) {
     let observer = Observer {
         latitude: config.latitude,
         longitude: config.longitude,
@@ -432,8 +467,6 @@ pub async fn run(
         );
         TimeZone::UTC
     });
-    let entities = Entities::new(&registries, &entry_id);
-    hass.set_unrecorded(EntityId::parse("sun.sun").expect("valid"), UNRECORDED);
     let clock = hass.clock().clone();
     // Until the wall clock reads `at`: after each wake the remaining time is
     // checked again, so a clock stepped back doesn't fire early (HA's
@@ -454,7 +487,7 @@ pub async fn run(
     loop {
         let now = clock.now();
         let ev = events(&observer, &tz, now);
-        entities.write(&hass, &ev, position(&observer, now), true);
+        entities.write(hass, &ev, position(&observer, now), true);
         if let Some(r) = ready.take() {
             r.done();
         }
@@ -467,7 +500,7 @@ pub async fn run(
             }
             sleep_until(at + every).await;
             at = clock.now();
-            entities.write(&hass, &ev, position(&observer, at), false);
+            entities.write(hass, &ev, position(&observer, at), false);
         }
         sleep_until(ev.next_change).await;
     }

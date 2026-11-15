@@ -1,7 +1,6 @@
 # Run hars with Docker Compose. See README.md for the steps.
 #
-#   docker compose run --rm hars auth add USERNAME PASSWORD   # once: the owner
-#   docker compose up -d                                      # http://<host>:8123
+#   docker compose up -d   # then open http://<host>:8123 and follow the onboarding
 #
 # The image is pulled from ghcr.io (published by .github/workflows/publish.yml).
 # If it can't be pulled and this file sits in a clone of the repository,

@@ -514,7 +514,12 @@ async fn read_only_users_are_limited() {
     let flow = s.auth.start_login_flow("http://127.0.0.1:8123/", None);
     let code = s
         .auth
-        .finish_login_flow(&flow, "http://127.0.0.1:8123/", "reader", None)
+        .finish_login_flow(
+            &flow,
+            "http://127.0.0.1:8123/",
+            &s.auth.check_password("reader", "pw").unwrap(),
+            None,
+        )
         .unwrap();
     let t = s
         .auth
@@ -631,6 +636,7 @@ fn bare_conn(hass: &Hass) -> (super::Conn, tokio::sync::mpsc::Receiver<super::Fr
             auth,
             config: Default::default(),
             templates: Default::default(),
+            core_config: Default::default(),
         },
         principal,
         user,
@@ -1060,7 +1066,12 @@ async fn dashboards_are_served_saved_and_announced() {
     let flow = s.auth.start_login_flow("http://127.0.0.1:8123/", None);
     let code = s
         .auth
-        .finish_login_flow(&flow, "http://127.0.0.1:8123/", "reader", None)
+        .finish_login_flow(
+            &flow,
+            "http://127.0.0.1:8123/",
+            &s.auth.check_password("reader", "pw").unwrap(),
+            None,
+        )
         .unwrap();
     let t = s
         .auth
@@ -2953,7 +2964,12 @@ async fn read_only_users_render_templates() {
     let flow = s.auth.start_login_flow(client, None);
     let code = s
         .auth
-        .finish_login_flow(&flow, client, "reader", None)
+        .finish_login_flow(
+            &flow,
+            client,
+            &s.auth.check_password("reader", "pw").unwrap(),
+            None,
+        )
         .unwrap();
     let t = s
         .auth

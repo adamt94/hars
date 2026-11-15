@@ -1,6 +1,5 @@
-//! HA's auth HTTP views (`components/auth/__init__.py`, `login_flow.py`),
-//! the `Bearer` check on `/api/*` (`components/http/auth.py`) and the
-//! onboarding status views (`components/onboarding/views.py`).
+//! HA's auth HTTP views (`components/auth/__init__.py`, `login_flow.py`)
+//! and the `Bearer` check on `/api/*` (`components/http/auth.py`).
 
 // Request-parsing helpers return the finished error `Response`: it is only
 // built for a rejected request, so its size doesn't matter.
@@ -35,15 +34,13 @@ pub(crate) fn routes(auth: Auth) -> Router {
         )
         .route("/auth/token", axum::routing::post(token))
         .route("/auth/revoke", axum::routing::post(revoke))
-        .route("/api/onboarding", get(onboarding_status))
-        .route("/api/onboarding/installation_type", get(installation_type))
         // These bodies are a few hundred bytes; don't buffer megabytes for
         // anonymous callers.
         .layer(DefaultBodyLimit::max(MAX_BODY))
         .with_state(auth)
 }
 
-const MAX_BODY: usize = 16 * 1024;
+pub(crate) const MAX_BODY: usize = 16 * 1024;
 /// Client ids and redirect URIs are kept while a flow or code is pending, so
 /// their length is bounded (HA has no limit; real ones are under 100 bytes).
 const MAX_URL: usize = 2048;
@@ -70,7 +67,7 @@ fn remote_ip(ext: &axum::http::Extensions) -> Option<IpAddr> {
 }
 
 /// `HomeAssistantView.json_message`.
-fn json_message(status: StatusCode, message: &str) -> Response {
+pub(crate) fn json_message(status: StatusCode, message: &str) -> Response {
     (status, Json(json!({ "message": message }))).into_response()
 }
 
@@ -87,7 +84,7 @@ pub(crate) fn log_invalid(ip: Option<IpAddr>, what: &str) {
 
 /// Write changed auth state before answering, so an issued token survives
 /// a crash. Off the async runtime: it's a file write and an fsync.
-async fn persist(auth: &Auth) {
+pub(crate) async fn persist(auth: &Auth) {
     if !auth.needs_save() {
         return;
     }
@@ -185,7 +182,7 @@ async fn providers(State(auth): State<Auth>, RemoteIp(ip): RemoteIp) -> Response
 
 /// `RequestDataValidator`: the body is JSON whatever the Content-Type (the
 /// frontend's `fetch` sends none).
-fn json_body(body: &[u8]) -> Result<Map<String, Value>, Response> {
+pub(crate) fn json_body(body: &[u8]) -> Result<Map<String, Value>, Response> {
     match serde_json::from_slice::<Value>(body) {
         Ok(Value::Object(map)) => Ok(map),
         Ok(_) => Err(format_error("expected a dictionary")),
@@ -193,7 +190,7 @@ fn json_body(body: &[u8]) -> Result<Map<String, Value>, Response> {
     }
 }
 
-fn format_error(detail: &str) -> Response {
+pub(crate) fn format_error(detail: &str) -> Response {
     json_message(
         StatusCode::BAD_REQUEST,
         &format!("Message format incorrect: {detail}"),
@@ -343,6 +340,12 @@ async fn login_flow_step(
         }
         Err(LoginError::Blocked(reason)) => {
             json_message(StatusCode::FORBIDDEN, &format!("Login blocked: {reason}"))
+        }
+        // The login was taken back or made again while the password was
+        // checked: as a wrong password, on the same flow.
+        Err(LoginError::InvalidAuth) => {
+            log_invalid(ip, "invalid username or password");
+            login_form(&flow_id, json!({"base": "invalid_auth"}))
         }
     }
 }
@@ -517,32 +520,6 @@ async fn revoke(State(auth): State<Auth>, headers: HeaderMap, body: Bytes) -> St
         persist(&auth).await;
     }
     StatusCode::OK
-}
-
-// ----- onboarding status -----
-
-/// Registered only until onboarding is complete; then it's a 404, like HA
-/// after a restart.
-async fn onboarding_status(State(auth): State<Auth>) -> Response {
-    if auth.is_onboarded() {
-        return StatusCode::NOT_FOUND.into_response();
-    }
-    let steps: Vec<Value> = auth
-        .onboarding_steps()
-        .into_iter()
-        .map(|(step, done)| json!({"step": step, "done": done}))
-        .collect();
-    Json(steps).into_response()
-}
-
-async fn installation_type(State(auth): State<Auth>) -> Response {
-    if auth.is_onboarded() {
-        return StatusCode::NOT_FOUND.into_response();
-    }
-    if auth.onboarding_steps().iter().any(|(_, done)| *done) {
-        return unauthorized();
-    }
-    Json(json!({"installation_type": "Home Assistant Container"})).into_response()
 }
 
 #[cfg(test)]
@@ -1073,31 +1050,6 @@ mod tests {
                 StatusCode::BAD_REQUEST,
                 json!({"message": "Onboarding not finished", "code": "onboarding_required"})
             )
-        );
-        let o = c.send(Request::get("/api/onboarding"), Body::empty()).await;
-        assert_eq!(
-            o.json(),
-            json!([{"step": "user", "done": false}, {"step": "core_config", "done": false},
-                   {"step": "analytics", "done": false}, {"step": "integration", "done": false}])
-        );
-        let t = c
-            .send(
-                Request::get("/api/onboarding/installation_type"),
-                Body::empty(),
-            )
-            .await;
-        assert_eq!(
-            t.json(),
-            json!({"installation_type": "Home Assistant Container"})
-        );
-
-        // Once onboarded, the onboarding views are gone.
-        let c = Client::new(crate::test_util::auth(true));
-        assert_eq!(
-            c.send(Request::get("/api/onboarding"), Body::empty())
-                .await
-                .status,
-            StatusCode::NOT_FOUND
         );
     }
 

@@ -12,6 +12,19 @@ fn manifest(domain: &str) -> Option<&'static str> {
         .map(|i| MANIFESTS[i].1)
 }
 
+/// `Integration.integration_type` (`hub` when the manifest doesn't say),
+/// for integrations with an embedded manifest.
+pub(super) fn integration_type(domain: &str) -> Option<String> {
+    let manifest: Value = serde_json::from_str(manifest(domain)?).ok()?;
+    Some(
+        manifest
+            .get("integration_type")
+            .and_then(Value::as_str)
+            .unwrap_or("hub")
+            .to_owned(),
+    )
+}
+
 /// The command's schema (`integrations: [str]` for the list,
 /// `integration: str` for one), every error reported as voluptuous does.
 fn check(msg: &Map<String, Value>, allowed: &str) -> Result<(), Invalid> {
