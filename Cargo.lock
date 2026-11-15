@@ -589,6 +589,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "ha-recorder"
+version = "0.1.0"
+dependencies = [
+ "ha-core",
+ "jiff",
+ "parking_lot",
+ "smol_str",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "ha-registry"
 version = "0.1.0"
 dependencies = [

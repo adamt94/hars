@@ -1,0 +1,22 @@
+[package]
+name = "ha-recorder"
+description = "State and event history: an append-only segment log"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+ha-core.workspace = true
+jiff = "0.2.43"
+parking_lot = "0.12.5"
+smol_str = "0.3.2"
+tokio = { version = "1.54.1", features = ["sync"] }
+tracing = "0.1.44"
+
+[dev-dependencies]
+tokio = { version = "1.54.1", features = ["macros", "rt-multi-thread"] }
