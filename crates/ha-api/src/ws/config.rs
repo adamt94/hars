@@ -599,7 +599,7 @@ mod tests {
         for (name, ok) in [
             ("Europe/London", true),
             ("UTC", true),
-            ("US/Eastern", true),
+            ("America/New_York", true),
             ("europe/london", false),
             ("Mars/Phobos", false),
             ("", false),
