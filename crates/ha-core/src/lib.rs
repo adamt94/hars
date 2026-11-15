@@ -17,6 +17,7 @@ mod entity_id;
 pub mod entityfilter;
 mod event;
 mod lifecycle;
+pub mod py;
 pub mod recorded;
 pub mod restore;
 mod schema;
@@ -25,6 +26,7 @@ pub mod shadow;
 mod slug;
 mod state;
 pub mod storage;
+pub mod template;
 pub mod yaml;
 
 pub use clock::{Clock, SimulatedClock, isoformat, serialize_iso};

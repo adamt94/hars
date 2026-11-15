@@ -1,0 +1,1829 @@
+[
+ {
+  "name": "welcome",
+  "steps": [
+   {
+    "send": {
+     "id": 1,
+     "type": "render_template",
+     "template": "## Welcome {{ user }}",
+     "variables": {
+      "config": {
+       "type": "markdown",
+       "text_only": true
+      },
+      "user": "Ann"
+     },
+     "strict": true,
+     "report_errors": false
+    },
+    "replies": [
+     {
+      "id": 1,
+      "type": "result",
+      "success": true,
+      "result": null
+     },
+     {
+      "id": 1,
+      "type": "event",
+      "event": {
+       "result": "## Welcome Ann",
+       "listeners": {
+        "all": false,
+        "entities": [],
+        "domains": [],
+        "time": false
+       }
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "name": "welcome preview",
+  "steps": [
+   {
+    "send": {
+     "id": 1,
+     "type": "render_template",
+     "template": "## Welcome {{ user }}",
+     "variables": {
+      "user": "Ann"
+     },
+     "strict": true,
+     "report_errors": true
+    },
+    "replies": [
+     {
+      "id": 1,
+      "type": "result",
+      "success": true,
+      "result": null
+     },
+     {
+      "id": 1,
+      "type": "event",
+      "event": {
+       "result": "## Welcome Ann",
+       "listeners": {
+        "all": false,
+        "entities": [],
+        "domains": [],
+        "time": false
+       }
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "name": "static",
+  "steps": [
+   {
+    "send": {
+     "id": 1,
+     "type": "render_template",
+     "template": "  hello  "
+    },
+    "replies": [
+     {
+      "id": 1,
+      "type": "result",
+      "success": true,
+      "result": null
+     },
+     {
+      "id": 1,
+      "type": "event",
+      "event": {
+       "result": "hello",
+       "listeners": {
+        "all": false,
+        "entities": [],
+        "domains": [],
+        "time": false
+       }
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "name": "number",
+  "steps": [
+   {
+    "send": {
+     "id": 1,
+     "type": "render_template",
+     "template": "{{ 1 + 1 }}"
+    },
+    "replies": [
+     {
+      "id": 1,
+      "type": "result",
+      "success": true,
+      "result": null
+     },
+     {
+      "id": 1,
+      "type": "event",
+      "event": {
+       "result": 2,
+       "listeners": {
+        "all": false,
+        "entities": [],
+        "domains": [],
+        "time": false
+       }
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "name": "list",
+  "steps": [
+   {
+    "send": {
+     "id": 1,
+     "type": "render_template",
+     "template": "{{ [1, 'a', none, true, {'b': 2.0}] }}"
+    },
+    "replies": [
+     {
+      "id": 1,
+      "type": "result",
+      "success": true,
+      "result": null
+     },
+     {
+      "id": 1,
+      "type": "event",
+      "event": {
+       "result": [
+        1,
+        "a",
+        null,
+        true,
+        {
+         "b": 2.0
+        }
+       ],
+       "listeners": {
+        "all": false,
+        "entities": [],
+        "domains": [],
+        "time": false
+       }
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "name": "unserializable result",
+  "steps": [
+   {
+    "send": {
+     "id": 1,
+     "type": "render_template",
+     "template": "{{ 'b' }}'x'"
+    },
+    "replies": [
+     {
+      "id": 1,
+      "type": "result",
+      "success": true,
+      "result": null
+     },
+     {
+      "id": 1,
+      "type": "result",
+      "success": false,
+      "error": {
+       "code": "unknown_error",
+       "message": "Invalid JSON in response"
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "name": "unserializable result, reported",
+  "steps": [
+   {
+    "send": {
+     "id": 1,
+     "type": "render_template",
+     "template": "{{ 'b' }}'x'",
+     "report_errors": true
+    },
+    "replies": [
+     {
+      "id": 1,
+      "type": "result",
+      "success": true,
+      "result": null
+     },
+     {
+      "id": 1,
+      "type": "result",
+      "success": false,
+      "error": {
+       "code": "unknown_error",
+       "message": "Invalid JSON in response"
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "name": "undefined strict",
+  "steps": [
+   {
+    "send": {
+     "id": 1,
+     "type": "render_template",
+     "template": "{{ user }}",
+     "strict": true
+    },
+    "replies": [
+     {
+      "id": 1,
+      "type": "result",
+      "success": true,
+      "result": null
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "name": "undefined strict reported",
+  "steps": [
+   {
+    "send": {
+     "id": 1,
+     "type": "render_template",
+     "template": "{{ user }}",
+     "strict": true,
+     "report_errors": true
+    },
+    "replies": [
+     {
+      "id": 1,
+      "type": "event",
+      "event": {
+       "error": "UndefinedError: 'user' is undefined",
+       "level": "ERROR"
+      }
+     },
+     {
+      "id": 1,
+      "type": "result",
+      "success": true,
+      "result": null
+     },
+     {
+      "id": 1,
+      "type": "event",
+      "event": {
+       "error": "UndefinedError: 'user' is undefined",
+       "level": "ERROR"
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "name": "undefined lenient",
+  "steps": [
+   {
+    "send": {
+     "id": 1,
+     "type": "render_template",
+     "template": "{{ user }}x"
+    },
+    "replies": [
+     {
+      "id": 1,
+      "type": "result",
+      "success": true,
+      "result": null
+     },
+     {
+      "id": 1,
+      "type": "event",
+      "event": {
+       "result": "x",
+       "listeners": {
+        "all": false,
+        "entities": [],
+        "domains": [],
+        "time": false
+       }
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "name": "undefined lenient reported",
+  "steps": [
+   {
+    "send": {
+     "id": 1,
+     "type": "render_template",
+     "template": "{{ user }}x",
+     "report_errors": true
+    },
+    "replies": [
+     {
+      "id": 1,
+      "type": "event",
+      "event": {
+       "error": "'user' is undefined",
+       "level": "WARNING"
+      }
+     },
+     {
+      "id": 1,
+      "type": "result",
+      "success": true,
+      "result": null
+     },
+     {
+      "id": 1,
+      "type": "event",
+      "event": {
+       "error": "'user' is undefined",
+       "level": "WARNING"
+      }
+     },
+     {
+      "id": 1,
+      "type": "event",
+      "event": {
+       "result": "x",
+       "listeners": {
+        "all": false,
+        "entities": [],
+        "domains": [],
+        "time": false
+       }
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "name": "undefined attribute reported",
+  "steps": [
+   {
+    "send": {
+     "id": 1,
+     "type": "render_template",
+     "template": "{{ x.y }}",
+     "report_errors": true
+    },
+    "replies": [
+     {
+      "id": 1,
+      "type": "event",
+      "event": {
+       "error": "'x' is undefined",
+       "level": "ERROR"
+      }
+     },
+     {
+      "id": 1,
+      "type": "event",
+      "event": {
+       "error": "UndefinedError: 'x' is undefined",
+       "level": "ERROR"
+      }
+     },
+     {
+      "id": 1,
+      "type": "result",
+      "success": true,
+      "result": null
+     },
+     {
+      "id": 1,
+      "type": "event",
+      "event": {
+       "error": "'x' is undefined",
+       "level": "ERROR"
+      }
+     },
+     {
+      "id": 1,
+      "type": "event",
+      "event": {
+       "error": "UndefinedError: 'x' is undefined",
+       "level": "ERROR"
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "name": "missing key strict reported",
+  "steps": [
+   {
+    "send": {
+     "id": 1,
+     "type": "render_template",
+     "template": "{{ config.missing }}",
+     "variables": {
+      "config": {}
+     },
+     "strict": true,
+     "report_errors": true
+    },
+    "replies": [
+     {
+      "id": 1,
+      "type": "event",
+      "event": {
+       "error": "UndefinedError: 'dict object' has no attribute 'missing'",
+       "level": "ERROR"
+      }
+     },
+     {
+      "id": 1,
+      "type": "result",
+      "success": true,
+      "result": null
+     },
+     {
+      "id": 1,
+      "type": "event",
+      "event": {
+       "error": "UndefinedError: 'dict object' has no attribute 'missing'",
+       "level": "ERROR"
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "name": "syntax error",
+  "steps": [
+   {
+    "send": {
+     "id": 1,
+     "type": "render_template",
+     "template": "{{ 1 + }}"
+    },
+    "replies": [
+     {
+      "id": 1,
+      "type": "result",
+      "success": true,
+      "result": null
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "name": "syntax error reported",
+  "steps": [
+   {
+    "send": {
+     "id": 1,
+     "type": "render_template",
+     "template": "{{ 1 + }}",
+     "report_errors": true
+    },
+    "replies": [
+     {
+      "id": 1,
+      "type": "event",
+      "event": {
+       "error": "TemplateSyntaxError: unexpected 'end of print statement'",
+       "level": "ERROR"
+      }
+     },
+     {
+      "id": 1,
+      "type": "result",
+      "success": true,
+      "result": null
+     },
+     {
+      "id": 1,
+      "type": "event",
+      "event": {
+       "error": "TemplateSyntaxError: unexpected 'end of print statement'",
+       "level": "ERROR"
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "name": "syntax error with timeout",
+  "steps": [
+   {
+    "send": {
+     "id": 1,
+     "type": "render_template",
+     "template": "{{ 1 + }}",
+     "timeout": 3
+    },
+    "replies": [
+     {
+      "id": 1,
+      "type": "result",
+      "success": true,
+      "result": null
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "name": "unknown filter reported",
+  "steps": [
+   {
+    "send": {
+     "id": 1,
+     "type": "render_template",
+     "template": "{{ 1 | nofilter }}",
+     "report_errors": true
+    },
+    "replies": [
+     {
+      "id": 1,
+      "type": "event",
+      "event": {
+       "error": "TemplateAssertionError: No filter named 'nofilter'.",
+       "level": "ERROR"
+      }
+     },
+     {
+      "id": 1,
+      "type": "result",
+      "success": true,
+      "result": null
+     },
+     {
+      "id": 1,
+      "type": "event",
+      "event": {
+       "error": "TemplateAssertionError: No filter named 'nofilter'.",
+       "level": "ERROR"
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "name": "timed out",
+  "steps": [
+   {
+    "send": {
+     "id": 1,
+     "type": "render_template",
+     "template": "{% for i in range(100000) %}{% for j in range(10) %}{% endfor %}{% endfor %}x",
+     "timeout": 1e-09
+    },
+    "replies": [
+     {
+      "id": 1,
+      "type": "result",
+      "success": false,
+      "error": {
+       "code": "template_error",
+       "message": "Exceeded maximum execution time of 1e-09s"
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "name": "timed out, string timeout",
+  "steps": [
+   {
+    "send": {
+     "id": 1,
+     "type": "render_template",
+     "template": "{% for i in range(100000) %}{% for j in range(10) %}{% endfor %}{% endfor %}x",
+     "timeout": "0.000000001",
+     "report_errors": true
+    },
+    "replies": [
+     {
+      "id": 1,
+      "type": "result",
+      "success": false,
+      "error": {
+       "code": "template_error",
+       "message": "Exceeded maximum execution time of 1e-09s"
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "name": "timeout not reached",
+  "steps": [
+   {
+    "send": {
+     "id": 1,
+     "type": "render_template",
+     "template": "{{ 2 }}",
+     "timeout": 3
+    },
+    "replies": [
+     {
+      "id": 1,
+      "type": "result",
+      "success": true,
+      "result": null
+     },
+     {
+      "id": 1,
+      "type": "event",
+      "event": {
+       "result": 2,
+       "listeners": {
+        "all": false,
+        "entities": [],
+        "domains": [],
+        "time": false
+       }
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "name": "timeout not reached, string",
+  "steps": [
+   {
+    "send": {
+     "id": 1,
+     "type": "render_template",
+     "template": "{{ 2 }}",
+     "timeout": " 3 "
+    },
+    "replies": [
+     {
+      "id": 1,
+      "type": "result",
+      "success": true,
+      "result": null
+     },
+     {
+      "id": 1,
+      "type": "event",
+      "event": {
+       "result": 2,
+       "listeners": {
+        "all": false,
+        "entities": [],
+        "domains": [],
+        "time": false
+       }
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "name": "timeout zero",
+  "steps": [
+   {
+    "send": {
+     "id": 1,
+     "type": "render_template",
+     "template": "{% for i in range(100000) %}{% for j in range(10) %}{% endfor %}{% endfor %}x",
+     "timeout": 0
+    },
+    "replies": [
+     {
+      "id": 1,
+      "type": "result",
+      "success": true,
+      "result": null
+     },
+     {
+      "id": 1,
+      "type": "event",
+      "event": {
+       "result": "x",
+       "listeners": {
+        "all": false,
+        "entities": [],
+        "domains": [],
+        "time": false
+       }
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "name": "timeout on static",
+  "steps": [
+   {
+    "send": {
+     "id": 1,
+     "type": "render_template",
+     "template": "static",
+     "timeout": 1e-09
+    },
+    "replies": [
+     {
+      "id": 1,
+      "type": "result",
+      "success": true,
+      "result": null
+     },
+     {
+      "id": 1,
+      "type": "event",
+      "event": {
+       "result": "static",
+       "listeners": {
+        "all": false,
+        "entities": [],
+        "domains": [],
+        "time": false
+       }
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "name": "timeout, undefined reported",
+  "steps": [
+   {
+    "send": {
+     "id": 1,
+     "type": "render_template",
+     "template": "{{ user }}x",
+     "timeout": 3,
+     "report_errors": true
+    },
+    "replies": [
+     {
+      "id": 1,
+      "type": "event",
+      "event": {
+       "error": "'user' is undefined",
+       "level": "WARNING"
+      }
+     },
+     {
+      "id": 1,
+      "type": "result",
+      "success": true,
+      "result": null
+     },
+     {
+      "id": 1,
+      "type": "event",
+      "event": {
+       "error": "'user' is undefined",
+       "level": "WARNING"
+      }
+     },
+     {
+      "id": 1,
+      "type": "event",
+      "event": {
+       "result": "x",
+       "listeners": {
+        "all": false,
+        "entities": [],
+        "domains": [],
+        "time": false
+       }
+      }
+     },
+     {
+      "id": 1,
+      "type": "event",
+      "event": {
+       "error": "'user' is undefined",
+       "level": "WARNING"
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "name": "timeout, strict error",
+  "steps": [
+   {
+    "send": {
+     "id": 1,
+     "type": "render_template",
+     "template": "{{ user }}",
+     "timeout": 3,
+     "strict": true,
+     "report_errors": true
+    },
+    "replies": [
+     {
+      "id": 1,
+      "type": "event",
+      "event": {
+       "error": "UndefinedError: 'user' is undefined",
+       "level": "ERROR"
+      }
+     },
+     {
+      "id": 1,
+      "type": "result",
+      "success": true,
+      "result": null
+     },
+     {
+      "id": 1,
+      "type": "event",
+      "event": {
+       "error": "UndefinedError: 'user' is undefined",
+       "level": "ERROR"
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "name": "timeout, undefined attribute reported",
+  "steps": [
+   {
+    "send": {
+     "id": 1,
+     "type": "render_template",
+     "template": "{{ x.y }}",
+     "timeout": 3,
+     "report_errors": true
+    },
+    "replies": [
+     {
+      "id": 1,
+      "type": "event",
+      "event": {
+       "error": "'x' is undefined",
+       "level": "ERROR"
+      }
+     },
+     {
+      "id": 1,
+      "type": "event",
+      "event": {
+       "error": "UndefinedError: 'x' is undefined",
+       "level": "ERROR"
+      }
+     },
+     {
+      "id": 1,
+      "type": "result",
+      "success": true,
+      "result": null
+     },
+     {
+      "id": 1,
+      "type": "event",
+      "event": {
+       "error": "'x' is undefined",
+       "level": "ERROR"
+      }
+     },
+     {
+      "id": 1,
+      "type": "event",
+      "event": {
+       "error": "UndefinedError: 'x' is undefined",
+       "level": "ERROR"
+      }
+     },
+     {
+      "id": 1,
+      "type": "event",
+      "event": {
+       "error": "'x' is undefined",
+       "level": "ERROR"
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "name": "timeout, syntax error reported",
+  "steps": [
+   {
+    "send": {
+     "id": 1,
+     "type": "render_template",
+     "template": "{{ 1 + }}",
+     "timeout": 3,
+     "report_errors": true
+    },
+    "replies": [
+     {
+      "id": 1,
+      "type": "event",
+      "event": {
+       "error": "TemplateSyntaxError: unexpected 'end of print statement'",
+       "level": "ERROR"
+      }
+     },
+     {
+      "id": 1,
+      "type": "result",
+      "success": true,
+      "result": null
+     },
+     {
+      "id": 1,
+      "type": "event",
+      "event": {
+       "error": "TemplateSyntaxError: unexpected 'end of print statement'",
+       "level": "ERROR"
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "name": "timeout, cached",
+  "steps": [
+   {
+    "send": {
+     "id": 1,
+     "type": "render_template",
+     "template": "{{ user }}x",
+     "timeout": 3
+    },
+    "replies": [
+     {
+      "id": 1,
+      "type": "result",
+      "success": true,
+      "result": null
+     },
+     {
+      "id": 1,
+      "type": "event",
+      "event": {
+       "result": "x",
+       "listeners": {
+        "all": false,
+        "entities": [],
+        "domains": [],
+        "time": false
+       }
+      }
+     }
+    ]
+   },
+   {
+    "send": {
+     "id": 2,
+     "type": "render_template",
+     "template": "{{ user }}x",
+     "strict": true
+    },
+    "replies": [
+     {
+      "id": 2,
+      "type": "result",
+      "success": true,
+      "result": null
+     },
+     {
+      "id": 2,
+      "type": "event",
+      "event": {
+       "result": "x",
+       "listeners": {
+        "all": false,
+        "entities": [],
+        "domains": [],
+        "time": false
+       }
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "name": "unsubscribe",
+  "steps": [
+   {
+    "send": {
+     "id": 1,
+     "type": "render_template",
+     "template": "{{ 1 }}"
+    },
+    "replies": [
+     {
+      "id": 1,
+      "type": "result",
+      "success": true,
+      "result": null
+     },
+     {
+      "id": 1,
+      "type": "event",
+      "event": {
+       "result": 1,
+       "listeners": {
+        "all": false,
+        "entities": [],
+        "domains": [],
+        "time": false
+       }
+      }
+     }
+    ]
+   },
+   {
+    "send": {
+     "id": 2,
+     "type": "unsubscribe_events",
+     "subscription": 1
+    },
+    "replies": [
+     {
+      "id": 2,
+      "type": "result",
+      "success": true,
+      "result": null
+     }
+    ]
+   },
+   {
+    "send": {
+     "id": 3,
+     "type": "unsubscribe_events",
+     "subscription": 1
+    },
+    "replies": [
+     {
+      "id": 3,
+      "type": "result",
+      "success": false,
+      "error": {
+       "code": "not_found",
+       "message": "Subscription not found."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "name": "unsubscribe after timeout",
+  "steps": [
+   {
+    "send": {
+     "id": 1,
+     "type": "render_template",
+     "template": "{% for i in range(100000) %}{% for j in range(10) %}{% endfor %}{% endfor %}x",
+     "timeout": 1e-09
+    },
+    "replies": [
+     {
+      "id": 1,
+      "type": "result",
+      "success": false,
+      "error": {
+       "code": "template_error",
+       "message": "Exceeded maximum execution time of 1e-09s"
+      }
+     }
+    ]
+   },
+   {
+    "send": {
+     "id": 2,
+     "type": "unsubscribe_events",
+     "subscription": 1
+    },
+    "replies": [
+     {
+      "id": 2,
+      "type": "result",
+      "success": false,
+      "error": {
+       "code": "not_found",
+       "message": "Subscription not found."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "name": "unsubscribe after error",
+  "steps": [
+   {
+    "send": {
+     "id": 1,
+     "type": "render_template",
+     "template": "{{ 1 + }}"
+    },
+    "replies": [
+     {
+      "id": 1,
+      "type": "result",
+      "success": true,
+      "result": null
+     }
+    ]
+   },
+   {
+    "send": {
+     "id": 2,
+     "type": "unsubscribe_events",
+     "subscription": 1
+    },
+    "replies": [
+     {
+      "id": 2,
+      "type": "result",
+      "success": true,
+      "result": null
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "name": "cache strict first",
+  "steps": [
+   {
+    "send": {
+     "id": 1,
+     "type": "render_template",
+     "template": "{{ user }}",
+     "strict": true
+    },
+    "replies": [
+     {
+      "id": 1,
+      "type": "result",
+      "success": true,
+      "result": null
+     }
+    ]
+   },
+   {
+    "send": {
+     "id": 2,
+     "type": "render_template",
+     "template": "{{ user }}"
+    },
+    "replies": [
+     {
+      "id": 2,
+      "type": "result",
+      "success": true,
+      "result": null
+     }
+    ]
+   },
+   {
+    "send": {
+     "id": 3,
+     "type": "render_template",
+     "template": "{{ user }}",
+     "report_errors": true
+    },
+    "replies": [
+     {
+      "id": 3,
+      "type": "event",
+      "event": {
+       "error": "'user' is undefined",
+       "level": "WARNING"
+      }
+     },
+     {
+      "id": 3,
+      "type": "result",
+      "success": true,
+      "result": null
+     },
+     {
+      "id": 3,
+      "type": "event",
+      "event": {
+       "error": "'user' is undefined",
+       "level": "WARNING"
+      }
+     },
+     {
+      "id": 3,
+      "type": "event",
+      "event": {
+       "result": "",
+       "listeners": {
+        "all": false,
+        "entities": [],
+        "domains": [],
+        "time": false
+       }
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "name": "cache lenient first",
+  "steps": [
+   {
+    "send": {
+     "id": 1,
+     "type": "render_template",
+     "template": "{{ user }}"
+    },
+    "replies": [
+     {
+      "id": 1,
+      "type": "result",
+      "success": true,
+      "result": null
+     },
+     {
+      "id": 1,
+      "type": "event",
+      "event": {
+       "result": "",
+       "listeners": {
+        "all": false,
+        "entities": [],
+        "domains": [],
+        "time": false
+       }
+      }
+     }
+    ]
+   },
+   {
+    "send": {
+     "id": 2,
+     "type": "render_template",
+     "template": "{{ user }}",
+     "strict": true
+    },
+    "replies": [
+     {
+      "id": 2,
+      "type": "result",
+      "success": true,
+      "result": null
+     },
+     {
+      "id": 2,
+      "type": "event",
+      "event": {
+       "result": "",
+       "listeners": {
+        "all": false,
+        "entities": [],
+        "domains": [],
+        "time": false
+       }
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "name": "cache key is the raw string",
+  "steps": [
+   {
+    "send": {
+     "id": 1,
+     "type": "render_template",
+     "template": "{{ user }}",
+     "strict": true
+    },
+    "replies": [
+     {
+      "id": 1,
+      "type": "result",
+      "success": true,
+      "result": null
+     }
+    ]
+   },
+   {
+    "send": {
+     "id": 2,
+     "type": "render_template",
+     "template": " {{ user }}"
+    },
+    "replies": [
+     {
+      "id": 2,
+      "type": "result",
+      "success": true,
+      "result": null
+     },
+     {
+      "id": 2,
+      "type": "event",
+      "event": {
+       "result": "",
+       "listeners": {
+        "all": false,
+        "entities": [],
+        "domains": [],
+        "time": false
+       }
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "name": "entity_ids accepted",
+  "steps": [
+   {
+    "send": {
+     "id": 1,
+     "type": "render_template",
+     "template": "{{ 1 }}",
+     "entity_ids": "sun.sun, Light.Kitchen"
+    },
+    "replies": [
+     {
+      "id": 1,
+      "type": "result",
+      "success": true,
+      "result": null
+     },
+     {
+      "id": 1,
+      "type": "event",
+      "event": {
+       "result": 1,
+       "listeners": {
+        "all": false,
+        "entities": [],
+        "domains": [],
+        "time": false
+       }
+      }
+     }
+    ]
+   },
+   {
+    "send": {
+     "id": 2,
+     "type": "render_template",
+     "template": "{{ 2 }}",
+     "entity_ids": [
+      "sun.sun"
+     ]
+    },
+    "replies": [
+     {
+      "id": 2,
+      "type": "result",
+      "success": true,
+      "result": null
+     },
+     {
+      "id": 2,
+      "type": "event",
+      "event": {
+       "result": 2,
+       "listeners": {
+        "all": false,
+        "entities": [],
+        "domains": [],
+        "time": false
+       }
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "name": "no template",
+  "steps": [
+   {
+    "send": {
+     "id": 1,
+     "type": "render_template"
+    },
+    "replies": [
+     {
+      "id": 1,
+      "type": "result",
+      "success": false,
+      "error": {
+       "code": "invalid_format",
+       "message": "required key not provided @ data['template']. Got None"
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "name": "template not str",
+  "steps": [
+   {
+    "send": {
+     "id": 1,
+     "type": "render_template",
+     "template": 5
+    },
+    "replies": [
+     {
+      "id": 1,
+      "type": "result",
+      "success": false,
+      "error": {
+       "code": "invalid_format",
+       "message": "expected str for dictionary value @ data['template']. Got 5"
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "name": "variables not dict",
+  "steps": [
+   {
+    "send": {
+     "id": 1,
+     "type": "render_template",
+     "template": "x",
+     "variables": [
+      1
+     ]
+    },
+    "replies": [
+     {
+      "id": 1,
+      "type": "result",
+      "success": false,
+      "error": {
+       "code": "invalid_format",
+       "message": "expected dict for dictionary value @ data['variables']. Got [1]"
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "name": "strict not bool",
+  "steps": [
+   {
+    "send": {
+     "id": 1,
+     "type": "render_template",
+     "template": "x",
+     "strict": 1
+    },
+    "replies": [
+     {
+      "id": 1,
+      "type": "result",
+      "success": false,
+      "error": {
+       "code": "invalid_format",
+       "message": "expected bool for dictionary value @ data['strict']. Got 1"
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "name": "report_errors not bool",
+  "steps": [
+   {
+    "send": {
+     "id": 1,
+     "type": "render_template",
+     "template": "x",
+     "report_errors": "yes"
+    },
+    "replies": [
+     {
+      "id": 1,
+      "type": "result",
+      "success": false,
+      "error": {
+       "code": "invalid_format",
+       "message": "expected bool for dictionary value @ data['report_errors']. Got 'yes'"
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "name": "timeout not float",
+  "steps": [
+   {
+    "send": {
+     "id": 1,
+     "type": "render_template",
+     "template": "x",
+     "timeout": "soon"
+    },
+    "replies": [
+     {
+      "id": 1,
+      "type": "result",
+      "success": false,
+      "error": {
+       "code": "invalid_format",
+       "message": "expected float for dictionary value @ data['timeout']. Got 'soon'"
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "name": "timeout null",
+  "steps": [
+   {
+    "send": {
+     "id": 1,
+     "type": "render_template",
+     "template": "x",
+     "timeout": null
+    },
+    "replies": [
+     {
+      "id": 1,
+      "type": "result",
+      "success": false,
+      "error": {
+       "code": "invalid_format",
+       "message": "expected float for dictionary value @ data['timeout']. Got None"
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "name": "timeout bool",
+  "steps": [
+   {
+    "send": {
+     "id": 1,
+     "type": "render_template",
+     "template": "{{ 2 }}",
+     "timeout": true
+    },
+    "replies": [
+     {
+      "id": 1,
+      "type": "result",
+      "success": true,
+      "result": null
+     },
+     {
+      "id": 1,
+      "type": "event",
+      "event": {
+       "result": 2,
+       "listeners": {
+        "all": false,
+        "entities": [],
+        "domains": [],
+        "time": false
+       }
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "name": "extra key",
+  "steps": [
+   {
+    "send": {
+     "id": 1,
+     "type": "render_template",
+     "template": "x",
+     "extra": 1
+    },
+    "replies": [
+     {
+      "id": 1,
+      "type": "result",
+      "success": false,
+      "error": {
+       "code": "invalid_format",
+       "message": "extra keys not allowed @ data['extra']. Got 1"
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "name": "several errors",
+  "steps": [
+   {
+    "send": {
+     "id": 1,
+     "type": "render_template",
+     "strict": "x",
+     "variables": 1
+    },
+    "replies": [
+     {
+      "id": 1,
+      "type": "result",
+      "success": false,
+      "error": {
+       "code": "invalid_format",
+       "message": "expected bool for dictionary value @ data['strict']. Got 'x'\nexpected dict for dictionary value @ data['variables']. Got 1\nrequired key not provided @ data['template']. Got None"
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "name": "entity_ids invalid",
+  "steps": [
+   {
+    "send": {
+     "id": 1,
+     "type": "render_template",
+     "template": "x",
+     "entity_ids": "nope"
+    },
+    "replies": [
+     {
+      "id": 1,
+      "type": "result",
+      "success": false,
+      "error": {
+       "code": "invalid_format",
+       "message": "Entity ID nope is an invalid entity ID for dictionary value @ data['entity_ids']. Got 'nope'"
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "name": "entity_ids invalid in list",
+  "steps": [
+   {
+    "send": {
+     "id": 1,
+     "type": "render_template",
+     "template": "x",
+     "entity_ids": [
+      "sun.sun",
+      "Bad"
+     ]
+    },
+    "replies": [
+     {
+      "id": 1,
+      "type": "result",
+      "success": false,
+      "error": {
+       "code": "invalid_format",
+       "message": "Entity ID Bad is an invalid entity ID for dictionary value @ data['entity_ids']. Got ['sun.sun', 'Bad']"
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "name": "entity_ids null",
+  "steps": [
+   {
+    "send": {
+     "id": 1,
+     "type": "render_template",
+     "template": "x",
+     "entity_ids": null
+    },
+    "replies": [
+     {
+      "id": 1,
+      "type": "result",
+      "success": false,
+      "error": {
+       "code": "invalid_format",
+       "message": "Entity IDs cannot be None for dictionary value @ data['entity_ids']. Got None"
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "name": "entity_ids number",
+  "steps": [
+   {
+    "send": {
+     "id": 1,
+     "type": "render_template",
+     "template": "x",
+     "entity_ids": 5
+    },
+    "replies": [
+     {
+      "id": 1,
+      "type": "result",
+      "success": false,
+      "error": {
+       "code": "unknown_error",
+       "message": "Unknown error"
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "name": "entity_ids dict",
+  "steps": [
+   {
+    "send": {
+     "id": 1,
+     "type": "render_template",
+     "template": "x",
+     "entity_ids": {
+      "sun.sun": 1
+     }
+    },
+    "replies": [
+     {
+      "id": 1,
+      "type": "result",
+      "success": true,
+      "result": null
+     },
+     {
+      "id": 1,
+      "type": "event",
+      "event": {
+       "result": "x",
+       "listeners": {
+        "all": false,
+        "entities": [],
+        "domains": [],
+        "time": false
+       }
+      }
+     }
+    ]
+   }
+  ]
+ }
+]

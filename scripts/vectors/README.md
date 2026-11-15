@@ -15,9 +15,20 @@ fail on any difference. They live next to the code they test, in
 The rule: a new vector set commits the script that ran HA's code to make
 it, here, as `scripts/vectors/<module>.py`. Without it, vectors can't be
 remade when the pinned HA version moves, when an input is added, or when
-someone asks how an expected value was produced. Every vector set in the
-repository today was made before this rule, so none has its script yet; they
-are listed [at the end](#vector-sets-made-before-this-rule) as a backlog.
+someone asks how an expected value was produced. The generators so far are
+listed [below](#generators); the sets made before this rule have no script
+yet and are listed [at the end](#vector-sets-made-before-this-rule) as a
+backlog.
+
+## Generators
+
+| Script | Writes | Runs |
+|---|---|---|
+| `render_template.py` | `ha-core/src/template/vectors/` (renders, `_parse_result`, the environment's names) and `ha-api/src/ws/vectors/render_template.json` (whole `render_template` conversations) | HA 2026.6.1's `helpers/template` and `websocket_api` `handle_render_template` on Jinja 3.1.6, on a fresh `HomeAssistant` per case |
+
+`render_template.py` writes two crates' vectors because they are two halves
+of one behaviour: the engine's answers and the command's messages around
+them.
 
 ## Writing one
 
@@ -45,15 +56,17 @@ are listed [at the end](#vector-sets-made-before-this-rule) as a backlog.
 Each script runs in its own virtualenv with HA and its library at the pinned
 versions. HA 2026.6.1 requires Python 3.14.2 or later; use that interpreter
 for the virtualenv, even though the repository's script tests need only 3.11.
-No generator has been written yet (see the table below), so this is what
-running the future `hue.py` will look like:
+For example, the template vectors (HA's own requirements bring Jinja 3.1.6):
 
 ```sh
-python3.14 -m venv .venv-hue  # Python 3.14.2+ installed
-.venv-hue/bin/pip install homeassistant==2026.6.1 aiohue==4.8.1
-.venv-hue/bin/python -I scripts/vectors/hue.py
-cargo test -p ha-integrations hue
+python3.14 -m venv .venv-template  # Python 3.14.2+ installed
+.venv-template/bin/pip install homeassistant==2026.6.1
+.venv-template/bin/python -I scripts/vectors/render_template.py
+cargo test -p ha-core template && cargo test -p ha-api render_template
 ```
+
+A future `hue.py` would add its library: `pip install homeassistant==2026.6.1
+aiohue==4.8.1`.
 
 ## Skeleton
 

@@ -22,6 +22,10 @@ thiserror = "2.0.21"
 tracing = "0.1.44"
 tokio = { version = "1.54.1", features = ["sync", "time", "rt", "macros"] }
 libyaml-safer = "0.3.0"
+# Templates: only what Jinja has that HA's environment uses. No `debug`
+# (error source dumps), `json`, `urlencode` or `multi_template`
+# (`include`/`import` need HA's `custom_templates`, not served).
+minijinja = { version = "3.1.0", default-features = false, features = ["builtins", "macros", "loop_controls", "adjacent_loop_items"] }
 
 [dev-dependencies]
 criterion = { version = "0.7.0", default-features = false }

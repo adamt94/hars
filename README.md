@@ -12,7 +12,8 @@ numeric-state and time triggers), the `sun`, `met`, `hue`, `lifx`,
 `switchbot_cloud`, `mobile_app`, `person` and `zone` integrations, and
 importing a Home Assistant 2026.6 install. **Not yet:** the onboarding screen,
 setting your location, adding integrations or editing automations from the
-UI, templates, scripts, notifications and remote access. If you need those,
+UI, templates beyond plain text and variables (no `states()` or `now()`
+yet), scripts, notifications and remote access. If you need those,
 keep Home Assistant for now.
 
 ## Install

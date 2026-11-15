@@ -34,6 +34,12 @@ codegen-units = 1
 panic = "abort"
 strip = true
 
+# Templates render on a subscription, not per state write: minijinja is
+# built for size: 328,336 bytes smaller than opt-level 3, 1.1 µs per render
+# either way (docs/perf/RESULTS.md).
+[profile.release.package.minijinja]
+opt-level = "z"
+
 # Fast-to-build, still-optimised profile for profiling/benchmarks.
 [profile.profiling]
 inherits = "release"

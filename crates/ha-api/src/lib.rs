@@ -84,6 +84,8 @@ pub(crate) struct Shared {
     pub hass: Hass,
     pub auth: Auth,
     pub config: Arc<ApiConfig>,
+    /// `render_template`'s compiled templates.
+    pub templates: Arc<ws::template::Cache>,
 }
 
 /// The integrations `hars` implements, by HA domain: `get_config`'s
@@ -171,6 +173,7 @@ pub fn router(hass: Hass, auth: Auth, config: &ApiConfig) -> Router {
         hass: hass.clone(),
         auth: auth.clone(),
         config: Arc::new(config.clone()),
+        templates: Default::default(),
     };
     let config_route = Router::new()
         .route("/api/config", axum::routing::get(api_config))

@@ -1,0 +1,774 @@
+[
+ {
+  "rendered": "1",
+  "result": {
+   "json": 1
+  }
+ },
+ {
+  "rendered": "-1",
+  "result": {
+   "json": -1
+  }
+ },
+ {
+  "rendered": "+5",
+  "result": {
+   "json": 5
+  }
+ },
+ {
+  "rendered": "1.0",
+  "result": {
+   "json": 1.0
+  }
+ },
+ {
+  "rendered": "1.",
+  "result": {
+   "json": 1.0
+  }
+ },
+ {
+  "rendered": ".5",
+  "result": {
+   "json": 0.5
+  }
+ },
+ {
+  "rendered": "-0",
+  "result": {
+   "json": 0
+  }
+ },
+ {
+  "rendered": "-0.0",
+  "result": {
+   "json": -0.0
+  }
+ },
+ {
+  "rendered": "007",
+  "result": {
+   "json": "007"
+  }
+ },
+ {
+  "rendered": "00",
+  "result": {
+   "json": "00"
+  }
+ },
+ {
+  "rendered": "0",
+  "result": {
+   "json": 0
+  }
+ },
+ {
+  "rendered": "1_000",
+  "result": {
+   "json": "1_000"
+  }
+ },
+ {
+  "rendered": "1e5",
+  "result": {
+   "json": "1e5"
+  }
+ },
+ {
+  "rendered": "1E5",
+  "result": {
+   "json": "1E5"
+  }
+ },
+ {
+  "rendered": "0x1F",
+  "result": {
+   "json": "0x1F"
+  }
+ },
+ {
+  "rendered": "0o17",
+  "result": {
+   "json": "0o17"
+  }
+ },
+ {
+  "rendered": "0b11",
+  "result": {
+   "json": "0b11"
+  }
+ },
+ {
+  "rendered": "inf",
+  "result": {
+   "json": "inf"
+  }
+ },
+ {
+  "rendered": "nan",
+  "result": {
+   "json": "nan"
+  }
+ },
+ {
+  "rendered": "1e999",
+  "result": {
+   "json": "1e999"
+  }
+ },
+ {
+  "rendered": "123456789012345678901234567890",
+  "result": {
+   "unserializable": true
+  }
+ },
+ {
+  "rendered": "9223372036854775807",
+  "result": {
+   "json": 9223372036854775807
+  }
+ },
+ {
+  "rendered": "9223372036854775808",
+  "result": {
+   "json": 9223372036854775808
+  }
+ },
+ {
+  "rendered": "18446744073709551615",
+  "result": {
+   "json": 18446744073709551615
+  }
+ },
+ {
+  "rendered": "18446744073709551616",
+  "result": {
+   "unserializable": true
+  }
+ },
+ {
+  "rendered": "-9223372036854775808",
+  "result": {
+   "json": -9223372036854775808
+  }
+ },
+ {
+  "rendered": "-9223372036854775809",
+  "result": {
+   "unserializable": true
+  }
+ },
+ {
+  "rendered": "True",
+  "result": {
+   "json": true
+  }
+ },
+ {
+  "rendered": "False",
+  "result": {
+   "json": false
+  }
+ },
+ {
+  "rendered": "None",
+  "result": {
+   "json": null
+  }
+ },
+ {
+  "rendered": "true",
+  "result": {
+   "json": "true"
+  }
+ },
+ {
+  "rendered": "none",
+  "result": {
+   "json": "none"
+  }
+ },
+ {
+  "rendered": "abc",
+  "result": {
+   "json": "abc"
+  }
+ },
+ {
+  "rendered": "'abc'",
+  "result": {
+   "json": "'abc'"
+  }
+ },
+ {
+  "rendered": "\"abc\"",
+  "result": {
+   "json": "\"abc\""
+  }
+ },
+ {
+  "rendered": "'a' 'b'",
+  "result": {
+   "json": "'a' 'b'"
+  }
+ },
+ {
+  "rendered": "b'x'",
+  "result": {
+   "unserializable": true
+  }
+ },
+ {
+  "rendered": "...",
+  "result": {
+   "unserializable": true
+  }
+ },
+ {
+  "rendered": "1j",
+  "result": {
+   "json": "1j"
+  }
+ },
+ {
+  "rendered": "1+2j",
+  "result": {
+   "json": "1+2j"
+  }
+ },
+ {
+  "rendered": "(1)",
+  "result": {
+   "json": "(1)"
+  }
+ },
+ {
+  "rendered": "(1,)",
+  "result": {
+   "json": [
+    1
+   ]
+  }
+ },
+ {
+  "rendered": "()",
+  "result": {
+   "json": []
+  }
+ },
+ {
+  "rendered": "1, 2",
+  "result": {
+   "json": [
+    1,
+    2
+   ]
+  }
+ },
+ {
+  "rendered": "[1, 2,]",
+  "result": {
+   "json": [
+    1,
+    2
+   ]
+  }
+ },
+ {
+  "rendered": "[1, [2, (3, 4)]]",
+  "result": {
+   "json": [
+    1,
+    [
+     2,
+     [
+      3,
+      4
+     ]
+    ]
+   ]
+  }
+ },
+ {
+  "rendered": "{'a': 1, 'b': [True, None]}",
+  "result": {
+   "json": {
+    "a": 1,
+    "b": [
+     true,
+     null
+    ]
+   }
+  }
+ },
+ {
+  "rendered": "{1: 'a', 2.5: 'b', True: 'c', None: 'd'}",
+  "result": {
+   "json": {
+    "1": "c",
+    "2.5": "b",
+    "null": "d"
+   }
+  }
+ },
+ {
+  "rendered": "{1: 'a', True: 'b'}",
+  "result": {
+   "json": {
+    "1": "b"
+   }
+  }
+ },
+ {
+  "rendered": "{'a': 1, 'a': 2}",
+  "result": {
+   "json": {
+    "a": 2
+   }
+  }
+ },
+ {
+  "rendered": "{(1, 2): 3}",
+  "result": {
+   "unserializable": true
+  }
+ },
+ {
+  "rendered": "{[1]: 2}",
+  "result": {
+   "json": "{[1]: 2}"
+  }
+ },
+ {
+  "rendered": "{1, 2}",
+  "result": {
+   "json": [
+    1,
+    2
+   ]
+  }
+ },
+ {
+  "rendered": "set()",
+  "result": {
+   "json": []
+  }
+ },
+ {
+  "rendered": "{}",
+  "result": {
+   "json": {}
+  }
+ },
+ {
+  "rendered": "[]",
+  "result": {
+   "json": []
+  }
+ },
+ {
+  "rendered": "[1e999]",
+  "result": {
+   "json": [
+    null
+   ]
+  }
+ },
+ {
+  "rendered": "[1+2j]",
+  "result": {
+   "unserializable": true
+  }
+ },
+ {
+  "rendered": "[b'x']",
+  "result": {
+   "unserializable": true
+  }
+ },
+ {
+  "rendered": "[...]",
+  "result": {
+   "unserializable": true
+  }
+ },
+ {
+  "rendered": "[123456789012345678901234567890]",
+  "result": {
+   "unserializable": true
+  }
+ },
+ {
+  "rendered": "[-1, +2, -3.5, - 4]",
+  "result": {
+   "json": [
+    -1,
+    2,
+    -3.5,
+    -4
+   ]
+  }
+ },
+ {
+  "rendered": "[0x10, 0o10, 0b10, 1_0]",
+  "result": {
+   "json": [
+    16,
+    8,
+    2,
+    10
+   ]
+  }
+ },
+ {
+  "rendered": "[1e3, 1.5e-7, 2E+2]",
+  "result": {
+   "json": [
+    1000.0,
+    1.5e-07,
+    200.0
+   ]
+  }
+ },
+ {
+  "rendered": "['a\\nb', 'tab\\t', '\\x41\\u00e9\\U0001F600', '\\101', 'q\\'s', \"d\\\"q\", 'back\\\\slash']",
+  "result": {
+   "json": [
+    "a\nb",
+    "tab\t",
+    "Aé😀",
+    "A",
+    "q's",
+    "d\"q",
+    "back\\slash"
+   ]
+  }
+ },
+ {
+  "rendered": "[r'a\\nb', u'x', R'y']",
+  "result": {
+   "json": [
+    "a\\nb",
+    "x",
+    "y"
+   ]
+  }
+ },
+ {
+  "rendered": "['''tri''', \"\"\"ple\"\"\"]",
+  "result": {
+   "json": [
+    "tri",
+    "ple"
+   ]
+  }
+ },
+ {
+  "rendered": "['\\N{BULLET}']",
+  "result": {
+   "json": [
+    "•"
+   ]
+  }
+ },
+ {
+  "rendered": "['a' 'b', \"c\" 'd']",
+  "result": {
+   "json": [
+    "ab",
+    "cd"
+   ]
+  }
+ },
+ {
+  "rendered": "['unknown \\q escape']",
+  "result": {
+   "json": [
+    "unknown \\q escape"
+   ]
+  }
+ },
+ {
+  "rendered": "[f'x']",
+  "result": {
+   "json": "[f'x']"
+  }
+ },
+ {
+  "rendered": "[1 + 2]",
+  "result": {
+   "json": "[1 + 2]"
+  }
+ },
+ {
+  "rendered": "[1 - 2j]",
+  "result": {
+   "unserializable": true
+  }
+ },
+ {
+  "rendered": "[-(1)]",
+  "result": {
+   "json": [
+    -1
+   ]
+  }
+ },
+ {
+  "rendered": "[not True]",
+  "result": {
+   "json": "[not True]"
+  }
+ },
+ {
+  "rendered": "[1, 2] # comment",
+  "result": {
+   "json": [
+    1,
+    2
+   ]
+  }
+ },
+ {
+  "rendered": "[1,\n 2]",
+  "result": {
+   "json": [
+    1,
+    2
+   ]
+  }
+ },
+ {
+  "rendered": " [1]",
+  "result": {
+   "json": [
+    1
+   ]
+  }
+ },
+ {
+  "rendered": "[1]\n",
+  "result": {
+   "json": [
+    1
+   ]
+  }
+ },
+ {
+  "rendered": "[1] [2]",
+  "result": {
+   "json": "[1] [2]"
+  }
+ },
+ {
+  "rendered": "{'a': }",
+  "result": {
+   "json": "{'a': }"
+  }
+ },
+ {
+  "rendered": "[",
+  "result": {
+   "json": "["
+  }
+ },
+ {
+  "rendered": "'",
+  "result": {
+   "json": "'"
+  }
+ },
+ {
+  "rendered": "''",
+  "result": {
+   "json": "''"
+  }
+ },
+ {
+  "rendered": "[1, 'it\\'s', \"say \\\"hi\\\"\"]",
+  "result": {
+   "json": [
+    1,
+    "it's",
+    "say \"hi\""
+   ]
+  }
+ },
+ {
+  "rendered": "[0.1, 100.0, 1e16, 1e-5, 123.456]",
+  "result": {
+   "json": [
+    0.1,
+    100.0,
+    1e+16,
+    1e-05,
+    123.456
+   ]
+  }
+ },
+ {
+  "rendered": "['é€', '\\u20ac']",
+  "result": {
+   "json": [
+    "é€",
+    "€"
+   ]
+  }
+ },
+ {
+  "rendered": "[True, False, None]",
+  "result": {
+   "json": [
+    true,
+    false,
+    null
+   ]
+  }
+ },
+ {
+  "rendered": "{'nested': {'deep': [1, {'x': ()}]}}",
+  "result": {
+   "json": {
+    "nested": {
+     "deep": [
+      1,
+      {
+       "x": []
+      }
+     ]
+    }
+   }
+  }
+ },
+ {
+  "rendered": "-",
+  "result": {
+   "json": "-"
+  }
+ },
+ {
+  "rendered": "+",
+  "result": {
+   "json": "+"
+  }
+ },
+ {
+  "rendered": "1-",
+  "result": {
+   "json": "1-"
+  }
+ },
+ {
+  "rendered": "--1",
+  "result": {
+   "json": "--1"
+  }
+ },
+ {
+  "rendered": "-+1",
+  "result": {
+   "json": "-+1"
+  }
+ },
+ {
+  "rendered": "+-1",
+  "result": {
+   "json": "+-1"
+  }
+ },
+ {
+  "rendered": "- 1",
+  "result": {
+   "json": "- 1"
+  }
+ },
+ {
+  "rendered": "1 ",
+  "result": {
+   "json": "1 "
+  }
+ },
+ {
+  "rendered": " 1",
+  "result": {
+   "json": " 1"
+  }
+ },
+ {
+  "rendered": "1\n",
+  "result": {
+   "json": 1
+  }
+ },
+ {
+  "rendered": "(1, 2)",
+  "result": {
+   "json": [
+    1,
+    2
+   ]
+  }
+ },
+ {
+  "rendered": "((1, 2),)",
+  "result": {
+   "json": [
+    [
+     1,
+     2
+    ]
+   ]
+  }
+ },
+ {
+  "rendered": "[1 for x in y]",
+  "result": {
+   "json": "[1 for x in y]"
+  }
+ },
+ {
+  "rendered": "x",
+  "result": {
+   "json": "x"
+  }
+ },
+ {
+  "rendered": "[x]",
+  "result": {
+   "json": "[x]"
+  }
+ },
+ {
+  "rendered": "{**a}",
+  "result": {
+   "json": "{**a}"
+  }
+ },
+ {
+  "rendered": "[*a]",
+  "result": {
+   "json": "[*a]"
+  }
+ },
+ {
+  "rendered": "1 if 1 else 2",
+  "result": {
+   "json": "1 if 1 else 2"
+  }
+ },
+ {
+  "rendered": "lambda: 1",
+  "result": {
+   "json": "lambda: 1"
+  }
+ },
+ {
+  "rendered": "__import__('os')",
+  "result": {
+   "json": "__import__('os')"
+  }
+ }
+]

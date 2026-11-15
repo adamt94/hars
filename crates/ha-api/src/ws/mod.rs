@@ -17,6 +17,7 @@ mod manifest;
 mod mobile_app;
 mod recorder;
 mod sensor;
+pub(crate) mod template;
 mod weather;
 
 use crate::Shared;
@@ -154,6 +155,9 @@ pub(crate) enum Subscription {
     /// Registered so it can be unsubscribed, but nothing ever fires it
     /// (`persistent_notification/subscribe` while there are none).
     Idle,
+    /// Decided in the background (`render_template` with a `timeout`):
+    /// not found until it is live, and gone if it never starts.
+    Later(Arc<parking_lot::Mutex<template::Later>>),
 }
 
 /// `subscribe_events` ids by event type. The bus listener holds the lock
@@ -507,6 +511,23 @@ impl Conn {
                 reply(&self.out);
             }
             Some(Subscription::Idle) => reply(&self.out),
+            Some(Subscription::Later(state)) => {
+                let mut now = state.lock();
+                match *now {
+                    template::Later::Live => {
+                        *now = template::Later::Never;
+                        reply(&self.out);
+                    }
+                    // HA hasn't registered it yet: not found, and it may
+                    // still start.
+                    template::Later::Pending => {
+                        drop(now);
+                        self.subs.insert(id, Subscription::Later(state));
+                        return false;
+                    }
+                    template::Later::Never => return false,
+                }
+            }
             None => return false,
         }
         true
@@ -610,34 +631,7 @@ pub(crate) fn py_repr(out: &mut String, v: &Value) {
     }
 }
 
-/// Python's `repr` of a `str`: single quotes unless only `'` is inside,
-/// escapes for `\\`, the quote and control characters.
-pub(crate) fn py_repr_str(out: &mut String, s: &str) {
-    let quote = if s.contains('\'') && !s.contains('"') {
-        '"'
-    } else {
-        '\''
-    };
-    out.push(quote);
-    for c in s.chars() {
-        match c {
-            '\\' => out.push_str("\\\\"),
-            '\n' => out.push_str("\\n"),
-            '\r' => out.push_str("\\r"),
-            '\t' => out.push_str("\\t"),
-            c if c == quote => {
-                out.push('\\');
-                out.push(c);
-            }
-            c if (c as u32) < 0x100 && c.is_control() => {
-                out.push_str(&format!("\\x{:02x}", c as u32));
-            }
-            c if c.is_control() => out.push_str(&format!("\\u{:04x}", c as u32)),
-            c => out.push(c),
-        }
-    }
-    out.push(quote);
-}
+pub(crate) use ha_core::py::repr_str as py_repr_str;
 
 pub(crate) fn only_keys(msg: &Map<String, Value>, allowed: &[&str]) -> Result<(), Invalid> {
     let extra = msg

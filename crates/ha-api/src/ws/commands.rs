@@ -73,6 +73,7 @@ pub(super) fn dispatch(conn: &mut Conn, id: u64, ty: &str, msg: &Map<String, Val
             .or_else(|| super::recorder::dispatch(conn, id, ty, msg))
             .or_else(|| super::history::dispatch(conn, id, ty, msg))
             .or_else(|| super::logbook::dispatch(conn, id, ty, msg))
+            .or_else(|| super::template::dispatch(conn, id, ty, msg))
         {
             Some(res) => res,
             None => return false,
@@ -451,7 +452,7 @@ fn subscribe_entities(conn: &mut Conn, id: u64, msg: &Map<String, Value>) -> Res
 
 /// Why a schema rejected a message: voluptuous's errors, or a `TypeError`
 /// from a validator, which HA answers with `unknown_error`.
-enum Bad {
+pub(super) enum Bad {
     Invalid(Vec<String>),
     TypeError,
 }
@@ -553,7 +554,7 @@ fn filter_lists(value: &Value, key: &str) -> Result<FilterLists, Bad> {
 /// `cv.entity_ids` at `data<path>`: a comma-separated string or a list
 /// (a dict gives its keys), each lowercased and checked. The first bad id
 /// is the error.
-fn cv_entity_ids(v: &Value, path: &str) -> Result<Vec<String>, Bad> {
+pub(super) fn cv_entity_ids(v: &Value, path: &str) -> Result<Vec<String>, Bad> {
     let fail = |why: String| Bad::Invalid(vec![format!("{why} for dictionary value @ data{path}")]);
     let items: Vec<Value> = match v {
         Value::Null => return Err(fail("Entity IDs cannot be None".into())),

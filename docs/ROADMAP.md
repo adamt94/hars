@@ -76,7 +76,8 @@ as they are, and the importer carries them over.
 - SwitchBot webhooks: these need an external URL
 - Onboarding defaults that are installed but unused: `shopping_list`/`todo`,
   `google_translate` TTS, `radio_browser`, `go2rtc`, `backup`, `analytics`, Assist
-- Blueprints, scripts/scenes YAML, Jinja templates
+- Blueprints, scripts/scenes YAML, Jinja templates beyond `render_template`'s
+  first slice
 - Config flows for *adding* integrations, the UI automation editor, dashboard
   editing beyond `lovelace/config/save`, long-term statistics, the add-on store, HACS
 - Importing HA's history database: `hars` history starts fresh at cutover
@@ -259,6 +260,17 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
       `lovelace/config/save` + `/delete` (admin, fire `lovelace_updated`),
       `lovelace/resources`; each dashboard is a panel and its URL loads the app
 - [ ] `lovelace/dashboards/create|update|delete`, resource editing
+- [x] WS `render_template`, first slice of Jinja templates (`minijinja`, in
+      `ha_core::template`): HA's schema and errors, the result then
+      `{result, listeners}`, `{error, level}` events with `report_errors`
+      in HA's order, `template_error` for a `timeout`, strict and lenient
+      undefined with Jinja's messages, results parsed as HA's
+      `literal_eval` does, 128 compiled templates kept. The default
+      dashboard's "Welcome {{ user }}" heading now renders. Vectors from
+      `scripts/vectors/render_template.py`. Not yet: HA's own functions,
+      filters and tests (`states`, `is_state`, `now`, `float`, …), which
+      fail with "not supported yet" instead of rendering, and so
+      re-rendering on state or time changes; see post-MVP
 - [ ] One serialised `Arc<str>` per state change, shared by all connections
 - [ ] Acceptance: replaying the frontend trace passes against `hars` with
       fixture entities (protocol smoke test; real data comes in M4/M5)
@@ -479,7 +491,11 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
 ## Post-MVP
 - Push notifications (`notify.<device>` via the relay, local push channel)
 - Remote access, SwitchBot webhooks
-- Jinja templates (`minijinja`), scripts, scenes YAML, blueprints
+- Jinja templates beyond the first slice: HA's functions, filters and tests
+  (states, time, areas, devices, maths, regex, JSON, …), re-rendering
+  `render_template` subscriptions on state and time changes (`listeners`,
+  rate limits), templates in automations, `custom_templates` imports;
+  scripts, scenes YAML, blueprints
 - Config flows for adding integrations; UI automation/script editor
 - Long-term statistics
 - MQTT, ESPHome native API, zigbee2mqtt; `input_*` / `template` helpers, `todo`, TTS

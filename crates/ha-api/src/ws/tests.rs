@@ -630,6 +630,7 @@ fn bare_conn(hass: &Hass) -> (super::Conn, tokio::sync::mpsc::Receiver<super::Fr
             hass: hass.clone(),
             auth,
             config: Default::default(),
+            templates: Default::default(),
         },
         principal,
         user,
@@ -2713,4 +2714,122 @@ async fn logbook_stream_windows_and_checks() {
         true
     );
     let _ = std::fs::remove_dir_all(dir);
+}
+
+/// `render_template` conversations from `scripts/vectors/render_template.py`:
+/// HA 2026.6.1's `handle_render_template` on a fresh `HomeAssistant` each,
+/// with every message it sent back, in order.
+#[tokio::test]
+async fn render_template_as_ha() {
+    let path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/src/ws/vectors/render_template.json"
+    );
+    let conversations: Vec<Value> =
+        serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+    assert!(conversations.len() > 40);
+    for conversation in conversations {
+        let name = conversation["name"].as_str().unwrap();
+        let s = server().await;
+        let mut c = Client::authed(&s, &token(&s.auth).0).await;
+        for step in conversation["steps"].as_array().unwrap() {
+            c.send(step["send"].clone()).await;
+            for want in step["replies"].as_array().unwrap() {
+                assert_eq!(&c.recv().await, want, "{name}: after {}", step["send"]);
+            }
+        }
+        // Nothing else follows.
+        let pong = c.call(json!({"id": 1000, "type": "ping"})).await;
+        assert_eq!(pong, json!({"id": 1000, "type": "pong"}), "{name}");
+    }
+}
+
+/// A template that reads nothing holds nothing: no task, no listener, no
+/// timer; only the id, so `unsubscribe_events` finds it.
+#[tokio::test]
+async fn a_rendered_template_holds_nothing() {
+    let hass = Hass::new();
+    let (mut conn, mut rx) = bare_conn(&hass);
+    handle(
+        &mut conn,
+        json!({"id": 1, "type": "render_template", "template": "## Welcome {{ user }}",
+               "variables": {"user": "Ann"}, "strict": true}),
+    );
+    assert!(matches!(conn.subs.get(&1), Some(super::Subscription::Idle)));
+    assert!(conn.event_listener.is_none());
+    let mut sent = Vec::new();
+    while let Ok(super::Frame::Json(m)) = rx.try_recv() {
+        sent.push(serde_json::from_str::<Value>(&m).unwrap());
+    }
+    assert_eq!(sent.len(), 2, "the result and one event, both at once");
+    assert_eq!(sent[1]["event"]["result"], "## Welcome Ann");
+}
+
+/// While a `timeout` check runs, HA hasn't registered the subscription:
+/// unsubscribing finds nothing, and the subscription still starts after.
+#[tokio::test]
+async fn unsubscribing_during_the_timeout_check_finds_nothing() {
+    let hass = Hass::new();
+    let (mut conn, mut rx) = bare_conn(&hass);
+    handle(
+        &mut conn,
+        json!({"id": 1, "type": "render_template", "template": "{{ 1 }}", "timeout": 5}),
+    );
+    handle(
+        &mut conn,
+        json!({"id": 2, "type": "unsubscribe_events", "subscription": 1}),
+    );
+    let next = |rx: &mut tokio::sync::mpsc::Receiver<super::Frame>| match rx.try_recv() {
+        Ok(super::Frame::Json(m)) => serde_json::from_str::<Value>(&m).unwrap(),
+        _ => Value::Null,
+    };
+    assert_eq!(next(&mut rx)["error"]["code"], "not_found");
+    // The check finishes and the subscription starts.
+    let mut sent = Vec::new();
+    for _ in 0..200 {
+        tokio::time::sleep(Duration::from_millis(5)).await;
+        while let Ok(super::Frame::Json(m)) = rx.try_recv() {
+            sent.push(serde_json::from_str::<Value>(&m).unwrap());
+        }
+        if sent.len() == 2 {
+            break;
+        }
+    }
+    assert_eq!(sent[0]["type"], "result");
+    assert_eq!(sent[1]["event"]["result"], 1);
+    handle(
+        &mut conn,
+        json!({"id": 3, "type": "unsubscribe_events", "subscription": 1}),
+    );
+    assert_eq!(next(&mut rx)["success"], true);
+    assert!(conn.subs.is_empty());
+}
+
+/// HA has no admin or permission check on `render_template`.
+#[tokio::test]
+async fn read_only_users_render_templates() {
+    let s = server().await;
+    s.auth.add_user("reader", "pw").unwrap();
+    let client = "http://127.0.0.1:8123/";
+    let flow = s.auth.start_login_flow(client, None);
+    let code = s
+        .auth
+        .finish_login_flow(&flow, client, "reader", None)
+        .unwrap();
+    let t = s
+        .auth
+        .exchange_code(Some(client), Some(&code), None)
+        .unwrap();
+    let id = s
+        .auth
+        .validate_access_token(&t.access_token, None)
+        .unwrap()
+        .user_id;
+    s.auth.set_user_groups(&id, &[ha_auth::GROUP_ID_READ_ONLY]);
+    let mut c = Client::authed(&s, &t.access_token).await;
+    let r = c
+        .call(json!({"id": 2, "type": "render_template", "template": "{{ 6 * 7 }}"}))
+        .await;
+    assert_eq!(r["success"], true);
+    assert_eq!(c.recv().await["event"]["result"], 42);
 }

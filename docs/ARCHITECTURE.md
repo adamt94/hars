@@ -26,7 +26,7 @@ Ten crates in `crates/`. `ha-server` builds the only binary, `hars`.
 
 | Crate | Job | Home Assistant equivalent |
 |---|---|---|
-| `ha-core` | `Hass`, the state machine, the event bus and lossless feeds, services and schemas, lifecycle stages, `.storage` files, restore state, the clock, YAML loading, `slugify`, shadow mode's gate | `core.py`, `helpers/storage.py`, `helpers/restore_state.py`, `util/yaml` |
+| `ha-core` | `Hass`, the state machine, the event bus and lossless feeds, services and schemas, lifecycle stages, `.storage` files, restore state, the clock, YAML loading, `slugify`, shadow mode's gate, Jinja templates (on `minijinja`) | `core.py`, `helpers/storage.py`, `helpers/restore_state.py`, `util/yaml`, `helpers/template` |
 | `ha-auth` | Users, credentials, login flows, refresh and access tokens, permissions | `auth/` |
 | `ha-registry` | Entity, device, area, floor and label registries; target expansion (device/area/floor/label to entities) | `helpers/*_registry.py` |
 | `ha-http` | The one outbound HTTP(S) client: HTTP/1.1, rustls with compiled-in roots, timeouts, server-sent events | `aiohttp` client session |
@@ -259,8 +259,8 @@ How it is kept:
 
 - **Vectors.** Where hars must give HA's answer, tests compare with inputs
   run through HA's own code at the pinned version. A new vector set commits
-  the script that made it in `scripts/vectors/`. The existing sets were made
-  before that rule and have no script yet; they are listed as a backlog in
+  the script that made it in `scripts/vectors/`. The sets made before that
+  rule have no script yet; they are listed as a backlog in
   [scripts/vectors/README.md](../scripts/vectors/README.md#vector-sets-made-before-this-rule)
   ([ADR 0008](adr/0008-vectors-from-home-assistant.md)).
 - **Generated tables.** Translations, icons and manifests are generated from
@@ -286,6 +286,7 @@ How it is kept:
 | A WebSocket command | `crates/ha-api/src/ws/<domain>.rs`, chained in `ws/commands.rs` | [Guide](guides/add-an-api-command.md) |
 | A REST view | `crates/ha-api/src/<area>.rs`, merged in `ha_api::router` | Add its permission to `auth::required_permission` |
 | Core behaviour every crate needs (event types, lifecycle, storage) | `ha-core` | Keep it free of integration knowledge |
+| A template function, filter or test (`states`, `as_timestamp`) | `crates/ha-core/src/template/` | Templates live in `ha-core` because the API, automations and template entities all render them; they are not a crate of their own because every build carries them (see below) |
 | New YAML automation syntax | `crates/ha-automation/src/config.rs` and `lib.rs` | |
 | Wiring, environment variables, CLI commands | `ha-server` | |
 

@@ -182,3 +182,44 @@ container on an Apple-silicon Mac. A fresh install: `sun` only.
 The fourth thread is the recorder's writer. Earlier rows are glibc builds
 from `scripts/perf-docker.sh`, so their binary sizes are not directly
 comparable with this one. Within every budget.
+
+### `render_template` and minijinja, 2026-11-15
+
+The first slice of Jinja templates (`ha_core::template` on minijinja 3.1.0,
+features `builtins`, `macros`, `loop_controls`, `adjacent_loop_items`) and
+the WebSocket `render_template` command. `PERF_GATE=1 scripts/perf-docker.sh
+10 30` (glibc build in `rust:1`, Docker on an Apple-silicon Mac, 2 vCPUs,
+`PERF_DETAIL=1`), main (7b365dd) then the branch, one after the other. A
+fresh install, `sun` only; no template is rendered, so the environments are
+never built.
+
+| build | binary | start→/api/ | idle RSS | idle PSS | idle CPU | wakeups/s | threads | run |
+|---|---|---|---|---|---|---|---|---|
+| main | 7.90 MiB (8,279,296 B) | 11 ms | 9.6 MiB | 8.6 MiB | 0.000 % | 0.00 | 4 | 10s warm-up, 30s quiet |
+| branch | 8.46 MiB (8,869,888 B) | 10 ms | 9.9 MiB | 9.0 MiB | 0.000 % | 0.00 | 4 | 10s warm-up, 30s quiet |
+
+The binary grows 590,592 bytes. The idle RSS difference is binary pages
+only: file-backed PSS 6,705 → 7,092 kB, anonymous 2,168 → 2,144 kB. Idle
+CPU and wakeups are unchanged: a `render_template` subscription holds no
+task, timer or listener, because templates can't read states or the clock
+yet.
+
+How the size was trimmed (macOS release builds, same toolchain and profile):
+
+| build | bytes | vs main |
+|---|---|---|
+| main | 7,363,584 | |
+| minijinja at the profile's `opt-level = 3` | 8,142,112 | +778,528 |
+| minijinja at `opt-level = "z"` (kept) | 7,813,776 | +450,192 |
+| the same with minijinja's default features | 7,863,664 | +500,080 |
+
+`[profile.release.package.minijinja] opt-level = "z"` saves 328,336 bytes;
+leaving out `debug`, `multi_template` and `std_collections` saves 49,888.
+Rendering stays cheap at `"z"`: the default dashboard's
+`## Welcome {{ user }}` takes 5.8 µs to compile and render and 1.1 µs to
+render again (4.3 µs and 1.1 µs at `opt-level = 3`; Apple M4, release,
+20,000 runs). Templates render once per subscription, never per state
+write, so size wins. The growth is over the 256 KiB note threshold: it
+buys Jinja itself, which the frontend uses for markdown cards and the
+default dashboard's heading, and which automations and template entities
+will need. Within every budget.
