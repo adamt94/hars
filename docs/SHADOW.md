@@ -3,8 +3,9 @@
 Shadow mode runs `hars` beside the Home Assistant it will replace, with HA
 still in charge of the house. For a week it does what it would do (the same
 triggers, the same automations) while nothing it decides reaches a device,
-and a diff tool compares its decisions with HA's. It is the ROADMAP's gate
-before cutover (M7): **one week with no differences.**
+and a diff tool compares its decisions with HA's. It is the
+[roadmap](ROADMAP.md)'s gate before cutover (M7): **one week with no
+differences.**
 
 ## What shadow mode does
 
@@ -31,10 +32,10 @@ decisions behind it, retries every second, and when it recovers writes a
 to be written (the final-write stage), with one last try if the disk is
 failing.
 
-Entities whose state only changes when *commanded* are the exception: the
-SwitchBot IR air conditioner (`assumed_state`) and its switch, and the Bot's
-button (its state is when it was last pressed). Nothing reports their change,
-so in shadow mode `hars` never updates them. An automation that reads one will
+Entities whose state only changes when *commanded* are the exception: a
+SwitchBot IR air conditioner (`assumed_state`) and its switch, and a SwitchBot
+Bot's button (its state is when it was last pressed). Nothing reports their
+change, so in shadow mode `hars` never updates them. An automation that reads one will
 see a stale value; read the diff with that in mind.
 
 ## What it does not check
@@ -55,8 +56,9 @@ HA's: both would write `.storage`.
    stopped) and import it:
 
    ```sh
-   docker run --rm -v hars-shadow:/config -v /path/to/ha-config-copy:/ha:ro hars import /ha --dry-run
-   docker run --rm -v hars-shadow:/config -v /path/to/ha-config-copy:/ha:ro hars import /ha
+   IMAGE=ghcr.io/adamt94/homeassistant-rust
+   docker run --rm -v hars-shadow:/config -v /path/to/ha-config-copy:/ha:ro $IMAGE import /ha --dry-run
+   docker run --rm -v hars-shadow:/config -v /path/to/ha-config-copy:/ha:ro $IMAGE import /ha
    ```
 
    Read `import-report.json`: an automation reported `unavailable` will show
@@ -64,8 +66,8 @@ HA's: both would write `.storage`.
 2. Run it on another port, on the LAN so it can reach the devices:
 
    ```sh
-   docker run -d --name hars-shadow --network host \
-     -e HARS_SHADOW=1 -e HARS_BIND=0.0.0.0:8124 -v hars-shadow:/config hars
+   docker run -d --name hars-shadow --network host --restart unless-stopped \
+     -e HARS_SHADOW=1 -e HARS_BIND=0.0.0.0:8124 -v hars-shadow:/config $IMAGE
    docker logs hars-shadow | grep "SHADOW MODE"
    ```
 
@@ -74,12 +76,16 @@ HA's: both would write `.storage`.
 3. Leave the phone on HA. Do not log the companion app in to `hars`: its
    webhooks would feed `hars` state that HA doesn't have.
 
-Side effects on the house are reads only, but they are more reads: SwitchBot's
-cloud API is polled by both (about 290 more requests a day, against its 10,000
-daily limit), the Hue bridge has a second event-stream client, and LIFX bulbs
-get a second poller.
+Side effects on the house are reads only, but they are more reads: a SwitchBot
+Cloud account is polled by both (about 290 more requests a day for a Hub and
+a Bot, against its 10,000 daily limit), a Hue bridge gets a second
+event-stream client, and LIFX bulbs get a second poller.
 
 ## Reading the result
+
+From a clone of this repository (it needs only Python 3), with the log
+copied out of the container
+(`docker cp hars-shadow:/config/.hars/shadow.jsonl .`):
 
 ```sh
 scripts/shadow-diff.py --ha-db /path/to/home-assistant_v2.db \
@@ -104,9 +110,9 @@ compares, over the window from `hars`'s first start to now:
 
 It exits 0 when nothing differs and the log has no gaps, 1 otherwise, and 2
 when it can't read its input (a log line that isn't JSON, other than one a
-crash cut off; a reversed window), so it never certifies input it didn't read. When `hars` was down (it prints
-each start it saw), leave the gap out with
-`--exclude START,END`; otherwise HA's calls in it count as missing. If you
+crash cut off; a reversed window), so it never certifies input it didn't
+read. When `hars` was down (it prints each start it saw), leave the gap out
+with `--exclude START,END`; otherwise HA's calls in it count as missing. If you
 change an automation in HA, import again (`--force`) and start the week over.
 
 `python3 -m unittest discover -s scripts` runs its tests.

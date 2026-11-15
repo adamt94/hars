@@ -1,0 +1,38 @@
+name: Integration request
+description: Ask for a Home Assistant integration to be supported.
+labels: [integration]
+body:
+  - type: markdown
+    attributes:
+      value: >
+        hars adds integrations one at a time, each matched against Home
+        Assistant's own code and measured for memory and wakeups. See
+        docs/ROADMAP.md for what is planned.
+  - type: input
+    id: domain
+    attributes:
+      label: Integration domain
+      description: As in Home Assistant, e.g. `esphome`, `mqtt`.
+    validations:
+      required: true
+  - type: textarea
+    id: entities
+    attributes:
+      label: What you use it for
+      description: Devices, entity types (light, sensor, climate, ...) and services you need.
+    validations:
+      required: true
+  - type: dropdown
+    id: transport
+    attributes:
+      label: How it talks to devices
+      options:
+        - Local push (stream, socket)
+        - Local polling
+        - Cloud
+        - Not sure
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything else
+      description: Links to Home Assistant's integration page, the library it uses, quirks.

@@ -1,0 +1,47 @@
+name: Bug report
+description: hars does something wrong, or differently from Home Assistant.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what you expected
+      description: If Home Assistant 2026.6 behaves differently, say what it does.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Image tag or commit
+      description: "`docker inspect --format '{{.Config.Image}} {{.Image}}' hars`, or the commit you built."
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: How you run hars
+      options:
+        - Docker Compose (compose.yaml)
+        - Docker, other
+        - Binary or from source
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Log
+      description: "`docker compose logs --tail 200`. Remove tokens, keys and anything personal."
+      render: text
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I removed tokens, passwords, keys and locations from what I pasted.
+          required: true

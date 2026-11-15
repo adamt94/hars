@@ -1,0 +1,23 @@
+# Run hars with Docker Compose. See README.md for the steps.
+#
+#   docker compose run --rm hars auth add USERNAME PASSWORD   # once: the owner
+#   docker compose up -d                                      # http://<host>:8123
+#
+# The image is pulled from ghcr.io (published by .github/workflows/publish.yml).
+# If it can't be pulled and this file sits in a clone of the repository,
+# Compose builds it from the Dockerfile instead.
+services:
+  hars:
+    image: ghcr.io/adamt94/homeassistant-rust:latest
+    build: .
+    container_name: hars
+    # LAN devices (LIFX broadcast discovery, mDNS) need the host's network.
+    # hars listens on port 8123 of the host (set HARS_BIND to change it).
+    network_mode: host
+    volumes:
+      # Everything hars keeps: logins, registries, dashboards, history.
+      - ./config:/config
+    restart: unless-stopped
+    # On stop, hars finishes requests (up to 5 s), then saves and flushes
+    # history. Give it time to do that before Docker kills it.
+    stop_grace_period: 1m

@@ -1,5 +1,9 @@
 # Vector generators
 
+How hars's tests are checked against Home Assistant. Why:
+[ADR 0008](../../docs/adr/0008-vectors-from-home-assistant.md). Where this
+fits in testing: [CONTRIBUTING.md](../../CONTRIBUTING.md#tests).
+
 A *vector* is a test case whose expected answer came from running Home
 Assistant's own code: real input (a bridge's JSON, a bulb's reply, a service
 call) and what HA 2026.6.1 did with it (states, attributes, the request it
@@ -36,7 +40,8 @@ expected value was produced.
 ## Running one
 
 Each script runs in its own virtualenv with HA and its library at the pinned
-versions:
+versions. No generator has been written yet (see the table below), so this
+is what running the future `hue.py` will look like:
 
 ```sh
 python3 -m venv .venv-hue

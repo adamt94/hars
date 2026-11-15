@@ -47,3 +47,11 @@ jobs:
           test "$(docker inspect hars --format '{{.State.ExitCode}}')" = 0
           docker logs hars 2>&1 | grep -q "hars stopped"
           echo "image: $(docker image inspect hars --format '{{.Size}}') bytes"
+      # The budgets in docs/PERF.md, on the image's binary: size, start-up,
+      # and idle RSS, CPU and wakeups after a short warm-up. Fails over budget.
+      - name: Resource budgets
+        run: |
+          id=$(docker create hars)
+          docker cp "$id":/hars ./hars-bin
+          docker rm "$id"
+          PERF_GATE=1 scripts/perf.sh ./hars-bin 15 30

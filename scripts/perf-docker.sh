@@ -14,6 +14,7 @@ exec docker run --rm \
   -e CARGO_TARGET_DIR=/target \
   -e PERF_MET="${PERF_MET:-0}" \
   -e PERF_DETAIL="${PERF_DETAIL:-0}" \
+  -e PERF_GATE="${PERF_GATE:-0}" \
   -w /src \
   rust:1 \
-  bash -c "cargo build --release --locked -q && scripts/perf.sh /target/release/hars ${1:-10} ${2:-60}"
+  bash -c "cargo build --release --locked -q && scripts/perf.sh /target/release/hars ${1:-15} ${2:-60}"

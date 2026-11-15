@@ -1,16 +1,26 @@
 #!/usr/bin/env bash
-# Measure hars against the MVP resource budgets (docs/ROADMAP.md, docs/PERF.md).
+# Measure hars against the resource budgets in docs/PERF.md.
 #
 # Linux only: it reads /proc. On macOS use scripts/perf-docker.sh.
 #
 #   scripts/perf.sh [binary] [warmup_s] [quiet_s]
 #
 # The MVP gate is a 300 s warm-up and a 1800 s quiet run; the defaults are
-# shorter for day-to-day checks. Prints one Markdown table row.
+# shorter for day-to-day checks. The warm-up must be longer than tokio's 10 s
+# blocking-thread keep-alive (the login's bcrypt runs on one), or that thread
+# exits during the quiet window. Prints one Markdown table row.
+#
+# The run uses a throwaway config dir with one login. PERF_CONFIG=DIR starts
+# from a copy of DIR instead (an imported install, so its integrations run).
+#
+# PERF_GATE=1 also fails (exit 3) when a number is over its budget, as CI
+# does. The budgets are the defaults below; docs/PERF.md#budgets lists them.
+# Each can be overridden (MAX_BINARY_MIB=8 ...), e.g. to check that the gate
+# trips.
 set -euo pipefail
 
 BIN=${1:-target/release/hars}
-WARMUP=${2:-10}
+WARMUP=${2:-15}
 QUIET=${3:-60}
 PORT=${PORT:-18123}
 URL="http://127.0.0.1:$PORT"
@@ -37,6 +47,9 @@ fi
 # A throwaway config with one login; /api/ needs a token, as in HA.
 export HARS_CONFIG
 HARS_CONFIG=$(mktemp -d)
+if [ -n "${PERF_CONFIG:-}" ]; then
+  cp -a "$PERF_CONFIG"/. "$HARS_CONFIG"/
+fi
 "$BIN" auth add perf perf-password >/dev/null
 # PERF_MET=1: a home in London with HA's onboarding `met` entry, so the
 # forecast is fetched (from api.met.no) and held during the run.
@@ -52,7 +65,8 @@ answers() { [ "$(curl -s -o /dev/null -w '%{http_code}' --max-time 1 "$URL/api/"
 t0=$(date +%s%N)
 HARS_BIND="127.0.0.1:$PORT" "$BIN" >/dev/null 2>&1 &
 pid=$!
-trap 'kill "$pid" 2>/dev/null || true; rm -rf "$HARS_CONFIG"' EXIT
+# Wait for hars to stop (it saves on SIGTERM) before removing its config.
+trap '{ kill "$pid" && wait "$pid"; } 2>/dev/null || true; rm -rf "$HARS_CONFIG" || true' EXIT
 until answers; do
   kill -0 "$pid" 2>/dev/null || { echo "hars exited during start-up" >&2; exit 1; }
   if (( $(date +%s%N) - t0 > 10000000000 )); then
@@ -98,9 +112,29 @@ fi
 
 awk -v size="$size" -v start="$start_ms" -v rss="$rss_kib" -v pss="$pss_kib" \
     -v dt=$((ticks1 - ticks0)) -v hz="$hz" -v sw=$((sw1 - sw0)) -v q="$QUIET" \
-    -v threads="$threads" -v w="$WARMUP" 'BEGIN {
+    -v threads="$threads" -v w="$WARMUP" -v gate="${PERF_GATE:-0}" \
+    -v max_bin="${MAX_BINARY_MIB:-15}" -v max_start="${MAX_START_MS:-1000}" \
+    -v max_rss="${MAX_RSS_MIB:-20}" -v max_cpu="${MAX_CPU_PCT:-0.1}" \
+    -v max_wake="${MAX_WAKEUPS:-1}" '
+function check(name, value, limit, unit) {
+  if (value + 0 > limit + 0) {
+    printf "over budget: %s is %s %s, budget %s %s\n", name, value, unit, limit, unit > "/dev/stderr"
+    over = 1
+  }
+}
+BEGIN {
+  bin = size / 1048576; rss_m = rss / 1024; cpu = 100 * dt / hz / q; wake = sw / q
   printf "| binary | start→/api/ | idle RSS | idle PSS | idle CPU | wakeups/s | threads | run |\n"
   printf "|---|---|---|---|---|---|---|---|\n"
   printf "| %.2f MiB | %d ms | %.1f MiB | %.1f MiB | %.3f %% | %.2f | %d | %ds warm-up, %ds quiet |\n",
-    size / 1048576, start, rss / 1024, pss / 1024, 100 * dt / hz / q, sw / q, threads, w, q
+    bin, start, rss_m, pss / 1024, cpu, wake, threads, w, q
+  if (gate == 1) {
+    check("binary", sprintf("%.2f", bin), max_bin, "MiB")
+    check("start-up", start, max_start, "ms")
+    check("idle RSS", sprintf("%.1f", rss_m), max_rss, "MiB")
+    check("idle CPU", sprintf("%.3f", cpu), max_cpu, "%")
+    check("wakeups", sprintf("%.2f", wake), max_wake, "/s")
+    if (over) exit 3
+    print "within budget" > "/dev/stderr"
+  }
 }'

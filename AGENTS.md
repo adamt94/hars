@@ -1,25 +1,41 @@
 # AGENTS.md
 
-homeassistant-rust (`hars`) is a Rust rebuild of Home Assistant. **The #1 goal
-is minimal resource usage** (RAM, CPU, allocations, idle wakeups, binary size).
-Read `docs/ARCHITECTURE.md` and `docs/ROADMAP.md` before starting work.
+hars (homeassistant-rust) is a Rust rebuild of Home Assistant's core. **The
+#1 goal is minimal resource use** (RAM, CPU, allocations, idle wakeups,
+binary size) while behaving exactly like the pinned Home Assistant release.
+
+Read before changing code: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+(crates, runtime, where code goes), [docs/PERF.md](docs/PERF.md) (budgets,
+rules, evidence), [CONTRIBUTING.md](CONTRIBUTING.md) (tests, PRs). Pick work
+from [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Commands
-- Build: `cargo build` / `cargo build --release`
-- Test: `cargo test --workspace`
-- Lint (must pass, CI uses `-D warnings`): `cargo clippy --all-targets -- -D warnings`
+
+- All CI checks: `scripts/check.sh` (fmt check, clippy `-D warnings`
+  `--locked`, workspace tests `--locked`, Python script tests)
 - Format: `cargo fmt --all`
-- Run: `cargo run --release` (binds `0.0.0.0:8123`; override with `HARS_BIND`)
+- One crate's tests: `cargo test -p ha-integrations met`
+- Run: `HARS_CONFIG=./config cargo run --release` (binds `0.0.0.0:8123`;
+  `HARS_BIND` overrides); first `... -- auth add USER PASS`
+- Resource budgets: `PERF_GATE=1 scripts/perf.sh target/release/hars`
+  (Linux) or `PERF_GATE=1 scripts/perf-docker.sh` (macOS)
 
 ## Rules
-- Pick work from `docs/ROADMAP.md` and tick boxes as you finish items.
-- Match Home Assistant's API/JSON shapes when implementing an API surface;
-  check HA's docs/source for the exact shape rather than guessing.
-- Hot paths: share data via `Arc`, avoid cloning `String`s (use `SmolStr`/`EntityId`),
-  no blocking I/O on the async runtime, no busy polling.
-- Claims about performance need numbers: add or run a benchmark, or measure RSS.
-- Add a new crate only when a module clearly outgrows its current crate.
-- `unsafe` is denied workspace-wide; justify any exception in review.
-- Every behaviour change ships with a test.
-- Test vectors made by running HA's code ship with the script that made
-  them, in `scripts/vectors/` (see its README).
+
+- Match Home Assistant 2026.6.1's API/JSON shapes, files and behaviour.
+  Check HA's source; don't guess.
+- Expected values that must match HA come from vectors made by running HA's
+  code, with the script committed in `scripts/vectors/`
+  ([its README](scripts/vectors/README.md)).
+- Every behaviour change ships with a test. Use the simulated clock; no real
+  network.
+- Follow the hot-path rules in [PERF.md](docs/PERF.md#rules): `Arc` sharing,
+  no `String` clones (`SmolStr`/`EntityId`), no blocking I/O on async
+  threads, no polling. Performance claims need numbers.
+- Put code where [ARCHITECTURE.md](docs/ARCHITECTURE.md#where-new-code-goes)
+  says. Crates depend only downwards (`scripts/test_crate_layers.py`); add a
+  crate only when that section's rule allows it.
+- `unsafe` is denied workspace-wide; an exception needs a reason in review.
+- When a change finishes a roadmap item, tick its box in the same change.
+  Update the docs the change affects (CONTRIBUTING.md lists which).
+- Never commit tokens, keys, personal data or real coordinates.

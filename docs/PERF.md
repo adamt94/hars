@@ -1,37 +1,131 @@
-# Performance
+# Performance guide
 
-Every milestone records its numbers here. The MVP gates are in
-[`ROADMAP.md`](ROADMAP.md#resource-budgets-mvp-gates); a regression past a gate
-blocks the milestone.
+Using as little memory, CPU, wakeups and disk as possible is hars's main
+goal. This guide is the one place for the budgets, the rules that keep hars
+inside them, how to measure, and what a pull request must show. Measured
+results over time are in [perf/RESULTS.md](perf/RESULTS.md).
+
+## Budgets
+
+| Metric | Budget | Checked in CI |
+|---|---|---|
+| Stripped release binary | **≤ 15 MiB** (the frontend is served from disk, not embedded) | yes |
+| Cold start to serving `/api/` | **≤ 1 s** | yes |
+| Idle RSS | **≤ 20 MiB** with the full reference install and one dashboard open | on a fresh install |
+| Idle CPU | **≤ 0.1 %** of one core | on a fresh install |
+| Wakeups when quiet | **≤ 1 /s** on average | on a fresh install |
+| Recorder disk writes when quiet | batched, at most one fsync per 5 s | no (by design: [ADR 0003](adr/0003-recorder-segment-log.md)) |
+
+The MVP is measured on Linux with the [reference
+install](adr/0009-mvp-reference-install.md) loaded, after a 5-minute warm-up
+and a 30-minute quiet run.
+
+**CI gate.** CI's `docker` job copies the binary out of the image it built
+and runs `PERF_GATE=1 scripts/perf.sh ./hars-bin 15 30`. That measures a
+fresh install (one login, 200 state writes, no integrations other than
+`sun`) and fails the job if any number is over the budgets above, which are
+the defaults in `scripts/perf.sh`. The table row is printed in the job's log
+on every pull request, so the binary size and idle RSS can be compared with
+`main`'s.
+
+## Rules
+
+Each rule says why. Hot paths are the state write, event fan-out, WebSocket
+serialisation and filtering, the recorder's intake, and anything run per
+state change.
+
+1. **Share, don't copy.** Pass `Arc<State>`, `Arc<Event>` and other shared
+   data by `Arc`. *Why:* one `state_changed` reaches the state machine, the
+   recorder, automations and every WebSocket client; an `Arc` makes that one
+   allocation instead of one per consumer.
+2. **No `String` clones on hot paths.** Use `EntityId` and `SmolStr` (inline
+   up to 23 bytes) and borrow `&str`. *Why:* almost every id and state value
+   fits inline, so a write allocates nothing for them; a `String` allocates
+   every time.
+3. **Count allocations per event.** A state write allocates its `State` and
+   nothing per consumer; a matching entity filter allocates nothing (it keeps
+   byte offsets). Check a change with the `state_write`, `fan_out` and
+   `entity_filter` benches. *Why:* allocation is the main CPU cost at this
+   size, and freed memory is not always returned to the OS.
+4. **Never poll.** Sleep until the next deadline (`tokio::time::sleep_until`
+   on `hass.clock()`), or wait on a socket or channel. A device that must be
+   polled is polled at Home Assistant's interval, no faster. *Why:* every
+   timer wake costs CPU and keeps a small device's CPU out of its deep sleep
+   states. An idle hars has zero wakeups and must stay that way.
+5. **Bound what can grow.** Queues to clients are bounded (the bus, 4096
+   events; a WebSocket outbox, 4096 messages). Lossless feeds are unbounded,
+   so only internal consumers that keep up may use them. *Why:* a slow
+   client must not be able to grow hars's memory.
+6. **No blocking I/O on async threads.** File reads and writes, bcrypt and
+   other slow work go on `spawn_blocking`. *Why:* a blocked worker stalls
+   every task scheduled on it. Note that a blocking thread lingers for 10 s
+   after its last job, so measure idle after that.
+7. **Hold nothing while idle.** If something is used once an hour, create it
+   then and drop it after (`met` makes its HTTPS client per fetch). *Why:*
+   idle RSS is the budget that matters most on small devices.
+8. **Every dependency pays for its bytes.** Use `default-features = false`
+   and enable only what is used. Report the binary size change of any new
+   dependency. *Why:* binary pages that run become RSS (adding the HTTPS
+   client grew the binary 1.44 MiB and idle RSS 0.7 MiB, even with `met`
+   off), and the binary is the install on a small device.
+9. **Large static data stays out of the heap.** Data served as it is
+   (translations, icons) is compiled in as ready-made JSON pieces and joined
+   per request, never parsed into structures at start. Very large data (the
+   frontend) is served from disk. *Why:* compiled-in bytes are file-backed
+   pages the kernel can drop; parsed copies are heap that stays.
+10. **Feature-gate heavy integrations.** Integrations are compiled in, with
+    no Cargo features today ([ADR 0005](adr/0005-integrations-compiled-in.md)).
+    An integration that adds more than 512 KiB to the release binary, or
+    brings a dependency tree nothing else uses (an MQTT or Zigbee stack),
+    goes in its own crate behind a Cargo feature, on by default. *Why:*
+    users who don't use it shouldn't carry its pages.
+11. **Numbers for every performance claim.** "Faster" or "smaller" in a
+    comment, commit or review needs a measurement from the commands below.
 
 ## How to measure
 
-### Process budgets: `scripts/perf.sh`
+### Process numbers: `scripts/perf.sh`
 
-Linux only (it reads `/proc`). On macOS, `scripts/perf-docker.sh` builds and
-runs it in a `rust:1` container.
+Linux only (it reads `/proc`). On macOS, `scripts/perf-docker.sh` builds a
+release binary in a `rust:1` container and runs it there.
 
 ```sh
-scripts/perf.sh target/release/hars 300 1800   # the MVP gate: 5-min warm-up, 30-min quiet
-scripts/perf-docker.sh 10 60                   # quick check from macOS
+scripts/perf.sh target/release/hars              # 15 s warm-up, 60 s quiet
+scripts/perf.sh target/release/hars 300 1800     # the MVP run
+scripts/perf-docker.sh 15 60                     # from macOS
+PERF_GATE=1 scripts/perf-docker.sh 15 30         # what CI checks
 ```
 
-It starts the binary, times how long until `GET /api/` answers, posts 200
-state writes as warm-up traffic, waits out the warm-up, then measures over the
-quiet window:
+It starts the binary with a throwaway config and one login, times how long
+until `/api/` answers, logs in and posts 200 state writes, waits out the
+warm-up, then measures over the quiet window. It prints one Markdown row:
 
 | Column | Source |
 |---|---|
-| binary | size of the stripped release binary |
-| start→/api/ | process spawn until `/api/` first answers (2 ms polling, so ±2 ms). Since auth, that answer is a `401`; the warm-up then logs in |
-| idle RSS / PSS | `Rss` and `Pss` in `/proc/<pid>/smaps_rollup` (exact, unlike `VmRSS`) |
-| idle CPU | `utime + stime` delta over the quiet window, % of one core |
-| wakeups/s | voluntary context switches summed over all threads: a proxy, since each block is followed by a wakeup. Preemptions are excluded. It warns if threads came or went during the window |
+| binary | size of the binary file |
+| start→/api/ | process spawn until `/api/` first answers (a `401`). Polled every 2 ms; curl and process start add a few ms |
+| idle RSS / PSS | `Rss` and `Pss` from `/proc/<pid>/smaps_rollup` |
+| idle CPU | `utime + stime` over the quiet window, % of one core |
+| wakeups/s | voluntary context switches of all threads, per second. It warns if threads started or exited during the window |
+| threads | threads at the end |
 
-The script refuses to start if something already answers on the port, and
-fails if `/api/` does not answer within 10 s.
+Options, as environment variables:
 
-### Hot paths: `cargo bench -p ha-core`
+- `PERF_GATE=1`: exit 3 if a number is over budget. `MAX_BINARY_MIB`,
+  `MAX_START_MS`, `MAX_RSS_MIB`, `MAX_CPU_PCT` and `MAX_WAKEUPS` override
+  the budgets, for example to check the gate trips.
+- `PERF_MET=1`: add a `met` entry for London, so a real forecast is fetched
+  and held.
+- `PERF_CONFIG=DIR`: start from a copy of `DIR` instead of an empty config,
+  for example an imported install, so its integrations run. This is how the
+  full reference-install figure is taken (with a browser left on a
+  dashboard).
+- `PERF_DETAIL=1`: print the file-backed and anonymous parts of RSS.
+
+The warm-up must be longer than 10 s (the login's blocking thread), or the
+wakeup figure is wrong.
+
+### Hot paths: `cargo bench -p ha-core --bench core`
 
 `criterion` benches in `crates/ha-core/benches/core.rs`:
 
@@ -39,166 +133,45 @@ fails if `/api/` does not answer within 10 s.
   `Hass::set_state`. Building the attribute map is excluded.
 - `fan_out/feeds/N`: one changed write delivered to `N` lossless feeds and
   one bus subscriber, all drained.
+- `entity_filter/…`: `subscribe_entities` filters (globs, domains).
 
-## Results
+To compare a branch with `main` on the same machine:
 
-### M0 (core), 2026-11-13
+```sh
+git switch main && cargo bench -p ha-core --bench core -- --save-baseline main
+git switch -   && cargo bench -p ha-core --bench core -- --baseline main
+```
 
-No integrations yet, so this is the floor the inventory builds on, not a gate
-result. Docker on an Apple-silicon Mac (linux/aarch64, 2 vCPUs).
+Criterion prints the change and whether it is significant. Add a bench to
+`core.rs` (or a new `benches/` file) when you add a hot path.
 
-| binary | start→/api/ | idle RSS | idle PSS | idle CPU | wakeups/s | threads | run |
-|---|---|---|---|---|---|---|---|
-| 2.02 MiB | 8 ms | 13.2 MiB | 12.4 MiB | 0.000 % | 0.00 | 3 | 5s warm-up, 30s quiet |
+### Binary size
 
-Idle is truly idle: no CPU time and no voluntary context switches over the quiet window.
+`ls -l target/release/hars` after `cargo build --release`, on `main` and on
+the branch. CI's resource step prints the size of the Docker image's binary
+(static musl) for every pull request.
 
-**RSS finding:** 8 MiB of the 13.2 MiB is a single mimalloc arena backed by
-transparent huge pages (the container's kernel has THP set to `always`, and
-`AnonHugePages` is 8192 kB). With `MIMALLOC_ALLOW_THP=0`, the same binary sits at
-3.7 MiB (`AnonHugePages` 0). mimalloc's `no_thp` Cargo feature does not help,
-because it only skips the `madvise` call.
+## What a pull request must show
 
-### THP off by default, 2026-11-13
-
-`hars` now sets `PR_SET_THP_DISABLE` (via `rustix`) and re-execs itself once
-at start-up, so the new image allocates nothing with THP on. Setting the flag
-without re-exec only got to 7.6 MiB, because mimalloc faults 4 MiB of huge
-pages before `main` runs. A build-time mimalloc define was also tried and
-rejected: a plain `CFLAGS` in the environment, or `cargo install --git`,
-silently drops it. The pid is kept across the exec, and
-`MIMALLOC_ALLOW_THP=1` keeps THP on. Same container, built with
-`CFLAGS=-O2`:
-
-| binary | start→/api/ | idle RSS | idle PSS | idle CPU | wakeups/s | threads | run |
-|---|---|---|---|---|---|---|---|
-| 2.02 MiB | 7 ms | 4.1 MiB | 3.1 MiB | 0.000 % | 0.00 | 3 | 5s warm-up, 30s quiet |
-
-Idle RSS went from 13.2 to 4.1 MiB (−69 %), and start-up did not get slower.
-
-### Auth, 2026-11-14
-
-`/api/*` now needs a token, so `perf.sh` creates a login (`hars auth add`) and
-the warm-up logs in first, as the frontend does: bcrypt at cost 12 on a
-blocking thread, then a `.storage/auth` write. The warm-up must be longer
-than tokio's 10 s blocking-thread keep-alive, or that thread exits during the
-quiet window and the wakeup count is wrong (`perf.sh` warns).
-
-| binary | start→/api/ | idle RSS | idle PSS | idle CPU | wakeups/s | threads | run |
-|---|---|---|---|---|---|---|---|
-| 2.70 MiB | 10 ms | 5.2 MiB | 4.3 MiB | 0.000 % | 0.00 | 3 | 15s warm-up, 30s quiet |
-
-Where the extra 1.1 MiB comes from, measured on the same binary (RSS /
-anonymous, 15 s after each step):
-
-| after | RSS | anonymous |
-|---|---|---|
-| start, no login | 4.5 MiB | 1.0 MiB |
-| 20 rejected `/api/` requests | 4.7 MiB | 1.0 MiB |
-| 1 login | 5.1 MiB | 1.2 MiB |
-| 6 logins | 5.2 MiB | 1.3 MiB |
-
-The baseline gained 0.5 MiB, mostly the larger binary's mapped pages. The
-first login adds 0.4 MiB: mimalloc keeps the heap the blocking thread used for
-bcrypt. Each further login costs about 20 KiB (a refresh token in memory).
-
-### WebSocket API, 2026-11-14
-
-Same harness as above (no WebSocket client connected). An open connection
-costs one timer: the 55 s heartbeat ping.
-
-| binary | start→/api/ | idle RSS | idle PSS | idle CPU | wakeups/s | threads | run |
-|---|---|---|---|---|---|---|---|
-| 3.08 MiB | 9 ms | 5.5 MiB | 4.6 MiB | 0.000 % | 0.00 | 3 | 15s warm-up, 30s quiet |
-
-### Registries, dashboards, zones/people and `sun`, 2026-11-14
-
-Fresh install (no imported data), so `sun` runs at the default location.
-Its position refreshes every 2 to 20 minutes depending on the sun's phase,
-as in HA, each a single timer; none fell in this 60 s window.
-
-| binary | start→/api/ | idle RSS | idle PSS | idle CPU | wakeups/s | threads | run |
-|---|---|---|---|---|---|---|---|
-| 3.70 MiB | 10 ms | 6.7 MiB | 5.8 MiB | 0.000 % | 0.00 | 3 | 15s warm-up, 60s quiet |
-
-### `met`, 2026-11-14
-
-`PERF_MET=1 scripts/perf-docker.sh 15 60`: a home in London with HA's
-onboarding `met` entry, so the run includes a real fetch from api.met.no
-(60 KB of JSON, 88 time steps) and holds its forecast.
-
-| binary | start→/api/ | idle RSS | idle PSS | idle CPU | wakeups/s | threads | run |
-|---|---|---|---|---|---|---|---|
-| 5.14 MiB | 13 ms | 8.7 MiB | 7.6 MiB | 0.000 % | 0.00 | 3 | 15s warm-up, 60s quiet, `met` running |
-| 5.14 MiB | 11 ms | 7.4 MiB | 6.5 MiB | 0.000 % | 0.00 | 3 | 15s warm-up, 60s quiet, no `met` entry |
-
-The binary grew 1.44 MiB (3,884,416 → 5,393,024 bytes), nearly all of it
-the HTTPS client: rustls with ring, and Mozilla's roots compiled in. A
-client that only did HTTP would not reach api.met.no. That size costs 0.7
-MiB of RSS even when `met` doesn't run (6.7 → 7.4 MiB), from mapped pages.
-
-Running `met` adds 1.3 MiB, split between 0.6 MiB of file-backed pages
-(the TLS code it touches) and 0.6 MiB of anonymous memory (`PERF_DETAIL=1`).
-What was tried:
-
-- Loading the system's CA file (`rustls-native-certs`) instead: anonymous
-  memory was 0.5 MiB higher (2668 vs 2184 kB), and it is blocking file
-  I/O. Before that I/O moved off the async threads, it also put 31 ms onto
-  start-up, because the client was built before the server bound its port.
-  Compiled-in roots are what HA does too: it ships `certifi`. The Docker
-  image now carries no CA bundle.
-- Making the client for each fetch and dropping it afterwards: an idle
-  `hars` holds no TLS state or socket between the hourly fetches.
-
-Refreshes are one timer every 55–64 minutes, as HA, so none falls in the
-window.
-
-
-### Translations and icons, 2026-11-14
-
-| binary | start→/api/ | idle RSS | idle PSS | idle CPU | wakeups/s | threads | run |
-|---|---|---|---|---|---|---|---|
-| 5.46 MiB | 11 ms | 7.5 MiB | 6.5 MiB | 0.000 % | 0.00 | 3 | 15s warm-up, 60s quiet |
-
-The binary grew 320 KiB (5,393,024 → 5,720,704 bytes), mostly the 214 KB
-of English strings and icons compiled in. Idle RSS barely moved (7.4 → 7.5
-MiB): the strings are file-backed pages, read only while a request is
-answered. Nothing is parsed or cached; an answer is the stored JSON
-pieces joined.
-
-### Entity filter, 2026-11-14
-
-`subscribe_entities` filters (`ha_core::entityfilter`) run once per state
-change per filtered subscription. The glob walk keeps byte offsets into the
-entity id, so a match allocates nothing. `cargo bench -p ha-core -- entity_filter`
-on an Apple M4:
-
-| case | time |
+| If the change… | Show in the description |
 |---|---|
-| glob `sensor.phone_*_level` vs `sensor.phone_battery_level` | 76.6 ns |
-| the iOS app's `include.domains [zone, person]`, rejecting a sensor | 18.2 ns |
-| case 4, globs on both sides | 143 ns |
+| does anything | CI green. The resource step is part of it |
+| adds or upgrades a dependency, or adds compiled-in data | release binary size before and after, in bytes |
+| touches a hot path (rule list above) | `criterion` before and after with `--baseline main`, for the benches it affects (add one if none covers it) |
+| adds an integration, a background task, a timer, a socket or a cache | a `scripts/perf.sh` row, warm-up ≥ 15 s and quiet ≥ 60 s, with the feature running (`PERF_CONFIG` or `PERF_MET`), and a new entry in [perf/RESULTS.md](perf/RESULTS.md) |
+| claims to be faster or smaller | before and after numbers from the commands above |
 
-### `mobile_app` webhook, 2026-11-14
+"None needed" with a reason is fine for changes that can't affect any of
+these (docs, tests only).
 
-Release `hars` (aarch64-darwin), main vs the webhook branch: 6,337,120 →
-6,419,920 bytes, **+80.9 KiB**. That is over the spec's 64 KiB budget for
-the whole feature: `crypto_secretbox` is about 16.5 KB, and the rest is the
-pipeline and commands. It is a candidate for trimming once sensors and
-location land. Seal + open of a 2 KiB payload costs 12.1 µs on an Apple M4
-(the spec's standalone bench).
+## When numbers get worse
 
-### Lossless recorded-event feed, 2026-11-15
-
-Every `fire` now takes the bus's lossless-subscriber mutex (held across the
-broadcast send, so the recorder's feed and the bus agree on order).
-`cargo bench -p ha-core -- "state_write|fan_out"` on an Apple M4, main vs the
-branch, with no lossless subscriber: every case within ±2 % (criterion: no
-change for `state_write/changed/*` and `fan_out/*`; 106.3 vs 105.2 ns for
-an unchanged write, which fires nothing).
-
-| case | main | branch |
-|---|---|---|
-| `state_write/changed/no_attributes` | 247.4 ns | 243.7 ns |
-| `state_write/changed/light_attributes` | 507.8 ns | 499.5 ns |
-| `fan_out/feeds/16` | 550.4 ns | 553.2 ns |
+- **Over a budget:** CI fails and the pull request does not merge. A budget
+  only changes through a new [ADR](adr/README.md) the maintainers agree to.
+- **Worse but within budget** (a bench slower with criterion calling it a
+  regression, the binary over 256 KiB larger, idle RSS over 0.5 MiB higher,
+  or any idle wakeup): the description says how much and why it is worth
+  it, and [perf/RESULTS.md](perf/RESULTS.md) records it. The reviewer may
+  ask for it to be trimmed first.
+- **Found after merge:** open an issue labelled `perf` with the numbers. It
+  is fixed or reverted before the milestone it belongs to is closed.

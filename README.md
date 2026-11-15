@@ -1,83 +1,157 @@
-# homeassistant-rust
+# hars
 
-A ground-up rebuild of [Home Assistant](https://www.home-assistant.io/) in Rust.
+hars is a rebuild of [Home Assistant](https://www.home-assistant.io/)'s core
+in Rust, made to run a smart home in a few megabytes of memory. It serves the
+unchanged official Home Assistant frontend and companion apps, and keeps its
+data in Home Assistant's own file formats. A fresh install idles at about
+7 MiB of memory and no CPU ([measurements](docs/perf/RESULTS.md)).
 
-**Primary goal: maximum performance per unit of hardware** — minimal RAM, CPU,
-disk I/O and startup time, so a full smart-home hub runs comfortably on a
-Raspberry Pi Zero–class device (or alongside everything else on a server).
+It is early software. **Works today:** the web UI and login, dashboards,
+history and logbook, the iOS companion app, YAML automations (state,
+numeric-state and time triggers), the `sun`, `met`, `hue`, `lifx`,
+`switchbot_cloud`, `mobile_app`, `person` and `zone` integrations, and
+importing a Home Assistant 2026.6 install. **Not yet:** the onboarding screen,
+adding integrations or editing automations from the UI, templates, scripts,
+notifications and remote access. If you need those, keep Home Assistant for
+now.
 
-| | Home Assistant (Python) | target for `hars` |
-|---|---|---|
-| Idle RSS | ~300–500 MB | **< 20 MB** |
-| Cold start | 30–90 s | **< 1 s** |
-| `state_changed` throughput | ~10³/s | **> 10⁶/s** |
-| Install size | ~1 GB+ | **single static binary, < 20 MB** |
+## Install
 
-Current scaffold: 1.5 MB release binary, ~4.4 MB RSS at idle.
+You need a Linux machine (x86-64 or ARM64) with Docker and Docker Compose.
 
-## Status
+1. Make a folder for hars and download the Compose file into it:
 
-Early scaffold. Working today:
+   ```sh
+   mkdir hars && cd hars
+   curl -fsSLO https://raw.githubusercontent.com/adamt94/homeassistant-rust/main/compose.yaml
+   ```
 
-- `ha-core`: `EntityId`, immutable `Arc<State>` snapshots, `StateMachine`, broadcast `EventBus`, `Hass` handle
-- `ha-server` (`hars` binary): `GET /api/`, `GET /api/states`, `GET|POST /api/states/{entity_id}` — same shapes as Home Assistant's REST API
+2. Create your login. hars has no onboarding screen yet, so the first login
+   is made here; it becomes the owner (administrator).
 
-See [`docs/ROADMAP.md`](docs/ROADMAP.md) for what's next and
-[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the design.
+   ```sh
+   docker compose run --rm hars auth add YOUR_NAME YOUR_PASSWORD
+   ```
 
-## Quick start
+   It prints `created owner "YOUR_NAME"; onboarding is complete`.
+   Moving from Home Assistant? Skip this step and
+   [import](#moving-from-home-assistant) instead: your logins come with it.
+
+3. Start hars:
+
+   ```sh
+   docker compose up -d
+   ```
+
+4. Open `http://<your-machine>:8123` and log in with that name and password.
+
+Docker restarts hars if it stops and after a reboot. The image is
+pulled from `ghcr.io/adamt94/homeassistant-rust`, which
+[a workflow](.github/workflows/publish.yml) publishes from every commit to
+`main`. If you run these steps in a clone of this repository (in place of
+step 1's download) and the image can't be pulled, Compose builds it from the
+[Dockerfile](Dockerfile) instead, which takes a few minutes.
+
+## Moving from Home Assistant
+
+hars can take over a Home Assistant **2026.6** install: users, passwords and
+logged-in sessions (browsers and the companion app), registries, areas,
+dashboards, integrations' settings and the YAML automations. Do this instead
+of step 2, before the first start.
+
+1. Make a copy of Home Assistant's config folder with Home Assistant stopped,
+   or unpack a backup. Never point hars at the folder Home Assistant is using.
+2. Check what will come across, then import:
+
+   ```sh
+   docker compose run --rm -v /path/to/ha-copy:/ha:ro hars import /ha --dry-run
+   docker compose run --rm -v /path/to/ha-copy:/ha:ro hars import /ha
+   ```
+
+3. Read `config/import-report.json`: it lists each integration and automation
+   and whether hars can run it.
+4. Stop Home Assistant (both can't use port 8123) and run
+   `docker compose up -d`.
+
+History is not imported: it starts fresh. If you already ran step 2 of the
+install, the import refuses to replace that login; add `--force` to replace
+it. To try hars beside Home Assistant first, with nothing it decides reaching
+a device, see [shadow mode](docs/SHADOW.md).
+
+## Running it
+
+Run these in the folder with `compose.yaml`.
+
+| To | Run |
+|---|---|
+| see the logs | `docker compose logs -f` |
+| stop / start | `docker compose stop` / `docker compose start` |
+| add another login | `docker compose stop`, then `docker compose run --rm hars auth add NAME PASSWORD`, then `docker compose start` |
+| upgrade | `docker compose pull && docker compose up -d` (in a clone that builds: `git pull && docker compose up -d --build`) |
+| remove (data stays) | `docker compose down` |
+
+On stop, hars finishes open requests (up to 5 s), saves, and flushes history.
+Compose gives it a minute.
+
+**Where your data lives:** in `./config`, next to `compose.yaml`. It holds
+`.storage/` (logins, registries, dashboards, integrations' settings, in Home
+Assistant's formats), `.hars/recorder/` (history, 10 days or 64 MiB by
+default), `configuration.yaml` and what it includes, and
+`import-report.json` if you imported. Upgrades keep it.
+
+**Back up:** stop hars and copy the folder. Some files are readable by root
+only, so use `sudo`:
 
 ```sh
-cargo run --release            # listens on 0.0.0.0:8123 (HARS_BIND to override)
-curl -X POST localhost:8123/api/states/light.kitchen \
-  -H 'content-type: application/json' \
-  -d '{"state":"on","attributes":{"brightness":200}}'
-curl localhost:8123/api/states
+docker compose stop
+sudo tar czf hars-backup-$(date +%F).tar.gz config
+docker compose start
 ```
 
-## Docker
+To restore, stop hars, move `config` aside, `sudo tar xzf` the backup in its
+place and start hars.
 
-```sh
-docker build -t hars .
-docker run --rm -v hars-config:/config hars auth add USERNAME PASSWORD   # once: creates the owner
-docker run --rm -p 8123:8123 -v hars-config:/config hars
-```
+**Networking:** `compose.yaml` uses the host's network (`network_mode: host`)
+so hars can reach devices on your LAN (LIFX discovery and other broadcasts
+need it). hars listens on port 8123. To use another port, add
+`environment: [HARS_BIND=0.0.0.0:8124]` under the service.
 
-To take over an existing Home Assistant 2026.6 install instead, import a copy
-of its config directory (copied with HA stopped, or from a backup):
+## Troubleshooting and limits
 
-```sh
-docker run --rm -v hars-config:/config -v /path/to/ha-config-copy:/ha:ro hars import /ha --dry-run
-docker run --rm -v hars-config:/config -v /path/to/ha-config-copy:/ha:ro hars import /ha
-```
+- **The browser shows Home Assistant's onboarding screen**, and the log says
+  `no owner yet`: there is no login. Stop hars, run install step 2, start it.
+- **Nothing answers on port 8123 with Docker Desktop (macOS, Windows):** host
+  networking is off there by default. Turn it on in Docker Desktop's settings,
+  or replace `network_mode: host` with `ports: ["8123:8123"]` (LAN discovery
+  then won't work).
+- **`Address in use` in the log:** something else, often Home Assistant,
+  already uses port 8123. Stop it or change `HARS_BIND` as above.
+- **An integration or automation is missing after an import:** check
+  `config/import-report.json`; it says why.
+- **More detail in the log:** add `environment: [RUST_LOG=debug]`.
+- **Limits:** only Home Assistant 2026.6 installs can be imported. The UI is
+  in English. The companion app is tested on iOS. Everything in "Not yet"
+  above. The full list of what is done and planned is in the
+  [roadmap](docs/ROADMAP.md).
 
-Users, passwords and logged-in sessions (browsers, the iPhone app) carry over
-unchanged; `import-report.json` lists what `hars` doesn't import yet.
+## Other ways to run it
 
-`/config` uses Home Assistant's own `.storage` file formats. Until `hars` has
-the onboarding screens, the first `auth add` creates the owner and marks
-onboarding complete; later ones add more logins. Run it while the server is
-stopped. Outside Docker, `HARS_CONFIG` sets the directory (default `./config`).
+- **Just the binary:** the image's `/hars` is a static Linux binary:
+  `docker cp "$(docker create ghcr.io/adamt94/homeassistant-rust)":/hars .`
+  It reads `HARS_CONFIG` (default `./config`), `HARS_BIND` and
+  `HARS_FRONTEND` (an unpacked `hass_frontend` folder; without it only the
+  API is served).
+- **From source:** `cargo build --release`; see
+  [CONTRIBUTING.md](CONTRIBUTING.md).
 
-The image is `FROM scratch`: a static musl binary, CA roots, tzdata and the
-official frontend (`home-assistant-frontend` 20260527.4, fetched from PyPI and
-checked by sha256 at build time), about 240 MB. Outside Docker, point
-`HARS_FRONTEND` at an unpacked `hass_frontend` directory to serve the UI. `docker stop` sends SIGTERM, which hars handles by draining HTTP for up to
-5 s and exiting 0, well inside Docker's default 10 s grace period. For LAN integrations (LIFX broadcast, mDNS) use `--network host`.
+## More
 
-To run `hars` beside HA for a week, with nothing it decides reaching a
-device, and compare its decisions with HA's, see [`docs/SHADOW.md`](docs/SHADOW.md).
-
-## Development
-
-```sh
-cargo fmt --all
-cargo clippy --all-targets -- -D warnings
-cargo test --workspace
-cargo build --profile profiling   # optimised + debug symbols, for perf/flamegraph
-```
+- [Documentation index](docs/README.md): how hars is built, performance,
+  the roadmap.
+- [Contributing](CONTRIBUTING.md), [security policy](SECURITY.md),
+  [code of conduct](CODE_OF_CONDUCT.md).
 
 ## License
 
-Apache-2.0, same as Home Assistant. This is an independent reimplementation and
-is not affiliated with or endorsed by the Home Assistant project or Nabu Casa.
+Apache-2.0, as Home Assistant. hars is an independent reimplementation. It is
+not affiliated with or endorsed by the Home Assistant project or Nabu Casa.

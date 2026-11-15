@@ -1,67 +1,50 @@
 # Roadmap
 
-## North star: the MVP
+What hars is building towards, in milestones. Contributors pick work from
+the unticked items; a pull request that finishes one ticks its box. Why the
+plan looks like this is in [ADR 0009](adr/0009-mvp-reference-install.md).
 
-**MVP = `hars` replaces the maintainer's running Home Assistant with no visible
-loss of function**: the same dashboards (rendered by the unchanged official HA
-frontend), the same automations firing at the same moments, the same devices
-controllable, and the iPhone companion app still logged in and reporting, all
-within the resource budgets below.
+## The MVP
 
-Anything not in the inventory is **post-MVP**. When in doubt, cut it.
+**The MVP is a Home Assistant 2026.6.1 install running on hars with no
+visible loss of function**: the same dashboards (rendered by the unchanged
+official frontend), the same automations firing at the same moments, the
+same devices controllable, and the iOS companion app still logged in and
+reporting, all within the [resource budgets](PERF.md#budgets).
 
-### Compatibility targets (pinned)
+The install it is measured against is a real one, called **the reference
+install** below. Its inventory is the acceptance list. Anything not in it is
+**post-MVP**; when in doubt, cut it.
 
-| Thing | Version |
-|---|---|
-| Home Assistant core (behaviour + `.storage` shapes) | **2026.6.1** |
-| Frontend bundle served by `hars` | **`home-assistant-frontend` 20260527.4** (the version 2026.6.1 ships) |
-| iOS companion app | **2026.9.0**, iOS 27 |
-| Time zone / units | Europe/London (DST transitions matter), metric |
-
-Upgrading any of these needs browser and iPhone regression runs first.
-
-### Resource budgets (MVP gates)
-
-Measured on Linux (container) with the full inventory loaded, after a 5-min
-warm-up and a 30-min quiet run. The harness lands in M0 and every milestone
-records its numbers in `docs/PERF.md`. A regression past a gate blocks the
-milestone.
-
-| Metric | MVP gate |
-|---|---|
-| Idle RSS (full inventory, 1 dashboard open) | **≤ 20 MiB** |
-| Idle CPU | **≤ 0.1 %** of one core |
-| Process wakeups when quiet | **≤ 1 /s** average |
-| Stripped release binary | **≤ 15 MiB** (frontend served from disk, not embedded) |
-| Cold start to serving `/api/` | **≤ 1 s** |
-| Recorder disk writes when quiet | batched; no more than 1 fsync per 5 s |
+The pinned versions hars matches are in
+[ARCHITECTURE.md](ARCHITECTURE.md#home-assistant-compatibility). Moving one
+needs the browser and companion-app regression runs first.
 
 ---
 
 ## MVP scope inventory
 
-Taken from the live install on 2026-11-13. This is the acceptance list. Entity
-ids are kept as they are, and the importer carries them over.
+The reference install's inventory, taken on 2026-11-13. Entity ids are kept
+as they are, and the importer carries them over.
 
 ### Integrations
 
 | Integration | Entities | Transport | Endpoint/credential |
 |---|---|---|---|
-| `hue` | 8 lights (3 filament bulbs, Hue Go, colour lamp, room `grouped_light`s), 4 scenes, motion + illuminance + temperature + battery, motion/light-sensor enable switches, 1 bridge `behavior_instance` switch | Local HTTPS CLIP v2 + SSE (push) | host + app key imported |
-| `lifx` | Color 1000 kitchen light + identify/restart buttons | LAN UDP :56700 | host imported |
-| `switchbot_cloud` | Bot (`button.towel_switch` + battery), DIY IR air conditioner (`climate` + `switch`, assumed state), Hub 2 temp/humidity | Cloud HTTPS v1.1, **polling-only** (600 s, as HA) | token + secret imported |
+| `hue` | 8 lights (filament bulbs, a Hue Go, a colour lamp, room `grouped_light`s), 4 scenes, motion + illuminance + temperature + battery sensors, motion/light-sensor enable switches, 1 bridge `behavior_instance` switch | Local HTTPS CLIP v2 + SSE (push) | host + app key imported |
+| `lifx` | 1 colour bulb + identify/restart buttons | LAN UDP :56700 | host imported |
+| `switchbot_cloud` | Bot (a `button` + battery), DIY IR air conditioner (`climate` + `switch`, assumed state), Hub 2 temperature/humidity | Cloud HTTPS v1.1, **polling-only** (600 s, as HA) | token + secret imported |
 | `met` | `weather.forecast_home` | HTTPS api.met.no | home location |
 | `sun` | `sun.sun` + 6 `sensor.sun_next_*` | Local calculation | home location |
-| `mobile_app` | iPhone `device_tracker.phone`, 15 sensors (+1 disabled), 2 kiosk binary sensors (+1 disabled camera sensor), `notify.phone` | App → `hars` webhooks, **encrypted** (`supports_encryption`) | registration imported |
+| `mobile_app` | an iPhone: a `device_tracker`, 15 sensors (+1 disabled), 2 kiosk binary sensors (+1 disabled camera sensor), a `notify` service | App → `hars` webhooks, **encrypted** (`supports_encryption`) | registration imported |
 | `person` / `zone` | `person.*`, `zone.home` | Built-in | imported |
 
-### Dashboards ("widgets")
+### Dashboards
 
 - **Overview**: the auto-generated default dashboard (HA returns
   `config_not_found` and the frontend generates it)
-- **Bedroom** (`/bedroom-dashboard`): `sections` view → `grid` sections →
-  `tile` cards (`light-brightness` feature, `toggle` / `more-info` actions) and
+- **A sections dashboard**: `sections` view → `grid` sections → `tile`
+  cards (`light-brightness` feature, `toggle` / `more-info` actions) and
   `button` cards (`call-service` → `scene.turn_on`)
 - **Map** (`/map`): the `map` strategy, unchanged (person + tracker, zone radius)
 - **More-info** for every inventory entity: light brightness/colour/temperature
@@ -80,12 +63,13 @@ ids are kept as they are, and the importer carries them over.
 
 ### Explicitly out of MVP
 
-- `notify.phone` / push notifications: never called in the 10 days of recorded history
-- Remote access: none today (no external URL, no Nabu Casa); LAN only
+- Push notifications through `notify`: never called in the reference
+  install's 10 days of recorded history
+- Remote access (the reference install is LAN only)
 - SwitchBot webhooks: these need an external URL
 - Onboarding defaults that are installed but unused: `shopping_list`/`todo`,
   `google_translate` TTS, `radio_browser`, `go2rtc`, `backup`, `analytics`, Assist
-- Blueprints, scripts/scenes YAML (both empty), Jinja templates
+- Blueprints, scripts/scenes YAML, Jinja templates
 - Config flows for *adding* integrations, the UI automation editor, dashboard
   editing beyond `lovelace/config/save`, long-term statistics, the add-on store, HACS
 - Importing HA's history database: `hars` history starts fresh at cutover
@@ -94,14 +78,14 @@ ids are kept as they are, and the importer carries them over.
 
 ## Test oracle
 
-HA's own recorder DB on the live install holds 10 days of real data: about
-20.7k state rows, 1,128 `automation_triggered` and 1,387 `call_service` events.
-This is the reference for "behaves like HA":
+HA's own recorder database on the reference install holds 10 days of real
+data: about 20.7k state rows, 1,128 `automation_triggered` and 1,387
+`call_service` events. This is the reference for "behaves like HA":
 
 1. **Automation replay**: feed recorded state changes into `hars` with a
    simulated clock and compare the service calls it issues (order, timing within
    1 s, non-firings) with HA's recorded `call_service` events.
-2. **Frontend traces**: capture sanitised WebSocket traces from the live HA for
+2. **Frontend traces**: capture sanitised WebSocket traces from the reference HA for
    a cold load, each dashboard, every more-info dialog and control, reconnect,
    and app backgrounding. Classify each command as required, supported-empty or
    expected-error, then replay against `hars`.
@@ -139,8 +123,11 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
       subscribers, which resync from a snapshot when they lag
 - [x] Perf harness (`docs/PERF.md`): RSS/PSS, CPU time, wakeups, binary size;
       `criterion` benches for state writes and event fan-out
+- [x] CI gate on the resource budgets (`PERF_GATE=1 scripts/perf.sh` on the
+      image's binary) and on the crates' dependency direction
 - [x] Turn off transparent huge pages for mimalloc by default (8 MiB of
-      13 MiB idle RSS on a THP=`always` Linux host; see `docs/PERF.md`)
+      13 MiB idle RSS on a THP=`always` Linux host; see
+      [ADR 0007](adr/0007-transparent-huge-pages-off.md))
 - [x] Graceful shutdown on SIGTERM + lifecycle events
       (`homeassistant_start`/`started`/`stop`)
 
@@ -169,8 +156,10 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
         report marks each entry's integration as supported or not. Hue host/key,
         LIFX host, SwitchBot token/secret and mobile_app registration are used
         as those integrations land
-- [ ] `configuration.yaml`: `!include`, `!secret`, `!include_dir_merge_named`;
-      unknown keys log a warning, while unsupported **automation** syntax fails validation
+- [x] `configuration.yaml` loaded as HA loads it: `!include`, the
+      `!include_dir_*` tags, `!secret`, `!env_var`; unsupported
+      **automation** syntax makes that automation `unavailable`
+- [ ] Unknown top-level `configuration.yaml` keys log a warning
 - [x] Restore state: `core.restore_state` (imported) loaded at start and
       dumped as HA dumps it (at start, every 15 min, at stop; 7-day expiry);
       entities register as restorable (hue scenes restore their last
@@ -290,10 +279,10 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
       demand one); nothing polls
 - [x] Acceptance: the automation replay oracle matches HA on all 4 automations
       over 10 days of recorded data (1,345 triggers, 1,627 light calls; the
-      vector is the household's motion timeline, so it's kept out of the
-      repo: `HARS_AUTOMATION_REPLAY` runs it)
+      vector is the reference install's motion timeline, which is personal
+      data, so it's kept out of the repo: `HARS_AUTOMATION_REPLAY` runs it)
 
-### M4: Integrations (each behind a Cargo feature, numbers recorded when added)
+### M4: Integrations (binary and RSS cost recorded in `docs/perf/RESULTS.md` as each lands)
 - [x] `sun` (solar elevation/azimuth + `sensor.sun_next_*`, HA-matched maths:
       a port of astral 2.2 that matches HA to the microsecond on 231 event
       times), `person`, `zone.home`; started from `core.config_entries`
@@ -392,7 +381,7 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
 - [x] WS `subscribe_entities` `include`/`exclude` filters (HA's `entityfilter`
       cases 1-6, `fnmatch` globs, `cv.entity_ids`): the app subscribes to
       zones and persons only
-- [ ] `device_tracker.phone` → `person` → Map dashboard updates live
+- [ ] The phone's `device_tracker` → `person` → Map dashboard updates live
       (tracker → person → zone done and vectored; the live Map check is left
       for cutover)
 - [ ] Acceptance: the existing app session keeps working after cutover without
@@ -400,7 +389,8 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
       controls work in the app
 
 ### M6: History
-- [x] Recorder: an append-only segment log (`ha-recorder`, decision D7) in
+- [x] Recorder: an append-only segment log (`ha-recorder`, decision D7,
+      [ADR 0003](adr/0003-recorder-segment-log.md)) in
       place of SQLite: bounded writer queue, max batch delay 5 s, 10-day
       **and** byte-size retention (nightly purge at 04:12), sane behaviour on
       a full disk
@@ -453,18 +443,23 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
       and logs the calls it *would* make and its `automation_triggered`
       events; `scripts/shadow-diff.py` compares them with HA's recorder
       database (service, targets, data within 1 s; triggers per automation)
-- [ ] Run shadow mode for a week on the live install: no differences. The
-      phone stays on HA.
+- [ ] Run shadow mode for a week beside the reference install: no
+      differences. The phone stays on HA.
 - [x] Packaging: static musl binary in a `FROM scratch` image with tzdata
       (CA roots are compiled into the binary), a persistent volume and SIGTERM
       handling
+- [x] `compose.yaml` (host network, `./config`, restart policy) and a
+      workflow that publishes linux/amd64 and linux/arm64 images to ghcr.io
+      (`.github/workflows/publish.yml`)
+- [ ] Onboarding without the command line (the M2 onboarding UI), so
+      installing is `docker compose up -d` and a browser
 - [ ] Promote: stop HA, run the importer on a fresh copy, start `hars` on :8123.
       Rollback = start the untouched HA snapshot again.
 - [ ] Publish the RSS / CPU / startup / wakeup numbers against the HA instance
       being replaced
 
 ## Post-MVP
-- Push notifications (`notify.phone` via the relay, local push channel)
+- Push notifications (`notify.<device>` via the relay, local push channel)
 - Remote access, SwitchBot webhooks
 - Jinja templates (`minijinja`), scripts, scenes YAML, blueprints
 - Config flows for adding integrations; UI automation/script editor
@@ -472,21 +467,20 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
 - MQTT, ESPHome native API, zigbee2mqtt; `input_*` / `template` helpers, `todo`, TTS
 - Synthetic-scale HA vs `hars` benchmark harness
 
-## Decision log
-- **2026-11-13**: MVP scoped to the live install. Two Sol reviews (frontend/API/app;
-  integrations/automation/perf) were folded in. Key calls: pin HA 2026.6.1 +
-  frontend 20260527.4; HA's recorder DB is the test oracle; automations get
-  lossless delivery; import auth sessions; mobile encryption is required;
-  notify, remote access and history import are deferred; cutover is via a
-  shadow-mode week; budget is ≤ 20 MiB idle RSS.
-- **2026-11-15**: History (M6). The recorder is an append-only segment log
-  under `<config>/.hars/recorder/`, not SQLite and never HA's DB (D7, D8),
-  capped at 64 MiB on top of 10 days (D9). Deliberate deviations from HA:
-  - D1: statistics answer empty, so state_class sensors show the history line;
-  - D2: attribute-only writes that repeat the previous row, outside HA's
-    significant domains, aren't recorded (−46 % rows on the live install);
-  - D3: only the logbook's event types are recorded;
-  - D4: the logbook's `context_*` fields are worked out at write time;
-  - D5: history reads flush the pending batch first.
+## Decisions
 
-  HA's rule that the first row after a restart has no old state is kept (D6).
+Decisions and their reasons are recorded as [ADRs](adr/README.md). The two
+made while planning the MVP:
+
+- **2026-11-13**: the MVP is scoped to the reference install, pins HA
+  2026.6.1 and frontend 20260527.4, uses HA's recorder database as the test
+  oracle, gives automations lossless delivery, imports auth sessions,
+  requires app encryption, defers notifications, remote access and history
+  import, cuts over after a shadow-mode week, and budgets ≤ 20 MiB idle RSS
+  ([ADR 0009](adr/0009-mvp-reference-install.md),
+  [0001](adr/0001-match-a-pinned-home-assistant.md),
+  [0002](adr/0002-lossy-bus-lossless-feeds.md)).
+- **2026-11-15**: history (M6) is an append-only segment log, not SQLite and
+  never HA's database, capped at 64 MiB on top of 10 days, with the
+  deliberate deviations D1 to D9
+  ([ADR 0003](adr/0003-recorder-segment-log.md)).

@@ -4,3 +4,5 @@ target-wt
 config
 *.db
 *.db-*
+frontend
+hars-bin
