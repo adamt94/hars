@@ -393,9 +393,12 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
 ### M6: History
 - [ ] Recorder: SQLite (WAL), bounded writer queue, max batch delay 5 s,
       10-day **and** byte-size retention, purge + checkpoint, sane behaviour on a full disk
-- [ ] Stop waits for the final-write flush: the lifecycle stages
-      (`homeassistant_final_write`) need a completion barrier, as HA's
-      `async_stop` waits for each stage's handlers; today they only fire events
+- [x] Stop waits for the final-write flush: `finish_stop` awaits the
+      `homeassistant_final_write` (60 s) and `homeassistant_close` (30 s)
+      handlers, as HA's `async_stop` does
+- [x] A lossless feed for the recorder: state changes and the logbook's event
+      types in the bus's order (`EventBus::subscribe_lossless`); HA's
+      unrecorded-attribute sets by domain, plus `sun.sun`'s own
 - [ ] Crash test: kill -9 loses at most one batch window and never corrupts the DB
 - [x] WS `sensor/numeric_device_classes` and
       `sensor/device_class_convertible_units` (HA 2026.6.1's tables)

@@ -17,6 +17,7 @@ mod entity_id;
 pub mod entityfilter;
 mod event;
 mod lifecycle;
+pub mod recorded;
 pub mod restore;
 mod schema;
 mod service;
@@ -26,9 +27,9 @@ pub mod storage;
 pub mod yaml;
 
 pub use clock::{Clock, SimulatedClock, isoformat, serialize_iso};
-pub use context::{Context, ContextId};
+pub use context::{Context, ContextId, InvalidUlid};
 pub use entity_id::{EntityId, EntityIdError, decimal_value, valid_entity_id};
-pub use event::{Event, EventBus, EventKind, Origin};
+pub use event::{Event, EventBus, EventFeed, EventKind, Origin};
 pub use lifecycle::{CoreState, SetupGuard};
 pub use schema::{Kind, Range, Schema};
 pub use service::{
@@ -59,6 +60,9 @@ struct HassInner {
     config: parking_lot::RwLock<Arc<config::CoreConfig>>,
     restore: parking_lot::RwLock<Arc<restore::RestoreState>>,
     setups: lifecycle::Setups,
+    stop: lifecycle::StopHandlers,
+    /// Entities' own unrecorded attributes ([`Hass::set_unrecorded`]).
+    unrecorded: parking_lot::RwLock<std::collections::HashMap<EntityId, &'static [&'static str]>>,
 }
 
 impl Hass {
@@ -96,6 +100,18 @@ impl Hass {
 
     pub fn set_config(&self, config: config::CoreConfig) {
         *self.inner.config.write() = Arc::new(config);
+    }
+
+    /// Declare an entity's own unrecorded attributes (HA's
+    /// `_unrecorded_attributes`), on top of its domain's.
+    pub fn set_unrecorded(&self, entity_id: EntityId, attributes: &'static [&'static str]) {
+        self.inner.unrecorded.write().insert(entity_id, attributes);
+    }
+
+    /// The attributes the recorder leaves out of `entity_id`'s rows.
+    pub fn unrecorded(&self, entity_id: &EntityId) -> recorded::Unrecorded {
+        let own = self.inner.unrecorded.read().get(entity_id).copied();
+        recorded::Unrecorded::of(entity_id, own.unwrap_or(&[]))
     }
 
     pub fn core_state(&self) -> CoreState {

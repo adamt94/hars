@@ -26,6 +26,15 @@ impl ContextId {
         Self((ms << 80) | random)
     }
 
+    /// The 16 big-endian bytes HA stores (`ulid_to_bytes`).
+    pub fn to_bytes(self) -> [u8; 16] {
+        self.0.to_be_bytes()
+    }
+
+    pub fn from_bytes(bytes: [u8; 16]) -> Self {
+        Self(u128::from_be_bytes(bytes))
+    }
+
     fn encode(self) -> [u8; 26] {
         let mut out = [0u8; 26];
         for (i, c) in out.iter_mut().enumerate() {
@@ -41,6 +50,36 @@ impl fmt::Display for ContextId {
         let buf = self.encode();
         // Crockford base32 is ASCII.
         f.write_str(std::str::from_utf8(&buf).unwrap_or_default())
+    }
+}
+
+/// Not a 26-character ULID.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[error("invalid ULID")]
+pub struct InvalidUlid;
+
+impl std::str::FromStr for ContextId {
+    type Err = InvalidUlid;
+
+    /// The 26-character Crockford form, either case. The first character
+    /// carries 3 bits, so it is at most `7`.
+    fn from_str(s: &str) -> Result<Self, InvalidUlid> {
+        let bytes = s.as_bytes();
+        if bytes.len() != 26 {
+            return Err(InvalidUlid);
+        }
+        let mut v: u128 = 0;
+        for (i, &b) in bytes.iter().enumerate() {
+            let d = CROCKFORD
+                .iter()
+                .position(|&c| c == b.to_ascii_uppercase())
+                .ok_or(InvalidUlid)? as u128;
+            if i == 0 && d > 7 {
+                return Err(InvalidUlid);
+            }
+            v = (v << 5) | d;
+        }
+        Ok(Self(v))
     }
 }
 
@@ -136,6 +175,31 @@ mod tests {
             ContextId(1 << 125).to_string(),
             format!("1{}", "0".repeat(25))
         );
+    }
+
+    #[test]
+    fn parses_and_stores_as_ha_does() {
+        let id: ContextId = "01KF0CD6T0000000000000002E".parse().unwrap();
+        assert_eq!(id.to_string(), "01KF0CD6T0000000000000002E");
+        assert_eq!(
+            "01kf0cd6t0000000000000002e".parse::<ContextId>(),
+            Ok(id),
+            "either case"
+        );
+        // `ulid_to_bytes("01KF0CD6T0000000000000002E").hex()` in HA's venv.
+        let hex: String = id.to_bytes().iter().map(|b| format!("{b:02x}")).collect();
+        assert_eq!(hex, "019bc0c69b400000000000000000004e");
+        assert_eq!(ContextId::from_bytes(id.to_bytes()), id);
+        for bad in [
+            "",
+            "01KF0CD6T0000000000000002",
+            "81KF0CD6T0000000000000002E",
+            "01KF0CD6T000000000000000UE",
+        ] {
+            assert_eq!(bad.parse::<ContextId>(), Err(InvalidUlid), "{bad}");
+        }
+        let fresh = ContextId::at(Timestamp::now());
+        assert_eq!(fresh.to_string().parse::<ContextId>(), Ok(fresh));
     }
 
     #[test]

@@ -317,7 +317,7 @@ async fn run(thp_disabled: std::io::Result<bool>) -> anyhow::Result<()> {
     registry.flush().await;
     config_entries.flush().await;
     api_config.components.flush().await;
-    hass.finish_stop();
+    hass.finish_stop().await;
     tracing::info!("hars stopped");
     Ok(())
 }

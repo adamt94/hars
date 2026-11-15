@@ -125,6 +125,14 @@ async fn runs_on_has_schedule() {
     );
     assert_eq!(sun.attributes["rising"], true);
     assert_eq!(sun.attributes["friendly_name"], "Sun");
+    // Only the name is recorded (`sun/entity.py`'s `_unrecorded_attributes`).
+    let unrecorded = hass.unrecorded(&sun.entity_id);
+    let recorded: Vec<_> = sun
+        .attributes
+        .keys()
+        .filter(|k| !unrecorded.excludes(k))
+        .collect();
+    assert_eq!(recorded, ["friendly_name"]);
     let dawn = state(&hass, "sensor.sun_next_dawn").unwrap();
     // Timestamp sensors are to the second (`isoformat(timespec="seconds")`).
     assert_eq!(dawn.state, "2026-06-22T02:27:14+00:00");

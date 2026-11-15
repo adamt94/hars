@@ -187,3 +187,18 @@ the whole feature: `crypto_secretbox` is about 16.5 KB, and the rest is the
 pipeline and commands. It is a candidate for trimming once sensors and
 location land. Seal + open of a 2 KiB payload costs 12.1 µs on an Apple M4
 (the spec's standalone bench).
+
+### Lossless recorded-event feed, 2026-11-15
+
+Every `fire` now takes the bus's lossless-subscriber mutex (held across the
+broadcast send, so the recorder's feed and the bus agree on order).
+`cargo bench -p ha-core -- "state_write|fan_out"` on an Apple M4, main vs the
+branch, with no lossless subscriber: every case within ±2 % (criterion: no
+change for `state_write/changed/*` and `fan_out/*`; 106.3 vs 105.2 ns for
+an unchanged write, which fires nothing).
+
+| case | main | branch |
+|---|---|---|
+| `state_write/changed/no_attributes` | 247.4 ns | 243.7 ns |
+| `state_write/changed/light_attributes` | 507.8 ns | 499.5 ns |
+| `fan_out/feeds/16` | 550.4 ns | 553.2 ns |

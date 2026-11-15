@@ -418,6 +418,19 @@ fn object(v: Value) -> Map<String, Value> {
     }
 }
 
+/// `sun.sun`'s own unrecorded attributes (`sun/entity.py`).
+pub const UNRECORDED: &[&str] = &[
+    "azimuth",
+    "elevation",
+    "rising",
+    "next_dawn",
+    "next_dusk",
+    "next_midnight",
+    "next_noon",
+    "next_rising",
+    "next_setting",
+];
+
 /// Run the integration for config entry `entry_id` until the task is
 /// dropped: work out the events, refresh the position on the phase's
 /// schedule, and start again when the phase changes. Each step sleeps until
@@ -444,6 +457,7 @@ pub async fn run(
         TimeZone::UTC
     });
     let entities = Entities::new(&registries, &entry_id);
+    hass.set_unrecorded(EntityId::parse("sun.sun").expect("valid"), UNRECORDED);
     let clock = hass.clock().clone();
     // Until the wall clock reads `at`: after each wake the remaining time is
     // checked again, so a clock stepped back doesn't fire early (HA's

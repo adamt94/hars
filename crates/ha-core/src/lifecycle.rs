@@ -3,6 +3,61 @@
 
 use crate::{Context, Event, EventKind, Hass};
 use serde::Serialize;
+use std::future::Future;
+use std::pin::Pin;
+use std::time::Duration;
+
+/// How long `homeassistant_final_write` handlers get (`core.py`'s
+/// `FINAL_WRITE_STAGE_SHUTDOWN_TIMEOUT`).
+pub const FINAL_WRITE_TIMEOUT: Duration = Duration::from_secs(60);
+/// How long `homeassistant_close` handlers get (`CLOSE_STAGE_SHUTDOWN_TIMEOUT`).
+pub const CLOSE_TIMEOUT: Duration = Duration::from_secs(30);
+
+type StopFuture = Pin<Box<dyn Future<Output = ()> + Send>>;
+type StopHandler = (&'static str, Box<dyn FnOnce() -> StopFuture + Send>);
+
+/// Work `finish_stop` waits for ([`Hass::on_final_write`], [`Hass::on_close`]).
+#[derive(Default)]
+pub(crate) struct StopHandlers {
+    final_write: parking_lot::Mutex<Vec<StopHandler>>,
+    close: parking_lot::Mutex<Vec<StopHandler>>,
+}
+
+/// Run one stop stage's handlers together, for at most `timeout`; the
+/// ones still running then are named and abandoned.
+async fn run_stage(handlers: Vec<StopHandler>, timeout: Duration, stage: &str) {
+    if handlers.is_empty() {
+        return;
+    }
+    let mut set = tokio::task::JoinSet::new();
+    let mut running = std::collections::HashMap::new();
+    for (name, start) in handlers {
+        running.insert(set.spawn(start()).id(), name);
+    }
+    let deadline = tokio::time::Instant::now() + timeout;
+    loop {
+        match tokio::time::timeout_at(deadline, set.join_next_with_id()).await {
+            Ok(None) => return,
+            Ok(Some(Ok((id, ())))) => {
+                running.remove(&id);
+            }
+            Ok(Some(Err(e))) => {
+                let name = running.remove(&e.id()).unwrap_or("?");
+                tracing::error!("{stage} handler {name} failed: {e}");
+            }
+            Err(_) => {
+                let mut names: Vec<_> = running.into_values().collect();
+                names.sort_unstable();
+                tracing::warn!(
+                    "timed out after {timeout:?} waiting for {stage} handlers: {}; continuing",
+                    names.join(", ")
+                );
+                // Dropping the set aborts them.
+                return;
+            }
+        }
+    }
+}
 
 /// Where the instance is in its lifecycle. Serializes as HA's
 /// `CoreState` value (`"RUNNING"`, …), as `/api/config` reports it.
@@ -161,12 +216,45 @@ impl Hass {
     }
 
     /// Last stop stages, as the end of HA's `async_stop`: `FINAL_WRITE` +
-    /// `homeassistant_final_write` (the recorder flushes), `NOT_RUNNING` +
-    /// `homeassistant_close`, then `STOPPED`.
-    pub fn finish_stop(&self) {
+    /// `homeassistant_final_write`, waiting up to 60 s for the
+    /// [`Hass::on_final_write`] handlers (the recorder's last write), then
+    /// `NOT_RUNNING` + `homeassistant_close` and up to 30 s for the
+    /// [`Hass::on_close`] handlers, then `STOPPED`.
+    pub async fn finish_stop(&self) {
         self.enter(CoreState::FinalWrite, EventKind::HomeassistantFinalWrite {});
+        let handlers = std::mem::take(&mut *self.inner.stop.final_write.lock());
+        run_stage(handlers, FINAL_WRITE_TIMEOUT, "homeassistant_final_write").await;
         self.enter(CoreState::NotRunning, EventKind::HomeassistantClose {});
+        let handlers = std::mem::take(&mut *self.inner.stop.close.lock());
+        run_stage(handlers, CLOSE_TIMEOUT, "homeassistant_close").await;
         self.set_core_state(CoreState::Stopped);
+    }
+
+    /// Run `start()` once `homeassistant_final_write` has fired, and have
+    /// [`Hass::finish_stop`] wait for it (up to 60 s, with the others).
+    pub fn on_final_write<F, Fut>(&self, name: &'static str, start: F)
+    where
+        F: FnOnce() -> Fut + Send + 'static,
+        Fut: Future<Output = ()> + Send + 'static,
+    {
+        self.inner
+            .stop
+            .final_write
+            .lock()
+            .push((name, Box::new(move || Box::pin(start()) as StopFuture)));
+    }
+
+    /// The same at `homeassistant_close` (up to 30 s).
+    pub fn on_close<F, Fut>(&self, name: &'static str, start: F)
+    where
+        F: FnOnce() -> Fut + Send + 'static,
+        Fut: Future<Output = ()> + Send + 'static,
+    {
+        self.inner
+            .stop
+            .close
+            .lock()
+            .push((name, Box::new(move || Box::pin(start()) as StopFuture)));
     }
 
     fn enter(&self, state: CoreState, kind: EventKind) {
@@ -222,7 +310,7 @@ mod tests {
         assert_eq!(hass.core_state(), CoreState::Running);
         hass.begin_stop();
         assert_eq!(hass.core_state(), CoreState::Stopping);
-        hass.finish_stop();
+        hass.finish_stop().await;
         assert_eq!(hass.core_state(), CoreState::Stopped);
 
         let mut fired = Vec::new();
@@ -251,5 +339,74 @@ mod tests {
             serde_json::to_value(CoreState::FinalWrite).unwrap(),
             "FINAL_WRITE"
         );
+    }
+
+    fn lifecycle_events(
+        rx: &mut tokio::sync::broadcast::Receiver<std::sync::Arc<Event>>,
+    ) -> Vec<String> {
+        let mut fired = Vec::new();
+        while let Ok(e) = rx.try_recv() {
+            let v = serde_json::to_value(&*e).unwrap();
+            fired.push(v["event_type"].as_str().unwrap_or("custom").to_owned());
+        }
+        fired
+    }
+
+    /// A slow final-write handler holds `homeassistant_close` back until it
+    /// is done; the handlers run together.
+    #[tokio::test(start_paused = true)]
+    async fn final_write_waits_for_its_handlers() {
+        let hass = Hass::new();
+        let done = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        for (name, secs) in [("a", 5), ("b", 7)] {
+            let done = done.clone();
+            hass.on_final_write(name, move || async move {
+                tokio::time::sleep(Duration::from_secs(secs)).await;
+                done.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            });
+        }
+        let closed = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        {
+            let closed = closed.clone();
+            hass.on_close("c", move || async move {
+                closed.store(true, std::sync::atomic::Ordering::SeqCst);
+            });
+        }
+        let mut rx = hass.bus().subscribe();
+        let start = tokio::time::Instant::now();
+        let stop = tokio::spawn({
+            let hass = hass.clone();
+            async move { hass.finish_stop().await }
+        });
+        tokio::time::sleep(Duration::from_secs(6)).await;
+        assert_eq!(hass.core_state(), CoreState::FinalWrite);
+        assert_eq!(lifecycle_events(&mut rx), ["homeassistant_final_write"]);
+        stop.await.unwrap();
+        assert_eq!(
+            start.elapsed(),
+            Duration::from_secs(7),
+            "concurrent, not 12 s"
+        );
+        assert_eq!(done.load(std::sync::atomic::Ordering::SeqCst), 2);
+        assert!(closed.load(std::sync::atomic::Ordering::SeqCst));
+        assert_eq!(lifecycle_events(&mut rx), ["homeassistant_close"]);
+        assert_eq!(hass.core_state(), CoreState::Stopped);
+    }
+
+    /// A hung handler is cut at its stage's timeout, and stop goes on.
+    #[tokio::test(start_paused = true)]
+    async fn hung_handlers_are_cut_at_the_timeout() {
+        let hass = Hass::new();
+        hass.on_final_write("hung", std::future::pending::<()>);
+        hass.on_close("hung too", std::future::pending::<()>);
+        let start = tokio::time::Instant::now();
+        hass.finish_stop().await;
+        assert_eq!(start.elapsed(), FINAL_WRITE_TIMEOUT + CLOSE_TIMEOUT);
+        assert_eq!(hass.core_state(), CoreState::Stopped);
+        // Idle: nothing registered, no wait.
+        let idle = Hass::new();
+        let start = tokio::time::Instant::now();
+        idle.finish_stop().await;
+        assert_eq!(start.elapsed(), Duration::ZERO);
     }
 }
