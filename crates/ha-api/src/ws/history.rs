@@ -342,15 +342,17 @@ fn start_stream(conn: &mut Conn, id: u64, recorder: &Arc<Recorder>, args: Args) 
                         }
                     }
                 }
-                // `timeout_at` polls the loop first, so check the deadline
-                // here too: nothing is sent after `end`.
+                let msg = live_states(&batch, args.no_attributes).map(|states| {
+                    format!(r#"{{"id":{id},"type":"event","event":{{"states":{states}}}}}"#)
+                });
+                // `timeout_at` polls the loop first, and building the message
+                // takes time: check the deadline last, so nothing is sent
+                // after `end`.
                 if deadline.is_some_and(|at| tokio::time::Instant::now() >= at) {
                     return;
                 }
-                if let Some(states) = live_states(&batch, args.no_attributes)
-                    && !emit(format!(
-                        r#"{{"id":{id},"type":"event","event":{{"states":{states}}}}}"#
-                    ))
+                if let Some(msg) = msg
+                    && !emit(msg)
                 {
                     return;
                 }
