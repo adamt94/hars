@@ -1,16 +1,20 @@
 //! `kill -9` while the writer is busy: what was committed is all there, in
-//! order, and the store opens (a torn last frame is cut, never trusted).
+//! order, and the store opens. The kill lands at a different moment each
+//! round but not at a chosen byte: how a torn last frame is cut is the
+//! store's own recovery tests (`recovery_cuts_tails_and_moves_bad_files_aside`).
 //!
 //! The test runs itself as the writer (`HARS_CRASH_DIR` set), reads what the
 //! writer says it has committed, kills it with SIGKILL, then reopens the
-//! store.
+//! store. This is a process kill, not power loss.
 #![cfg(unix)]
 
 use ha_recorder::{Config, Rec, Row, StateRow, Store};
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
+use std::process::Child;
 use std::process::{Command, Stdio};
 use std::sync::Arc;
+use std::sync::mpsc;
 use std::time::Duration;
 
 const ENV: &str = "HARS_CRASH_DIR";
@@ -20,6 +24,16 @@ fn config(dir: PathBuf) -> Config {
     Config {
         commit_interval: Duration::from_millis(50),
         ..Config::new(dir)
+    }
+}
+
+/// The child writer, killed and reaped if the test fails before it does so.
+struct Writer(Child);
+
+impl Drop for Writer {
+    fn drop(&mut self) {
+        let _ = self.0.kill();
+        let _ = self.0.wait();
     }
 }
 
@@ -71,11 +85,24 @@ fn kill_9_loses_at_most_the_uncommitted_batch_and_never_corrupts() {
             .env(ENV, &dir)
             .stdout(Stdio::piped())
             .spawn()
+            .map(Writer)
             .unwrap();
-        let mut lines = BufReader::new(child.stdout.take().unwrap()).lines();
+        // A thread reads the child's lines, so a stalled writer times out
+        // instead of hanging the test.
+        let (tx, lines) = mpsc::channel();
+        let stdout = child.0.stdout.take().unwrap();
+        std::thread::spawn(move || {
+            for line in BufReader::new(stdout).lines().map_while(Result::ok) {
+                if tx.send(line).is_err() {
+                    break;
+                }
+            }
+        });
         let (mut committed, mut seen) = (0i64, 0);
         while seen < round {
-            let line = lines.next().expect("the writer died early").unwrap();
+            let line = lines
+                .recv_timeout(Duration::from_secs(30))
+                .expect("the writer stopped committing");
             if let Some(n) = line.strip_prefix("committed ") {
                 committed = n.parse().unwrap();
                 seen += 1;
@@ -83,8 +110,8 @@ fn kill_9_loses_at_most_the_uncommitted_batch_and_never_corrupts() {
         }
         // Anywhere in the next batch: between commits, or mid-write.
         std::thread::sleep(Duration::from_micros(round as u64 * 4_321 % 23_000));
-        child.kill().unwrap();
-        child.wait().unwrap();
+        child.0.kill().unwrap();
+        child.0.wait().unwrap();
 
         // Reopening cuts a torn tail. What is left is rows `0..n` in order,
         // with no gap, and at least everything reported committed.
