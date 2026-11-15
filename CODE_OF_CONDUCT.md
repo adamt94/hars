@@ -9,10 +9,16 @@ project.
 
 ## Reporting
 
-If someone's behaviour is a problem, tell the maintainers privately through
-GitHub's private vulnerability reporting (**Security** tab, **Report a
-vulnerability**, and say it is a conduct report), or by contacting a
-maintainer through their GitHub profile. Reports are kept confidential.
+If someone's behaviour is a problem, report it to the maintainers
+privately with GitHub's content reporting: open the **…** menu on the
+comment, issue or pull request, choose **Report content**, then **Report to
+repository admins**. Only the maintainers see the report. If the problem
+isn't tied to one piece of content, or you want to explain more, contact a
+maintainer through the details on their GitHub profile. Reports are kept
+confidential.
+
+Please don't use the security advisory form for conduct reports; it is
+for vulnerabilities.
 
 Maintainers may remove comments, commits and other contributions that break
 this code, and may block people who break it repeatedly or seriously, as the

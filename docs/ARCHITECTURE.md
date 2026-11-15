@@ -226,7 +226,7 @@ All of it is in `ha-api`; `ha_api::router` builds it.
 
 | Surface | Where | Notes |
 |---|---|---|
-| REST `/api/…` | `rest.rs`, `automation.rs`, `lib.rs` (`/api/config`) | Behind `auth::require_auth`; each route's permission is in `auth::required_permission` |
+| REST `/api/…` | `rest.rs`, `automation.rs`, `lib.rs` (`/api/config`), `mobile_app::registration_routes` (`/api/mobile_app/registrations`) | Behind `auth::require_auth`; each route's permission is in `auth::required_permission` |
 | Auth `/auth/…` | `auth.rs` | Login flow, token, revoke; HA's `.storage/auth*` files |
 | WebSocket `/api/websocket` | `ws/` | Authenticates in the protocol; `ws/commands.rs::dispatch` matches the command type, then asks each domain's module (`ws/weather.rs`, `ws/history.rs`, …) |
 | Companion app webhook `/api/webhook/{id}` | `mobile_app/` | The webhook id is the credential; encryption is required for registrations with `supports_encryption` enabled |
@@ -240,8 +240,9 @@ How to add a command or a view:
 ## Home Assistant compatibility
 
 hars matches one pinned release of each thing it talks to. Moving a pin is a
-deliberate change: rerun the vector generators against the new release,
-then the browser and companion-app checks.
+deliberate change: remake each vector set with its generator at the new
+release (the existing sets need their generators written first; see below),
+then run the browser and companion-app checks.
 
 | Thing | Pinned version |
 |---|---|
@@ -253,10 +254,11 @@ then the browser and companion-app checks.
 How it is kept:
 
 - **Vectors.** Where hars must give HA's answer, tests compare with inputs
-  run through HA's own code at the pinned version, and the script that made
-  them is in `scripts/vectors/`
-  ([ADR 0008](adr/0008-vectors-from-home-assistant.md),
-  [scripts/vectors/README.md](../scripts/vectors/README.md)).
+  run through HA's own code at the pinned version. A new vector set commits
+  the script that made it in `scripts/vectors/`. The existing sets were made
+  before that rule and have no script yet; they are listed as a backlog in
+  [scripts/vectors/README.md](../scripts/vectors/README.md#vector-sets-made-before-this-rule)
+  ([ADR 0008](adr/0008-vectors-from-home-assistant.md)).
 - **Generated tables.** Translations, icons and manifests are generated from
   HA's wheel by `scripts/gen-i18n.py` and `scripts/gen-manifests.py`.
 - **Same files.** hars reads and writes HA's `.storage` files, so

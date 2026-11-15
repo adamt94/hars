@@ -25,8 +25,8 @@ from [docs/ROADMAP.md](docs/ROADMAP.md).
 - Match Home Assistant 2026.6.1's API/JSON shapes, files and behaviour.
   Check HA's source; don't guess.
 - Expected values that must match HA come from vectors made by running HA's
-  code, with the script committed in `scripts/vectors/`
-  ([its README](scripts/vectors/README.md)).
+  code. A new vector set commits its script in `scripts/vectors/`; existing
+  sets have none yet ([its README](scripts/vectors/README.md) lists them).
 - Every behaviour change ships with a test. Use the simulated clock; no real
   network.
 - Follow the hot-path rules in [PERF.md](docs/PERF.md#rules): `Arc` sharing,

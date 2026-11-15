@@ -11,10 +11,12 @@ sent, the error it raised). The Rust tests feed the same input to `hars` and
 fail on any difference. They live next to the code they test, in
 `crates/<crate>/src/<module>/vectors/`.
 
-The script that runs HA's code to make a vector set is committed here, as
-`scripts/vectors/<module>.py`. Without it, vectors can't be remade when the
-pinned HA version moves, when an input is added, or when someone asks how an
-expected value was produced.
+The rule: a new vector set commits the script that ran HA's code to make
+it, here, as `scripts/vectors/<module>.py`. Without it, vectors can't be
+remade when the pinned HA version moves, when an input is added, or when
+someone asks how an expected value was produced. Every vector set in the
+repository today was made before this rule, so none has its script yet; they
+are listed [at the end](#vector-sets-made-before-this-rule) as a backlog.
 
 ## Writing one
 

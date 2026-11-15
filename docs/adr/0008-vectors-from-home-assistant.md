@@ -14,9 +14,9 @@ that weren't kept can't be remade when the pinned version moves.
 - Where hars must give HA's answer, tests compare with **vectors**: real
   inputs and what HA's own code at the pinned version produced for them,
   saved in the module's `vectors/` folder.
-- The script that ran HA's code is committed in `scripts/vectors/`, checks
-  the pinned versions before it runs, and gives the same output on the same
-  input. The rules are in
+- For each new vector set, the script that ran HA's code is committed in
+  `scripts/vectors/`. It checks the pinned versions before it runs, and
+  gives the same output on the same input. The rules are in
   [scripts/vectors/README.md](../../scripts/vectors/README.md).
 
 ## Consequences

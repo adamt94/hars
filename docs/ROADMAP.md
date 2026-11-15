@@ -16,6 +16,13 @@ The install it is measured against is a real one, called **the reference
 install** below. Its inventory is the acceptance list. Anything not in it is
 **post-MVP**; when in doubt, cut it.
 
+A few acceptance checks need the reference install's own data: its devices,
+its phone and its recorded history (the `HARS_AUTOMATION_REPLAY` run, the
+checks against the real bridge, the companion-app runs and the shadow-mode
+week). That data is personal and stays out of the repository, so the
+maintainer runs those checks. If your change needs one, say so in the pull
+request.
+
 The pinned versions hars matches are in
 [ARCHITECTURE.md](ARCHITECTURE.md#home-assistant-compatibility). Moving one
 needs the browser and companion-app regression runs first.
@@ -93,9 +100,9 @@ data: about 20.7k state rows, 1,128 `automation_triggered` and 1,387
    entity (capability flags, colour/temperature limits, units, device classes).
 
 4. **Vectors**: inputs run through HA's own code, with what HA produced saved
-   next to the Rust module that must reproduce it. The script that ran HA is
-   committed in `scripts/vectors/` so the vectors can be remade (see its
-   README).
+   next to the Rust module that must reproduce it. A new vector set commits
+   the script that ran HA in `scripts/vectors/` so it can be remade (see its
+   README); the sets made before that rule are the backlog item below.
 
 Fixtures are sanitised (no tokens, coordinates rounded) before they are committed.
 

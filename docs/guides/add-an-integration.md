@@ -167,10 +167,12 @@ Put tests in `<domain>/tests.rs`. `met/tests.rs` shows the three kinds:
 - **Vectors** (`state_attributes_and_forecasts_match_ha`): recorded API
   bodies in `vectors/`, and the states, attributes and forecasts HA 2026.6.1
   and pyMetno produced from them. The test loads them with `include_str!`
-  and compares field by field. Write the script that made them as
-  `scripts/vectors/<domain>.py`, following
-  [scripts/vectors/README.md](../../scripts/vectors/README.md), and name it
-  in the comment at the top of `tests.rs`.
+  and compares field by field. `met`'s vectors predate the rule that keeps
+  the script, so there is no `met.py` to copy: start from the skeleton in
+  [scripts/vectors/README.md](../../scripts/vectors/README.md), save it as
+  `scripts/vectors/<domain>.py`, commit it with the vectors it writes, and
+  name it in the comment at the top of your `tests.rs`. (`met/tests.rs`
+  only names the versions that made its vectors, on its `Vector` struct.)
 - **Schedule and failure** (`refreshes_on_has_schedule_and_goes_unavailable_on_failure`):
   `#[tokio::test(start_paused = true)]`, a `SimulatedClock`, and a closure in
   place of the network. It checks the refresh interval, the setup retry

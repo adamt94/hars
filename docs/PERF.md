@@ -48,8 +48,9 @@ state change.
    (it keeps byte offsets). Check a change with the `state_write`, `fan_out` and
    `entity_filter` benches. *Why:* allocation is the main CPU cost at this
    size, and freed memory is not always returned to the OS.
-4. **Never poll.** Sleep until the next deadline (`tokio::time::sleep_until`
-   on `hass.clock()`), or wait on a socket or channel. A device that must be
+4. **Never poll.** Sleep until the next deadline
+   (`tokio::time::sleep_until(hass.clock().instant() + wait)`, as `sun` does),
+   or wait on a socket or channel. A device that must be
    polled is polled at Home Assistant's interval, no faster. *Why:* every
    timer wake costs CPU and keeps a small device's CPU out of its deep sleep
    states. Between scheduled work, hars should have no wakeups. Sun updates,

@@ -37,3 +37,35 @@
 - CI and publishing: [`ci.yml`](../.github/workflows/ci.yml) (checks, image
   smoke test, resource budgets) and
   [`publish.yml`](../.github/workflows/publish.yml) (the ghcr.io image).
+
+### Launch checklist
+
+The [install steps](../README.md#install) assume a public repository and a
+public image. Before announcing hars, in this order:
+
+1. Make the repository public (**Settings**, **General**, **Danger Zone**,
+   **Change visibility**).
+2. Turn on private vulnerability reporting in the repository's security
+   settings; [SECURITY.md](../SECURITY.md) and the issue form's "Security
+   problem" link depend on it. Under **Settings**, **Moderation options**,
+   **Reported content**, check who may send content reports;
+   [CODE_OF_CONDUCT.md](../CODE_OF_CONDUCT.md) relies on them. Make sure each
+   maintainer's GitHub profile shows a way to reach them, or add a project
+   contact to the Code of Conduct.
+3. Run the publish workflow: merge to `main`, or **Actions**, **Publish
+   image**, **Run workflow**. Wait for both jobs to pass.
+4. Make the image public. A new ghcr.io package starts private: open the
+   package (**Packages** on the repository page), **Package settings**,
+   **Change visibility**, **Public**.
+5. Check an anonymous pull gets both architectures:
+
+   ```sh
+   docker logout ghcr.io
+   docker buildx imagetools inspect ghcr.io/adamt94/homeassistant-rust:latest
+   docker pull ghcr.io/adamt94/homeassistant-rust:latest
+   ```
+
+6. Follow the README's install steps word for word in an empty folder
+   outside any clone, starting with its `curl` of the raw `compose.yaml`.
+   Without a clone there is no Dockerfile to fall back on, so this proves
+   the image and the download both work. Log in at `http://localhost:8123`.

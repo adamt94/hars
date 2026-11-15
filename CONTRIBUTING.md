@@ -54,8 +54,13 @@ resource budget gate (`PERF_GATE=1 scripts/perf.sh`, see
 
 **Every behaviour change ships with a test.** The conventions:
 
-- **Unit tests sit next to the code**, in a `tests.rs` beside the module
-  (`#[cfg(test)] mod tests;`). Tests that need a process or a binary go in
+- **Unit tests sit next to the code**, in one of two forms. Most files end
+  with an inline `#[cfg(test)] mod tests { … }`. A module whose tests are
+  long or use fixtures keeps them in a `tests.rs` beside it, declared with
+  `#[cfg(test)] mod tests;`, as each integration in `ha-integrations` does
+  (`sun/tests.rs`, `met/tests.rs`, …). Use the inline form for a small
+  module and move to `tests.rs` once the tests outgrow the file. Tests that
+  need a process or a binary go in
   `crates/<crate>/tests/` (for example `ha-server/tests/shutdown.rs` and the
   recorder's `kill -9` test, `ha-recorder/tests/crash.rs`).
 - **Time is simulated**, never slept through. Build `Hass` with
@@ -67,9 +72,10 @@ resource budget gate (`PERF_GATE=1 scripts/perf.sh`, see
 - **Expected values come from Home Assistant, not from reading its code.**
   Where hars must match HA (states, attributes, maths, requests, errors), the
   test compares with *vectors*: inputs run through HA 2026.6.1's own code,
-  saved in the module's `vectors/` folder. The script that made them is
-  committed in `scripts/vectors/`. The rules and a skeleton are in
-  [scripts/vectors/README.md](scripts/vectors/README.md).
+  saved in the module's `vectors/` folder. A new vector set commits the
+  script that made it in `scripts/vectors/`; the existing sets were made
+  before that rule and are listed there as a backlog. The rules, a skeleton
+  and the backlog are in [scripts/vectors/README.md](scripts/vectors/README.md).
 - **Fixtures are sanitised:** no tokens or keys, ids replaced, coordinates
   rounded. Nothing personal is committed.
 - **Python scripts** have `test_*.py` tests in `scripts/`
