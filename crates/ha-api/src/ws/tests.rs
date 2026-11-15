@@ -630,6 +630,7 @@ fn bare_conn(hass: &Hass) -> (super::Conn, tokio::sync::mpsc::Receiver<super::Fr
             hass: hass.clone(),
             auth,
             config: Default::default(),
+            core_config: Default::default(),
         },
         principal,
         user,

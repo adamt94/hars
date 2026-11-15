@@ -182,3 +182,27 @@ container on an Apple-silicon Mac. A fresh install: `sun` only.
 The fourth thread is the recorder's writer. Earlier rows are glibc builds
 from `scripts/perf-docker.sh`, so their binary sizes are not directly
 comparable with this one. Within every budget.
+
+### Onboarding in the browser, 2026-11-15
+
+The onboarding views, `config/core/update` and `config/core/detect`,
+`analytics`, `config_entries/subscribe`, the generated country, currency,
+language and default-area tables, and `zone.home`, `sun` and `met` following
+the home (a `watch` channel: no wakeups until the settings change). A fresh
+install now saves `sun`'s config entry at its first start, as HA does.
+`PERF_GATE=1 scripts/perf.sh /target/release/hars 10 30` in a `rust:1`
+container on an Apple-silicon Mac (glibc builds, as `scripts/perf-docker.sh`
+makes them), `main` (7b365dd) and the branch each built in its own target
+volume, three runs each:
+
+| build | binary | start→/api/ | idle RSS | idle PSS | idle CPU | wakeups/s | threads |
+|---|---|---|---|---|---|---|---|
+| main | 8,279,296 B (7.90 MiB) | 10–31 ms | 9.4–9.6 MiB | 8.4–8.6 MiB | 0.000 % | 0.00 | 4 |
+| branch | 8,476,032 B (8.08 MiB) | 9–29 ms | 9.8–10.0 MiB | 8.8–9.0 MiB | 0.000 % | 0.00 | 4 |
+
+The binary grows 196,736 B (192 KiB): the onboarding and settings commands
+and about 8 KiB of generated tables. Idle RSS is 0.3–0.4 MiB higher, all of
+it file-backed: with `PERF_DETAIL=1`, `Pss_File` is 6,685 → 7,020 kB and
+`Anonymous` 2,088 → 2,052 kB, so it is the larger binary's pages, which the
+kernel can drop, not heap. Start-up time is noise between runs. Idle stays
+idle. Within every budget.

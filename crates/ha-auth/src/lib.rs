@@ -128,6 +128,14 @@ pub enum AddUserError {
     Hash(#[from] bcrypt::BcryptError),
 }
 
+/// What [`Auth::create_owner`] made: the user, and the username its
+/// credential logs in with (for [`Auth::create_auth_code`]).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Onboarded {
+    pub user_id: String,
+    pub username: String,
+}
+
 /// What [`Auth::add_user`] created.
 #[derive(Debug, PartialEq, Eq)]
 pub enum Added {
@@ -325,11 +333,127 @@ impl Auth {
             .collect()
     }
 
+    /// Whether `step` is done.
+    pub fn is_step_done(&self, step: &str) -> bool {
+        self.0
+            .state
+            .lock()
+            .onboarding
+            .done
+            .iter()
+            .any(|d| d == step)
+    }
+
+    /// `_async_mark_done`: append `step` to the store's `done` list (in the
+    /// order steps finish, as HA keeps it). [`Auth::save`] writes it.
+    pub fn mark_step_done(&self, step: &str) {
+        let mut s = self.0.state.lock();
+        s.onboarding.done.push(step.to_owned());
+        s.dirty |= DIRTY_ONBOARDING;
+    }
+
+    /// `UserOnboardingView`'s accounts (blocking: bcrypt): a user named
+    /// `name` in `system-admin`, the owner as the first user that isn't
+    /// system-generated (`_user_should_be_owner`), with a `homeassistant`
+    /// login for `username` linked to it. HA checks the username in
+    /// `async_add_auth` after creating the user, and its error becomes a
+    /// 500 with the user left behind; `hars` checks first and creates
+    /// nothing.
+    pub fn create_owner(
+        &self,
+        name: &str,
+        username: &str,
+        password: &str,
+    ) -> Result<Onboarded, AddUserError> {
+        // `_validate_new_username`: normalized whatever the legacy mode.
+        let normalized = normalize_username(username);
+        if normalized != username {
+            return Err(AddUserError::NotNormalized(normalized));
+        }
+        if self.username_taken(username) {
+            return Err(AddUserError::Exists);
+        }
+        let hash = bcrypt::hash_with_result(truncate72(password), self.0.bcrypt_cost)?
+            .format_for_version(bcrypt::Version::TwoB);
+        let mut s = self.0.state.lock();
+        // Checked again: another login may have been added while hashing.
+        let legacy = s.legacy_usernames;
+        if s.provider.users.iter().any(|u| {
+            normalize_username(&u.username) == normalized || (legacy && u.username == username)
+        }) {
+            return Err(AddUserError::Exists);
+        }
+        s.provider.users.push(ProviderUser {
+            username: username.into(),
+            password: B64.encode(hash),
+            extra: Map::new(),
+        });
+        let is_owner = s.data.users.iter().all(|u| u.system_generated);
+        let user_id = uuid_hex();
+        s.data.users.push(User {
+            id: user_id.clone(),
+            group_ids: vec![GROUP_ID_ADMIN.into()],
+            is_owner,
+            is_active: true,
+            name: Some(name.into()),
+            system_generated: false,
+            local_only: false,
+            extra: Map::new(),
+        });
+        // `async_get_or_create_credentials` then `async_link_user`: a stale
+        // credential for the same username is replaced.
+        s.data
+            .credentials
+            .retain(|c| !(c.auth_provider_type == PROVIDER_TYPE && c.username() == Some(username)));
+        s.data.credentials.push(Credential {
+            id: uuid_hex(),
+            user_id: user_id.clone(),
+            auth_provider_type: PROVIDER_TYPE.into(),
+            auth_provider_id: None,
+            data: json!({ "username": username }),
+            extra: Map::new(),
+        });
+        s.dirty |= DIRTY_AUTH | DIRTY_PROVIDER;
+        Ok(Onboarded {
+            user_id,
+            username: username.into(),
+        })
+    }
+
+    fn username_taken(&self, username: &str) -> bool {
+        let s = self.0.state.lock();
+        let normalized = normalize_username(username);
+        s.provider.users.iter().any(|u| {
+            normalize_username(&u.username) == normalized
+                || (s.legacy_usernames && u.username == username)
+        })
+    }
+
+    /// The `homeassistant` username of the credential a refresh token was
+    /// issued for (`refresh_token.credential`), if it has one.
+    pub fn refresh_token_username(&self, refresh_token_id: &str) -> Option<String> {
+        let s = self.0.state.lock();
+        let token = s
+            .data
+            .refresh_tokens
+            .iter()
+            .find(|t| t.id == refresh_token_id)?;
+        let credential_id = token.credential_id.as_deref()?;
+        s.data
+            .credentials
+            .iter()
+            .find(|c| c.id == credential_id && c.auth_provider_type == PROVIDER_TYPE)
+            .and_then(|c| c.username())
+            .map(str::to_owned)
+    }
+
     // ----- the homeassistant provider -----
 
-    /// Add a username and password to the provider (blocking: bcrypt). The
-    /// first one also becomes the owner and completes onboarding, so a fresh
-    /// install can be logged into before the onboarding UI exists in `hars`.
+    /// `hars auth add`: add a username and password to the provider
+    /// (blocking: bcrypt). The first one also becomes the owner and
+    /// completes every onboarding step, so an install can be set up without
+    /// a browser (the browser's onboarding is [`Auth::create_owner`] and
+    /// the onboarding views).
     pub fn add_user(&self, username: &str, password: &str) -> Result<Added, AddUserError> {
         let normalized = normalize_username(username);
         if normalized != username {
@@ -483,26 +607,15 @@ impl Auth {
         {
             return Err(LoginError::Blocked(reason));
         }
-        s.codes
-            .retain(|_, c| now.duration_since(c.created) < AUTH_CODE_TTL);
-        if s.codes.len() >= MAX_PENDING {
-            let oldest = s
-                .codes
-                .iter()
-                .min_by_key(|(_, c)| c.created)
-                .map(|(k, _)| k.clone());
-            s.codes.remove(&oldest.expect("not empty"));
-        }
-        let code = uuid_hex();
-        s.codes.insert(
-            code.clone(),
-            AuthCode {
-                client_id: client_id.into(),
-                username: username.into(),
-                created: now,
-            },
-        );
-        Ok(code)
+        Ok(store_code(&mut s, client_id, username, now))
+    }
+
+    /// `create_auth_code`: a single-use code `/auth/token` exchanges for
+    /// tokens of the user `username` logs in as (onboarding's user and
+    /// integration steps).
+    pub fn create_auth_code(&self, client_id: &str, username: &str) -> String {
+        let now = self.0.clock.now();
+        store_code(&mut self.0.state.lock(), client_id, username, now)
     }
 
     // ----- tokens -----
@@ -698,6 +811,31 @@ impl Auth {
     fn now_f64(&self) -> f64 {
         self.0.clock.now().as_microsecond() as f64 / 1e6
     }
+}
+
+/// `_create_auth_code_store`'s `store_result`: codes expire after 10
+/// minutes; `hars` also keeps at most [`MAX_PENDING`].
+fn store_code(s: &mut State, client_id: &str, username: &str, now: Timestamp) -> String {
+    s.codes
+        .retain(|_, c| now.duration_since(c.created) < AUTH_CODE_TTL);
+    if s.codes.len() >= MAX_PENDING {
+        let oldest = s
+            .codes
+            .iter()
+            .min_by_key(|(_, c)| c.created)
+            .map(|(k, _)| k.clone());
+        s.codes.remove(&oldest.expect("not empty"));
+    }
+    let code = uuid_hex();
+    s.codes.insert(
+        code.clone(),
+        AuthCode {
+            client_id: client_id.into(),
+            username: username.into(),
+            created: now,
+        },
+    );
+    code
 }
 
 /// `normalize_username`: `str.strip().casefold()`.

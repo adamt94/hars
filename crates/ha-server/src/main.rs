@@ -89,7 +89,7 @@ async fn run(thp_disabled: std::io::Result<bool>) -> anyhow::Result<()> {
     let addr = std::env::var("HARS_BIND").unwrap_or_else(|_| "0.0.0.0:8123".into());
     let mut api_config = api_config()?;
     let config_dir = config_dir()?;
-    let (core_config, config_source) = {
+    let core_config = {
         let dir = config_dir.clone();
         tokio::task::spawn_blocking(move || ha_core::config::CoreConfig::load(&dir)).await??
     };
@@ -159,6 +159,7 @@ async fn run(thp_disabled: std::io::Result<bool>) -> anyhow::Result<()> {
         })
         .await?
     };
+    ha_integrations::import_default_entries(&config_entries);
     let entries = config_entries.list();
     {
         // The registries ask about entries (a device's primary entry, and
@@ -211,6 +212,18 @@ async fn run(thp_disabled: std::io::Result<bool>) -> anyhow::Result<()> {
             None
         }
     };
+    // The flows onboarding starts once the location is set (met's).
+    api_config.onboarding = Some(ha_integrations::onboarding::Onboarding::new(
+        &hass,
+        registry.clone(),
+        started.weather.clone(),
+        config_entries.clone(),
+        ha_integrations::met::URL.to_owned(),
+        api_config
+            .integrations
+            .contains(&ha_integrations::met::DOMAIN),
+    ));
+    api_config.config_entries = Some(config_entries.clone());
     api_config.weather = started.weather;
     api_config.lovelace = {
         let dir = config_dir.clone();
@@ -228,16 +241,25 @@ async fn run(thp_disabled: std::io::Result<bool>) -> anyhow::Result<()> {
         let dir = config_dir.clone();
         std::sync::Arc::new(tokio::task::spawn_blocking(move || ha_api::Labs::load(&dir)).await?)
     };
+    api_config.analytics = {
+        let dir = config_dir.clone();
+        std::sync::Arc::new(
+            tokio::task::spawn_blocking(move || ha_api::Analytics::load(&dir)).await?,
+        )
+    };
+    api_config.installation_type = tokio::task::spawn_blocking(ha_api::installation_type).await?;
+    api_config.storage = Some(config_dir.clone());
     api_config.config_dir = std::path::absolute(&config_dir)?.display().to_string();
-    api_config.config_source = config_source;
     let auth = {
         let (dir, clock) = (config_dir.clone(), hass.clock().clone());
         tokio::task::spawn_blocking(move || ha_auth::Auth::load(&dir, clock)).await??
     };
     tracing::info!("config directory {}", config_dir.display());
     if !auth.is_onboarded() {
-        tracing::warn!(
-            "no owner yet: create one with `hars auth add USERNAME PASSWORD` (same HARS_CONFIG)"
+        let port = addr.rsplit(':').next().unwrap_or("8123");
+        tracing::info!(
+            "not set up yet: open http://<this machine>:{port} in a browser to create the owner \
+             and set the location (or, without a browser, `hars auth add USERNAME PASSWORD`)"
         );
     }
 

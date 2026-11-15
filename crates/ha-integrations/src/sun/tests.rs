@@ -268,3 +268,49 @@ async fn a_clock_stepped_back_does_not_fire_early() {
     );
     task.abort();
 }
+
+/// `core_config_updated` with a new home (onboarding's core config step):
+/// the sun is worked out again at once for it, as HA's `update_location`;
+/// an elevation change alone doesn't move it (astral's `Location` has no
+/// elevation).
+#[tokio::test(start_paused = true)]
+async fn a_new_home_moves_the_sun_at_once() {
+    let (hass, _sim) = hass_at("2026-06-21T12:00:00Z");
+    let task = tokio::spawn(run(
+        hass.clone(),
+        Default::default(),
+        "e1".into(),
+        hass.setup_guard(),
+    ));
+    tokio::task::yield_now().await;
+    let before = state(&hass, "sun.sun").unwrap();
+
+    let mut c = (*hass.config()).clone();
+    c.elevation = 300;
+    hass.set_config(c.clone());
+    tokio::task::yield_now().await;
+    assert!(std::sync::Arc::ptr_eq(
+        &before,
+        &state(&hass, "sun.sun").unwrap()
+    ));
+
+    c.latitude = 51.5;
+    c.longitude = -0.12;
+    c.time_zone = "Europe/London".into();
+    hass.set_config(c.clone());
+    tokio::task::yield_now().await;
+    let after = state(&hass, "sun.sun").unwrap();
+    let london = Observer {
+        latitude: 51.5,
+        longitude: -0.12,
+        elevation: 300.0,
+    };
+    let tz = TimeZone::get("Europe/London").unwrap();
+    let want = events(&london, &tz, hass.clock().now());
+    assert_eq!(after.attributes["next_rising"], iso(want.next_rising));
+    assert_ne!(
+        after.attributes["next_rising"],
+        before.attributes["next_rising"]
+    );
+    task.abort();
+}

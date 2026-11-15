@@ -18,6 +18,11 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
 
+/// `normalized_name_base_registry.normalize_name`.
+pub fn normalize_name(name: &str) -> String {
+    ha_core::casefold::casefold(name).replace(' ', "")
+}
+
 /// `vec![...]` of rows, each in an `Arc`.
 #[macro_export]
 macro_rules! rows {
@@ -574,6 +579,9 @@ pub struct Registries {
     pub entity_file: FileRest,
     pub device_file: FileRest,
     pub areas: Vec<Area>,
+    /// The area file's `minor_version` (the current one when there was no
+    /// file).
+    pub area_minor: u32,
     pub floors: Vec<Floor>,
     pub labels: Vec<Label>,
 }
@@ -677,6 +685,7 @@ impl Registries {
                 extra: devices.extra,
             },
             areas: areas.areas,
+            area_minor,
             floors: floors.floors,
             labels: labels.labels,
         };
@@ -721,6 +730,60 @@ impl Registries {
             deleted_devices: &self.device_file.deleted,
             extra: &self.device_file.extra,
         })
+    }
+
+    /// Write `core.area_registry` as HA's `_data_to_save` does: plain
+    /// indented JSON, each area's keys in HA's order. A file at an older
+    /// minor version is never overwritten, as for the entities.
+    pub fn save_areas(&self, config_dir: &Path) -> std::io::Result<()> {
+        #[derive(Serialize)]
+        struct Row<'a> {
+            aliases: &'a [String],
+            floor_id: &'a Option<String>,
+            humidity_entity_id: &'a Option<String>,
+            icon: &'a Option<String>,
+            id: &'a str,
+            labels: &'a [String],
+            name: &'a str,
+            picture: &'a Option<String>,
+            temperature_entity_id: &'a Option<String>,
+            created_at: &'a Option<String>,
+            modified_at: &'a Option<String>,
+        }
+        #[derive(Serialize)]
+        struct Out<'a> {
+            areas: Vec<Row<'a>>,
+        }
+        let store = store(config_dir, AREA_KEY);
+        check_minor(&store, self.area_minor)?;
+        store.save(&Out {
+            areas: self
+                .areas
+                .iter()
+                .map(|a| Row {
+                    aliases: &a.aliases,
+                    floor_id: &a.floor_id,
+                    humidity_entity_id: &a.humidity_entity_id,
+                    icon: &a.icon,
+                    id: &a.id,
+                    labels: &a.labels,
+                    name: &a.name,
+                    picture: &a.picture,
+                    temperature_entity_id: &a.temperature_entity_id,
+                    created_at: &a.created_at,
+                    modified_at: &a.modified_at,
+                })
+                .collect(),
+        })
+    }
+
+    /// `async_get_area_by_name`: names compare case-folded, without spaces
+    /// (`normalize_name`).
+    pub fn area_by_name(&self, name: &str) -> Option<&Area> {
+        let wanted = normalize_name(name);
+        self.areas
+            .iter()
+            .find(|a| normalize_name(&a.name) == wanted)
     }
 
     /// The parts of HA's minor-version migrations that change what `hars`

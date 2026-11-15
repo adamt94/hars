@@ -291,6 +291,11 @@ fn zones(config: &CoreConfig) -> (TimeZone, TimeZone) {
 /// each one finishes. A failed refresh makes the entity unavailable until
 /// the next success; forecast readers keep the last good forecast. An
 /// entry with `pref_disable_polling` is fetched once, at setup, as HA.
+///
+/// An entry that tracks the home (`track_home`, as onboarding makes) is
+/// fetched again at once for the new place when the home's latitude,
+/// longitude or elevation changes (`track_home` in HA's coordinator); the
+/// entity keeps its id and name.
 pub async fn run(
     hass: Hass,
     registries: Arc<Registries>,
@@ -306,22 +311,50 @@ pub async fn run(
         .and_then(Value::as_object)
         .unwrap_or(&empty);
     let polling = entry.get("pref_disable_polling").and_then(Value::as_bool) != Some(true);
-    let config = hass.config();
-    let Some(loc) = Location::new(data, &config) else {
+    let track_home = data.get("track_home").and_then(Value::as_bool) == Some(true);
+    let mut watch = hass.watch_config();
+    let config = watch.borrow_and_update().clone();
+    let Some(mut loc) = Location::new(data, &config) else {
         tracing::warn!("Skip setting up met.no integration; No Home location has been set");
         return;
     };
     let Some(entity) = entity(&registries, &loc) else {
         return;
     };
-    let url = format!(
-        "{base_url}?{}",
-        forecast::query(loc.latitude, loc.longitude, loc.elevation)
-    );
-    schedule(&hass, &weather, &entity, polling, ready, |prev| {
-        fetch_once(user_agent, &url, prev)
-    })
-    .await;
+    let mut ready = Some(ready);
+    loop {
+        let url = format!(
+            "{base_url}?{}",
+            forecast::query(loc.latitude, loc.longitude, loc.elevation)
+        );
+        let refresh = schedule(&hass, &weather, &entity, polling, ready.take(), |prev| {
+            fetch_once(user_agent, &url, prev)
+        });
+        if !track_home {
+            return refresh.await;
+        }
+        // `set_coordinates`: what is compared is `str()` of each, so a
+        // change of the elevation counts too.
+        let here = (loc.latitude, loc.longitude, loc.elevation);
+        let moved = async {
+            loop {
+                if watch.changed().await.is_err() {
+                    return std::future::pending().await;
+                }
+                let c = watch.borrow_and_update().clone();
+                let there = (c.latitude, c.longitude, c.elevation as f64);
+                if there != here {
+                    return there;
+                }
+            }
+        };
+        tokio::select! {
+            () = refresh => return,
+            (latitude, longitude, elevation) = moved => {
+                loc = Location { latitude, longitude, elevation, ..loc };
+            }
+        }
+    }
 }
 
 /// HA's coordinator schedule around `fetch`, which is handed the last good
@@ -331,7 +364,7 @@ async fn schedule<F, Fut>(
     weather: &Weather,
     entity: &Entity,
     polling: bool,
-    ready: ha_core::SetupGuard,
+    mut ready: Option<ha_core::SetupGuard>,
     mut fetch: F,
 ) where
     F: FnMut(Option<Fetched>) -> Fut,
@@ -344,7 +377,6 @@ async fn schedule<F, Fut>(
     // The first refresh: `ConfigEntryNotReady` until it works. Setup is
     // done after the first try either way (HA retries in the background).
     let mut tries = 0u32;
-    let mut ready = Some(ready);
     let mut last = loop {
         match fetch(None).await {
             Ok(f) => break f,

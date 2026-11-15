@@ -1,0 +1,54 @@
+{
+ "steps": [
+  {
+   "http": {
+    "method": "GET",
+    "path": "/api/onboarding",
+    "auth": false
+   },
+   "status": 404,
+   "body": "404: Not Found",
+   "content_type": "text/plain"
+  },
+  {
+   "http": {
+    "method": "GET",
+    "path": "/api/onboarding/installation_type",
+    "auth": false
+   },
+   "status": 404,
+   "body": "404: Not Found",
+   "content_type": "text/plain"
+  },
+  {
+   "http": {
+    "method": "POST",
+    "path": "/api/onboarding/users",
+    "auth": false,
+    "body": {
+     "client_id": "http://127.0.0.1:8123/",
+     "name": "Test Name",
+     "username": "test-user",
+     "password": "test-pass",
+     "language": "de"
+    }
+   },
+   "status": 404,
+   "body": "404: Not Found",
+   "content_type": "text/plain"
+  },
+  {
+   "http": {
+    "method": "POST",
+    "path": "/api/onboarding/integration/wait",
+    "auth": false,
+    "body": {
+     "domain": "person"
+    }
+   },
+   "status": 404,
+   "body": "404: Not Found",
+   "content_type": "text/plain"
+  }
+ ]
+}

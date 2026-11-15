@@ -156,7 +156,9 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
         device trackers from `homeassistant_start`; zones count them. HA's
         Vincenty `distance` and `async_in_zones`; 20 `location.json` steps match
   - [ ] Full Unicode transliteration in `slugify` (CJK, Cyrillic) for new
-        entity ids; imported ones come from the registry
+        entity ids and area ids (onboarding's default areas in Russian,
+        Greek, Chinese, Vietnamese, ... get other ids than HA's; their
+        names match); imported ones come from the registry
   - [x] Lovelace dashboards and the dashboards list (`url_path` identity),
         resources; storage mode (YAML dashboards come with `configuration.yaml`)
   - [x] Auth: users, bcrypt hashes, **refresh tokens with ids, client ids and
@@ -194,15 +196,30 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
       protocol auth; webhooks use secret ids; onboarding status is anonymous
       (see [security policy](../SECURITY.md)). State lives in HA's own
       `.storage/{auth, auth_provider.homeassistant, onboarding}` files.
-      `hars auth add` creates the owner until onboarding UI lands; binary
+      `hars auth add` creates the owner without a browser; binary
       2.33 → 2.64 MiB
-- [ ] Onboarding UI: `/api/onboarding/users` and the `core_config`,
-      `analytics` and `integration` steps (needs WS); a fresh install
-      redirects to `/onboarding.html` until then. Until the `core_config`
-      step (or `config/core/update`) lands, a fresh install's location, time
-      zone and units are HA's defaults (0,0, UTC, metric) unless
-      `.storage/core.config` is written by hand
-      ([README](../README.md#set-your-location))
+- [x] Onboarding UI, as HA's `components/onboarding/views.py`: the
+      status and installation-type views, `/api/onboarding/users` (owner,
+      person, the three default areas named in the chosen language, auth
+      code), the `core_config`, `analytics` and `integration` steps (per-step
+      locks, HA's "already done" 403s, `.storage/onboarding` saved per step;
+      the views are 404s after a restart with every step done). WS
+      `config/core/update` (HA's schema and messages; saved to
+      `.storage/core.config` in HA's bytes; `core_config_updated` fired;
+      `zone.home`, `sun` and a home-tracking `met` follow at once) and
+      `config/core/detect` (HA's whoami service, asked only when the user
+      agrees in the page); `analytics` and `analytics/preferences`
+      (`.storage/core.analytics`; nothing is ever sent);
+      `config_entries/subscribe` and `config_entries/flow/subscribe`. After
+      the core config step, met's onboarding flow creates its entry, so a
+      fresh install gets `weather.forecast_home`; a fresh install's first
+      start saves `sun`'s entry as HA's import does. Vectors from HA's own
+      views (`scripts/vectors/onboarding.py`). Left out: an entry's setup
+      state (`config_entries/subscribe` says `loaded`/`not_loaded`) and live
+      entry updates; `update_units` (no suggested units kept); the
+      `WWW-Authenticate` header HA adds to 401s; the other onboarding flows
+      (`google_translate`, `radio_browser`, `shopping_list`), as hars has
+      none of those integrations
 - [ ] CORS for `/auth/token` and `/auth/revoke` (HA allows any origin)
 - [ ] Permissions beyond the built-in groups: custom group policies (users
       with only custom groups are refused for now), per-entity filtering, and
@@ -468,8 +485,10 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
 - [x] `compose.yaml` (host network, `./config`, restart policy) and a
       workflow that publishes linux/amd64 and linux/arm64 images to ghcr.io
       (`.github/workflows/publish.yml`)
-- [ ] Onboarding without the command line (the M2 onboarding UI), so
-      installing is `docker compose up -d` and a browser
+- [x] Onboarding without the command line (the M2 onboarding UI), so
+      installing is `docker compose up -d` and a browser (proven end to end
+      in Chromium with the pinned frontend: owner, location, analytics,
+      finish, dashboard, restart)
 - [ ] Acceptance: a documented cutover and rollback procedure (stop HA,
       import a fresh copy, start `hars` on :8123; roll back by starting the
       untouched HA copy), proven on the reference install

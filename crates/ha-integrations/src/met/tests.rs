@@ -422,7 +422,9 @@ async fn refreshes_on_has_schedule_and_goes_unavailable_on_failure() {
     };
     let (h, w) = (hass.clone(), weather.clone());
     let task =
-        tokio::spawn(async move { schedule(&h, &w, &entity, true, h.setup_guard(), fetch).await });
+        tokio::spawn(
+            async move { schedule(&h, &w, &entity, true, Some(h.setup_guard()), fetch).await },
+        );
     let id = EntityId::parse("weather.forecast_home").unwrap();
 
     tokio::time::sleep(Duration::from_secs(20)).await;
@@ -613,11 +615,105 @@ async fn polling_disabled_fetches_only_at_setup() {
         std::future::ready(Ok(fixture_a()))
     };
     let (h, w) = (hass.clone(), weather.clone());
-    let task =
-        tokio::spawn(async move { schedule(&h, &w, &entity, false, h.setup_guard(), fetch).await });
+    let task = tokio::spawn(async move {
+        schedule(&h, &w, &entity, false, Some(h.setup_guard()), fetch).await
+    });
     tokio::time::sleep(Duration::from_secs(5 * 3600)).await;
     assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 1);
     let id = EntityId::parse("weather.forecast_home").unwrap();
     assert_eq!(hass.states().get(&id).unwrap().state, "partlycloudy");
     task.abort();
+}
+
+/// An entry that tracks the home (onboarding's) is fetched again at once
+/// for a new home, as HA's coordinator does on `core_config_updated`;
+/// the entity keeps its id. Other settings changes fetch nothing.
+#[tokio::test]
+async fn a_home_entry_follows_the_home() {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    let body = include_bytes!("vectors/fixture_a.json");
+    let (tx, mut requests) = tokio::sync::mpsc::unbounded_channel::<String>();
+    tokio::spawn(async move {
+        loop {
+            let (mut s, _) = listener.accept().await.unwrap();
+            let mut buf = vec![0; 4096];
+            let n = s.read(&mut buf).await.unwrap();
+            let line = String::from_utf8_lossy(&buf[..n])
+                .lines()
+                .next()
+                .unwrap()
+                .to_owned();
+            let _ = tx.send(line);
+            let head = format!(
+                "HTTP/1.1 200 OK\r\ncontent-length: {}\r\nconnection: close\r\n\r\n",
+                body.len()
+            );
+            s.write_all(head.as_bytes()).await.unwrap();
+            s.write_all(body).await.unwrap();
+        }
+    });
+    let hass = Hass::new();
+    hass.start();
+    let mut config = CoreConfig {
+        latitude: 51.5,
+        longitude: -0.12,
+        location_name: "Home".into(),
+        ..CoreConfig::default()
+    };
+    hass.set_config(config.clone());
+    let entry = json!({"entry_id": "e1", "domain": "met", "data": {"track_home": true}})
+        .as_object()
+        .unwrap()
+        .clone();
+    let weather = Arc::new(Weather::default());
+    let task = tokio::spawn(run(
+        hass.clone(),
+        Arc::default(),
+        weather,
+        "hars-test",
+        format!("http://{addr}/complete"),
+        entry,
+        hass.setup_guard(),
+    ));
+    assert_eq!(
+        next_request(&mut requests).await,
+        "GET /complete?lat=51.5&lon=-0.12&altitude=0 HTTP/1.1"
+    );
+    let id = EntityId::parse("weather.forecast_home").unwrap();
+    for _ in 0..100 {
+        if hass.states().get(&id).is_some() {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    assert!(hass.states().get(&id).is_some());
+
+    // The name changes nothing for met.
+    config.location_name = "Flat".into();
+    hass.set_config(config.clone());
+    config.latitude = 52.37;
+    config.longitude = 4.89;
+    config.elevation = 3;
+    hass.set_config(config.clone());
+    assert_eq!(
+        next_request(&mut requests).await,
+        "GET /complete?lat=52.37&lon=4.89&altitude=3 HTTP/1.1"
+    );
+    assert!(hass.states().get(&id).is_some());
+    assert!(
+        hass.states()
+            .get(&EntityId::parse("weather.forecast_flat").unwrap())
+            .is_none()
+    );
+    assert!(requests.try_recv().is_err());
+    task.abort();
+}
+
+async fn next_request(r: &mut tokio::sync::mpsc::UnboundedReceiver<String>) -> String {
+    tokio::time::timeout(Duration::from_secs(5), r.recv())
+        .await
+        .unwrap()
+        .unwrap()
 }

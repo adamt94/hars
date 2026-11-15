@@ -29,7 +29,8 @@ pub struct Registry {
     snap: RwLock<Arc<Registries>>,
     /// One writer at a time, so no change is lost between copy and swap.
     writer: Mutex<()>,
-    saves: Option<[Arc<DelayedSave>; 2]>,
+    /// Entities, devices, areas.
+    saves: Option<[Arc<DelayedSave>; 3]>,
     entries: RwLock<Option<EntryLookup>>,
 }
 
@@ -83,6 +84,7 @@ struct Tx {
     events: Vec<(&'static str, Value)>,
     save_entities: bool,
     save_devices: bool,
+    save_areas: bool,
 }
 
 impl Tx {
@@ -126,22 +128,17 @@ impl Registry {
     /// Saved to `config_dir/.storage` after changes, as HA does.
     pub fn new(hass: &Hass, config_dir: &Path, registries: Registries) -> Arc<Self> {
         Arc::new_cyclic(|weak: &std::sync::Weak<Self>| {
-            let save = |entities: bool| {
+            let save = |key: &'static str| {
                 let (weak, dir) = (weak.clone(), config_dir.to_owned());
-                let key = if entities {
-                    crate::ENTITY_KEY
-                } else {
-                    crate::DEVICE_KEY
-                };
                 DelayedSave::spawn(key, move || {
                     let Some(this) = weak.upgrade() else {
                         return Ok(());
                     };
                     let snap = this.snapshot();
-                    if entities {
-                        snap.save_entities(&dir)
-                    } else {
-                        snap.save_devices(&dir)
+                    match key {
+                        crate::ENTITY_KEY => snap.save_entities(&dir),
+                        crate::DEVICE_KEY => snap.save_devices(&dir),
+                        _ => snap.save_areas(&dir),
                     }
                 })
             };
@@ -149,7 +146,11 @@ impl Registry {
                 hass: hass.clone(),
                 snap: RwLock::new(Arc::new(registries)),
                 writer: Mutex::new(()),
-                saves: Some([save(true), save(false)]),
+                saves: Some([
+                    save(crate::ENTITY_KEY),
+                    save(crate::DEVICE_KEY),
+                    save(crate::AREA_KEY),
+                ]),
                 entries: RwLock::new(None),
             }
         })
@@ -185,14 +186,15 @@ impl Registry {
         }
     }
 
-    fn schedule_save(&self, entities: bool) {
+    /// `which`: 0 entities, 1 devices, 2 areas.
+    fn schedule_save(&self, which: usize) {
         if let Some(saves) = &self.saves {
             let delay = if self.hass.core_state() == CoreState::Running {
                 SAVE_DELAY
             } else {
                 SAVE_DELAY_STARTING
             };
-            saves[usize::from(!entities)].schedule(delay);
+            saves[which].schedule(delay);
         }
     }
 
@@ -206,14 +208,17 @@ impl Registry {
             events: Vec::new(),
             save_entities: false,
             save_devices: false,
+            save_areas: false,
         };
         let out = f(&mut tx);
         *self.snap.write() = Arc::new(tx.r);
-        if tx.save_entities {
-            self.schedule_save(true);
-        }
-        if tx.save_devices {
-            self.schedule_save(false);
+        for (which, save) in [tx.save_entities, tx.save_devices, tx.save_areas]
+            .into_iter()
+            .enumerate()
+        {
+            if save {
+                self.schedule_save(which);
+            }
         }
         let now = self.hass.clock().now();
         for (name, data) in tx.events {
@@ -227,6 +232,42 @@ impl Registry {
             ));
         }
         out
+    }
+
+    /// `async_create` for an area unless one with the same name (compared
+    /// as `normalize_name` does) exists, as onboarding guards it: the new
+    /// area, or `None`. Its id is the name slugified, with `_2`, `_3`, ...
+    /// when taken (`generate_id_from_name`). Fires `area_registry_updated`
+    /// and schedules the save.
+    pub fn create_area(&self, name: &str, icon: Option<&str>) -> Option<crate::Area> {
+        let now = now_iso(&self.hass);
+        self.write(|tx| {
+            if tx.r.area_by_name(name).is_some() {
+                return None;
+            }
+            let base = ha_core::slugify(name);
+            let mut id = base.clone();
+            let mut tries = 1;
+            while tx.r.areas.iter().any(|a| a.id == id) {
+                tries += 1;
+                id = format!("{base}_{tries}");
+            }
+            let area = crate::Area {
+                id: id.clone(),
+                name: name.to_owned(),
+                icon: icon.map(str::to_owned),
+                created_at: Some(now.clone()),
+                modified_at: Some(now),
+                ..Default::default()
+            };
+            tx.r.areas.push(area.clone());
+            tx.events.push((
+                "area_registry_updated",
+                json!({"action": "create", "area_id": id}),
+            ));
+            tx.save_areas = true;
+            Some(area)
+        })
     }
 
     /// The row for `(domain, platform, unique_id)`.

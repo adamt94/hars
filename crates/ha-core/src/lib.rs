@@ -51,14 +51,15 @@ pub struct Hass {
     inner: Arc<HassInner>,
 }
 
-#[derive(Default)]
 struct HassInner {
     clock: Clock,
     bus: EventBus,
     states: StateMachine,
     services: ServiceRegistry,
     core_state: AtomicU8,
-    config: parking_lot::RwLock<Arc<config::CoreConfig>>,
+    /// A watch channel, so what follows the location ([`Hass::watch_config`])
+    /// sleeps until it changes.
+    config: tokio::sync::watch::Sender<Arc<config::CoreConfig>>,
     restore: parking_lot::RwLock<Arc<restore::RestoreState>>,
     setups: lifecycle::Setups,
     stop: lifecycle::StopHandlers,
@@ -66,6 +67,24 @@ struct HassInner {
     unrecorded: parking_lot::RwLock<std::collections::HashMap<EntityId, &'static [&'static str]>>,
     /// Shadow mode ([`shadow`]): set once at start-up.
     shadow: std::sync::atomic::AtomicBool,
+}
+
+impl Default for HassInner {
+    fn default() -> Self {
+        Self {
+            clock: Clock::default(),
+            bus: EventBus::default(),
+            states: StateMachine::default(),
+            services: ServiceRegistry::default(),
+            core_state: AtomicU8::default(),
+            config: tokio::sync::watch::Sender::new(Arc::default()),
+            restore: Default::default(),
+            setups: Default::default(),
+            stop: Default::default(),
+            unrecorded: Default::default(),
+            shadow: Default::default(),
+        }
+    }
 }
 
 impl Hass {
@@ -89,7 +108,14 @@ impl Hass {
 
     /// Location, units and locale (`hass.config`).
     pub fn config(&self) -> Arc<config::CoreConfig> {
-        self.inner.config.read().clone()
+        self.inner.config.borrow().clone()
+    }
+
+    /// Wakes on each [`Hass::set_config`]: for what HA updates on
+    /// `core_config_updated` (`zone.home`, `sun`, `met`'s home), without
+    /// waking on any other event.
+    pub fn watch_config(&self) -> tokio::sync::watch::Receiver<Arc<config::CoreConfig>> {
+        self.inner.config.subscribe()
     }
 
     /// Last states for entities that restore themselves.
@@ -101,8 +127,11 @@ impl Hass {
         *self.inner.restore.write() = Arc::new(restore);
     }
 
+    /// Replace the location, units and locale. Those watching
+    /// ([`Hass::watch_config`]) are woken; firing `core_config_updated` is
+    /// the caller's (HA fires it from `async_update` with what changed).
     pub fn set_config(&self, config: config::CoreConfig) {
-        *self.inner.config.write() = Arc::new(config);
+        self.inner.config.send_replace(Arc::new(config));
     }
 
     /// Declare an entity's own unrecorded attributes (HA's

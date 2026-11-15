@@ -6,14 +6,14 @@ unchanged official Home Assistant frontend and companion apps, and keeps its
 data in Home Assistant's own file formats. A fresh install idles at about
 7 MiB of memory and no CPU ([measurements](docs/perf/RESULTS.md)).
 
-It is early software. **Works today:** the web UI and login, dashboards,
-history and logbook, the iOS companion app, YAML automations (state,
-numeric-state and time triggers), the `sun`, `met`, `hue`, `lifx`,
-`switchbot_cloud`, `mobile_app`, `person` and `zone` integrations, and
-importing a Home Assistant 2026.6 install. **Not yet:** the onboarding screen,
-setting your location, adding integrations or editing automations from the
-UI, templates, scripts, notifications and remote access. If you need those,
-keep Home Assistant for now.
+It is early software. **Works today:** setting up in the browser with Home
+Assistant's onboarding screens, the web UI and login, dashboards, history and
+logbook, the iOS companion app, YAML automations (state, numeric-state and
+time triggers), the `sun`, `met`, `hue`, `lifx`, `switchbot_cloud`,
+`mobile_app`, `person` and `zone` integrations, and importing a Home
+Assistant 2026.6 install. **Not yet:** adding integrations or editing
+automations from the UI, templates, scripts, notifications and remote
+access. If you need those, keep Home Assistant for now.
 
 ## Install
 
@@ -26,51 +26,55 @@ You need a Linux machine (x86-64 or ARM64) with Docker and Docker Compose.
    curl -fsSLO https://raw.githubusercontent.com/adamt94/homeassistant-rust/main/compose.yaml
    ```
 
-2. Create your login. hars has no onboarding screen yet, so the first login
-   is made here; it becomes the owner (administrator).
-
-   ```sh
-   docker compose run --rm hars auth add YOUR_NAME YOUR_PASSWORD
-   ```
-
-   It prints `created owner "YOUR_NAME"; onboarding is complete`.
-   To keep the password out of your shell history, run `read -rs PW`, type
-   it, and write `"$PW"` in its place.
-   Moving from Home Assistant? Skip this step and
-   [import](#moving-from-home-assistant) instead: your logins come with it.
-
-3. Start hars:
+2. Start hars:
 
    ```sh
    docker compose up -d
    ```
 
-4. Open `http://<your-machine>:8123` and log in with that name and password.
+3. Open `http://<your-machine>:8123` in a browser and follow Home
+   Assistant's onboarding screens: create your login (it becomes the owner),
+   set your home's location, time zone and country, choose the analytics
+   options, and finish. You land on the dashboard, logged in. hars keeps the
+   location in Home Assistant's own `config/.storage/core.config` and starts
+   a weather forecast for it (`met`). It never sends analytics anywhere,
+   whatever you choose: the choice is only stored.
 
-Next, [set your location](#set-your-location). Docker restarts hars if it
-stops and after a reboot. The image is pulled from
-`ghcr.io/adamt94/homeassistant-rust`, which
+   Moving from Home Assistant? Don't onboard:
+   [import](#moving-from-home-assistant) first instead; your logins and
+   settings come with it.
+
+Docker restarts hars if it stops and after a reboot. The image is pulled
+from `ghcr.io/adamt94/homeassistant-rust`, which
 [a workflow](.github/workflows/publish.yml) publishes from every commit to
 `main`. If you run these steps in a clone of this repository (in place of
 step 1's download) and the image can't be pulled, Compose builds it from the
 [Dockerfile](Dockerfile) instead, which takes a few minutes.
 
-## Set your location
+### Without a browser (scripted setup)
 
-A fresh install starts with Home Assistant's defaults: location 0,0, time
-zone UTC, metric units, named "Home". Sunrise and sunset, time triggers and
-the days in history all follow them. There is no settings screen for this
-yet, so write them to `config/.storage/core.config` (Home Assistant's own
-file) and restart. Skip this if you imported: your settings came with it.
+To set hars up from a script, create the owner before the first start. This
+completes onboarding, so the browser goes straight to the login page:
 
 ```sh
-sudo tee config/.storage/core.config >/dev/null <<'EOF'
+docker compose run --rm hars auth add YOUR_NAME YOUR_PASSWORD
+```
+
+It prints `created owner "YOUR_NAME"; onboarding is complete`. To keep the
+password out of your shell history, run `read -rs PW`, type it, and write
+`"$PW"` in its place. The location then stays at Home Assistant's defaults
+(0,0, time zone UTC, metric units, named "Home"), which sunrise and sunset,
+time triggers and the days in history follow. Write your own to
+`config/.storage/core.config` (Home Assistant's own file) and restart:
+
+```sh
+sudo tee config/.storage/core.config >/dev/null <<'END'
 {"version": 1, "minor_version": 4, "key": "core.config", "data": {
   "latitude": 51.5072, "longitude": -0.1276, "elevation": 11,
   "unit_system_v2": "metric", "location_name": "Home",
   "time_zone": "Europe/London", "currency": "GBP", "country": "GB",
   "language": "en", "radius": 100, "external_url": null, "internal_url": null}}
-EOF
+END
 docker compose restart
 ```
 
@@ -84,8 +88,8 @@ doesn't load, hars won't start and `docker compose logs` says why.
 
 hars can take over a Home Assistant **2026.6** install: users, passwords and
 logged-in sessions (browsers and the companion app), registries, areas,
-dashboards, integrations' settings and the YAML automations. Do this instead
-of step 2, before the first start.
+dashboards, integrations' settings, the location and the YAML automations.
+Do this instead of onboarding, before the first start.
 
 1. Make a copy of Home Assistant's config folder with Home Assistant stopped,
    or unpack a backup. Never point hars at the folder Home Assistant is using.
@@ -101,9 +105,9 @@ of step 2, before the first start.
 4. Stop Home Assistant (both can't use port 8123) and run
    `docker compose up -d`.
 
-History is not imported: it starts fresh. If you already ran step 2 of the
-install, the import refuses to replace that login; add `--force` to replace
-it. To try hars beside Home Assistant first, with nothing it decides reaching
+History is not imported: it starts fresh. If you already onboarded (or ran
+`hars auth add`), the import refuses to replace that login; add `--force` to
+replace it. To try hars beside Home Assistant first, with nothing it decides reaching
 a device, see [shadow mode](docs/SHADOW.md).
 
 ## Running it
@@ -147,7 +151,8 @@ need it). hars listens on port 8123. To use another port, add
 ## Troubleshooting and limits
 
 - **The browser shows Home Assistant's onboarding screen**, and the log says
-  `no owner yet`: there is no login. Stop hars, run install step 2, start it.
+  `not set up yet`: there is no login yet. Follow the screens (install step
+  3), or set up [without a browser](#without-a-browser-scripted-setup).
 - **Nothing answers on port 8123 with Docker Desktop (macOS, Windows):** host
   networking is off there by default. Turn it on in Docker Desktop's settings,
   or replace `network_mode: host` with `ports: ["8123:8123"]` (LAN discovery

@@ -1,6 +1,7 @@
 //! The HTTP surface of `hars`: Home Assistant's REST API and the official
 //! frontend, served unchanged from disk.
 
+mod analytics;
 mod auth;
 mod automation;
 pub mod brands;
@@ -15,14 +16,20 @@ mod lovelace;
 mod mobile_app;
 #[rustfmt::skip]
 mod manifests_data;
+mod onboarding;
+#[rustfmt::skip]
+mod onboarding_data;
 mod rest;
 pub mod system_log;
 pub(crate) mod ws;
 
+pub use analytics::Analytics;
 pub use frontend::Frontend;
 pub use frontend_data::FrontendData;
 pub use labs::Labs;
 pub use lovelace::Lovelace;
+pub use onboarding::installation_type;
+pub use ws::WHOAMI_URL;
 
 use axum::{
     Router,
@@ -31,7 +38,6 @@ use axum::{
 };
 use ha_auth::Auth;
 use ha_core::Hass;
-use ha_core::config::ConfigSource;
 use std::sync::Arc;
 
 /// What the API serves besides the REST endpoints.
@@ -42,8 +48,21 @@ pub struct ApiConfig {
     pub frontend: Option<Arc<Frontend>>,
     /// The config directory, as `get_config` reports it.
     pub config_dir: String,
-    /// Whether `.storage/core.config` existed (`config_source`).
-    pub config_source: ConfigSource,
+    /// Where settings changed through the API (`.storage/core.config`) are
+    /// written; `None` keeps them in memory (tests).
+    pub storage: Option<std::path::PathBuf>,
+    /// What onboarding says this install is ([`installation_type`]).
+    pub installation_type: &'static str,
+    /// HA's location service for `config/core/detect`; `None` is
+    /// [`WHOAMI_URL`] (tests use a local server).
+    pub whoami_url: Option<String>,
+    /// The analytics preferences (stored, never sent).
+    pub analytics: Arc<Analytics>,
+    /// `core.config_entries`, as `config_entries/subscribe` lists them.
+    pub config_entries: Option<Arc<ha_integrations::config_entries::ConfigEntries>>,
+    /// The config flows onboarding starts after its core config step
+    /// (`met`), and what they started.
+    pub onboarding: Option<Arc<ha_integrations::onboarding::Onboarding>>,
     /// The frontend's per-user and system settings.
     pub frontend_data: Arc<FrontendData>,
     /// Home Assistant Labs' preview features.
@@ -84,6 +103,9 @@ pub(crate) struct Shared {
     pub hass: Hass,
     pub auth: Auth,
     pub config: Arc<ApiConfig>,
+    /// Held while the core config is read, changed and saved, so one
+    /// update can't undo another.
+    pub core_config: Arc<tokio::sync::Mutex<()>>,
 }
 
 /// The integrations `hars` implements, by HA domain: `get_config`'s
@@ -110,6 +132,9 @@ pub(crate) fn components(config: &ApiConfig) -> Vec<&'static str> {
         c.push("brands");
     }
     c.extend(&config.integrations);
+    if let Some(o) = &config.onboarding {
+        c.extend(o.started());
+    }
     c.sort_unstable();
     c.dedup();
     c
@@ -124,7 +149,7 @@ pub(crate) fn config_json(shared: &Shared, local_only: bool) -> serde_json::Valu
         "allowlist_external_urls": [],
         "components": components(&shared.config),
         "config_dir": shared.config.config_dir,
-        "config_source": shared.config.config_source.as_str(),
+        "config_source": c.source.as_str(),
         "country": c.country,
         "currency": c.currency,
         "debug": false,
@@ -171,21 +196,29 @@ pub fn router(hass: Hass, auth: Auth, config: &ApiConfig) -> Router {
         hass: hass.clone(),
         auth: auth.clone(),
         config: Arc::new(config.clone()),
+        core_config: Arc::default(),
     };
+    // HA registers the onboarding views only while a step is left
+    // (`onboarding.async_setup`): once every step was done they are 404s.
+    let onboarding = (!auth.is_onboarded()).then(|| onboarding::Views::new(shared.clone()));
     let config_route = Router::new()
         .route("/api/config", axum::routing::get(api_config))
         .with_state(shared.clone());
-    let api = rest::router(hass)
+    let mut api = rest::router(hass)
         .merge(config_route)
         .merge(automation::routes(config.config_dir.clone().into()))
-        .merge(mobile_app::registration_routes(shared.clone()))
-        .route_layer(axum::middleware::from_fn_with_state(
-            auth.clone(),
-            auth::require_auth,
-        ));
+        .merge(mobile_app::registration_routes(shared.clone()));
+    if let Some(views) = &onboarding {
+        api = api.merge(views.authed_routes());
+    }
+    let api = api.route_layer(axum::middleware::from_fn_with_state(
+        auth.clone(),
+        auth::require_auth,
+    ));
     // The WebSocket authenticates inside the protocol, not over HTTP.
     let mut router = api
         .merge(auth::routes(auth.clone()))
+        .merge(onboarding.map(|v| v.anonymous_routes()).unwrap_or_default())
         .merge(mobile_app::routes(shared.clone()))
         .merge(ws::routes(shared));
     if let Some(b) = &config.brands {

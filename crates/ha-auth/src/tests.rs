@@ -509,3 +509,61 @@ fn permissions_follow_the_built_in_groups() {
     assert_eq!(user(&["custom"], false).permission(), Permission::None);
     assert_eq!(user(&[], false).permission(), Permission::None);
 }
+
+/// Onboarding's user step: the owner named as given, their login, a code
+/// for the page's client, and the step recorded in the order done.
+#[test]
+fn onboarding_creates_the_owner_and_records_steps() {
+    let dir = temp_dir("onboarding-owner");
+    let auth = Auth::load_with_cost(&dir, Clock::system(), 4).unwrap();
+    assert!(matches!(
+        auth.create_owner("Adam", "Adam", "pw"),
+        Err(AddUserError::NotNormalized(n)) if n == "adam"
+    ));
+    let owner = auth.create_owner("Adam Smith", "adam", "pw").unwrap();
+    assert!(matches!(
+        auth.create_owner("Other", "adam", "pw"),
+        Err(AddUserError::Exists)
+    ));
+    let user = auth.user(&owner.user_id).unwrap();
+    assert!(user.is_owner && user.is_admin());
+    assert_eq!(user.name.as_deref(), Some("Adam Smith"));
+    assert_eq!(auth.check_password("adam", "pw").as_deref(), Some("adam"));
+    // Not onboarded: the steps are the views' to mark.
+    assert!(!auth.is_step_done("user"));
+    auth.mark_step_done("user");
+    auth.mark_step_done("integration");
+    assert!(auth.is_user_onboarded() && !auth.is_onboarded());
+
+    const CLIENT: &str = "http://127.0.0.1:8123/";
+    let code = auth.create_auth_code(CLIENT, &owner.username);
+    let t = auth.exchange_code(Some(CLIENT), Some(&code), None).unwrap();
+    let p = auth.validate_access_token(&t.access_token, None).unwrap();
+    assert_eq!(p.user_id, owner.user_id);
+    assert_eq!(
+        auth.refresh_token_username(&p.refresh_token_id).as_deref(),
+        Some("adam")
+    );
+    assert_eq!(auth.refresh_token_username("nope"), None);
+
+    // A second user made this way isn't the owner.
+    let other = auth.create_owner("Bob", "bob", "pw").unwrap();
+    assert!(!auth.user(&other.user_id).unwrap().is_owner);
+    auth.save().unwrap();
+    let again = Auth::load_with_cost(&dir, Clock::system(), 4).unwrap();
+    assert_eq!(
+        again.onboarding_steps(),
+        vec![
+            ("user", true),
+            ("core_config", false),
+            ("analytics", false),
+            ("integration", true)
+        ]
+    );
+    let file = std::fs::read_to_string(dir.join(".storage/onboarding")).unwrap();
+    assert!(
+        file.contains("\"done\": [\n      \"user\",\n      \"integration\"\n    ]"),
+        "{file}"
+    );
+    let _ = std::fs::remove_dir_all(dir);
+}

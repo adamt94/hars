@@ -257,18 +257,7 @@ impl Components {
         let mut zones = vec![(
             "zone.home".to_owned(),
             config.location_name.clone(),
-            standard_attributes(
-                zone_attrs(
-                    &json!(config.latitude),
-                    &json!(config.longitude),
-                    &json!(config.radius),
-                    &json!(false),
-                ),
-                &config.location_name,
-                Some("mdi:home"),
-                None,
-                None,
-            ),
+            home_zone_attributes(&config),
         )];
         taken.insert("zone.home".into());
         for zone in &self.zones {
@@ -449,6 +438,82 @@ impl Components {
         }
     }
 
+    /// `person.async_create_person`, as onboarding's user step calls it: a
+    /// stored person `{id, name, user_id, device_trackers: []}` whose id is
+    /// the name slugified (`_2`, `_3`, ... when taken, as `IDManager`
+    /// does), registered in the entity registry (`person.<slug>`, unique id
+    /// the person's id) when there is one, and its entity, `unknown` until
+    /// it has trackers. The store is saved 10 s later. `None` for an empty
+    /// name, which HA's schema refuses.
+    pub fn create_person(
+        &self,
+        hass: &Hass,
+        registry: Option<&ha_registry::Registry>,
+        name: &str,
+        user_id: Option<&str>,
+    ) -> Option<EntityId> {
+        if name.is_empty() {
+            return None;
+        }
+        let id = {
+            let mut persons = self.persons.write();
+            let base = slugify(name);
+            let mut id = base.clone();
+            let mut attempt = 1;
+            while persons.iter().any(|p| str_of(p, "id") == Some(id.as_str())) {
+                attempt += 1;
+                id = format!("{base}_{attempt}");
+            }
+            let mut item = Map::new();
+            item.insert("id".into(), json!(id));
+            item.insert("name".into(), json!(name));
+            item.insert("user_id".into(), json!(user_id));
+            item.insert("device_trackers".into(), json!([]));
+            persons.push(item);
+            id
+        };
+        if let Some(save) = self.person_save.get() {
+            save.schedule(PERSON_SAVE_DELAY);
+        }
+        let entity = match registry {
+            Some(r) => {
+                let patch = ha_registry::EntityPatch {
+                    has_entity_name: Some(false),
+                    object_id_base: Some(Some(name.to_owned())),
+                    original_name: Some(Some(name.to_owned())),
+                    ..Default::default()
+                };
+                r.get_or_create_entity("person", "person", &id, None, patch)
+                    .entity_id
+                    .clone()
+            }
+            None => {
+                let mut taken: HashSet<String> = hass
+                    .states()
+                    .all()
+                    .iter()
+                    .map(|s| s.entity_id.to_string())
+                    .collect();
+                entity_id("person", name, None, &mut taken)
+            }
+        };
+        let entity_id = EntityId::parse(&entity).ok()?;
+        let p = Person {
+            entity_id: entity_id.clone(),
+            id,
+            device_trackers: Vec::new(),
+            user_id: user_id.map(str::to_owned),
+            base: standard_attributes(json!({}), name, None, None, None),
+        };
+        hass.restore().register(entity_id.as_str(), None);
+        let mut t = self.entities.lock();
+        t.persons.push(Arc::new(p));
+        let i = t.persons.len() - 1;
+        // No trackers: `unknown`, in no zone.
+        t.update(hass, i);
+        Some(entity_id)
+    }
+
     /// `homeassistant_start`: people read their trackers, and follow them
     /// from now on.
     pub fn start(&self, hass: &Hass) {
@@ -461,19 +526,51 @@ impl Components {
         }
     }
 
-    /// Follow tracker changes (one task; it sleeps until a state changes).
+    /// Follow tracker changes and the location settings (one task; it
+    /// sleeps until a state or the settings change).
     pub fn track(self: &Arc<Self>, hass: &Hass) -> tokio::task::JoinHandle<()> {
         let mut feed = hass.subscribe_state_changes();
         feed.snapshot.clear();
+        let mut config = hass.watch_config();
+        config.mark_unchanged();
         let (this, hass) = (self.clone(), hass.clone());
         tokio::spawn(async move {
-            while let Some(event) = feed.recv().await {
-                let ha_core::EventKind::StateChanged { entity_id, .. } = &event.kind else {
-                    continue;
-                };
-                this.changed(&hass, entity_id);
+            loop {
+                tokio::select! {
+                    event = feed.recv() => {
+                        let Some(event) = event else { return };
+                        if let ha_core::EventKind::StateChanged { entity_id, .. } = &event.kind {
+                            this.changed(&hass, entity_id);
+                        }
+                    }
+                    Ok(()) = config.changed() => {
+                        let config = config.borrow_and_update().clone();
+                        this.home_changed(&hass, &config);
+                    }
+                }
             }
         })
+    }
+
+    /// `core_config_updated`: `zone.home` takes the new name, location and
+    /// radius (`Zone.async_update_config`), and is written if they changed.
+    /// Who is in it is kept, as in HA.
+    fn home_changed(&self, hass: &Hass, config: &ha_core::config::CoreConfig) {
+        let attributes = home_zone_attributes(config);
+        let mut t = self.entities.lock();
+        let Some(zone) = t
+            .zones
+            .iter_mut()
+            .find(|z| z.entity_id.as_str() == "zone.home")
+        else {
+            return;
+        };
+        if zone.attributes == attributes {
+            return;
+        }
+        zone.attributes = attributes;
+        zone.name = ha_core::casefold::casefold(&config.location_name);
+        zone.write(hass);
     }
 
     fn changed(&self, hass: &Hass, entity_id: &EntityId) {
@@ -504,6 +601,20 @@ impl Components {
             "config": [],
         })
     }
+}
+
+/// `zone.home`'s attributes (`_home_conf`), all but `persons`.
+fn home_zone_attributes(config: &ha_core::config::CoreConfig) -> Attributes {
+    standard_attributes(
+        json!({
+            "latitude": config.latitude, "longitude": config.longitude,
+            "radius": config.radius, "passive": false, "editable": true,
+        }),
+        &config.location_name,
+        Some("mdi:home"),
+        None,
+        None,
+    )
 }
 
 /// A last state, as the restore store keeps it.

@@ -32,7 +32,7 @@ Ten crates in `crates/`. `ha-server` builds the only binary, `hars`.
 | `ha-http` | The one outbound HTTP(S) client: HTTP/1.1, rustls with compiled-in roots, timeouts, server-sent events | `aiohttp` client session |
 | `ha-recorder` | History: an append-only segment log, its intake, retention, and the history and logbook queries | `components/recorder`, `history`, `logbook` |
 | `ha-components` | Built-in `zone` and `person`; new entity ids for them (with `ha_core::slugify`, re-exported here) | `components/zone`, `components/person` |
-| `ha-integrations` | Config entries; the shared entity components (`light`, `switch`, `scene`, `button`, `climate`, `weather`); every integration (`sun`, `met`, `hue`, `lifx`, `switchbot_cloud`, `mobile_app`) | `config_entries.py`, `components/<domain>` |
+| `ha-integrations` | Config entries; the shared entity components (`light`, `switch`, `scene`, `button`, `climate`, `weather`); every integration (`sun`, `met`, `hue`, `lifx`, `switchbot_cloud`, `mobile_app`); the config flows onboarding starts (`met`'s) | `config_entries.py`, `components/<domain>`, `components/onboarding/views.py` |
 | `ha-automation` | YAML automations: triggers, conditions, actions, modes | `components/automation`, `helpers/script.py` |
 | `ha-api` | Everything served over HTTP: REST, WebSocket, auth views, the companion app's webhook, the frontend, brands | `components/api`, `websocket_api`, `http`, `frontend`, `auth` views |
 | `ha-server` | The `hars` binary: start-up wiring, signals, the allocator, the `auth add` and `import` commands, shadow mode's log | `__main__.py`, `bootstrap.py` |
@@ -81,10 +81,13 @@ layer 0   ha-core   (no workspace dependencies)
 4. Starts the **recorder** first, so every state written from here on is
    history, then shadow mode's log if `HARS_SHADOW=1`.
 5. Loads the registries, the restore state, `zone` and `person`, and the
-   config entries.
+   config entries (on a fresh install, saving `sun`'s, as HA's first start
+   imports it).
 6. **Starts the integrations** (`ha_integrations::start`) and the companion
    app's registrations, then sets up the YAML automations.
-7. Loads auth, binds the HTTP port and starts serving.
+7. Loads the frontend's settings, Labs, the analytics preferences and
+   auth, works out the installation type, binds the HTTP port and starts
+   serving. Until onboarding is done, the onboarding views are served too.
 8. Waits until every integration has made its first setup attempt (at most
    300 s, HA's `STAGE_2_TIMEOUT`), then fires `homeassistant_start`, writes
    registered entities that nothing provides as `unavailable`, fires
@@ -95,6 +98,10 @@ layer 0   ha-core   (no workspace dependencies)
 - **`Hass`** is a cheap-to-clone handle (`Arc` inside) passed to everything.
   It holds the clock, the state machine, the event bus, the service
   registry, the lifecycle state, the core config and the restore state.
+  The core config sits in a `watch` channel: what follows the home
+  (`zone.home`, `sun`, a `met` entry that tracks the home) sleeps on
+  `hass.watch_config()` and wakes only when `config/core/update` changes
+  it; everything else reads `hass.config()` when it needs it.
 - **`EntityId`** is `domain.object_id`, validated once at the edge and
   stored as a `SmolStr` (inline up to 23 bytes, so it almost never
   allocates).
@@ -138,8 +145,10 @@ the event fires ([SHADOW.md](SHADOW.md)). `entity_id` targets are resolved by
 ### Config entries and integration setup
 
 Integrations start from HA's `core.config_entries`, imported as is. On a
-fresh install with no config-entries file, `sun` starts, as HA's default
-configuration does. `ha_integrations::start` matches enabled entries to integrations by
+fresh install with no config-entries file, `sun`'s entry is saved and `sun`
+starts, as HA's default configuration does. Onboarding's core config step
+adds `met`'s entry and starts it while running
+(`ha_integrations::onboarding`). `ha_integrations::start` matches enabled entries to integrations by
 domain and spawns one task per entry. Each integration's `run` function:
 
 1. gets a `SetupGuard` (`hass.setup_guard()`) and calls `done()` after its
@@ -231,7 +240,7 @@ All of it is in `ha-api`; `ha_api::router` builds it.
 | WebSocket `/api/websocket` | `ws/` | Authenticates in the protocol; `ws/commands.rs::dispatch` matches the command type, then asks each domain's module (`ws/weather.rs`, `ws/history.rs`, …) |
 | Companion app webhook `/api/webhook/{id}` | `mobile_app/` | The webhook id is the credential; encryption is required for registrations with `supports_encryption` enabled |
 | Frontend `/`, `/frontend_latest/…` | `frontend.rs` | Served from `HARS_FRONTEND` on disk with precompressed files ([ADR 0004](adr/0004-frontend-from-disk.md)) |
-| Onboarding status `/api/onboarding`, `/api/onboarding/installation_type` | `auth.rs` | Anonymous status only; owner creation still needs the CLI |
+| Onboarding `/api/onboarding/…` | `onboarding.rs` | HA's views, registered only while a step is left. The status, installation type, `users` and `integration/wait` views are anonymous; the other steps need a `Bearer` token |
 | Brands `/api/brands/…` | `brands.rs` | Proxied from HA's CDN with HA's disk cache |
 
 How to add a command or a view:
@@ -259,12 +268,15 @@ How it is kept:
 
 - **Vectors.** Where hars must give HA's answer, tests compare with inputs
   run through HA's own code at the pinned version. A new vector set commits
-  the script that made it in `scripts/vectors/`. The existing sets were made
-  before that rule and have no script yet; they are listed as a backlog in
+  the script that made it in `scripts/vectors/` (onboarding's is
+  `onboarding.py`). The sets made before that rule have no script yet;
+  they are listed as a backlog in
   [scripts/vectors/README.md](../scripts/vectors/README.md#vector-sets-made-before-this-rule)
   ([ADR 0008](adr/0008-vectors-from-home-assistant.md)).
 - **Generated tables.** Translations, icons and manifests are generated from
-  HA's wheel by `scripts/gen-i18n.py` and `scripts/gen-manifests.py`. Sensor
+  HA's wheel by `scripts/gen-i18n.py` and `scripts/gen-manifests.py`;
+  the countries, currencies and languages `config/core/update` accepts and
+  onboarding's default area names by `scripts/gen-onboarding.py`. Sensor
   units, statistic units and the Labs feature list are also compiled in;
   the [inventory](../scripts/vectors/README.md#generated-compatibility-tables)
   records their sources and missing extractors, plus Python's case-fold table.

@@ -1,0 +1,1996 @@
+{
+ "steps": [
+  {
+   "http": {
+    "method": "GET",
+    "path": "/api/onboarding",
+    "auth": false
+   },
+   "status": 200,
+   "body": [
+    {
+     "step": "user",
+     "done": false
+    },
+    {
+     "step": "core_config",
+     "done": false
+    },
+    {
+     "step": "analytics",
+     "done": false
+    },
+    {
+     "step": "integration",
+     "done": false
+    }
+   ],
+   "content_type": "application/json"
+  },
+  {
+   "http": {
+    "method": "POST",
+    "path": "/api/onboarding/users",
+    "auth": false,
+    "body": "{"
+   },
+   "status": 400,
+   "body": {
+    "message": "Invalid JSON."
+   },
+   "content_type": "application/json"
+  },
+  {
+   "http": {
+    "method": "POST",
+    "path": "/api/onboarding/users",
+    "auth": false,
+    "body": []
+   },
+   "status": 400,
+   "body": {
+    "message": "Message format incorrect: expected a dictionary"
+   },
+   "content_type": "application/json"
+  },
+  {
+   "http": {
+    "method": "POST",
+    "path": "/api/onboarding/users",
+    "auth": false,
+    "body": {
+     "client_id": "http://127.0.0.1:8123/",
+     "name": "Test Name",
+     "username": "test-user",
+     "password": "test-pass"
+    }
+   },
+   "status": 400,
+   "body": {
+    "message": "Message format incorrect: required key not provided @ data['language']"
+   },
+   "content_type": "application/json"
+  },
+  {
+   "http": {
+    "method": "POST",
+    "path": "/api/onboarding/users",
+    "auth": false,
+    "body": {
+     "client_id": "http://127.0.0.1:8123/",
+     "name": 1,
+     "username": "test-user",
+     "password": "test-pass",
+     "language": "de"
+    }
+   },
+   "status": 400,
+   "body": {
+    "message": "Message format incorrect: expected str for dictionary value @ data['name']"
+   },
+   "content_type": "application/json"
+  },
+  {
+   "http": {
+    "method": "POST",
+    "path": "/api/onboarding/users",
+    "auth": false,
+    "body": {
+     "client_id": "http://127.0.0.1:8123/",
+     "name": "Test Name",
+     "username": "test-user",
+     "password": "test-pass",
+     "language": "de",
+     "x": 1
+    }
+   },
+   "status": 400,
+   "body": {
+    "message": "Message format incorrect: extra keys not allowed @ data['x']"
+   },
+   "content_type": "application/json"
+  },
+  {
+   "http": {
+    "method": "POST",
+    "path": "/api/onboarding/core_config",
+    "auth": false
+   },
+   "status": 401,
+   "body": "401: Unauthorized",
+   "content_type": "text/plain",
+   "www_authenticate": "Bearer resource_metadata=\"http://127.0.0.1:<port>/.well-known/oauth-protected-resource\"",
+   "note": "no token"
+  },
+  {
+   "http": {
+    "method": "POST",
+    "path": "/api/onboarding/users",
+    "auth": false,
+    "body": {
+     "client_id": "http://127.0.0.1:8123/",
+     "name": "Test Name",
+     "username": "test-user",
+     "password": "test-pass",
+     "language": "de"
+    }
+   },
+   "status": 200,
+   "body": {
+    "auth_code": "<hex32>"
+   },
+   "content_type": "application/json"
+  },
+  {
+   "http": {
+    "method": "POST",
+    "path": "/api/onboarding/users",
+    "auth": false,
+    "body": {
+     "client_id": "http://127.0.0.1:8123/",
+     "name": "Test Name",
+     "username": "test-user",
+     "password": "test-pass",
+     "language": "de"
+    }
+   },
+   "status": 403,
+   "body": {
+    "message": "User step already done"
+   },
+   "content_type": "application/json"
+  },
+  {
+   "http": {
+    "method": "GET",
+    "path": "/api/onboarding",
+    "auth": false
+   },
+   "status": 200,
+   "body": [
+    {
+     "step": "user",
+     "done": true
+    },
+    {
+     "step": "core_config",
+     "done": false
+    },
+    {
+     "step": "analytics",
+     "done": false
+    },
+    {
+     "step": "integration",
+     "done": false
+    }
+   ],
+   "content_type": "application/json"
+  },
+  {
+   "http": {
+    "method": "GET",
+    "path": "/api/onboarding/installation_type",
+    "auth": false
+   },
+   "status": 401,
+   "body": "401: Unauthorized",
+   "content_type": "text/plain"
+  },
+  {
+   "token": {
+    "client_id": "http://127.0.0.1:8123/"
+   },
+   "status": 200,
+   "body": {
+    "access_token": "<jwt>",
+    "token_type": "Bearer",
+    "refresh_token": "<hex128>",
+    "expires_in": 1800,
+    "ha_auth_provider": "homeassistant"
+   }
+  },
+  {
+   "ws": {
+    "id": 1,
+    "type": "config/core/update",
+    "country": "XX"
+   },
+   "replies": [
+    {
+     "id": 1,
+     "type": "result",
+     "success": false,
+     "error": {
+      "code": "invalid_format",
+      "message": "invalid ISO 3166 formatted country for dictionary value @ data['country']. Got 'XX'"
+     }
+    }
+   ]
+  },
+  {
+   "ws": {
+    "id": 2,
+    "type": "config/core/update",
+    "country": 5
+   },
+   "replies": [
+    {
+     "id": 2,
+     "type": "result",
+     "success": false,
+     "error": {
+      "code": "invalid_format",
+      "message": "invalid ISO 3166 formatted country for dictionary value @ data['country']. Got 5"
+     }
+    }
+   ]
+  },
+  {
+   "ws": {
+    "id": 3,
+    "type": "config/core/update",
+    "currency": "XXX"
+   },
+   "replies": [
+    {
+     "id": 3,
+     "type": "result",
+     "success": false,
+     "error": {
+      "code": "invalid_format",
+      "message": "invalid ISO 4217 formatted currency for dictionary value @ data['currency']. Got 'XXX'"
+     }
+    }
+   ]
+  },
+  {
+   "ws": {
+    "id": 4,
+    "type": "config/core/update",
+    "language": "xx"
+   },
+   "replies": [
+    {
+     "id": 4,
+     "type": "result",
+     "success": false,
+     "error": {
+      "code": "invalid_format",
+      "message": "invalid RFC 5646 formatted language for dictionary value @ data['language']. Got 'xx'"
+     }
+    }
+   ]
+  },
+  {
+   "ws": {
+    "id": 5,
+    "type": "config/core/update",
+    "latitude": 91
+   },
+   "replies": [
+    {
+     "id": 5,
+     "type": "result",
+     "success": false,
+     "error": {
+      "code": "invalid_format",
+      "message": "invalid latitude for dictionary value @ data['latitude']. Got 91"
+     }
+    }
+   ]
+  },
+  {
+   "ws": {
+    "id": 6,
+    "type": "config/core/update",
+    "latitude": "north"
+   },
+   "replies": [
+    {
+     "id": 6,
+     "type": "result",
+     "success": false,
+     "error": {
+      "code": "invalid_format",
+      "message": "invalid latitude for dictionary value @ data['latitude']. Got 'north'"
+     }
+    }
+   ]
+  },
+  {
+   "ws": {
+    "id": 7,
+    "type": "config/core/update",
+    "longitude": -180.5
+   },
+   "replies": [
+    {
+     "id": 7,
+     "type": "result",
+     "success": false,
+     "error": {
+      "code": "invalid_format",
+      "message": "invalid longitude for dictionary value @ data['longitude']. Got -180.5"
+     }
+    }
+   ]
+  },
+  {
+   "ws": {
+    "id": 8,
+    "type": "config/core/update",
+    "elevation": 1.5
+   },
+   "replies": [
+    {
+     "id": 8,
+     "type": "result",
+     "success": false,
+     "error": {
+      "code": "invalid_format",
+      "message": "expected int for dictionary value @ data['elevation']. Got 1.5"
+     }
+    }
+   ]
+  },
+  {
+   "ws": {
+    "id": 9,
+    "type": "config/core/update",
+    "elevation": "1"
+   },
+   "replies": [
+    {
+     "id": 9,
+     "type": "result",
+     "success": false,
+     "error": {
+      "code": "invalid_format",
+      "message": "expected int for dictionary value @ data['elevation']. Got '1'"
+     }
+    }
+   ]
+  },
+  {
+   "ws": {
+    "id": 10,
+    "type": "config/core/update",
+    "radius": -1
+   },
+   "replies": [
+    {
+     "id": 10,
+     "type": "result",
+     "success": false,
+     "error": {
+      "code": "invalid_format",
+      "message": "value must be at least 0 for dictionary value @ data['radius']. Got -1"
+     }
+    }
+   ]
+  },
+  {
+   "ws": {
+    "id": 11,
+    "type": "config/core/update",
+    "radius": "12"
+   },
+   "replies": [
+    {
+     "id": 11,
+     "type": "result",
+     "success": true,
+     "result": null
+    }
+   ]
+  },
+  {
+   "ws": {
+    "id": 12,
+    "type": "config/core/update",
+    "unit_system": "kelvin"
+   },
+   "replies": [
+    {
+     "id": 12,
+     "type": "result",
+     "success": false,
+     "error": {
+      "code": "invalid_format",
+      "message": "not a valid value for dictionary value @ data['unit_system']. Got 'kelvin'"
+     }
+    }
+   ]
+  },
+  {
+   "ws": {
+    "id": 13,
+    "type": "config/core/update",
+    "unit_system": 5
+   },
+   "replies": [
+    {
+     "id": 13,
+     "type": "result",
+     "success": false,
+     "error": {
+      "code": "invalid_format",
+      "message": "not a valid value for dictionary value @ data['unit_system']. Got 5"
+     }
+    }
+   ]
+  },
+  {
+   "ws": {
+    "id": 14,
+    "type": "config/core/update",
+    "external_url": "http://example.com/path"
+   },
+   "replies": [
+    {
+     "id": 14,
+     "type": "result",
+     "success": false,
+     "error": {
+      "code": "invalid_format",
+      "message": "url is not allowed to have a path component for dictionary value @ data['external_url']. Got 'http://example.com/path'"
+     }
+    }
+   ]
+  },
+  {
+   "ws": {
+    "id": 15,
+    "type": "config/core/update",
+    "external_url": "ftp://example.com"
+   },
+   "replies": [
+    {
+     "id": 15,
+     "type": "result",
+     "success": false,
+     "error": {
+      "code": "invalid_format",
+      "message": "invalid url for dictionary value @ data['external_url']. Got 'ftp://example.com'"
+     }
+    }
+   ]
+  },
+  {
+   "ws": {
+    "id": 16,
+    "type": "config/core/update",
+    "internal_url": "not a url"
+   },
+   "replies": [
+    {
+     "id": 16,
+     "type": "result",
+     "success": false,
+     "error": {
+      "code": "invalid_format",
+      "message": "invalid url for dictionary value @ data['internal_url']. Got 'not a url'"
+     }
+    }
+   ]
+  },
+  {
+   "ws": {
+    "id": 17,
+    "type": "config/core/update",
+    "location_name": 5
+   },
+   "replies": [
+    {
+     "id": 17,
+     "type": "result",
+     "success": false,
+     "error": {
+      "code": "invalid_format",
+      "message": "expected str for dictionary value @ data['location_name']. Got 5"
+     }
+    }
+   ]
+  },
+  {
+   "ws": {
+    "id": 18,
+    "type": "config/core/update",
+    "time_zone": 5
+   },
+   "replies": [
+    {
+     "id": 18,
+     "type": "result",
+     "success": false,
+     "error": {
+      "code": "invalid_format",
+      "message": "expected str for dictionary value @ data['time_zone']. Got 5"
+     }
+    }
+   ]
+  },
+  {
+   "ws": {
+    "id": 19,
+    "type": "config/core/update",
+    "update_units": "yes"
+   },
+   "replies": [
+    {
+     "id": 19,
+     "type": "result",
+     "success": false,
+     "error": {
+      "code": "invalid_format",
+      "message": "expected bool for dictionary value @ data['update_units']. Got 'yes'"
+     }
+    }
+   ]
+  },
+  {
+   "ws": {
+    "id": 20,
+    "type": "config/core/update",
+    "foo": 1
+   },
+   "replies": [
+    {
+     "id": 20,
+     "type": "result",
+     "success": false,
+     "error": {
+      "code": "invalid_format",
+      "message": "extra keys not allowed @ data['foo']. Got 1"
+     }
+    }
+   ]
+  },
+  {
+   "ws": {
+    "id": 21,
+    "type": "config/core/update",
+    "time_zone": "Mars/Phobos"
+   },
+   "replies": [
+    {
+     "id": 21,
+     "type": "result",
+     "success": false,
+     "error": {
+      "code": "invalid_info",
+      "message": "Received invalid time zone Mars/Phobos"
+     }
+    }
+   ],
+   "note": "a bad time zone is an invalid_info error"
+  },
+  {
+   "ws": {
+    "id": 22,
+    "type": "subscribe_events",
+    "event_type": "core_config_updated"
+   },
+   "replies": [
+    {
+     "id": 22,
+     "type": "result",
+     "success": true,
+     "result": null
+    }
+   ]
+  },
+  {
+   "ws": {
+    "id": 23,
+    "type": "config/core/update",
+    "unit_system": "Imperial",
+    "latitude": 52,
+    "radius": "150",
+    "update_units": true
+   },
+   "replies": [
+    {
+     "type": "event",
+     "event": {
+      "event_type": "core_config_updated",
+      "data": {
+       "unit_system": "us_customary",
+       "latitude": 52.0,
+       "radius": 150
+      },
+      "origin": "LOCAL",
+      "time_fired": "<time>",
+      "context": {
+       "id": "<ulid>",
+       "parent_id": null,
+       "user_id": null
+      }
+     },
+     "id": 22
+    },
+    {
+     "id": 23,
+     "type": "result",
+     "success": true,
+     "result": null
+    }
+   ]
+  },
+  {
+   "ws": {
+    "id": 24,
+    "type": "config/core/update",
+    "location_name": "Home",
+    "latitude": 51.5,
+    "longitude": -0.12,
+    "elevation": 0,
+    "unit_system": "metric",
+    "time_zone": "Europe/London",
+    "currency": "GBP",
+    "country": "GB",
+    "language": "en-GB"
+   },
+   "replies": [
+    {
+     "type": "event",
+     "event": {
+      "event_type": "core_config_updated",
+      "data": {
+       "location_name": "Home",
+       "latitude": 51.5,
+       "longitude": -0.12,
+       "elevation": 0,
+       "unit_system": "metric",
+       "time_zone": "Europe/London",
+       "currency": "GBP",
+       "country": "GB",
+       "language": "en-GB"
+      },
+      "origin": "LOCAL",
+      "time_fired": "<time>",
+      "context": {
+       "id": "<ulid>",
+       "parent_id": null,
+       "user_id": null
+      }
+     },
+     "id": 22
+    },
+    {
+     "id": 24,
+     "type": "result",
+     "success": true,
+     "result": null
+    }
+   ]
+  },
+  {
+   "ws": {
+    "id": 25,
+    "type": "config/core/update",
+    "external_url": "https://example.com/",
+    "internal_url": null
+   },
+   "replies": [
+    {
+     "type": "event",
+     "event": {
+      "event_type": "core_config_updated",
+      "data": {
+       "external_url": "https://example.com/",
+       "internal_url": null
+      },
+      "origin": "LOCAL",
+      "time_fired": "<time>",
+      "context": {
+       "id": "<ulid>",
+       "parent_id": null,
+       "user_id": null
+      }
+     },
+     "id": 22
+    },
+    {
+     "id": 25,
+     "type": "result",
+     "success": true,
+     "result": null
+    }
+   ]
+  },
+  {
+   "ws": {
+    "id": 26,
+    "type": "get_config"
+   },
+   "replies": [
+    {
+     "id": 26,
+     "type": "result",
+     "success": true,
+     "result": {
+      "allowlist_external_dirs": [],
+      "allowlist_external_urls": [],
+      "components": [
+       "analytics",
+       "api",
+       "auth",
+       "binary_sensor",
+       "http",
+       "image_upload",
+       "onboarding",
+       "person",
+       "sensor",
+       "sun",
+       "sun.binary_sensor",
+       "sun.sensor",
+       "websocket_api",
+       "zone"
+      ],
+      "config_dir": "<config_dir>",
+      "config_source": "storage",
+      "country": "GB",
+      "currency": "GBP",
+      "debug": false,
+      "elevation": 0,
+      "external_url": "https://example.com/",
+      "internal_url": null,
+      "language": "en-GB",
+      "latitude": 51.5,
+      "location_name": "Home",
+      "longitude": -0.12,
+      "radius": 150,
+      "recovery_mode": false,
+      "safe_mode": false,
+      "state": "RUNNING",
+      "time_zone": "Europe/London",
+      "unit_system": {
+       "length": "km",
+       "accumulated_precipitation": "mm",
+       "area": "m²",
+       "mass": "g",
+       "pressure": "Pa",
+       "temperature": "°C",
+       "volume": "L",
+       "wind_speed": "m/s"
+      },
+      "version": "2026.6.1",
+      "whitelist_external_dirs": []
+     }
+    }
+   ]
+  },
+  {
+   "ws": {
+    "id": 27,
+    "type": "config/core/detect"
+   },
+   "replies": [
+    {
+     "id": 27,
+     "type": "result",
+     "success": true,
+     "result": {
+      "unit_system": "metric",
+      "latitude": 51.5,
+      "longitude": -0.12,
+      "time_zone": "Europe/London",
+      "currency": "GBP",
+      "country": "GB"
+     }
+    }
+   ],
+   "note": "whoami answers"
+  },
+  {
+   "http": {
+    "method": "POST",
+    "path": "/api/onboarding/core_config",
+    "auth": true
+   },
+   "status": 200,
+   "body": {},
+   "content_type": "application/json"
+  },
+  {
+   "http": {
+    "method": "POST",
+    "path": "/api/onboarding/core_config",
+    "auth": true
+   },
+   "status": 403,
+   "body": {
+    "message": "Core config step already done"
+   },
+   "content_type": "application/json"
+  },
+  {
+   "ws": {
+    "id": 28,
+    "type": "analytics"
+   },
+   "replies": [
+    {
+     "id": 28,
+     "type": "result",
+     "success": true,
+     "result": {
+      "preferences": {
+       "base": false,
+       "diagnostics": false,
+       "usage": false,
+       "statistics": false,
+       "snapshots": false
+      },
+      "onboarded": false
+     }
+    }
+   ]
+  },
+  {
+   "ws": {
+    "id": 29,
+    "type": "analytics/preferences",
+    "preferences": {
+     "base": "yes"
+    }
+   },
+   "replies": [
+    {
+     "id": 29,
+     "type": "result",
+     "success": false,
+     "error": {
+      "code": "invalid_format",
+      "message": "expected bool for dictionary value @ data['preferences']['base']. Got 'yes'"
+     }
+    }
+   ]
+  },
+  {
+   "ws": {
+    "id": 30,
+    "type": "analytics/preferences",
+    "preferences": {
+     "x": true
+    }
+   },
+   "replies": [
+    {
+     "id": 30,
+     "type": "result",
+     "success": false,
+     "error": {
+      "code": "invalid_format",
+      "message": "extra keys not allowed @ data['preferences']['x']. Got True"
+     }
+    }
+   ]
+  },
+  {
+   "ws": {
+    "id": 31,
+    "type": "analytics/preferences",
+    "preferences": {}
+   },
+   "replies": [
+    {
+     "id": 31,
+     "type": "result",
+     "success": true,
+     "result": {
+      "preferences": {
+       "base": false,
+       "diagnostics": false,
+       "usage": false,
+       "statistics": false,
+       "snapshots": false
+      }
+     }
+    }
+   ]
+  },
+  {
+   "ws": {
+    "id": 32,
+    "type": "analytics/preferences",
+    "preferences": {
+     "base": true,
+     "usage": false
+    }
+   },
+   "replies": [
+    {
+     "id": 32,
+     "type": "result",
+     "success": true,
+     "result": {
+      "preferences": {
+       "base": true,
+       "diagnostics": false,
+       "usage": false,
+       "statistics": false,
+       "snapshots": false
+      }
+     }
+    }
+   ]
+  },
+  {
+   "ws": {
+    "id": 33,
+    "type": "analytics"
+   },
+   "replies": [
+    {
+     "id": 33,
+     "type": "result",
+     "success": true,
+     "result": {
+      "preferences": {
+       "base": true,
+       "diagnostics": false,
+       "usage": false,
+       "statistics": false,
+       "snapshots": false
+      },
+      "onboarded": true
+     }
+    }
+   ]
+  },
+  {
+   "http": {
+    "method": "POST",
+    "path": "/api/onboarding/analytics",
+    "auth": true
+   },
+   "status": 200,
+   "body": {},
+   "content_type": "application/json"
+  },
+  {
+   "http": {
+    "method": "POST",
+    "path": "/api/onboarding/analytics",
+    "auth": true
+   },
+   "status": 403,
+   "body": {
+    "message": "Analytics config step already done"
+   },
+   "content_type": "application/json"
+  },
+  {
+   "ws": {
+    "id": 34,
+    "type": "config_entries/flow/subscribe"
+   },
+   "replies": [
+    {
+     "id": 34,
+     "type": "event",
+     "event": []
+    },
+    {
+     "id": 34,
+     "type": "result",
+     "success": true,
+     "result": null
+    }
+   ]
+  },
+  {
+   "ws": {
+    "id": 35,
+    "type": "config_entries/subscribe",
+    "type_filter": [
+     "device",
+     "hub",
+     "service"
+    ]
+   },
+   "replies": [
+    {
+     "id": 35,
+     "type": "result",
+     "success": true,
+     "result": null
+    },
+    {
+     "id": 35,
+     "type": "event",
+     "event": [
+      {
+       "type": null,
+       "entry": {
+        "created_at": "<time>",
+        "entry_id": "<ulid>",
+        "domain": "met",
+        "modified_at": "<time>",
+        "title": "Home",
+        "source": "onboarding",
+        "state": "setup_retry",
+        "supports_options": true,
+        "supports_remove_device": false,
+        "supports_unload": true,
+        "supports_reconfigure": false,
+        "supported_subentry_types": {},
+        "pref_disable_new_entities": false,
+        "pref_disable_polling": false,
+        "disabled_by": null,
+        "reason": "Update of data from the web site failed: ",
+        "error_reason_translation_key": null,
+        "error_reason_translation_placeholders": null,
+        "num_subentries": 0
+       }
+      },
+      {
+       "type": null,
+       "entry": {
+        "created_at": "<time>",
+        "entry_id": "<ulid>",
+        "domain": "shopping_list",
+        "modified_at": "<time>",
+        "title": "Shopping list",
+        "source": "onboarding",
+        "state": "loaded",
+        "supports_options": false,
+        "supports_remove_device": false,
+        "supports_unload": false,
+        "supports_reconfigure": false,
+        "supported_subentry_types": {},
+        "pref_disable_new_entities": false,
+        "pref_disable_polling": false,
+        "disabled_by": null,
+        "reason": null,
+        "error_reason_translation_key": null,
+        "error_reason_translation_placeholders": null,
+        "num_subentries": 0
+       }
+      },
+      {
+       "type": null,
+       "entry": {
+        "created_at": "<time>",
+        "entry_id": "<ulid>",
+        "domain": "sun",
+        "modified_at": "<time>",
+        "title": "Sun",
+        "source": "import",
+        "state": "loaded",
+        "supports_options": false,
+        "supports_remove_device": false,
+        "supports_unload": true,
+        "supports_reconfigure": false,
+        "supported_subentry_types": {},
+        "pref_disable_new_entities": false,
+        "pref_disable_polling": false,
+        "disabled_by": null,
+        "reason": null,
+        "error_reason_translation_key": null,
+        "error_reason_translation_placeholders": null,
+        "num_subentries": 0
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "http": {
+    "method": "POST",
+    "path": "/api/onboarding/integration/wait",
+    "auth": false,
+    "body": {}
+   },
+   "status": 400,
+   "body": {
+    "message": "Message format incorrect: required key not provided @ data['domain']"
+   },
+   "content_type": "application/json"
+  },
+  {
+   "http": {
+    "method": "POST",
+    "path": "/api/onboarding/integration/wait",
+    "auth": false,
+    "body": {
+     "domain": "person"
+    }
+   },
+   "status": 200,
+   "body": {
+    "integration_loaded": true
+   },
+   "content_type": "application/json"
+  },
+  {
+   "http": {
+    "method": "POST",
+    "path": "/api/onboarding/integration/wait",
+    "auth": false,
+    "body": {
+     "domain": "nope"
+    }
+   },
+   "status": 200,
+   "body": {
+    "integration_loaded": false
+   },
+   "content_type": "application/json"
+  },
+  {
+   "http": {
+    "method": "POST",
+    "path": "/api/onboarding/integration",
+    "auth": true,
+    "body": {
+     "client_id": "http://127.0.0.1:8123/"
+    }
+   },
+   "status": 400,
+   "body": {
+    "message": "Message format incorrect: required key not provided @ data['redirect_uri']"
+   },
+   "content_type": "application/json"
+  },
+  {
+   "http": {
+    "method": "POST",
+    "path": "/api/onboarding/integration",
+    "auth": true,
+    "body": {
+     "client_id": "http://127.0.0.1:8123/",
+     "redirect_uri": "http://127.0.0.1:8123/?auth_callback=1"
+    }
+   },
+   "status": 200,
+   "body": {
+    "auth_code": "<hex32>"
+   },
+   "content_type": "application/json"
+  },
+  {
+   "http": {
+    "method": "POST",
+    "path": "/api/onboarding/integration",
+    "auth": true,
+    "body": {
+     "client_id": "http://127.0.0.1:8123/",
+     "redirect_uri": "http://127.0.0.1:8123/?auth_callback=1"
+    }
+   },
+   "status": 403,
+   "body": {
+    "message": "Integration step already done"
+   },
+   "content_type": "application/json"
+  },
+  {
+   "http": {
+    "method": "GET",
+    "path": "/api/onboarding",
+    "auth": false
+   },
+   "status": 200,
+   "body": [
+    {
+     "step": "user",
+     "done": true
+    },
+    {
+     "step": "core_config",
+     "done": true
+    },
+    {
+     "step": "analytics",
+     "done": true
+    },
+    {
+     "step": "integration",
+     "done": true
+    }
+   ],
+   "content_type": "application/json"
+  },
+  {
+   "http": {
+    "method": "GET",
+    "path": "/api/onboarding/installation_type",
+    "auth": false
+   },
+   "status": 401,
+   "body": "401: Unauthorized",
+   "content_type": "text/plain"
+  },
+  {
+   "token": {
+    "client_id": "http://127.0.0.1:8123/"
+   },
+   "status": 200,
+   "body": {
+    "access_token": "<jwt>",
+    "token_type": "Bearer",
+    "refresh_token": "<hex128>",
+    "expires_in": 1800,
+    "ha_auth_provider": "homeassistant"
+   }
+  }
+ ],
+ "states": {
+  "person.test_name": {
+   "state": "unknown",
+   "attributes": {
+    "editable": true,
+    "id": "test_name",
+    "device_trackers": [],
+    "in_zones": [],
+    "user_id": "<hex32>",
+    "friendly_name": "Test Name"
+   }
+  },
+  "zone.home": {
+   "state": "0",
+   "attributes": {
+    "latitude": 51.5,
+    "longitude": -0.12,
+    "radius": 150,
+    "passive": false,
+    "persons": [],
+    "editable": true,
+    "icon": "mdi:home",
+    "friendly_name": "Home"
+   }
+  }
+ },
+ "stores": {
+  "onboarding": {
+   "version": 4,
+   "minor_version": 1,
+   "key": "onboarding",
+   "data": {
+    "done": [
+     "user",
+     "core_config",
+     "analytics",
+     "integration"
+    ]
+   }
+  },
+  "core.config": {
+   "version": 1,
+   "minor_version": 4,
+   "key": "core.config",
+   "data": {
+    "latitude": 51.5,
+    "longitude": -0.12,
+    "elevation": 0,
+    "unit_system_v2": "metric",
+    "location_name": "Home",
+    "time_zone": "Europe/London",
+    "external_url": "https://example.com/",
+    "internal_url": null,
+    "currency": "GBP",
+    "country": "GB",
+    "language": "en-GB",
+    "radius": 150
+   }
+  },
+  "core.analytics": {
+   "version": 1,
+   "minor_version": 1,
+   "key": "core.analytics",
+   "data": {
+    "onboarded": true,
+    "preferences": {
+     "base": true,
+     "usage": false
+    },
+    "uuid": null,
+    "submission_identifier": null,
+    "snapshot_submission_time": null
+   }
+  },
+  "core.area_registry": {
+   "version": 1,
+   "minor_version": 9,
+   "key": "core.area_registry",
+   "data": {
+    "areas": [
+     {
+      "aliases": [],
+      "floor_id": null,
+      "humidity_entity_id": null,
+      "icon": "mdi:sofa",
+      "id": "wohnzimmer",
+      "labels": [],
+      "name": "Wohnzimmer",
+      "picture": null,
+      "temperature_entity_id": null,
+      "created_at": "<time>",
+      "modified_at": "<time>"
+     },
+     {
+      "aliases": [],
+      "floor_id": null,
+      "humidity_entity_id": null,
+      "icon": "mdi:stove",
+      "id": "kuche",
+      "labels": [],
+      "name": "Küche",
+      "picture": null,
+      "temperature_entity_id": null,
+      "created_at": "<time>",
+      "modified_at": "<time>"
+     },
+     {
+      "aliases": [],
+      "floor_id": null,
+      "humidity_entity_id": null,
+      "icon": "mdi:bed",
+      "id": "schlafzimmer",
+      "labels": [],
+      "name": "Schlafzimmer",
+      "picture": null,
+      "temperature_entity_id": null,
+      "created_at": "<time>",
+      "modified_at": "<time>"
+     }
+    ]
+   }
+  },
+  "person": {
+   "version": 2,
+   "minor_version": 1,
+   "key": "person",
+   "data": {
+    "items": [
+     {
+      "id": "test_name",
+      "name": "Test Name",
+      "user_id": "<hex32>",
+      "device_trackers": []
+     }
+    ]
+   }
+  },
+  "core.entity_registry": {
+   "version": 1,
+   "minor_version": 22,
+   "key": "core.entity_registry",
+   "data": {
+    "entities": [
+     {
+      "aliases": [],
+      "aliases_v2": [
+       null
+      ],
+      "area_id": null,
+      "categories": {},
+      "capabilities": null,
+      "config_entry_id": "<ulid>",
+      "config_subentry_id": null,
+      "created_at": "<time>",
+      "device_class": null,
+      "device_id": "<hex32>",
+      "disabled_by": "integration",
+      "entity_category": "diagnostic",
+      "entity_id": "binary_sensor.sun_solar_rising",
+      "hidden_by": null,
+      "icon": null,
+      "id": "<hex32>",
+      "has_entity_name": true,
+      "labels": [],
+      "modified_at": "<time>",
+      "name": null,
+      "object_id_base": null,
+      "options": {},
+      "original_device_class": null,
+      "original_icon": null,
+      "original_name": "Solar rising",
+      "platform": "sun",
+      "suggested_object_id": "sun_solar_rising",
+      "supported_features": 0,
+      "translation_key": "solar_rising",
+      "unique_id": "<ulid>-solar_rising",
+      "previous_unique_id": null,
+      "unit_of_measurement": null
+     },
+     {
+      "aliases": [],
+      "aliases_v2": [
+       null
+      ],
+      "area_id": null,
+      "categories": {},
+      "capabilities": null,
+      "config_entry_id": null,
+      "config_subentry_id": null,
+      "created_at": "<time>",
+      "device_class": null,
+      "device_id": null,
+      "disabled_by": null,
+      "entity_category": null,
+      "entity_id": "person.test_name",
+      "hidden_by": null,
+      "icon": null,
+      "id": "<hex32>",
+      "has_entity_name": false,
+      "labels": [],
+      "modified_at": "<time>",
+      "name": null,
+      "object_id_base": "Test Name",
+      "options": {},
+      "original_device_class": null,
+      "original_icon": null,
+      "original_name": "Test Name",
+      "platform": "person",
+      "suggested_object_id": null,
+      "supported_features": 0,
+      "translation_key": null,
+      "unique_id": "test_name",
+      "previous_unique_id": null,
+      "unit_of_measurement": null
+     },
+     {
+      "aliases": [],
+      "aliases_v2": [
+       null
+      ],
+      "area_id": null,
+      "categories": {},
+      "capabilities": null,
+      "config_entry_id": "<ulid>",
+      "config_subentry_id": null,
+      "created_at": "<time>",
+      "device_class": null,
+      "device_id": "<hex32>",
+      "disabled_by": null,
+      "entity_category": "diagnostic",
+      "entity_id": "sensor.sun_next_dawn",
+      "hidden_by": null,
+      "icon": null,
+      "id": "<hex32>",
+      "has_entity_name": true,
+      "labels": [],
+      "modified_at": "<time>",
+      "name": null,
+      "object_id_base": null,
+      "options": {},
+      "original_device_class": "timestamp",
+      "original_icon": null,
+      "original_name": "Next dawn",
+      "platform": "sun",
+      "suggested_object_id": "sun_next_dawn",
+      "supported_features": 0,
+      "translation_key": "next_dawn",
+      "unique_id": "<ulid>-next_dawn",
+      "previous_unique_id": null,
+      "unit_of_measurement": null
+     },
+     {
+      "aliases": [],
+      "aliases_v2": [
+       null
+      ],
+      "area_id": null,
+      "categories": {},
+      "capabilities": null,
+      "config_entry_id": "<ulid>",
+      "config_subentry_id": null,
+      "created_at": "<time>",
+      "device_class": null,
+      "device_id": "<hex32>",
+      "disabled_by": null,
+      "entity_category": "diagnostic",
+      "entity_id": "sensor.sun_next_dusk",
+      "hidden_by": null,
+      "icon": null,
+      "id": "<hex32>",
+      "has_entity_name": true,
+      "labels": [],
+      "modified_at": "<time>",
+      "name": null,
+      "object_id_base": null,
+      "options": {},
+      "original_device_class": "timestamp",
+      "original_icon": null,
+      "original_name": "Next dusk",
+      "platform": "sun",
+      "suggested_object_id": "sun_next_dusk",
+      "supported_features": 0,
+      "translation_key": "next_dusk",
+      "unique_id": "<ulid>-next_dusk",
+      "previous_unique_id": null,
+      "unit_of_measurement": null
+     },
+     {
+      "aliases": [],
+      "aliases_v2": [
+       null
+      ],
+      "area_id": null,
+      "categories": {},
+      "capabilities": null,
+      "config_entry_id": "<ulid>",
+      "config_subentry_id": null,
+      "created_at": "<time>",
+      "device_class": null,
+      "device_id": "<hex32>",
+      "disabled_by": null,
+      "entity_category": "diagnostic",
+      "entity_id": "sensor.sun_next_midnight",
+      "hidden_by": null,
+      "icon": null,
+      "id": "<hex32>",
+      "has_entity_name": true,
+      "labels": [],
+      "modified_at": "<time>",
+      "name": null,
+      "object_id_base": null,
+      "options": {},
+      "original_device_class": "timestamp",
+      "original_icon": null,
+      "original_name": "Next midnight",
+      "platform": "sun",
+      "suggested_object_id": "sun_next_midnight",
+      "supported_features": 0,
+      "translation_key": "next_midnight",
+      "unique_id": "<ulid>-next_midnight",
+      "previous_unique_id": null,
+      "unit_of_measurement": null
+     },
+     {
+      "aliases": [],
+      "aliases_v2": [
+       null
+      ],
+      "area_id": null,
+      "categories": {},
+      "capabilities": null,
+      "config_entry_id": "<ulid>",
+      "config_subentry_id": null,
+      "created_at": "<time>",
+      "device_class": null,
+      "device_id": "<hex32>",
+      "disabled_by": null,
+      "entity_category": "diagnostic",
+      "entity_id": "sensor.sun_next_noon",
+      "hidden_by": null,
+      "icon": null,
+      "id": "<hex32>",
+      "has_entity_name": true,
+      "labels": [],
+      "modified_at": "<time>",
+      "name": null,
+      "object_id_base": null,
+      "options": {},
+      "original_device_class": "timestamp",
+      "original_icon": null,
+      "original_name": "Next noon",
+      "platform": "sun",
+      "suggested_object_id": "sun_next_noon",
+      "supported_features": 0,
+      "translation_key": "next_noon",
+      "unique_id": "<ulid>-next_noon",
+      "previous_unique_id": null,
+      "unit_of_measurement": null
+     },
+     {
+      "aliases": [],
+      "aliases_v2": [
+       null
+      ],
+      "area_id": null,
+      "categories": {},
+      "capabilities": null,
+      "config_entry_id": "<ulid>",
+      "config_subentry_id": null,
+      "created_at": "<time>",
+      "device_class": null,
+      "device_id": "<hex32>",
+      "disabled_by": null,
+      "entity_category": "diagnostic",
+      "entity_id": "sensor.sun_next_rising",
+      "hidden_by": null,
+      "icon": null,
+      "id": "<hex32>",
+      "has_entity_name": true,
+      "labels": [],
+      "modified_at": "<time>",
+      "name": null,
+      "object_id_base": null,
+      "options": {},
+      "original_device_class": "timestamp",
+      "original_icon": null,
+      "original_name": "Next rising",
+      "platform": "sun",
+      "suggested_object_id": "sun_next_rising",
+      "supported_features": 0,
+      "translation_key": "next_rising",
+      "unique_id": "<ulid>-next_rising",
+      "previous_unique_id": null,
+      "unit_of_measurement": null
+     },
+     {
+      "aliases": [],
+      "aliases_v2": [
+       null
+      ],
+      "area_id": null,
+      "categories": {},
+      "capabilities": null,
+      "config_entry_id": "<ulid>",
+      "config_subentry_id": null,
+      "created_at": "<time>",
+      "device_class": null,
+      "device_id": "<hex32>",
+      "disabled_by": null,
+      "entity_category": "diagnostic",
+      "entity_id": "sensor.sun_next_setting",
+      "hidden_by": null,
+      "icon": null,
+      "id": "<hex32>",
+      "has_entity_name": true,
+      "labels": [],
+      "modified_at": "<time>",
+      "name": null,
+      "object_id_base": null,
+      "options": {},
+      "original_device_class": "timestamp",
+      "original_icon": null,
+      "original_name": "Next setting",
+      "platform": "sun",
+      "suggested_object_id": "sun_next_setting",
+      "supported_features": 0,
+      "translation_key": "next_setting",
+      "unique_id": "<ulid>-next_setting",
+      "previous_unique_id": null,
+      "unit_of_measurement": null
+     },
+     {
+      "aliases": [],
+      "aliases_v2": [
+       null
+      ],
+      "area_id": null,
+      "categories": {},
+      "capabilities": {
+       "state_class": "measurement"
+      },
+      "config_entry_id": "<ulid>",
+      "config_subentry_id": null,
+      "created_at": "<time>",
+      "device_class": null,
+      "device_id": "<hex32>",
+      "disabled_by": "integration",
+      "entity_category": "diagnostic",
+      "entity_id": "sensor.sun_solar_azimuth",
+      "hidden_by": null,
+      "icon": null,
+      "id": "<hex32>",
+      "has_entity_name": true,
+      "labels": [],
+      "modified_at": "<time>",
+      "name": null,
+      "object_id_base": null,
+      "options": {
+       "sensor.private": {
+        "refresh_initial_entity_options": true
+       }
+      },
+      "original_device_class": null,
+      "original_icon": null,
+      "original_name": "Solar azimuth",
+      "platform": "sun",
+      "suggested_object_id": "sun_solar_azimuth",
+      "supported_features": 0,
+      "translation_key": "solar_azimuth",
+      "unique_id": "<ulid>-solar_azimuth",
+      "previous_unique_id": null,
+      "unit_of_measurement": "°"
+     },
+     {
+      "aliases": [],
+      "aliases_v2": [
+       null
+      ],
+      "area_id": null,
+      "categories": {},
+      "capabilities": {
+       "state_class": "measurement"
+      },
+      "config_entry_id": "<ulid>",
+      "config_subentry_id": null,
+      "created_at": "<time>",
+      "device_class": null,
+      "device_id": "<hex32>",
+      "disabled_by": "integration",
+      "entity_category": "diagnostic",
+      "entity_id": "sensor.sun_solar_elevation",
+      "hidden_by": null,
+      "icon": null,
+      "id": "<hex32>",
+      "has_entity_name": true,
+      "labels": [],
+      "modified_at": "<time>",
+      "name": null,
+      "object_id_base": null,
+      "options": {
+       "sensor.private": {
+        "refresh_initial_entity_options": true
+       }
+      },
+      "original_device_class": null,
+      "original_icon": null,
+      "original_name": "Solar elevation",
+      "platform": "sun",
+      "suggested_object_id": "sun_solar_elevation",
+      "supported_features": 0,
+      "translation_key": "solar_elevation",
+      "unique_id": "<ulid>-solar_elevation",
+      "previous_unique_id": null,
+      "unit_of_measurement": "°"
+     },
+     {
+      "aliases": [],
+      "aliases_v2": [
+       null
+      ],
+      "area_id": null,
+      "categories": {},
+      "capabilities": null,
+      "config_entry_id": "<ulid>",
+      "config_subentry_id": null,
+      "created_at": "<time>",
+      "device_class": null,
+      "device_id": null,
+      "disabled_by": null,
+      "entity_category": null,
+      "entity_id": "todo.shopping_list",
+      "hidden_by": null,
+      "icon": null,
+      "id": "<hex32>",
+      "has_entity_name": true,
+      "labels": [],
+      "modified_at": "<time>",
+      "name": null,
+      "object_id_base": "Shopping List",
+      "options": {},
+      "original_device_class": null,
+      "original_icon": null,
+      "original_name": "Shopping List",
+      "platform": "shopping_list",
+      "suggested_object_id": null,
+      "supported_features": 15,
+      "translation_key": "shopping_list",
+      "unique_id": "<ulid>",
+      "previous_unique_id": null,
+      "unit_of_measurement": null
+     }
+    ],
+    "deleted_entities": []
+   }
+  },
+  "core.config_entries": {
+   "version": 1,
+   "minor_version": 5,
+   "key": "core.config_entries",
+   "data": {
+    "entries": [
+     {
+      "created_at": "<time>",
+      "data": {},
+      "disabled_by": null,
+      "discovery_keys": {},
+      "domain": "analytics",
+      "entry_id": "<ulid>",
+      "minor_version": 1,
+      "modified_at": "<time>",
+      "options": {},
+      "pref_disable_new_entities": false,
+      "pref_disable_polling": false,
+      "source": "system",
+      "subentries": [],
+      "title": "Analytics",
+      "unique_id": null,
+      "version": 1
+     },
+     {
+      "created_at": "<time>",
+      "data": {
+       "track_home": true
+      },
+      "disabled_by": null,
+      "discovery_keys": {},
+      "domain": "met",
+      "entry_id": "<ulid>",
+      "minor_version": 1,
+      "modified_at": "<time>",
+      "options": {},
+      "pref_disable_new_entities": false,
+      "pref_disable_polling": false,
+      "source": "onboarding",
+      "subentries": [],
+      "title": "Home",
+      "unique_id": null,
+      "version": 1
+     },
+     {
+      "created_at": "<time>",
+      "data": {},
+      "disabled_by": null,
+      "discovery_keys": {},
+      "domain": "shopping_list",
+      "entry_id": "<ulid>",
+      "minor_version": 1,
+      "modified_at": "<time>",
+      "options": {},
+      "pref_disable_new_entities": false,
+      "pref_disable_polling": false,
+      "source": "onboarding",
+      "subentries": [],
+      "title": "Shopping list",
+      "unique_id": "shopping_list",
+      "version": 1
+     },
+     {
+      "created_at": "<time>",
+      "data": {},
+      "disabled_by": null,
+      "discovery_keys": {},
+      "domain": "sun",
+      "entry_id": "<ulid>",
+      "minor_version": 1,
+      "modified_at": "<time>",
+      "options": {},
+      "pref_disable_new_entities": false,
+      "pref_disable_polling": false,
+      "source": "import",
+      "subentries": [],
+      "title": "Sun",
+      "unique_id": null,
+      "version": 1
+     }
+    ]
+   }
+  },
+  "auth": {
+   "version": 1,
+   "minor_version": 1,
+   "key": "auth",
+   "data": {
+    "users": [
+     {
+      "id": "<hex32>",
+      "group_ids": [
+       "system-read-only"
+      ],
+      "is_owner": false,
+      "is_active": true,
+      "name": "Home Assistant Content",
+      "system_generated": true,
+      "local_only": false
+     },
+     {
+      "id": "<hex32>",
+      "group_ids": [
+       "system-admin"
+      ],
+      "is_owner": true,
+      "is_active": true,
+      "name": "Test Name",
+      "system_generated": false,
+      "local_only": false
+     }
+    ],
+    "groups": [
+     {
+      "id": "system-admin",
+      "name": "Administrators"
+     },
+     {
+      "id": "system-users",
+      "name": "Users"
+     },
+     {
+      "id": "system-read-only",
+      "name": "Read Only"
+     }
+    ],
+    "credentials": [
+     {
+      "id": "<hex32>",
+      "user_id": "<hex32>",
+      "auth_provider_type": "homeassistant",
+      "auth_provider_id": null,
+      "data": {
+       "username": "test-user"
+      }
+     }
+    ],
+    "refresh_tokens": [
+     {
+      "id": "<hex32>",
+      "user_id": "<hex32>",
+      "client_id": null,
+      "client_name": null,
+      "client_icon": null,
+      "token_type": "system",
+      "created_at": "<time>",
+      "access_token_expiration": 1800.0,
+      "token": "<hex128>",
+      "jwt_key": "<hex128>",
+      "last_used_at": null,
+      "last_used_ip": null,
+      "expire_at": null,
+      "credential_id": null,
+      "version": "2026.6.1"
+     },
+     {
+      "id": "<hex32>",
+      "user_id": "<hex32>",
+      "client_id": "http://127.0.0.1:8123/",
+      "client_name": null,
+      "client_icon": null,
+      "token_type": "normal",
+      "created_at": "<time>",
+      "access_token_expiration": 1800.0,
+      "token": "<hex128>",
+      "jwt_key": "<hex128>",
+      "last_used_at": "<time>",
+      "last_used_ip": "127.0.0.1",
+      "expire_at": "<time>",
+      "credential_id": "<hex32>",
+      "version": "2026.6.1"
+     },
+     {
+      "id": "<hex32>",
+      "user_id": "<hex32>",
+      "client_id": "http://127.0.0.1:8123/",
+      "client_name": null,
+      "client_icon": null,
+      "token_type": "normal",
+      "created_at": "<time>",
+      "access_token_expiration": 1800.0,
+      "token": "<hex128>",
+      "jwt_key": "<hex128>",
+      "last_used_at": "<time>",
+      "last_used_ip": "127.0.0.1",
+      "expire_at": "<time>",
+      "credential_id": "<hex32>",
+      "version": "2026.6.1"
+     }
+    ]
+   }
+  }
+ },
+ "raw": {
+  "onboarding": "{\n  \"version\": 4,\n  \"minor_version\": 1,\n  \"key\": \"onboarding\",\n  \"data\": {\n    \"done\": [\n      \"user\",\n      \"core_config\",\n      \"analytics\",\n      \"integration\"\n    ]\n  }\n}",
+  "core.config": "{\n  \"version\": 1,\n  \"minor_version\": 4,\n  \"key\": \"core.config\",\n  \"data\": {\n    \"latitude\": 51.5,\n    \"longitude\": -0.12,\n    \"elevation\": 0,\n    \"unit_system_v2\": \"metric\",\n    \"location_name\": \"Home\",\n    \"time_zone\": \"Europe/London\",\n    \"external_url\": \"https://example.com/\",\n    \"internal_url\": null,\n    \"currency\": \"GBP\",\n    \"country\": \"GB\",\n    \"language\": \"en-GB\",\n    \"radius\": 150\n  }\n}",
+  "core.analytics": "{\n  \"version\": 1,\n  \"minor_version\": 1,\n  \"key\": \"core.analytics\",\n  \"data\": {\n    \"onboarded\": true,\n    \"preferences\": {\n      \"base\": true,\n      \"usage\": false\n    },\n    \"uuid\": null,\n    \"submission_identifier\": null,\n    \"snapshot_submission_time\": null\n  }\n}"
+ }
+}

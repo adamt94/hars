@@ -73,6 +73,9 @@ pub(super) fn dispatch(conn: &mut Conn, id: u64, ty: &str, msg: &Map<String, Val
             .or_else(|| super::recorder::dispatch(conn, id, ty, msg))
             .or_else(|| super::history::dispatch(conn, id, ty, msg))
             .or_else(|| super::logbook::dispatch(conn, id, ty, msg))
+            .or_else(|| super::config::dispatch(conn, id, ty, msg))
+            .or_else(|| super::config_entries::dispatch(conn, id, ty, msg))
+            .or_else(|| super::analytics::dispatch(conn, id, ty, msg))
         {
             Some(res) => res,
             None => return false,

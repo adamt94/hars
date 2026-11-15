@@ -1,0 +1,697 @@
+{
+ "steps": [
+  {
+   "http": {
+    "method": "POST",
+    "path": "/api/onboarding/users",
+    "auth": false,
+    "body": {
+     "client_id": "http://127.0.0.1:8123/",
+     "name": "Test Name",
+     "username": "test-user",
+     "password": "test-pass",
+     "language": "en"
+    }
+   },
+   "status": 200,
+   "body": {
+    "auth_code": "<hex32>"
+   },
+   "content_type": "application/json"
+  },
+  {
+   "token": {
+    "client_id": "http://127.0.0.1:8123/"
+   },
+   "status": 200,
+   "body": {
+    "access_token": "<jwt>",
+    "token_type": "Bearer",
+    "refresh_token": "<hex128>",
+    "expires_in": 1800,
+    "ha_auth_provider": "homeassistant"
+   }
+  },
+  {
+   "http": {
+    "method": "POST",
+    "path": "/api/onboarding/integration",
+    "auth": true,
+    "body": {
+     "client_id": "http://127.0.0.1:8123/",
+     "redirect_uri": "http://example.com/"
+    }
+   },
+   "status": 400,
+   "body": {
+    "message": "invalid client id or redirect uri"
+   },
+   "content_type": "application/json"
+  },
+  {
+   "http": {
+    "method": "POST",
+    "path": "/api/onboarding/integration",
+    "auth": true,
+    "body": {
+     "client_id": "http://127.0.0.1:8123/",
+     "redirect_uri": "http://127.0.0.1:8123/?auth_callback=1"
+    }
+   },
+   "status": 403,
+   "body": {
+    "message": "Integration step already done"
+   },
+   "content_type": "application/json"
+  },
+  {
+   "http": {
+    "method": "GET",
+    "path": "/api/onboarding",
+    "auth": false
+   },
+   "status": 200,
+   "body": [
+    {
+     "step": "user",
+     "done": true
+    },
+    {
+     "step": "core_config",
+     "done": false
+    },
+    {
+     "step": "analytics",
+     "done": false
+    },
+    {
+     "step": "integration",
+     "done": true
+    }
+   ],
+   "content_type": "application/json"
+  },
+  {
+   "ws": {
+    "id": 1,
+    "type": "config/core/detect"
+   },
+   "replies": [
+    {
+     "id": 1,
+     "type": "result",
+     "success": true,
+     "result": {}
+    }
+   ],
+   "note": "whoami fails"
+  }
+ ],
+ "stores": {
+  "onboarding": {
+   "version": 4,
+   "minor_version": 1,
+   "key": "onboarding",
+   "data": {
+    "done": [
+     "user",
+     "integration"
+    ]
+   }
+  },
+  "core.area_registry": {
+   "version": 1,
+   "minor_version": 9,
+   "key": "core.area_registry",
+   "data": {
+    "areas": [
+     {
+      "aliases": [],
+      "floor_id": null,
+      "humidity_entity_id": null,
+      "icon": "mdi:sofa",
+      "id": "living_room",
+      "labels": [],
+      "name": "Living Room",
+      "picture": null,
+      "temperature_entity_id": null,
+      "created_at": "<time>",
+      "modified_at": "<time>"
+     },
+     {
+      "aliases": [],
+      "floor_id": null,
+      "humidity_entity_id": null,
+      "icon": "mdi:stove",
+      "id": "kitchen",
+      "labels": [],
+      "name": "Kitchen",
+      "picture": null,
+      "temperature_entity_id": null,
+      "created_at": "<time>",
+      "modified_at": "<time>"
+     },
+     {
+      "aliases": [],
+      "floor_id": null,
+      "humidity_entity_id": null,
+      "icon": "mdi:bed",
+      "id": "bedroom",
+      "labels": [],
+      "name": "Bedroom",
+      "picture": null,
+      "temperature_entity_id": null,
+      "created_at": "<time>",
+      "modified_at": "<time>"
+     }
+    ]
+   }
+  },
+  "person": {
+   "version": 2,
+   "minor_version": 1,
+   "key": "person",
+   "data": {
+    "items": [
+     {
+      "id": "test_name",
+      "name": "Test Name",
+      "user_id": "<hex32>",
+      "device_trackers": []
+     }
+    ]
+   }
+  },
+  "core.entity_registry": {
+   "version": 1,
+   "minor_version": 22,
+   "key": "core.entity_registry",
+   "data": {
+    "entities": [
+     {
+      "aliases": [],
+      "aliases_v2": [
+       null
+      ],
+      "area_id": null,
+      "categories": {},
+      "capabilities": null,
+      "config_entry_id": "<ulid>",
+      "config_subentry_id": null,
+      "created_at": "<time>",
+      "device_class": null,
+      "device_id": "<hex32>",
+      "disabled_by": "integration",
+      "entity_category": "diagnostic",
+      "entity_id": "binary_sensor.sun_solar_rising",
+      "hidden_by": null,
+      "icon": null,
+      "id": "<hex32>",
+      "has_entity_name": true,
+      "labels": [],
+      "modified_at": "<time>",
+      "name": null,
+      "object_id_base": null,
+      "options": {},
+      "original_device_class": null,
+      "original_icon": null,
+      "original_name": "Solar rising",
+      "platform": "sun",
+      "suggested_object_id": "sun_solar_rising",
+      "supported_features": 0,
+      "translation_key": "solar_rising",
+      "unique_id": "<ulid>-solar_rising",
+      "previous_unique_id": null,
+      "unit_of_measurement": null
+     },
+     {
+      "aliases": [],
+      "aliases_v2": [
+       null
+      ],
+      "area_id": null,
+      "categories": {},
+      "capabilities": null,
+      "config_entry_id": null,
+      "config_subentry_id": null,
+      "created_at": "<time>",
+      "device_class": null,
+      "device_id": null,
+      "disabled_by": null,
+      "entity_category": null,
+      "entity_id": "person.test_name",
+      "hidden_by": null,
+      "icon": null,
+      "id": "<hex32>",
+      "has_entity_name": false,
+      "labels": [],
+      "modified_at": "<time>",
+      "name": null,
+      "object_id_base": "Test Name",
+      "options": {},
+      "original_device_class": null,
+      "original_icon": null,
+      "original_name": "Test Name",
+      "platform": "person",
+      "suggested_object_id": null,
+      "supported_features": 0,
+      "translation_key": null,
+      "unique_id": "test_name",
+      "previous_unique_id": null,
+      "unit_of_measurement": null
+     },
+     {
+      "aliases": [],
+      "aliases_v2": [
+       null
+      ],
+      "area_id": null,
+      "categories": {},
+      "capabilities": null,
+      "config_entry_id": "<ulid>",
+      "config_subentry_id": null,
+      "created_at": "<time>",
+      "device_class": null,
+      "device_id": "<hex32>",
+      "disabled_by": null,
+      "entity_category": "diagnostic",
+      "entity_id": "sensor.sun_next_dawn",
+      "hidden_by": null,
+      "icon": null,
+      "id": "<hex32>",
+      "has_entity_name": true,
+      "labels": [],
+      "modified_at": "<time>",
+      "name": null,
+      "object_id_base": null,
+      "options": {},
+      "original_device_class": "timestamp",
+      "original_icon": null,
+      "original_name": "Next dawn",
+      "platform": "sun",
+      "suggested_object_id": "sun_next_dawn",
+      "supported_features": 0,
+      "translation_key": "next_dawn",
+      "unique_id": "<ulid>-next_dawn",
+      "previous_unique_id": null,
+      "unit_of_measurement": null
+     },
+     {
+      "aliases": [],
+      "aliases_v2": [
+       null
+      ],
+      "area_id": null,
+      "categories": {},
+      "capabilities": null,
+      "config_entry_id": "<ulid>",
+      "config_subentry_id": null,
+      "created_at": "<time>",
+      "device_class": null,
+      "device_id": "<hex32>",
+      "disabled_by": null,
+      "entity_category": "diagnostic",
+      "entity_id": "sensor.sun_next_dusk",
+      "hidden_by": null,
+      "icon": null,
+      "id": "<hex32>",
+      "has_entity_name": true,
+      "labels": [],
+      "modified_at": "<time>",
+      "name": null,
+      "object_id_base": null,
+      "options": {},
+      "original_device_class": "timestamp",
+      "original_icon": null,
+      "original_name": "Next dusk",
+      "platform": "sun",
+      "suggested_object_id": "sun_next_dusk",
+      "supported_features": 0,
+      "translation_key": "next_dusk",
+      "unique_id": "<ulid>-next_dusk",
+      "previous_unique_id": null,
+      "unit_of_measurement": null
+     },
+     {
+      "aliases": [],
+      "aliases_v2": [
+       null
+      ],
+      "area_id": null,
+      "categories": {},
+      "capabilities": null,
+      "config_entry_id": "<ulid>",
+      "config_subentry_id": null,
+      "created_at": "<time>",
+      "device_class": null,
+      "device_id": "<hex32>",
+      "disabled_by": null,
+      "entity_category": "diagnostic",
+      "entity_id": "sensor.sun_next_midnight",
+      "hidden_by": null,
+      "icon": null,
+      "id": "<hex32>",
+      "has_entity_name": true,
+      "labels": [],
+      "modified_at": "<time>",
+      "name": null,
+      "object_id_base": null,
+      "options": {},
+      "original_device_class": "timestamp",
+      "original_icon": null,
+      "original_name": "Next midnight",
+      "platform": "sun",
+      "suggested_object_id": "sun_next_midnight",
+      "supported_features": 0,
+      "translation_key": "next_midnight",
+      "unique_id": "<ulid>-next_midnight",
+      "previous_unique_id": null,
+      "unit_of_measurement": null
+     },
+     {
+      "aliases": [],
+      "aliases_v2": [
+       null
+      ],
+      "area_id": null,
+      "categories": {},
+      "capabilities": null,
+      "config_entry_id": "<ulid>",
+      "config_subentry_id": null,
+      "created_at": "<time>",
+      "device_class": null,
+      "device_id": "<hex32>",
+      "disabled_by": null,
+      "entity_category": "diagnostic",
+      "entity_id": "sensor.sun_next_noon",
+      "hidden_by": null,
+      "icon": null,
+      "id": "<hex32>",
+      "has_entity_name": true,
+      "labels": [],
+      "modified_at": "<time>",
+      "name": null,
+      "object_id_base": null,
+      "options": {},
+      "original_device_class": "timestamp",
+      "original_icon": null,
+      "original_name": "Next noon",
+      "platform": "sun",
+      "suggested_object_id": "sun_next_noon",
+      "supported_features": 0,
+      "translation_key": "next_noon",
+      "unique_id": "<ulid>-next_noon",
+      "previous_unique_id": null,
+      "unit_of_measurement": null
+     },
+     {
+      "aliases": [],
+      "aliases_v2": [
+       null
+      ],
+      "area_id": null,
+      "categories": {},
+      "capabilities": null,
+      "config_entry_id": "<ulid>",
+      "config_subentry_id": null,
+      "created_at": "<time>",
+      "device_class": null,
+      "device_id": "<hex32>",
+      "disabled_by": null,
+      "entity_category": "diagnostic",
+      "entity_id": "sensor.sun_next_rising",
+      "hidden_by": null,
+      "icon": null,
+      "id": "<hex32>",
+      "has_entity_name": true,
+      "labels": [],
+      "modified_at": "<time>",
+      "name": null,
+      "object_id_base": null,
+      "options": {},
+      "original_device_class": "timestamp",
+      "original_icon": null,
+      "original_name": "Next rising",
+      "platform": "sun",
+      "suggested_object_id": "sun_next_rising",
+      "supported_features": 0,
+      "translation_key": "next_rising",
+      "unique_id": "<ulid>-next_rising",
+      "previous_unique_id": null,
+      "unit_of_measurement": null
+     },
+     {
+      "aliases": [],
+      "aliases_v2": [
+       null
+      ],
+      "area_id": null,
+      "categories": {},
+      "capabilities": null,
+      "config_entry_id": "<ulid>",
+      "config_subentry_id": null,
+      "created_at": "<time>",
+      "device_class": null,
+      "device_id": "<hex32>",
+      "disabled_by": null,
+      "entity_category": "diagnostic",
+      "entity_id": "sensor.sun_next_setting",
+      "hidden_by": null,
+      "icon": null,
+      "id": "<hex32>",
+      "has_entity_name": true,
+      "labels": [],
+      "modified_at": "<time>",
+      "name": null,
+      "object_id_base": null,
+      "options": {},
+      "original_device_class": "timestamp",
+      "original_icon": null,
+      "original_name": "Next setting",
+      "platform": "sun",
+      "suggested_object_id": "sun_next_setting",
+      "supported_features": 0,
+      "translation_key": "next_setting",
+      "unique_id": "<ulid>-next_setting",
+      "previous_unique_id": null,
+      "unit_of_measurement": null
+     },
+     {
+      "aliases": [],
+      "aliases_v2": [
+       null
+      ],
+      "area_id": null,
+      "categories": {},
+      "capabilities": {
+       "state_class": "measurement"
+      },
+      "config_entry_id": "<ulid>",
+      "config_subentry_id": null,
+      "created_at": "<time>",
+      "device_class": null,
+      "device_id": "<hex32>",
+      "disabled_by": "integration",
+      "entity_category": "diagnostic",
+      "entity_id": "sensor.sun_solar_azimuth",
+      "hidden_by": null,
+      "icon": null,
+      "id": "<hex32>",
+      "has_entity_name": true,
+      "labels": [],
+      "modified_at": "<time>",
+      "name": null,
+      "object_id_base": null,
+      "options": {},
+      "original_device_class": null,
+      "original_icon": null,
+      "original_name": "Solar azimuth",
+      "platform": "sun",
+      "suggested_object_id": "sun_solar_azimuth",
+      "supported_features": 0,
+      "translation_key": "solar_azimuth",
+      "unique_id": "<ulid>-solar_azimuth",
+      "previous_unique_id": null,
+      "unit_of_measurement": "°"
+     },
+     {
+      "aliases": [],
+      "aliases_v2": [
+       null
+      ],
+      "area_id": null,
+      "categories": {},
+      "capabilities": {
+       "state_class": "measurement"
+      },
+      "config_entry_id": "<ulid>",
+      "config_subentry_id": null,
+      "created_at": "<time>",
+      "device_class": null,
+      "device_id": "<hex32>",
+      "disabled_by": "integration",
+      "entity_category": "diagnostic",
+      "entity_id": "sensor.sun_solar_elevation",
+      "hidden_by": null,
+      "icon": null,
+      "id": "<hex32>",
+      "has_entity_name": true,
+      "labels": [],
+      "modified_at": "<time>",
+      "name": null,
+      "object_id_base": null,
+      "options": {},
+      "original_device_class": null,
+      "original_icon": null,
+      "original_name": "Solar elevation",
+      "platform": "sun",
+      "suggested_object_id": "sun_solar_elevation",
+      "supported_features": 0,
+      "translation_key": "solar_elevation",
+      "unique_id": "<ulid>-solar_elevation",
+      "previous_unique_id": null,
+      "unit_of_measurement": "°"
+     }
+    ],
+    "deleted_entities": []
+   }
+  },
+  "core.config_entries": {
+   "version": 1,
+   "minor_version": 5,
+   "key": "core.config_entries",
+   "data": {
+    "entries": [
+     {
+      "created_at": "<time>",
+      "data": {},
+      "disabled_by": null,
+      "discovery_keys": {},
+      "domain": "analytics",
+      "entry_id": "<ulid>",
+      "minor_version": 1,
+      "modified_at": "<time>",
+      "options": {},
+      "pref_disable_new_entities": false,
+      "pref_disable_polling": false,
+      "source": "system",
+      "subentries": [],
+      "title": "Analytics",
+      "unique_id": null,
+      "version": 1
+     },
+     {
+      "created_at": "<time>",
+      "data": {},
+      "disabled_by": null,
+      "discovery_keys": {},
+      "domain": "sun",
+      "entry_id": "<ulid>",
+      "minor_version": 1,
+      "modified_at": "<time>",
+      "options": {},
+      "pref_disable_new_entities": false,
+      "pref_disable_polling": false,
+      "source": "import",
+      "subentries": [],
+      "title": "Sun",
+      "unique_id": null,
+      "version": 1
+     }
+    ]
+   }
+  },
+  "auth": {
+   "version": 1,
+   "minor_version": 1,
+   "key": "auth",
+   "data": {
+    "users": [
+     {
+      "id": "<hex32>",
+      "group_ids": [
+       "system-read-only"
+      ],
+      "is_owner": false,
+      "is_active": true,
+      "name": "Home Assistant Content",
+      "system_generated": true,
+      "local_only": false
+     },
+     {
+      "id": "<hex32>",
+      "group_ids": [
+       "system-admin"
+      ],
+      "is_owner": true,
+      "is_active": true,
+      "name": "Test Name",
+      "system_generated": false,
+      "local_only": false
+     }
+    ],
+    "groups": [
+     {
+      "id": "system-admin",
+      "name": "Administrators"
+     },
+     {
+      "id": "system-users",
+      "name": "Users"
+     },
+     {
+      "id": "system-read-only",
+      "name": "Read Only"
+     }
+    ],
+    "credentials": [
+     {
+      "id": "<hex32>",
+      "user_id": "<hex32>",
+      "auth_provider_type": "homeassistant",
+      "auth_provider_id": null,
+      "data": {
+       "username": "test-user"
+      }
+     }
+    ],
+    "refresh_tokens": [
+     {
+      "id": "<hex32>",
+      "user_id": "<hex32>",
+      "client_id": null,
+      "client_name": null,
+      "client_icon": null,
+      "token_type": "system",
+      "created_at": "<time>",
+      "access_token_expiration": 1800.0,
+      "token": "<hex128>",
+      "jwt_key": "<hex128>",
+      "last_used_at": null,
+      "last_used_ip": null,
+      "expire_at": null,
+      "credential_id": null,
+      "version": "2026.6.1"
+     },
+     {
+      "id": "<hex32>",
+      "user_id": "<hex32>",
+      "client_id": "http://127.0.0.1:8123/",
+      "client_name": null,
+      "client_icon": null,
+      "token_type": "normal",
+      "created_at": "<time>",
+      "access_token_expiration": 1800.0,
+      "token": "<hex128>",
+      "jwt_key": "<hex128>",
+      "last_used_at": "<time>",
+      "last_used_ip": "127.0.0.1",
+      "expire_at": "<time>",
+      "credential_id": "<hex32>",
+      "version": "2026.6.1"
+     }
+    ]
+   }
+  }
+ }
+}
