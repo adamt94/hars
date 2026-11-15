@@ -25,6 +25,12 @@ pub(super) fn dispatch(
 /// The schema: `str` fields (strict), `bool` ones, nothing else.
 fn schema(msg: &Map<String, Value>, strs: &[&str], bools: &[&str]) -> Result<(), Invalid> {
     let mut errors = Vec::new();
+    // voluptuous's path: `data[<repr(key)>]`.
+    let at = |k: &str| {
+        let mut r = String::new();
+        super::py_repr_str(&mut r, k);
+        format!("@ data[{r}]")
+    };
     for (k, v) in msg {
         let k = k.as_str();
         if matches!(k, "id" | "type") {
@@ -32,19 +38,19 @@ fn schema(msg: &Map<String, Value>, strs: &[&str], bools: &[&str]) -> Result<(),
         }
         if strs.contains(&k) {
             if !v.is_string() {
-                errors.push(format!("expected str for dictionary value @ data['{k}']"));
+                errors.push(format!("expected str for dictionary value {}", at(k)));
             }
         } else if bools.contains(&k) {
             if !v.is_boolean() {
-                errors.push(format!("expected bool for dictionary value @ data['{k}']"));
+                errors.push(format!("expected bool for dictionary value {}", at(k)));
             }
         } else {
-            errors.push(format!("extra keys not allowed @ data['{k}']"));
+            errors.push(format!("extra keys not allowed {}", at(k)));
         }
     }
     for k in strs {
         if !msg.contains_key(*k) {
-            errors.push(format!("required key not provided @ data['{k}']"));
+            errors.push(format!("required key not provided {}", at(k)));
         }
     }
     if errors.is_empty() {
