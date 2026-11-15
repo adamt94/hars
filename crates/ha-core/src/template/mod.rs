@@ -76,6 +76,17 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::sync::{Arc, LazyLock, OnceLock};
 
+/// A template nested deeper than compiling allows (400 links of an
+/// expression chain, or 150 levels of brackets or blocks). Jinja under
+/// Python's recursion limit fails at about the same depth with a
+/// `RecursionError`, which HA doesn't catch as a `TemplateError`.
+pub const TOO_DEEP: &str = "RecursionError: maximum recursion depth exceeded";
+
+/// The stack a render needs, at most: compiling recurses once per level up
+/// to the depth limits, and printing or comparing a value once per level up
+/// to the value depth limit (256). Renders run on threads this size.
+pub const STACK: usize = 4 * 1024 * 1024;
+
 /// `MAX_TEMPLATE_OUTPUT`, in characters.
 const MAX_OUTPUT: usize = 256 * 1024;
 
@@ -174,6 +185,9 @@ impl Template {
         env.add_template_owned(NAME, self.source.to_string())
             .map_err(|e| {
                 let detail = e.detail().unwrap_or_default();
+                if detail == "template exceeds maximum recursion limits" {
+                    return TemplateError(TOO_DEEP.into());
+                }
                 TemplateError(format!(
                     "TemplateSyntaxError: {}",
                     syntax::message(&self.source, detail)
@@ -455,7 +469,7 @@ fn environment(undefined: UndefinedBehavior) -> Environment<'static> {
         };
         let mut s = String::new();
         py_str(&mut Charged::new(&mut s, state), v)?;
-        Ok(Value::from_safe_string(markupsafe_escape(&s)))
+        Ok(Value::from_safe_string(markupsafe_escape(state, &s)?))
     };
     env.add_filter("escape", escape);
     env.add_filter("e", escape);
@@ -504,7 +518,7 @@ fn print_value(out: &mut minijinja::Output, state: &mut State, value: &Value) ->
     }
     let mut s = String::new();
     py_str(&mut Charged::new(&mut s, state), value)?;
-    Charged::new(out, state).put(&markupsafe_escape(&s))
+    Charged::new(out, state).put(&markupsafe_escape(state, &s)?)
 }
 
 /// A writer that pays the render's fuel for what it writes before writing
@@ -559,9 +573,11 @@ fn py_repr<W: fmt::Write>(out: &mut Charged<'_, W>, v: &Value, depth: usize) -> 
             Err(_) => out.put(&v.to_string()),
         },
         ValueKind::String => {
-            // Paid before the copy is made.
+            // Paid before the copy is made: escapes are at most four
+            // times a character's bytes (`\x01`).
             let raw = v.as_str().unwrap_or_default();
-            out.state.consume_fuel(raw.len() as u64 / 64)?;
+            out.state
+                .consume_fuel((raw.len() as u64).saturating_mul(4) / 64)?;
             let mut s = String::new();
             py::repr_str(&mut s, raw);
             out.put(&s)
@@ -613,9 +629,18 @@ fn py_repr<W: fmt::Write>(out: &mut Charged<'_, W>, v: &Value, depth: usize) -> 
 const RECURSION: &str =
     "RecursionError: maximum recursion depth exceeded while getting the repr of an object";
 
-/// `markupsafe.escape`.
-fn markupsafe_escape(s: &str) -> String {
-    let mut out = String::with_capacity(s.len());
+/// `markupsafe.escape`, paid for (its exact length) before it is made.
+fn markupsafe_escape(state: &State, s: &str) -> Result<String, Error> {
+    let grows: usize = s
+        .bytes()
+        .map(|b| match b {
+            b'&' | b'\'' | b'"' => 4,
+            b'<' | b'>' => 3,
+            _ => 0,
+        })
+        .sum();
+    state.consume_fuel((s.len() + grows) as u64 / 64)?;
+    let mut out = String::with_capacity(s.len() + grows);
     for c in s.chars() {
         match c {
             '&' => out.push_str("&amp;"),
@@ -626,7 +651,7 @@ fn markupsafe_escape(s: &str) -> String {
             c => out.push(c),
         }
     }
-    out
+    Ok(out)
 }
 
 /// Per render, on the rendering thread: the last missing name or key

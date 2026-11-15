@@ -188,8 +188,9 @@ pub(crate) struct Conn {
     /// nothing more until it ends, as HA handles it before the next
     /// message. Messages already read wait in `queue`.
     busy: Option<template::Busy>,
-    queue: std::collections::VecDeque<Value>,
-    /// Frame bytes behind the queue since it was last empty.
+    /// Each with its share of the frame's bytes.
+    queue: std::collections::VecDeque<(Value, usize)>,
+    /// The frame bytes of the messages in `queue`.
     queued_bytes: usize,
 }
 
@@ -449,16 +450,16 @@ impl Conn {
     /// (no reply in HA either), or more waiting behind a busy command than
     /// [`MAX_QUEUED`] messages or [`MAX_QUEUED_BYTES`].
     fn enqueue(&mut self, text: &str) -> bool {
-        let before = self.queue.len();
-        match serde_json::from_str::<Value>(text) {
-            Ok(Value::Array(msgs)) => self.queue.extend(msgs),
-            Ok(msg) => self.queue.push_back(msg),
+        let msgs = match serde_json::from_str::<Value>(text) {
+            Ok(Value::Array(msgs)) => msgs,
+            Ok(msg) => vec![msg],
             Err(_) => return false,
-        }
-        if before == 0 {
-            self.queued_bytes = 0;
-        }
-        self.queued_bytes += text.len();
+        };
+        // A frame's bytes, shared out over its messages, leave the count
+        // as each message is handled.
+        let share = text.len().div_ceil(msgs.len().max(1));
+        self.queued_bytes += share * msgs.len();
+        self.queue.extend(msgs.into_iter().map(|m| (m, share)));
         if self.queue.len() > MAX_QUEUED || self.queued_bytes > MAX_QUEUED_BYTES {
             tracing::error!(
                 "websocket client sent {} messages while one was busy; disconnecting",
@@ -472,9 +473,10 @@ impl Conn {
     /// Handle queued messages until one leaves the connection busy.
     fn drain(&mut self) {
         while self.busy.is_none() {
-            let Some(msg) = self.queue.pop_front() else {
+            let Some((msg, bytes)) = self.queue.pop_front() else {
                 return;
             };
+            self.queued_bytes -= bytes;
             self.handle(msg);
         }
     }
@@ -600,6 +602,7 @@ impl Conn {
             busy.abort();
         }
         self.queue.clear();
+        self.queued_bytes = 0;
         let ids: Vec<u64> = self.subs.keys().copied().collect();
         for id in ids {
             self.unsubscribe(id, |_| {});

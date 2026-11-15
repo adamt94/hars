@@ -10,7 +10,8 @@
 //! and answers `template_error` if that takes longer.
 //!
 //! Template input is hostile: any logged-in user can send it. Compiling
-//! and rendering run on blocking threads, never on the async runtime, at
+//! and rendering run on threads of their own, with a fixed stack
+//! ([`ha_core::template::STACK`]), never on the async runtime, at
 //! most [`RENDERS_AT_ONCE`] at a time across every connection, each render
 //! within its fuel budget ([`ha_core::template::FUEL`]). A connection
 //! handles its messages in order, so what follows a `render_template` waits
@@ -33,7 +34,7 @@ use serde_json::{Map, Value, json};
 use std::collections::HashMap;
 use std::sync::{Arc, LazyLock};
 use std::time::Duration;
-use tokio::sync::Semaphore;
+use tokio::sync::{OwnedSemaphorePermit, Semaphore, oneshot};
 use tokio::task::JoinHandle;
 
 /// `functools.lru_cache`'s default `maxsize`.
@@ -222,6 +223,12 @@ fn render_template(conn: &mut Conn, id: u64, msg: &Map<String, Value>) -> Result
             (setup, refresh)
         })
         .await?;
+        // Too deep to compile: Jinja's `RecursionError` escapes HA's
+        // handler, which answers with its catch-all.
+        if matches!(&setup.result, Err(e) if e.0 == ha_core::template::TOO_DEEP) {
+            out.error(json!(id), "unknown_error", "Unknown error");
+            return None;
+        }
         let reply = Reply {
             out: &out,
             id,
@@ -249,16 +256,30 @@ pub(crate) const RENDERS_AT_ONCE: usize = 2;
 static RENDERS: LazyLock<Arc<Semaphore>> =
     LazyLock::new(|| Arc::new(Semaphore::new(RENDERS_AT_ONCE)));
 
-/// Run template work on a blocking thread, holding a render permit until
+/// Run template work on a render thread, holding a render permit until
 /// it returns. `None` if it panicked.
 async fn blocking<T: Send + 'static>(work: impl FnOnce() -> T + Send + 'static) -> Option<T> {
     let permit = RENDERS.clone().acquire_owned().await.ok()?;
-    tokio::task::spawn_blocking(move || {
-        let _permit = permit;
-        work()
-    })
-    .await
-    .ok()
+    on_render_thread(permit, work)?.await.ok()
+}
+
+/// Start `work` on its own thread with [`ha_core::template::STACK`] (not
+/// the blocking pool's default), holding `permit` until it returns. The
+/// answer comes back on the receiver; `None` if no thread could start.
+fn on_render_thread<T: Send + 'static>(
+    permit: OwnedSemaphorePermit,
+    work: impl FnOnce() -> T + Send + 'static,
+) -> Option<oneshot::Receiver<T>> {
+    let (tx, rx) = oneshot::channel();
+    std::thread::Builder::new()
+        .name("hars-template".into())
+        .stack_size(ha_core::template::STACK)
+        .spawn(move || {
+            let _permit = permit;
+            let _ = tx.send(work());
+        })
+        .ok()?;
+    Some(rx)
 }
 
 /// Render permits free now.
@@ -283,7 +304,7 @@ enum Timed {
     Done(Log),
 }
 
-/// `async_render_will_timeout`: one render on a blocking thread, timed
+/// `async_render_will_timeout`: one render on a render thread, timed
 /// from when it starts (a wait for a permit doesn't count).
 async fn timed(
     template: &Arc<Template>,
@@ -295,12 +316,13 @@ async fn timed(
         return Timed::NotCompiled;
     };
     let (t, v) = (template.clone(), variables.clone());
-    let job = tokio::task::spawn_blocking(move || {
-        let _permit = permit;
+    let Some(job) = on_render_thread(permit, move || {
         t.compile(strict)
             .ok()
             .map(|()| t.render_discarding(v.as_deref(), strict).log)
-    });
+    }) else {
+        return Timed::NotCompiled;
+    };
     let finished = match Duration::try_from_secs_f64(timeout) {
         Ok(limit) => tokio::time::timeout(limit, job).await.ok(),
         // Negative: already over. Infinite or NaN: never.

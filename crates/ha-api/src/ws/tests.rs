@@ -3033,6 +3033,33 @@ async fn the_queue_behind_a_busy_command_is_bounded() {
     drop(held);
 }
 
+/// The queue's byte limit counts what is waiting, not all that was ever
+/// sent: a client that keeps a small backlog behind busy commands can send
+/// any amount over time.
+#[tokio::test]
+async fn the_queue_counts_only_what_waits() {
+    let _alone = RENDER_PERMITS.lock().await;
+    let hass = Hass::new();
+    let (mut conn, _rx) = bare_conn(&hass);
+    let padding = "x".repeat(3 * 1024 * 1024);
+    let frame = |id: u64| {
+        json!([
+            {"id": id, "type": "render_template", "template": "{{ 1 }}"},
+            {"id": id + 1, "type": "ping", "pad": padding},
+        ])
+        .to_string()
+    };
+    // A render, then 3 MiB waiting behind it; the next frame comes in while
+    // the queue still holds the previous one's tail, again and again: 18
+    // MiB in all, never more than 6 MiB waiting.
+    assert!(conn.handle_frame(&frame(1)));
+    for id in (3..12).step_by(2) {
+        assert!(conn.handle_frame(&frame(id)), "frame {id}");
+        settle(&mut conn).await;
+    }
+    assert!(conn.queued_bytes < 7 * 1024 * 1024);
+}
+
 /// The tests that take or count render permits run one at a time.
 static RENDER_PERMITS: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 

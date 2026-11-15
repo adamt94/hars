@@ -536,6 +536,12 @@ CONVERSATIONS = [
     ("cache lenient first", [rt(1, "{{ user }}"), rt(2, "{{ user }}", strict=True)]),
     ("cache key is the raw string", [rt(1, "{{ user }}", strict=True), rt(2, " {{ user }}")]),
     ("entity_ids accepted", [rt(1, "{{ 1 }}", entity_ids="sun.sun, Light.Kitchen"), rt(2, "{{ 2 }}", entity_ids=["sun.sun"])]),
+    # Nested past what Python's recursion limit allows Jinja to compile:
+    # a RecursionError, which isn't a TemplateError, so HA's catch-all.
+    ("deep expression", [rt(1, "{{ " + "1+" * 600 + "1 }}")]),
+    ("deep expression reported", [rt(1, "{{ " + "not " * 600 + "true }}", report_errors=True)]),
+    ("deep filters, with timeout", [rt(1, "{{ [1]" + "|list" * 600 + " }}", timeout=3)]),
+    ("deep but within the limit", [rt(1, "{{ " + "1+" * 300 + "1 }}")]),
     # Schema errors.
     ("no template", [{"id": 1, "type": "render_template"}]),
     ("template not str", [rt(1, 5)]),

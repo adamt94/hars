@@ -571,6 +571,7 @@ fn repeated_and_derived_work_is_paid_for() {
         r
     };
     for source in [
+        "{{ ([''] * 100) | join('x' * 10000000) | length }}",
         "{{ ([{'x': 1}] * 3000) | sort(attribute='x,' * 3000 ~ 'x') | length }}",
         "{{ ([{'x': 1}] * 3000) | min(attribute='x,' * 3000 ~ 'x') }}",
         "{{ ([{'x': {'x': 1}}] * 3000) | map(attribute='x.' * 3000 ~ 'x') | list | length }}",
@@ -657,7 +658,19 @@ fn worst_case_templates() -> Vec<String> {
         "{% set y %}{{ v }}{% endset %}{{ y | length }}",
         "{{ v | tojson if false else v | length }}",
     ];
-    let mut out = Vec::new();
+    // Built in a loop from a large part: separators, replacements, case
+    // changes, escapes and reprs.
+    let mut out: Vec<String> = [
+        "{{ ([''] * 100) | join('x' * 10000000) | length }}",
+        "{{ ([''] * 100000) | join('x' * 1000) | length }}",
+        "{{ ('a' * 100000) | replace('a', 'x' * 1000) | length }}",
+        "{{ ('ß' * 1000000) | upper | length }}",
+        "{{ ('<' * 3000000) | e | length }}",
+        "{{ (['\x01' * 3000000] | string) | length }}",
+        "{{ ('x' * 1000000) | title | length }}{{ ('x' * 1000000) | capitalize | length }}",
+    ]
+    .map(String::from)
+    .to_vec();
     for m in made {
         for u in used {
             for (open, close) in [
@@ -758,4 +771,96 @@ fn worst_case_child() {
     };
     let source = &worst_case_templates()[i.parse::<usize>().unwrap()];
     let _ = Template::new(source).render(None, false);
+}
+
+/// Templates nested past what compiling allows, each made of one construct
+/// repeated 100000 times (all inside the WebSocket's 4 MiB): each fails
+/// with `TOO_DEEP` instead of overflowing the stack. A stack overflow
+/// aborts the process, so `deep_template_child` renders them in a child
+/// process, on a thread with half the stack renders get.
+#[test]
+fn deep_templates_fail_without_crashing() {
+    let exe = std::env::current_exe().unwrap();
+    let out = std::process::Command::new(exe)
+        .args([
+            "--exact",
+            "template::tests::deep_template_child",
+            "--ignored",
+            "--nocapture",
+        ])
+        .env("HARS_DEEP_TEMPLATES", "1")
+        .output()
+        .unwrap();
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        out.status.success(),
+        "the child failed or crashed:\n{stderr}"
+    );
+    assert!(
+        stderr.contains("deep templates: all failed cleanly"),
+        "{stderr}"
+    );
+}
+
+fn deep_templates() -> Vec<(String, bool)> {
+    const N: usize = 100_000;
+    let ok = |s: String| (s, true);
+    let too_deep = |s: String| (s, false);
+    vec![
+        too_deep(format!("{{{{ {}true }}}}", "not ".repeat(N))),
+        too_deep(format!("{{{{ {}1 }}}}", "-".repeat(N))),
+        too_deep(format!("{{{{ {}1 }}}}", "1+".repeat(N))),
+        too_deep(format!("{{{{ {}1 }}}}", "2**".repeat(N))),
+        too_deep(format!("{{{{ {}'a' }}}}", "'a'~".repeat(N))),
+        too_deep(format!("{{{{ [1]{} }}}}", "|list".repeat(N))),
+        too_deep(format!("{{{{ 1{} }}}}", " is number".repeat(N))),
+        too_deep(format!("{{{{ x{} }}}}", ".a".repeat(N))),
+        too_deep(format!("{{{{ x{} }}}}", "[0]".repeat(N))),
+        too_deep(format!("{{{{ range{} }}}}", "()".repeat(N))),
+        too_deep(format!("{{{{ {}1 }}}}", "1 if true else ".repeat(N))),
+        too_deep(format!("{{{{ {}1{} }}}}", "(".repeat(N), ")".repeat(N))),
+        too_deep(format!("{{{{ {}1{} }}}}", "[".repeat(N), "]".repeat(N))),
+        too_deep(format!(
+            "{}x{}",
+            "{% if true %}".repeat(N),
+            "{% endif %}".repeat(N)
+        )),
+        too_deep(format!(
+            "{{% filter upper{} %}}x{{% endfilter %}}",
+            "|upper".repeat(N)
+        )),
+        // Within the limits, rendered as usual.
+        ok(format!("{{{{ {}1 }}}}", "1+".repeat(300))),
+        ok(format!("{{{{ {}true }}}}", "not ".repeat(300))),
+        ok(format!("{{{{ [1]{} }}}}", "|list".repeat(300))),
+        // Runtime recursion stops at minijinja's own limit.
+        ok("{% macro f(n) %}{{ f(n + 1) }}{% endmacro %}{{ f(1) }}".to_owned()),
+    ]
+}
+
+/// The child half of `deep_templates_fail_without_crashing`.
+#[test]
+#[ignore]
+fn deep_template_child() {
+    if std::env::var("HARS_DEEP_TEMPLATES").is_err() {
+        return;
+    }
+    std::thread::Builder::new()
+        .stack_size(STACK / 2)
+        .spawn(|| {
+            for (source, renders) in deep_templates() {
+                let r = Template::new(&source).render(None, false).result;
+                let head: String = source.chars().take(40).collect();
+                match (renders, r) {
+                    (false, Err(e)) => assert_eq!(e.0, TOO_DEEP, "{head}"),
+                    (true, Err(e)) => assert_ne!(e.0, TOO_DEEP, "{head}"),
+                    (false, Ok(_)) => panic!("{head} rendered"),
+                    (true, Ok(_)) => {}
+                }
+            }
+        })
+        .unwrap()
+        .join()
+        .unwrap();
+    eprintln!("deep templates: all failed cleanly");
 }

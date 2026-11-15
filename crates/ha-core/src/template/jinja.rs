@@ -543,27 +543,44 @@ pub(super) fn add_filters(env: &mut Environment<'static>) {
         f::max(state, v, kwargs).map(|r| hint(r, "No aggregated item, sequence was empty."))
     });
     // Filters that take `str(value)`.
-    env.add_filter("lower", |state: &State, v: &Value| {
-        text(state, v).map(|s| s.to_lowercase())
-    });
-    env.add_filter("upper", |state: &State, v: &Value| {
-        text(state, v).map(|s| s.to_uppercase())
-    });
-    env.add_filter("title", |state: &State, v: &Value| {
-        text(state, v).map(|s| f::title(s.into()))
-    });
+    env.add_filter(
+        "lower",
+        |state: &State, v: &Value| -> Result<String, Error> {
+            let s = text(state, v)?;
+            grow(state, &s)?;
+            Ok(s.to_lowercase())
+        },
+    );
+    env.add_filter(
+        "upper",
+        |state: &State, v: &Value| -> Result<String, Error> {
+            let s = text(state, v)?;
+            grow(state, &s)?;
+            Ok(s.to_uppercase())
+        },
+    );
+    env.add_filter(
+        "title",
+        |state: &State, v: &Value| -> Result<String, Error> {
+            let s = text(state, v)?;
+            grow(state, &s)?;
+            Ok(f::title(s.into()))
+        },
+    );
     // `str.capitalize()`.
     env.add_filter("capitalize", |state: &State, v: &Value| {
-        text(state, v).map(|s| {
-            let mut chars = s.chars();
-            match chars.next() {
-                Some(c) => c
-                    .to_uppercase()
-                    .chain(chars.as_str().to_lowercase().chars())
-                    .collect(),
-                None => String::new(),
-            }
-        })
+        text(state, v)
+            .and_then(|s| grow(state, &s).map(|()| s))
+            .map(|s| {
+                let mut chars = s.chars();
+                match chars.next() {
+                    Some(c) => c
+                        .to_uppercase()
+                        .chain(chars.as_str().to_lowercase().chars())
+                        .collect(),
+                    None => String::new(),
+                }
+            })
     });
     // `str.strip(chars)`.
     env.add_filter(
@@ -623,6 +640,12 @@ pub(super) fn add_filters(env: &mut Environment<'static>) {
         }
     });
     env.add_filter("join", join);
+}
+
+/// Pays, before it is made, for a case change of `s`: a character's other
+/// case is at most three times its bytes (`ß` → `SS`, `ŉ` → `ʼN`).
+fn grow(state: &State, s: &str) -> Result<(), Error> {
+    state.consume_fuel((s.len() as u64).saturating_mul(3) / 64)
 }
 
 /// `str.replace(old, new, count)` for a count that isn't "all".
@@ -757,17 +780,24 @@ fn join(
     if v.is_undefined() {
         return Ok(Value::from(""));
     }
+    // Every separator and item is paid for before it is appended.
     let mut out = String::new();
+    let mut w = super::Charged::new(&mut out, state);
     for (i, item) in v.try_iter()?.enumerate() {
+        state.consume_fuel(1)?;
         if i > 0 {
-            out.push_str(&d);
+            w.put(&d)?;
         }
         let item = match &attribute {
             Some(a) => attr_path(state, &item, a)?,
             None => item,
         };
-        out.push_str(&text(state, &item)?);
-        state.consume_fuel(1 + out.len() as u64 / 4096)?;
+        if item.is_undefined() {
+            // `str()` of an undefined item: Jinja's policy, then nothing.
+            text(state, &item)?;
+        } else {
+            py_str(&mut w, &item)?;
+        }
     }
     Ok(Value::from(out))
 }

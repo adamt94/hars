@@ -1443,6 +1443,110 @@
   ]
  },
  {
+  "name": "deep expression",
+  "steps": [
+   {
+    "send": {
+     "id": 1,
+     "type": "render_template",
+     "template": "{{ 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1 }}"
+    },
+    "replies": [
+     {
+      "id": 1,
+      "type": "result",
+      "success": false,
+      "error": {
+       "code": "unknown_error",
+       "message": "Unknown error"
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "name": "deep expression reported",
+  "steps": [
+   {
+    "send": {
+     "id": 1,
+     "type": "render_template",
+     "template": "{{ not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not not true }}",
+     "report_errors": true
+    },
+    "replies": [
+     {
+      "id": 1,
+      "type": "result",
+      "success": false,
+      "error": {
+       "code": "unknown_error",
+       "message": "Unknown error"
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "name": "deep filters, with timeout",
+  "steps": [
+   {
+    "send": {
+     "id": 1,
+     "type": "render_template",
+     "template": "{{ [1]|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list|list }}",
+     "timeout": 3
+    },
+    "replies": [
+     {
+      "id": 1,
+      "type": "result",
+      "success": false,
+      "error": {
+       "code": "unknown_error",
+       "message": "Unknown error"
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "name": "deep but within the limit",
+  "steps": [
+   {
+    "send": {
+     "id": 1,
+     "type": "render_template",
+     "template": "{{ 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1 }}"
+    },
+    "replies": [
+     {
+      "id": 1,
+      "type": "result",
+      "success": true,
+      "result": null
+     },
+     {
+      "id": 1,
+      "type": "event",
+      "event": {
+       "result": 301,
+       "listeners": {
+        "all": false,
+        "entities": [],
+        "domains": [],
+        "time": false
+       }
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
   "name": "no template",
   "steps": [
    {

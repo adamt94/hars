@@ -34,6 +34,14 @@ The changes, each marked `hars patch` in the source:
   which runs at compile time without fuel.
 - `src/value/ops.rs` `slice`: a step of `i64::MIN` is read as `-i64::MAX`,
   where negating it overflowed (and panicked).
+- `src/compiler/parser.rs`: expression trees are capped at a depth of
+  400 while they are built (`MAX_AST_DEPTH`): the parser's recursion plus
+  every link of a chain built in a loop (`1+1+…`, `x|f|f…`, `x.a.a…`,
+  `not not…`, `- -…`, `a if b else …`, `{% filter f|f… %}`). Unary `not`
+  and `-` used to recurse without a guard, and the loops built trees of any
+  depth that compiling, constant folding and dropping then recursed
+  through, overflowing the stack. Jinja under Python's default recursion
+  limit fails at about the same depth.
 - `src/filters.rs`: the fueled versions of `reverse`, `items`, `dictsort`,
   `groupby`, `first`, `last` and `length` are public (`#[doc(hidden)]`), so
   hars's wrappers around them keep the fuel accounting.

@@ -12,6 +12,14 @@ use crate::syntax::SyntaxConfig;
 use crate::value::Value;
 
 const MAX_RECURSION: usize = 150;
+
+/// hars patch: how deep an expression's tree may get, counting the
+/// parser's recursion and every link of a chain it builds in a loop
+/// (`1+1+…`, `x|f|f…`, `x.a.a…`, `not not…`, `- -…`, `a if b else c if …`).
+/// Compiling, folding and dropping the tree recurse, so the depth is
+/// capped while the tree is built. Jinja under Python's default recursion
+/// limit fails at about 400–500 links.
+const MAX_AST_DEPTH: usize = 400;
 const RESERVED_NAMES: [&str; 8] = [
     "true", "True", "false", "False", "none", "None", "loop", "self",
 ];
@@ -183,12 +191,15 @@ struct Parser<'a> {
     #[cfg(feature = "multi_template")]
     blocks: BTreeSet<&'a str>,
     depth: usize,
+    /// hars patch: links of the expression chains being built.
+    chain: usize,
 }
 
 macro_rules! binop {
     ($func:ident, $next:ident, { $($tok:tt)* }) => {
         fn $func(&mut self) -> Result<ast::Expr<'a>, Error> {
             let span = self.stream.current_span();
+            let base = self.chain;
             let mut left = ok!(self.$next());
             loop {
                 let op = match ok!(self.stream.current()) {
@@ -196,12 +207,14 @@ macro_rules! binop {
                     _ => break,
                 };
                 ok!(self.stream.next());
+                ok!(self.deepen());
                 let right = ok!(self.$next());
                 left = ast::Expr::BinOp(Spanned::new(
                     ast::BinOp { op, left, right, },
                     self.stream.expand_span(span),
                 ));
             }
+            self.chain = base;
             Ok(left)
         }
     };
@@ -216,11 +229,11 @@ macro_rules! unaryop {
                 _ => return self.$next()
             };
             ok!(self.stream.next());
+            ok!(self.deepen());
+            let expr = ok!(self.$func());
+            self.chain -= 1;
             Ok(ast::Expr::UnaryOp(Spanned::new(
-                ast::UnaryOp {
-                    op,
-                    expr: ok!(self.$func()),
-                },
+                ast::UnaryOp { op, expr },
                 self.stream.expand_span(span),
             )))
         }
@@ -230,7 +243,7 @@ macro_rules! unaryop {
 macro_rules! with_recursion_guard {
     ($parser:expr, $expr:expr) => {{
         $parser.depth += 1;
-        if $parser.depth > MAX_RECURSION {
+        if $parser.depth > MAX_RECURSION || $parser.depth + $parser.chain > MAX_AST_DEPTH {
             return Err(syntax_error(Cow::Borrowed(
                 "template exceeds maximum recursion limits",
             )));
@@ -242,6 +255,17 @@ macro_rules! with_recursion_guard {
 }
 
 impl<'a> Parser<'a> {
+    /// hars patch: one more link in an expression chain.
+    fn deepen(&mut self) -> Result<(), Error> {
+        self.chain += 1;
+        if self.depth + self.chain > MAX_AST_DEPTH {
+            return Err(syntax_error(Cow::Borrowed(
+                "template exceeds maximum recursion limits",
+            )));
+        }
+        Ok(())
+    }
+
     /// Creates a new parser.
     ///
     /// `in_expr` is necessary to parse within an expression context.  Otherwise
@@ -264,6 +288,7 @@ impl<'a> Parser<'a> {
             #[cfg(feature = "multi_template")]
             blocks: BTreeSet::new(),
             depth: 0,
+            chain: 0,
         }
     }
 
@@ -300,9 +325,11 @@ impl<'a> Parser<'a> {
 
     fn parse_ifexpr(&mut self) -> Result<ast::Expr<'a>, Error> {
         let mut span = self.stream.last_span();
+        let base = self.chain;
         let mut expr = ok!(self.parse_or());
         loop {
             if skip_token!(self, Token::Ident("if")) {
+                ok!(self.deepen());
                 let expr2 = ok!(self.parse_or());
                 let expr3 = if skip_token!(self, Token::Ident("else")) {
                     Some(ok!(self.parse_ifexpr()))
@@ -322,6 +349,7 @@ impl<'a> Parser<'a> {
                 break;
             }
         }
+        self.chain = base;
         Ok(expr)
     }
 
@@ -432,9 +460,11 @@ impl<'a> Parser<'a> {
             return self.parse_primary();
         }
         ok!(self.stream.next());
+        ok!(self.deepen());
         let operand_span = self.stream.current_span();
         let operand = ok!(self.parse_unary_only());
         let operand = ok!(self.parse_postfix(operand, operand_span));
+        self.chain -= 1;
         Ok(ast::Expr::UnaryOp(Spanned::new(
             ast::UnaryOp {
                 op: ast::UnaryOpKind::Neg,
@@ -457,8 +487,12 @@ impl<'a> Parser<'a> {
         mut span: Span,
     ) -> Result<ast::Expr<'a>, Error> {
         let mut expr = expr;
+        let base = self.chain;
         loop {
             let next_span = self.stream.current_span();
+            if matches_token!(self, Token::Dot | Token::BracketOpen | Token::ParenOpen) {
+                ok!(self.deepen());
+            }
             match ok!(self.stream.current()) {
                 Some((Token::Dot, _)) => {
                     ok!(self.stream.next());
@@ -548,6 +582,7 @@ impl<'a> Parser<'a> {
             }
             span = next_span;
         }
+        self.chain = base;
         Ok(expr)
     }
 
@@ -575,7 +610,11 @@ impl<'a> Parser<'a> {
 
     fn parse_filter_expr(&mut self, expr: ast::Expr<'a>) -> Result<ast::Expr<'a>, Error> {
         let mut expr = expr;
+        let base = self.chain;
         loop {
+            if matches_token!(self, Token::Pipe | Token::Ident("is")) {
+                ok!(self.deepen());
+            }
             match ok!(self.stream.current()) {
                 Some((Token::Pipe, _)) => {
                     ok!(self.stream.next());
@@ -643,6 +682,7 @@ impl<'a> Parser<'a> {
                 _ => break,
             }
         }
+        self.chain = base;
         Ok(expr)
     }
 
@@ -1171,11 +1211,13 @@ impl<'a> Parser<'a> {
 
     fn parse_filter_chain(&mut self) -> Result<ast::Expr<'a>, Error> {
         let mut filter = None;
+        let base = self.chain;
 
         while !matches_token!(self, Token::BlockEnd) {
             if filter.is_some() {
                 expect_token!(self, Token::Pipe, "`|`");
             }
+            ok!(self.deepen());
             let (name, span) = ok!(self.parse_filter_test_name());
             let args = if matches_token!(self, Token::ParenOpen) {
                 ok!(self.parse_args())
@@ -1192,6 +1234,7 @@ impl<'a> Parser<'a> {
             )));
         }
 
+        self.chain = base;
         filter.ok_or_else(|| syntax_error(Cow::Borrowed("expected a filter")))
     }
 
