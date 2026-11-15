@@ -464,12 +464,27 @@ impl Auth {
     /// Take back a [`Auth::create_owner`] whose save failed: the user, its
     /// credential and its login go, so the user step can run again and
     /// make the owner afresh. [`Auth::save`] writes the result.
+    /// Any session it already has (a login while the owner was waiting to
+    /// be saved) ends too: its refresh tokens are dropped and revoked, so
+    /// open WebSockets using them close.
     pub fn remove_owner(&self, owner: &Onboarded) {
         let mut s = self.0.state.lock();
         s.data.users.retain(|u| u.id != owner.user_id);
         s.data.credentials.retain(|c| c.user_id != owner.user_id);
         s.provider.users.retain(|u| u.username != owner.username);
+        let mut revoked = Vec::new();
+        s.data.refresh_tokens.retain(|t| {
+            let theirs = t.user_id == owner.user_id;
+            if theirs {
+                revoked.push(t.id.clone());
+            }
+            !theirs
+        });
         s.dirty |= DIRTY_AUTH | DIRTY_PROVIDER;
+        drop(s);
+        for id in revoked {
+            let _ = self.0.revoked.send(id);
+        }
     }
 
     /// The `homeassistant` username of the credential a refresh token was

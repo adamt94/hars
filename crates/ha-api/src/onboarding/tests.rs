@@ -1048,3 +1048,34 @@ async fn an_owner_closes_the_user_step() {
     let _ = std::fs::remove_dir_all(dir);
     let _ = std::fs::remove_dir_all(dir2);
 }
+
+/// A session opened on an owner onboarding then took back (its logins
+/// couldn't be saved) ends with it: the WebSocket is closed and the token
+/// no longer works, so the connection keeps no admin rights.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_taken_back_owners_websocket_is_closed() {
+    use futures_util::StreamExt;
+    use tokio_tungstenite::tungstenite::Message;
+    let dir = temp_dir("taken-back-ws");
+    let i = start(&dir, true).await;
+    // The provisional owner, logged into before its save fails.
+    let owner = i.auth.create_owner("Owner", "owner", "pw").unwrap();
+    let (token, _) = login(&i.auth, "owner");
+    let mut ws = ws_connect(i.addr, &token).await;
+    let r = ws_call(&mut ws, &json!({"id": 1, "type": "analytics"}), 1).await;
+    assert_eq!(r[0]["success"], true, "an admin until then");
+
+    i.auth.remove_owner(&owner);
+    let closed = tokio::time::timeout(Duration::from_secs(2), async {
+        loop {
+            match ws.next().await {
+                None | Some(Err(_)) | Some(Ok(Message::Close(_))) => return,
+                Some(Ok(_)) => {}
+            }
+        }
+    })
+    .await;
+    assert!(closed.is_ok(), "the WebSocket is closed");
+    assert!(i.auth.validate_access_token(&token, None).is_none());
+    let _ = std::fs::remove_dir_all(dir);
+}
