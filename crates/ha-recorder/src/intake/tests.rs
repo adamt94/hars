@@ -388,6 +388,11 @@ fn removals_forget_the_entity() {
             ts(T0 + 1),
             c.clone(),
         );
+        // HA's row for a removal: an empty state, ending the entity's line.
+        let row = state_row(intake.row(&gone));
+        assert_eq!((&*row.state, &*row.attributes, row.ts), ("", "{}", T0 + 1));
+        assert_eq!(row.flags, 0);
+        // An entity that was never recorded has no line to end.
         assert!(intake.row(&gone).is_none());
     }
     assert!(intake.last.is_empty());

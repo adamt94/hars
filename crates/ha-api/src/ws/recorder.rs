@@ -8,9 +8,6 @@ use super::{Conn, Invalid, only_keys};
 use jiff::Timestamp;
 use serde_json::{Map, Value, json};
 
-/// HA's `MAX_QUEUE_BACKLOG_MIN_VALUE`, which `recorder/info` reports.
-const MAX_BACKLOG: u32 = 65_000;
-
 pub(super) fn dispatch(
     conn: &mut Conn,
     id: u64,
@@ -26,7 +23,7 @@ pub(super) fn dispatch(
                 json!({
                     "backlog": info.backlog,
                     "db_in_default_location": true,
-                    "max_backlog": MAX_BACKLOG,
+                    "max_backlog": info.max_backlog,
                     "migration_in_progress": false,
                     "migration_is_live": false,
                     "recording": info.recording,

@@ -1865,7 +1865,7 @@ async fn recorder_info_and_empty_statistics() {
         c.call(json!({"id": 1, "type": "recorder/info"})).await,
         ok(
             1,
-            json!({"backlog": 0, "db_in_default_location": true, "max_backlog": 65000,
+            json!({"backlog": 0, "db_in_default_location": true, "max_backlog": 10000,
                    "migration_in_progress": false, "migration_is_live": false,
                    "recording": true, "thread_running": true})
         )

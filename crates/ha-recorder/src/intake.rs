@@ -233,12 +233,30 @@ impl Intake {
                 old_state,
                 new_state,
             } => {
-                // A removal isn't recorded (no state to store), but the
+                // A removal is HA's row with an empty state, so history
+                // ends the entity's line there (`States.from_event`); the
                 // entity is forgotten: a later one with this id starts over.
                 let Some(new) = new_state.as_deref() else {
-                    self.last.remove(entity_id);
                     self.oversized.remove(entity_id);
-                    return None;
+                    // Only an entity this process recorded has a line to end.
+                    self.last.remove(entity_id)?;
+                    let row = Row::State(StateRow {
+                        entity_id: entity_id.as_str().into(),
+                        ts,
+                        last_changed: ts,
+                        state: SmolStr::default(),
+                        attributes: Arc::from("{}"),
+                        flags: 0,
+                        context: ctx.id.to_bytes(),
+                        aug: None,
+                    });
+                    return Some((
+                        row,
+                        Effects {
+                            see: None,
+                            last: None,
+                        },
+                    ));
                 };
                 self.state_row(entity_id, old_state.is_some(), new)
             }
@@ -337,12 +355,14 @@ impl Intake {
     ) -> Option<(Row, Effects)> {
         let ts = new.last_updated.as_microsecond();
         let last_changed = new.last_changed.as_microsecond();
-        let (text, has_unit) = self.attributes(new);
+        let has_unit = self.attributes(new);
+        let text = String::from_utf8_lossy(&self.buf);
         let prev = self.last.get(entity_id);
-        // Reuse the previous row's text when it repeats.
+        // Reuse the previous row's text when it repeats; copy it out of
+        // the scratch buffer only when it changed.
         let attributes = match prev {
             Some(p) if *p.attributes == *text => p.attributes.clone(),
-            _ => Arc::from(text),
+            _ => Arc::from(&*text),
         };
         let origin = || Origin::State {
             entity_id: entity_id.clone(),
@@ -393,8 +413,9 @@ impl Intake {
         Some((row, effects))
     }
 
-    /// The recorded attributes as JSON text, and whether they have a unit.
-    fn attributes(&mut self, state: &State) -> (String, bool) {
+    /// Encode the recorded attributes as JSON text into `self.buf`;
+    /// whether they have a unit.
+    fn attributes(&mut self, state: &State) -> bool {
         let unrecorded = self.hass.unrecorded(&state.entity_id);
         let mut out = Capped(&mut self.buf);
         out.0.clear();
@@ -419,6 +440,8 @@ impl Intake {
         .is_ok();
         let buf = out.0;
         if !fits {
+            buf.clear();
+            buf.extend_from_slice(b"{}");
             if self.oversized.insert(state.entity_id.clone()) {
                 tracing::warn!(
                     "State attributes for {} exceed maximum size of {MAX_ATTRS_BYTES} bytes. \
@@ -426,9 +449,9 @@ impl Intake {
                     state.entity_id
                 );
             }
-            return ("{}".into(), false);
+            return false;
         }
-        (String::from_utf8_lossy(buf).into_owned(), has_unit)
+        has_unit
     }
 }
 

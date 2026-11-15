@@ -100,6 +100,7 @@ async fn rows_wait_for_the_commit_interval_then_go_as_one_frame() {
         store.info(),
         Info {
             backlog: 0,
+            max_backlog: 10_000,
             recording: true,
             thread_running: true
         }
