@@ -12,6 +12,7 @@ mod commands;
 mod entities;
 mod frontend;
 mod manifest;
+mod mobile_app;
 mod sensor;
 mod weather;
 

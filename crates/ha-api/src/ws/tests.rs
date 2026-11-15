@@ -1756,3 +1756,89 @@ async fn subscribe_entities_include_exclude_filters() {
         );
     }
 }
+
+/// HA's `ws.json`: the push channel's access checks, a silent channel,
+/// its unsubscribe, and a confirm with nothing pending.
+#[tokio::test]
+async fn mobile_app_push_channel_as_ha() {
+    let reg = |webhook: &str, user: &str| {
+        json!({"domain": "mobile_app", "entry_id": webhook, "disabled_by": null,
+               "data": {"webhook_id": webhook, "user_id": user, "secret": "00",
+                        "supports_encryption": false}})
+        .as_object()
+        .unwrap()
+        .clone()
+    };
+    // `server_with`, but the registration belongs to this server's owner.
+    let hass = Hass::new();
+    hass.start();
+    let auth = crate::test_util::auth(true);
+    let (tok, _) = token(&auth);
+    let owner = auth.validate_access_token(&tok, None).unwrap().user_id;
+    let app = ha_integrations::mobile_app::MobileApp::new(
+        &[reg("mine", &owner), reg("theirs", "someone-else")],
+        Vec::new(),
+    );
+    let config = crate::ApiConfig {
+        config_dir: "/config".into(),
+        mobile_app: Some(std::sync::Arc::new(app)),
+        ..Default::default()
+    };
+    let router = crate::router(hass.clone(), auth.clone(), &config)
+        .into_make_service_with_connect_info::<std::net::SocketAddr>();
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let url = format!("ws://{}/api/websocket", listener.local_addr().unwrap());
+    tokio::spawn(async move { axum::serve(listener, router).await.unwrap() });
+    let s = Server { url, hass, auth };
+    let mut c = Client::authed(&s, &tok).await;
+    let err = |r: Value| r["error"].clone();
+    assert_eq!(
+        err(c
+            .call(
+                json!({"id": 1, "type": "mobile_app/push_notification_channel",
+                          "webhook_id": "theirs", "support_confirm": true})
+            )
+            .await),
+        json!({"code": "unauthorized", "message": "User not linked to this webhook ID"})
+    );
+    assert_eq!(
+        err(c
+            .call(
+                json!({"id": 2, "type": "mobile_app/push_notification_channel",
+                          "webhook_id": "nope"})
+            )
+            .await),
+        json!({"code": "not_found", "message": "Webhook ID not found"})
+    );
+    let r = c
+        .call(
+            json!({"id": 3, "type": "mobile_app/push_notification_channel",
+                     "webhook_id": "mine", "support_confirm": true}),
+        )
+        .await;
+    assert_eq!(
+        (r["success"].clone(), r["result"].clone()),
+        (json!(true), Value::Null)
+    );
+    assert_eq!(
+        err(c
+            .call(
+                json!({"id": 4, "type": "mobile_app/push_notification_confirm",
+                          "webhook_id": "mine", "confirm_id": "nope"})
+            )
+            .await),
+        json!({"code": "not_found", "message": "Push notification channel not found"})
+    );
+    let r = c
+        .call(json!({"id": 5, "type": "unsubscribe_events", "subscription": 3}))
+        .await;
+    assert_eq!(r["success"], true);
+    // HA's schema: strict types, no extra keys.
+    let r = c
+        .call(
+            json!({"id": 6, "type": "mobile_app/push_notification_channel",
+                     "webhook_id": 5, "x": 1}),
+        )
+        .await;
+    assert_eq!(r["error"]["code"], "invalid_format");
+}
