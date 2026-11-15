@@ -11,9 +11,9 @@ history and logbook, the iOS companion app, YAML automations (state,
 numeric-state and time triggers), the `sun`, `met`, `hue`, `lifx`,
 `switchbot_cloud`, `mobile_app`, `person` and `zone` integrations, and
 importing a Home Assistant 2026.6 install. **Not yet:** the onboarding screen,
-adding integrations or editing automations from the UI, templates, scripts,
-notifications and remote access. If you need those, keep Home Assistant for
-now.
+setting your location, adding integrations or editing automations from the
+UI, templates, scripts, notifications and remote access. If you need those,
+keep Home Assistant for now.
 
 ## Install
 
@@ -34,6 +34,8 @@ You need a Linux machine (x86-64 or ARM64) with Docker and Docker Compose.
    ```
 
    It prints `created owner "YOUR_NAME"; onboarding is complete`.
+   To keep the password out of your shell history, run `read -rs PW`, type
+   it, and write `"$PW"` in its place.
    Moving from Home Assistant? Skip this step and
    [import](#moving-from-home-assistant) instead: your logins come with it.
 
@@ -45,12 +47,38 @@ You need a Linux machine (x86-64 or ARM64) with Docker and Docker Compose.
 
 4. Open `http://<your-machine>:8123` and log in with that name and password.
 
-Docker restarts hars if it stops and after a reboot. The image is
-pulled from `ghcr.io/adamt94/homeassistant-rust`, which
+Next, [set your location](#set-your-location). Docker restarts hars if it
+stops and after a reboot. The image is pulled from
+`ghcr.io/adamt94/homeassistant-rust`, which
 [a workflow](.github/workflows/publish.yml) publishes from every commit to
 `main`. If you run these steps in a clone of this repository (in place of
 step 1's download) and the image can't be pulled, Compose builds it from the
 [Dockerfile](Dockerfile) instead, which takes a few minutes.
+
+## Set your location
+
+A fresh install starts with Home Assistant's defaults: location 0,0, time
+zone UTC, metric units, named "Home". Sunrise and sunset, time triggers and
+the days in history all follow them. There is no settings screen for this
+yet, so write them to `config/.storage/core.config` (Home Assistant's own
+file) and restart. Skip this if you imported: your settings came with it.
+
+```sh
+sudo tee config/.storage/core.config >/dev/null <<'EOF'
+{"version": 1, "minor_version": 4, "key": "core.config", "data": {
+  "latitude": 51.5072, "longitude": -0.1276, "elevation": 11,
+  "unit_system_v2": "metric", "location_name": "Home",
+  "time_zone": "Europe/London", "currency": "GBP", "country": "GB",
+  "language": "en", "radius": 100, "external_url": null, "internal_url": null}}
+EOF
+docker compose restart
+```
+
+Put in your own values. `unit_system_v2` is `metric` or `us_customary`.
+`time_zone` is a name like `America/New_York`; hars reads it only from this
+file, not from `TZ`, and an unknown name means UTC. `elevation` and `radius`
+(the size of the home zone) are in meters. Keep every key: if the file
+doesn't load, hars won't start and `docker compose logs` says why.
 
 ## Moving from Home Assistant
 
@@ -124,8 +152,9 @@ need it). hars listens on port 8123. To use another port, add
   networking is off there by default. Turn it on in Docker Desktop's settings,
   or replace `network_mode: host` with `ports: ["8123:8123"]` (LAN discovery
   then won't work).
-- **`Address in use` in the log:** something else, often Home Assistant,
-  already uses port 8123. Stop it or change `HARS_BIND` as above.
+- **`Error: Address already in use (os error 98)` in the log:** something
+  else, often Home Assistant, already uses port 8123. Stop it or change
+  `HARS_BIND` as above.
 - **An integration or automation is missing after an import:** check
   `config/import-report.json`; it says why.
 - **More detail in the log:** add `environment: [RUST_LOG=debug]`.

@@ -10,7 +10,7 @@ in the component).
 ## WebSocket command
 
 The reference is `sensor/numeric_device_classes` in
-`crates/ha-api/src/ws/sensor.rs`, about 70 lines.
+`crates/ha-api/src/ws/sensor.rs`, about 60 lines.
 
 ### 1. Put it in the domain's module
 

@@ -2,8 +2,8 @@
 
 ## Using hars
 
-- [Install, upgrade, back up, troubleshoot](../README.md#install): the main
-  README.
+- [Install, set your location, upgrade, back up,
+  troubleshoot](../README.md#install): the main README.
 - [Moving from Home Assistant](../README.md#moving-from-home-assistant):
   importing an existing install.
 - [Shadow mode](SHADOW.md): run hars beside Home Assistant, with nothing it
@@ -52,12 +52,22 @@ public image. Before announcing hars, in this order:
    [CODE_OF_CONDUCT.md](../CODE_OF_CONDUCT.md) relies on them. Make sure each
    maintainer's GitHub profile shows a way to reach them, or add a project
    contact to the Code of Conduct.
-3. Run the publish workflow: merge to `main`, or **Actions**, **Publish
+3. Create the labels the templates use that GitHub doesn't make by default:
+   `integration` (the integration request form adds it) and `perf`
+   ([PERF.md](PERF.md) asks for it). `bug` is one of GitHub's default
+   labels. An issue form's label that doesn't exist is silently left off.
+
+   ```sh
+   gh label create integration
+   gh label create perf
+   ```
+
+4. Run the publish workflow: merge to `main`, or **Actions**, **Publish
    image**, **Run workflow**. Wait for both jobs to pass.
-4. Make the image public. A new ghcr.io package starts private: open the
+5. Make the image public. A new ghcr.io package starts private: open the
    package (**Packages** on the repository page), **Package settings**,
    **Change visibility**, **Public**.
-5. Check an anonymous pull gets both architectures:
+6. Check an anonymous pull gets both architectures:
 
    ```sh
    docker logout ghcr.io
@@ -65,7 +75,7 @@ public image. Before announcing hars, in this order:
    docker pull ghcr.io/adamt94/homeassistant-rust:latest
    ```
 
-6. Follow the README's install steps word for word in an empty folder
+7. Follow the README's install steps word for word in an empty folder
    outside any clone, starting with its `curl` of the raw `compose.yaml`.
    Without a clone there is no Dockerfile to fall back on, so this proves
    the image and the download both work. Log in at `http://localhost:8123`.

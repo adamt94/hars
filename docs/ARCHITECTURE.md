@@ -26,12 +26,12 @@ Ten crates in `crates/`. `ha-server` builds the only binary, `hars`.
 
 | Crate | Job | Home Assistant equivalent |
 |---|---|---|
-| `ha-core` | `Hass`, the state machine, the event bus and lossless feeds, services and schemas, lifecycle stages, `.storage` files, restore state, the clock, YAML loading, shadow mode's gate | `core.py`, `helpers/storage.py`, `helpers/restore_state.py`, `util/yaml` |
+| `ha-core` | `Hass`, the state machine, the event bus and lossless feeds, services and schemas, lifecycle stages, `.storage` files, restore state, the clock, YAML loading, `slugify`, shadow mode's gate | `core.py`, `helpers/storage.py`, `helpers/restore_state.py`, `util/yaml` |
 | `ha-auth` | Users, credentials, login flows, refresh and access tokens, permissions | `auth/` |
 | `ha-registry` | Entity, device, area, floor and label registries; target expansion (device/area/floor/label to entities) | `helpers/*_registry.py` |
 | `ha-http` | The one outbound HTTP(S) client: HTTP/1.1, rustls with compiled-in roots, timeouts, server-sent events | `aiohttp` client session |
 | `ha-recorder` | History: an append-only segment log, its intake, retention, and the history and logbook queries | `components/recorder`, `history`, `logbook` |
-| `ha-components` | Built-in `zone` and `person`; `slugify` for new entity ids | `components/zone`, `components/person` |
+| `ha-components` | Built-in `zone` and `person`; new entity ids for them (with `ha_core::slugify`, re-exported here) | `components/zone`, `components/person` |
 | `ha-integrations` | Config entries; the shared entity components (`light`, `switch`, `scene`, `button`, `climate`, `weather`); every integration (`sun`, `met`, `hue`, `lifx`, `switchbot_cloud`, `mobile_app`) | `config_entries.py`, `components/<domain>` |
 | `ha-automation` | YAML automations: triggers, conditions, actions, modes | `components/automation`, `helpers/script.py` |
 | `ha-api` | Everything served over HTTP: REST, WebSocket, auth views, the companion app's webhook, the frontend, brands | `components/api`, `websocket_api`, `http`, `frontend`, `auth` views |
@@ -100,8 +100,8 @@ layer 0   ha-core   (no workspace dependencies)
   allocates).
 - **`State`** is a snapshot shared as `Arc<State>`, immutable except for
   the atomic `last_reported` timestamp (its JSON value freezes at first
-  serialisation, matching HA's cache). The state machine, the `state_changed` event and every API response share one
-  allocation.
+  serialisation, matching HA's cache). The state machine, the
+  `state_changed` event and every API response share one allocation.
 - **`StateMachine`** is a `RwLock<HashMap<EntityId, Arc<State>>>`. A write
   that changes nothing returns the existing `Arc`, moves only
   `last_reported` and fires no event.

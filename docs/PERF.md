@@ -92,7 +92,9 @@ state change.
 ### Process numbers: `scripts/perf.sh`
 
 Linux only (it reads `/proc`). On macOS, `scripts/perf-docker.sh` builds a
-release binary in a `rust:1` container and runs it there.
+release binary in a `rust:1` container and runs it there. It passes the
+options below into the container and mounts `PERF_CONFIG`'s directory
+read-only (`scripts/test_perf_docker.py` checks this).
 
 ```sh
 scripts/perf.sh target/release/hars              # 15 s warm-up, 60 s quiet

@@ -193,7 +193,8 @@ Integrations add code, timers and sockets, so the pull request needs numbers
 2. A `scripts/perf.sh` row with the integration running: make a config dir
    with a `core.config_entries` entry for it (see how `PERF_MET=1` writes
    one in `scripts/perf.sh`), then
-   `PERF_CONFIG=that-dir scripts/perf.sh target/release/hars 15 60`.
+   `PERF_CONFIG=that-dir scripts/perf.sh target/release/hars 15 60`
+   (on macOS, `PERF_CONFIG=that-dir scripts/perf-docker.sh 15 60`).
    Idle wakeups should stay at 0 between its scheduled work.
 3. If it changes a hot path (state processing or per-change fan-out), include
    Criterion before/after results too; add a bench if none covers it.

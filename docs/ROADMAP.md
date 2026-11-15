@@ -194,7 +194,11 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
       2.33 → 2.64 MiB
 - [ ] Onboarding UI: `/api/onboarding/users` and the `core_config`,
       `analytics` and `integration` steps (needs WS); a fresh install
-      redirects to `/onboarding.html` until then
+      redirects to `/onboarding.html` until then. Until the `core_config`
+      step (or `config/core/update`) lands, a fresh install's location, time
+      zone and units are HA's defaults (0,0, UTC, metric) unless
+      `.storage/core.config` is written by hand
+      ([README](../README.md#set-your-location))
 - [ ] CORS for `/auth/token` and `/auth/revoke` (HA allows any origin)
 - [ ] Permissions beyond the built-in groups: custom group policies (users
       with only custom groups are refused for now), per-entity filtering, and
@@ -452,8 +456,8 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
       and logs the calls it *would* make and its `automation_triggered`
       events; `scripts/shadow-diff.py` compares them with HA's recorder
       database (service, targets, data within 1 s; triggers per automation)
-- [ ] Run shadow mode for a week beside the reference install: no
-      differences. The phone stays on HA.
+- [ ] Acceptance: shadow mode runs for a week beside the reference install
+      with no differences, while the companion app stays connected to HA
 - [x] Packaging: static musl binary in a `FROM scratch` image with tzdata
       (CA roots are compiled into the binary), a persistent volume and SIGTERM
       handling
@@ -462,10 +466,11 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
       (`.github/workflows/publish.yml`)
 - [ ] Onboarding without the command line (the M2 onboarding UI), so
       installing is `docker compose up -d` and a browser
-- [ ] Promote: stop HA, run the importer on a fresh copy, start `hars` on :8123.
-      Rollback = start the untouched HA snapshot again.
-- [ ] Publish the RSS / CPU / startup / wakeup numbers against the HA instance
-      being replaced
+- [ ] Acceptance: a documented cutover and rollback procedure (stop HA,
+      import a fresh copy, start `hars` on :8123; roll back by starting the
+      untouched HA copy), proven on the reference install
+- [ ] Acceptance: RSS / CPU / start-up / wakeup numbers for the reference
+      install, published beside the same numbers for HA on the same host
 
 ## Post-MVP
 - Push notifications (`notify.<device>` via the relay, local push channel)
