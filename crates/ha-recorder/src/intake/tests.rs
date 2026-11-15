@@ -391,7 +391,7 @@ fn removals_forget_the_entity() {
         // HA's row for a removal: an empty state, ending the entity's line.
         let row = state_row(intake.row(&gone));
         assert_eq!((&*row.state, &*row.attributes, row.ts), ("", "{}", T0 + 1));
-        assert_eq!(row.flags, 0);
+        assert_eq!(row.flags, REMOVED);
         // One that was recorded before this process started has a line to
         // end too: the removal writes a row whatever the intake remembers.
         assert_eq!(state_row(intake.row(&gone)).state, "");

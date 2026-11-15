@@ -7,10 +7,11 @@
 //! shared by the history and logbook commands.
 
 pub mod format;
+pub mod history;
 mod intake;
 mod recorder;
 mod store;
 
-pub use format::{EventRec, EventRow, HAS_UNIT, Rec, Row, StateRec, StateRow, VISIBLE};
+pub use format::{EventRec, EventRow, HAS_UNIT, REMOVED, Rec, Row, StateRec, StateRow, VISIBLE};
 pub use recorder::{Recorder, Settings};
 pub use store::{Config, Info, Store};

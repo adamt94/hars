@@ -26,7 +26,10 @@ async fn server() -> Server {
 }
 
 async fn server_with(config: crate::ApiConfig) -> Server {
-    let hass = Hass::new();
+    server_on(Hass::new(), config).await
+}
+
+async fn server_on(hass: Hass, config: crate::ApiConfig) -> Server {
     hass.start();
     let auth = crate::test_util::auth(true);
     let app = crate::router(hass.clone(), auth.clone(), &config)
@@ -1941,4 +1944,184 @@ async fn recorder_info_and_empty_statistics() {
         ok(11, json!({}))
     );
     let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// A server whose recorder records the server's own states.
+async fn recording_server(name: &str) -> (Server, std::path::PathBuf) {
+    let dir = std::env::temp_dir().join(format!("hars-ws-{name}-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let hass = Hass::new();
+    let recorder =
+        ha_recorder::Recorder::start(&hass, dir.clone(), &ha_recorder::Settings::default())
+            .await
+            .unwrap();
+    let s = server_on(
+        hass,
+        crate::ApiConfig {
+            recorder: Some(std::sync::Arc::new(recorder)),
+            ..Default::default()
+        },
+    )
+    .await;
+    (s, dir)
+}
+
+fn minutes_ago(n: i64) -> String {
+    (jiff::Timestamp::now() - jiff::SignedDuration::from_mins(n)).to_string()
+}
+
+/// `history/history_during_period`: recorded states in HA's compressed
+/// shape, and HA's checks before it reads anything.
+#[tokio::test]
+async fn history_during_period_answers_from_the_recorder() {
+    let (s, dir) = recording_server("history-period").await;
+    let mut c = Client::authed(&s, &token(&s.auth).0).await;
+    let light = EntityId::parse("light.a").unwrap();
+    s.hass.set_state(light.clone(), "on", Attributes::new());
+    s.hass.set_state(light.clone(), "off", Attributes::new());
+
+    let ask = |id: u64, extra: Value| {
+        let mut m = json!({"id": id, "type": "history/history_during_period",
+                           "start_time": minutes_ago(5), "entity_ids": ["light.a"]});
+        for (k, v) in extra.as_object().unwrap() {
+            m[k] = v.clone();
+        }
+        m
+    };
+    // The recorder takes the feed on its own task: ask until it has both.
+    let mut id = 1;
+    let rows = loop {
+        let r = c.call(ask(id, json!({}))).await;
+        assert_eq!(r["success"], true, "{r}");
+        if r["result"]["light.a"]
+            .as_array()
+            .is_some_and(|a| a.len() == 2)
+        {
+            break r["result"]["light.a"].clone();
+        }
+        id += 1;
+        assert!(id < 100, "never recorded: {r}");
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    };
+    assert_eq!(rows[0]["s"], "on");
+    assert_eq!(rows[1]["s"], "off");
+    assert_eq!(rows[1]["a"], json!({}));
+    assert!(rows[0]["lu"].as_f64().unwrap() < rows[1]["lu"].as_f64().unwrap());
+
+    id += 1;
+    let r = c
+        .call(ask(
+            id,
+            json!({"minimal_response": true, "no_attributes": true}),
+        ))
+        .await;
+    assert_eq!(
+        r["result"]["light.a"][1].as_object().unwrap().len(),
+        2,
+        "{r}"
+    );
+
+    id += 1;
+    let r = c.call(ask(id, json!({"start_time": "soon"}))).await;
+    assert_eq!(r["error"]["code"], "invalid_start_time");
+    id += 1;
+    let r = c.call(ask(id, json!({"end_time": "later"}))).await;
+    assert_eq!(r["error"]["code"], "invalid_end_time");
+    id += 1;
+    let r = c
+        .call(ask(id, json!({"entity_ids": ["not an entity"]})))
+        .await;
+    assert_eq!(r["error"]["code"], "invalid_entity_ids");
+    // A start in the future, or an unknown entity: empty.
+    id += 1;
+    let r = c
+        .call(ask(id, json!({"start_time": minutes_ago(-5)})))
+        .await;
+    assert_eq!(r["result"], json!({}));
+    id += 1;
+    let r = c
+        .call(ask(id, json!({"entity_ids": ["light.nobody"]})))
+        .await;
+    assert_eq!(r["result"], json!({}));
+    id += 1;
+    let r = c.call(ask(id, json!({"entity_ids": []}))).await;
+    assert_eq!(r["result"], json!({}));
+    id += 1;
+    let r = c
+        .call(json!({"id": id, "type": "history/history_during_period",
+                          "start_time": minutes_ago(5)}))
+        .await;
+    assert_eq!(r["error"]["code"], "invalid_format");
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+/// `history/stream`: the result, the recorded states, then live changes
+/// grouped into one message.
+#[tokio::test]
+async fn history_stream_sends_the_past_then_follows() {
+    let (s, dir) = recording_server("history-stream").await;
+    let mut c = Client::authed(&s, &token(&s.auth).0).await;
+    let light = EntityId::parse("light.a").unwrap();
+    s.hass.set_state(light.clone(), "on", Attributes::new());
+    // Wait for it to be recorded.
+    for id in 1.. {
+        let r = c
+            .call(json!({"id": id, "type": "history/history_during_period",
+                              "start_time": minutes_ago(5), "entity_ids": ["light.a"]}))
+            .await;
+        if r["result"].as_object().is_some_and(|m| !m.is_empty()) {
+            break;
+        }
+        assert!(id < 100, "never recorded");
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+
+    c.send(
+        json!({"id": 200, "type": "history/stream", "start_time": minutes_ago(5),
+                  "entity_ids": ["light.a"]}),
+    )
+    .await;
+    let r = c.recv().await;
+    assert_eq!(
+        r,
+        json!({"id": 200, "type": "result", "success": true, "result": null})
+    );
+    let past = c.recv().await;
+    assert_eq!(past["type"], "event");
+    assert_eq!(past["event"]["states"]["light.a"][0]["s"], "on");
+    assert!(past["event"]["start_time"].is_f64() && past["event"]["end_time"].is_f64());
+
+    // Live: two quick changes arrive as one message.
+    s.hass.set_state(light.clone(), "off", Attributes::new());
+    s.hass.set_state(light.clone(), "on", Attributes::new());
+    let live = c.recv().await;
+    let states = live["event"]["states"]["light.a"].as_array().unwrap();
+    assert_eq!(
+        states
+            .iter()
+            .map(|x| x["s"].as_str().unwrap())
+            .collect::<Vec<_>>(),
+        ["off", "on"],
+        "{live}"
+    );
+    assert!(live["event"].get("start_time").is_none());
+
+    // A finished window answers once, even when empty.
+    c.send(
+        json!({"id": 201, "type": "history/stream", "start_time": minutes_ago(120),
+                  "end_time": minutes_ago(60), "entity_ids": ["light.a"]}),
+    )
+    .await;
+    assert_eq!(c.recv().await["result"], Value::Null);
+    let r = c.recv().await;
+    assert_eq!(r["event"]["states"], json!({}));
+    // A start in the future is an error for a stream.
+    let r = c
+        .call(
+            json!({"id": 202, "type": "history/stream", "start_time": minutes_ago(-5),
+                     "entity_ids": ["light.a"]}),
+        )
+        .await;
+    assert_eq!(r["error"]["code"], "invalid_start_time");
+    let _ = std::fs::remove_dir_all(dir);
 }

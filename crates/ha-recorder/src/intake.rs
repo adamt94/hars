@@ -18,7 +18,7 @@
 //!   bounded map of recent contexts, instead of by query-time joins
 //!   (`logbook/processor.py`'s `ContextAugmenter`).
 
-use crate::format::{EventRow, HAS_UNIT, Row, StateRow, VISIBLE};
+use crate::format::{EventRow, HAS_UNIT, REMOVED, Row, StateRow, VISIBLE};
 use ha_core::{Context, ContextId, EntityId, Event, EventKind, Hass, State};
 use smol_str::SmolStr;
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -233,8 +233,8 @@ impl Intake {
                 old_state,
                 new_state,
             } => {
-                // A removal is HA's row with a NULL state (stored here as
-                // the empty state), so history ends the entity's line there.
+                // A removal is HA's row with a NULL state (stored as an empty
+                // state with the [`REMOVED`] flag), so history ends the entity's line there.
                 // The entity may have a line from before this process
                 // started, so every removal writes one. The entity is
                 // forgotten: a later one with this id starts over.
@@ -250,7 +250,7 @@ impl Intake {
                         last_changed: ts,
                         state: SmolStr::default(),
                         attributes: Arc::from("{}"),
-                        flags: 0,
+                        flags: REMOVED,
                         context: ctx.id.to_bytes(),
                         aug: None,
                     });

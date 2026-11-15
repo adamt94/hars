@@ -412,8 +412,13 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
       (`recorder/get_statistics_metadata`, `recorder/list_statistic_ids`,
       `recorder/statistics_during_period`), so the frontend falls back to
       history (D1)
-- [ ] WS `history/stream`, `history/history_during_period`,
-      `logbook/event_stream`, `logbook/get_events`
+- [x] WS `history/history_during_period` and `history/stream`: HA's
+      `get_significant_states` over the segment store (start-time state
+      stamped at the start, significant-only and `minimal_response` rules,
+      `{}` when the attributes are left out, removals as a `null` state);
+      the stream sends the past, re-reads what the writer hadn't committed,
+      then follows the live feed in 350 ms groups
+- [ ] WS `logbook/event_stream`, `logbook/get_events`
 - [ ] Acceptance: more-info history graphs and the Map trail render
 
 ### M7: Cutover

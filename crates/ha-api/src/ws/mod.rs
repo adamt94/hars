@@ -11,6 +11,7 @@ mod automation;
 mod commands;
 mod entities;
 mod frontend;
+mod history;
 mod manifest;
 mod mobile_app;
 mod recorder;

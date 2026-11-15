@@ -141,7 +141,7 @@ fn units(units: Option<&Value>) -> Result<(), Invalid> {
     Ok(())
 }
 
-fn string<'a>(
+pub(super) fn string<'a>(
     msg: &'a Map<String, Value>,
     key: &str,
     required: bool,
@@ -155,7 +155,11 @@ fn string<'a>(
 }
 
 /// A `[str]` field: its length.
-fn str_list(msg: &Map<String, Value>, key: &str, required: bool) -> Result<Option<usize>, Invalid> {
+pub(super) fn str_list(
+    msg: &Map<String, Value>,
+    key: &str,
+    required: bool,
+) -> Result<Option<usize>, Invalid> {
     match msg.get(key) {
         Some(Value::Array(items)) => match items.iter().position(|v| !v.is_string()) {
             Some(i) => Err(format!("expected str @ data['{key}'][{i}]")),

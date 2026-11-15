@@ -186,6 +186,9 @@ pub const VISIBLE: u8 = 1;
 /// The recorded attributes have a `unit_of_measurement` (a continuous
 /// sensor, which the logbook skips).
 pub const HAS_UNIT: u8 = 2;
+/// The entity was removed: HA's row with a NULL state (stored with an empty
+/// `state`), which ends the entity's line.
+pub const REMOVED: u8 = 4;
 
 /// A recorded row, borrowed from a scanned segment.
 #[derive(Debug, Clone, Copy, PartialEq)]
