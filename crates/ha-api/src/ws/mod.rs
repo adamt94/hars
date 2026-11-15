@@ -12,6 +12,7 @@ mod commands;
 mod entities;
 mod frontend;
 mod history;
+mod logbook;
 mod manifest;
 mod mobile_app;
 mod recorder;

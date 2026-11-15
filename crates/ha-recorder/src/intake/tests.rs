@@ -439,3 +439,161 @@ fn oversized_attributes_stop_encoding_at_the_limit() {
         MAX_ATTRS_BYTES
     );
 }
+
+/// What the live streams get: the rows the logbook shows live, with the
+/// stored row's `context_*` fields, while someone follows.
+#[test]
+fn live_rows_follow_has_old_state_and_continuity() {
+    let mut intake = Intake::new(Hass::new());
+    let live = intake.live();
+    let c = ctx(1);
+    let before = state("light.hall", "off", json!({}), T0 - 9, T0 - 9, &c);
+    let on = state("light.hall", "on", json!({"icon": "mdi:lamp"}), T0, T0, &c);
+    // Nobody follows: nothing is worked out, but the store's row is the same.
+    assert_eq!(state_row(intake.row(&changed(Some(&before), &on))).flags, 0);
+
+    let mut feed = live.subscribe();
+    // The first change after a start shows live though it isn't VISIBLE in
+    // the store (its previous row is from before the start).
+    let off = state(
+        "light.hall",
+        "off",
+        json!({"icon": "mdi:lamp"}),
+        T0 + 1,
+        T0 + 1,
+        &ctx(2),
+    );
+    assert_eq!(
+        state_row(intake.row(&changed(Some(&on), &off))).flags,
+        VISIBLE
+    );
+    let got = state_row(feed.try_recv().map(|r| (*r).clone()));
+    assert_eq!((got.flags, &*got.state, got.ts), (VISIBLE, "off", T0 + 1));
+    assert_eq!(&*got.attributes, r#"{"icon":"mdi:lamp"}"#);
+    assert!(feed.try_recv().is_none());
+
+    // A restart: the entity's first row of this process, with an old state.
+    let mut intake = Intake::new(Hass::new());
+    let mut feed = intake.live().subscribe();
+    let first = state_row(intake.row(&changed(Some(&on), &off)));
+    assert_eq!(first.flags, 0, "history never shows it (D6)");
+    let live_row = state_row(feed.try_recv().map(|r| (*r).clone()));
+    assert_eq!((live_row.flags, &*live_row.state), (VISIBLE, "off"));
+
+    // Not shown live: the same state, an attribute-only write, an added
+    // entity, a removal, a counter, a continuous sensor (by any of unit,
+    // state class or numeric device class), a non-continuous sensor is.
+    let same = state("light.hall", "off", json!({"x": 1}), T0 + 3, T0 + 1, &c);
+    intake.row(&changed(Some(&off), &same));
+    let added = state("light.new", "on", json!({}), T0 + 4, T0 + 4, &c);
+    intake.row(&changed(None, &added));
+    let counter_a = state("counter.n", "1", json!({}), T0 + 5, T0 + 5, &c);
+    let counter_b = state("counter.n", "2", json!({}), T0 + 6, T0 + 6, &c);
+    intake.row(&changed(Some(&counter_a), &counter_b));
+    for (i, attrs) in [
+        json!({"unit_of_measurement": "W"}),
+        json!({"state_class": "measurement"}),
+        json!({"device_class": "power"}),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let i = i as i64;
+        let a = state("sensor.p", "1", attrs.clone(), T0 + 10 + i, T0 + 10 + i, &c);
+        let b = state("sensor.p", "2", attrs, T0 + 20 + i, T0 + 20 + i, &c);
+        intake.row(&changed(Some(&a), &b));
+    }
+    let gone = Event::new(
+        EventKind::StateChanged {
+            entity_id: off.entity_id.clone(),
+            old_state: Some(off.clone()),
+            new_state: None,
+        },
+        ts(T0 + 30),
+        c.clone(),
+    );
+    intake.row(&gone);
+    assert!(feed.try_recv().is_none());
+    let a = state(
+        "sensor.washer",
+        "idle",
+        json!({"device_class": "enum"}),
+        T0 + 40,
+        T0 + 40,
+        &c,
+    );
+    let b = state(
+        "sensor.washer",
+        "done",
+        json!({"device_class": "enum"}),
+        T0 + 41,
+        T0 + 41,
+        &c,
+    );
+    intake.row(&changed(Some(&a), &b));
+    assert_eq!(
+        &*state_row(feed.try_recv().map(|r| (*r).clone())).state,
+        "done"
+    );
+}
+
+/// A live row carries the same `context_*` fields as the stored one, and
+/// the events the logbook describes come too; `call_service` doesn't.
+#[test]
+fn live_rows_carry_the_context_fields_and_events() {
+    let mut intake = Intake::new(Hass::new());
+    let mut feed = intake.live().subscribe();
+    let mut ui = ctx(1);
+    ui.user_id = Some("u1".into());
+    let call = Event::new(
+        EventKind::CallService {
+            domain: "light".into(),
+            service: "turn_on".into(),
+            service_data: Arc::new(Default::default()),
+        },
+        ts(T0),
+        ui.clone(),
+    );
+    intake.row(&call);
+    assert!(feed.try_recv().is_none());
+    let off = state("light.hall", "off", json!({}), T0 - 9, T0 - 9, &ctx(9));
+    intake.row(&changed(None, &off));
+    let on = state("light.hall", "on", json!({}), T0 + 1, T0 + 1, &ui);
+    let stored = state_row(intake.row(&changed(Some(&off), &on)));
+    let live = state_row(feed.try_recv().map(|r| (*r).clone()));
+    assert_eq!(live.aug, stored.aug);
+    assert_eq!(
+        aug(&live.aug),
+        json!({"context_user_id": "u1", "context_domain": "light",
+               "context_service": "turn_on", "context_event_type": "call_service"})
+    );
+
+    let triggered = Event::new(
+        EventKind::Custom {
+            name: "automation_triggered".into(),
+            data: json!({"name": "A", "source": "time"}),
+        },
+        ts(T0 + 2),
+        ctx(3),
+    );
+    let stored = event_row(intake.row(&triggered));
+    let live = event_row(feed.try_recv().map(|r| (*r).clone()));
+    assert_eq!(live, stored);
+    for kind in [
+        EventKind::HomeassistantStart {},
+        EventKind::HomeassistantStop {},
+    ] {
+        let stored = event_row(intake.row(&Event::new(kind, ts(T0 + 3), ctx(4))));
+        assert_eq!(event_row(feed.try_recv().map(|r| (*r).clone())), stored);
+    }
+
+    // A dropped feed stops costing anything once a row finds it closed.
+    drop(feed);
+    assert!(intake.live().wanted());
+    intake.row(&Event::new(
+        EventKind::HomeassistantStop {},
+        ts(T0 + 4),
+        ctx(5),
+    ));
+    assert!(!intake.live().wanted());
+}

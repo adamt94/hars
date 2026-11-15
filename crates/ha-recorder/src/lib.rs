@@ -9,9 +9,12 @@
 pub mod format;
 pub mod history;
 mod intake;
+mod live;
+pub mod logbook;
 mod recorder;
 mod store;
 
 pub use format::{EventRec, EventRow, HAS_UNIT, REMOVED, Rec, Row, StateRec, StateRow, VISIBLE};
+pub use live::LiveFeed;
 pub use recorder::{Recorder, Settings};
 pub use store::{Config, Info, Store};

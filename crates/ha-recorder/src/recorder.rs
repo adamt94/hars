@@ -2,6 +2,7 @@
 //! final-write handler and the nightly purge.
 
 use crate::intake::{Intake, recorded};
+use crate::live::{Live, LiveFeed};
 use crate::store::{Config, Info, Store};
 use ha_core::Hass;
 use ha_core::yaml::Yaml;
@@ -97,6 +98,7 @@ pub struct Recorder {
     /// Events the bus has queued to the intake, and how many it has handled.
     queued: Arc<AtomicU64>,
     handled: tokio::sync::watch::Receiver<u64>,
+    live: Arc<Live>,
 }
 
 impl std::fmt::Debug for Recorder {
@@ -124,6 +126,7 @@ impl Recorder {
         let mut feed = hass.bus().subscribe_lossless(recorded);
         let (drained, drained_rx) = tokio::sync::oneshot::channel::<()>();
         let mut intake = Intake::new(hass.clone());
+        let live = intake.live();
         let queued = feed.queued();
         let (handled_tx, handled) = tokio::sync::watch::channel(0u64);
         {
@@ -159,6 +162,7 @@ impl Recorder {
             store,
             queued,
             handled,
+            live,
         })
     }
 
@@ -169,6 +173,16 @@ impl Recorder {
 
     pub fn store(&self) -> &Arc<Store> {
         &self.store
+    }
+
+    /// The logbook rows from now on, as the recorder works them out: every
+    /// one the logbook shows live, in the order the events were handled.
+    /// Everything handled before this call is in the store once [`sync`]
+    /// returns; everything after is in the feed.
+    ///
+    /// [`sync`]: Recorder::sync
+    pub fn subscribe_live(&self) -> LiveFeed {
+        self.live.subscribe()
     }
 
     /// Wait until everything the bus fired before this call has been

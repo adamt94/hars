@@ -147,6 +147,15 @@ impl Row {
             Self::Event(e) => e.ts,
         }
     }
+
+    /// The row as a scanned one, so what reads the store reads a row that
+    /// has not been written yet the same way.
+    pub fn as_rec(&self) -> Rec<'_> {
+        match self {
+            Self::State(s) => Rec::State(s.as_rec()),
+            Self::Event(e) => Rec::Event(e.as_rec()),
+        }
+    }
 }
 
 /// One `state_changed`, as recorded.
@@ -236,6 +245,18 @@ impl StateRow {
             state: &self.state,
             attributes: &self.attributes,
             flags: self.flags,
+            context: self.context,
+            aug: self.aug.as_deref(),
+        }
+    }
+}
+
+impl EventRow {
+    pub fn as_rec(&self) -> EventRec<'_> {
+        EventRec {
+            event_type: &self.event_type,
+            ts: self.ts,
+            data: self.data.as_deref(),
             context: self.context,
             aug: self.aug.as_deref(),
         }

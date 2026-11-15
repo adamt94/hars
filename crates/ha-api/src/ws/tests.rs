@@ -2164,3 +2164,553 @@ async fn history_stream_sends_the_past_then_follows() {
     assert_eq!(r["error"]["code"], "invalid_start_time");
     let _ = std::fs::remove_dir_all(dir);
 }
+
+/// An `automation_triggered` event, as the automation engine fires it.
+fn triggered(hass: &Hass, data: Value) -> ha_core::Context {
+    let context = ha_core::Context::new();
+    hass.bus().fire(ha_core::Event::new(
+        ha_core::EventKind::Custom {
+            name: "automation_triggered".into(),
+            data,
+        },
+        hass.clock().now(),
+        context.clone(),
+    ));
+    context
+}
+
+/// A logbook row without its time (which is checked to be a number).
+fn bare(row: &Value) -> Value {
+    let mut row = row.clone();
+    assert!(row["when"].is_f64(), "{row}");
+    row.as_object_mut().unwrap().remove("when");
+    row
+}
+
+fn bare_all(rows: &Value) -> Vec<Value> {
+    rows.as_array().unwrap().iter().map(bare).collect()
+}
+
+const USER: &str = "0a0a0a0a0a0a4a0a8a0a0a0a0a0a0a01";
+
+/// What the logbook tests record: start, a lamp switched by a user, a
+/// washer, an automation run, and the continuous things the logbook skips.
+fn logbook_history(hass: &Hass) -> ha_core::Context {
+    let id = |s: &str| EntityId::parse(s).unwrap();
+    let lamp = attrs(json!({"icon": "mdi:lamp"}));
+    // The first row of an entity is never in the logbook.
+    hass.set_state(id("light.a"), "on", lamp.clone());
+    let user = ha_core::Context::new().with_user(USER);
+    hass.set_state_with_context(id("light.a"), "off", lamp, Some(user));
+    let unit = attrs(json!({"unit_of_measurement": "W"}));
+    hass.set_state(id("sensor.power"), "1", unit.clone());
+    hass.set_state(id("sensor.power"), "2", unit);
+    hass.set_state(id("counter.visits"), "1", Attributes::new());
+    hass.set_state(id("counter.visits"), "2", Attributes::new());
+    hass.set_state(id("sensor.washer"), "idle", Attributes::new());
+    hass.set_state(id("sensor.washer"), "done", Attributes::new());
+    triggered(
+        hass,
+        json!({"name": "Washer done", "entity_id": "automation.washer_done",
+               "source": "state of sensor.washer"}),
+    )
+}
+
+/// `logbook/get_events`: HA's rows over the recorded history, its
+/// filters, and its checks before it reads anything.
+#[tokio::test]
+async fn logbook_get_events_answers_from_the_recorder() {
+    let (s, dir) = recording_server("logbook-events").await;
+    let mut c = Client::authed(&s, &token(&s.auth).0).await;
+    let run = logbook_history(&s.hass);
+
+    let ask = |id: u64, extra: Value| {
+        let mut m = json!({"id": id, "type": "logbook/get_events", "start_time": minutes_ago(5)});
+        for (k, v) in extra.as_object().unwrap() {
+            m[k] = v.clone();
+        }
+        m
+    };
+    let started = json!({"name": "Home Assistant", "message": "started",
+                         "icon": "mdi:home-assistant", "domain": "homeassistant"});
+    let lamp = json!({"state": "off", "entity_id": "light.a", "icon": "mdi:lamp",
+                      "context_user_id": USER});
+    let washer = json!({"state": "done", "entity_id": "sensor.washer"});
+    let automation = json!({"name": "Washer done", "message": "triggered by state of sensor.washer",
+                            "source": "state of sensor.washer",
+                            "entity_id": "automation.washer_done",
+                            "context_id": run.id.to_string(), "domain": "automation"});
+
+    // Everything shown, oldest first; no first rows, no units or counters.
+    let r = c.call(ask(1, json!({}))).await;
+    assert_eq!(r["success"], true, "{r}");
+    assert_eq!(
+        bare_all(&r["result"]),
+        [
+            started.clone(),
+            lamp.clone(),
+            washer.clone(),
+            automation.clone()
+        ]
+    );
+    let whens: Vec<f64> = r["result"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|row| row["when"].as_f64().unwrap())
+        .collect();
+    assert!(whens.windows(2).all(|w| w[0] <= w[1]), "{whens:?}");
+
+    // Entities: their rows and the automation runs that name them.
+    let r = c
+        .call(ask(
+            2,
+            json!({"entity_ids": ["light.a", "automation.washer_done"]}),
+        ))
+        .await;
+    assert_eq!(bare_all(&r["result"]), [lamp.clone(), automation.clone()]);
+    // Devices: events that name them, no states.
+    let r = c.call(ask(3, json!({"device_ids": ["dev1"]}))).await;
+    assert_eq!(r["result"], json!([]));
+    let r = c
+        .call(ask(
+            4,
+            json!({"device_ids": ["dev1"], "entity_ids": ["sensor.washer"]}),
+        ))
+        .await;
+    assert_eq!(bare_all(&r["result"]), [washer]);
+    // Every entity is a continuous sensor or counter: nothing to read.
+    let r = c
+        .call(ask(
+            5,
+            json!({"entity_ids": ["sensor.power", "counter.visits"]}),
+        ))
+        .await;
+    assert_eq!(r["result"], json!([]));
+    // A context: the automation's rows.
+    let r = c
+        .call(ask(6, json!({"context_id": run.id.to_string()})))
+        .await;
+    assert_eq!(bare_all(&r["result"]), [automation]);
+    // Not a ULID: no filter at all.
+    let r = c.call(ask(7, json!({"context_id": "nope"}))).await;
+    assert_eq!(r["result"].as_array().unwrap().len(), 4, "{r}");
+    // The window is open at both ends and defaults to now.
+    let r = c.call(ask(8, json!({"end_time": minutes_ago(1)}))).await;
+    assert_eq!(r["result"], json!([]));
+
+    // The checks.
+    let r = c.call(ask(9, json!({"start_time": "soon"}))).await;
+    assert_eq!(
+        r["error"],
+        json!({"code": "invalid_start_time", "message": "Invalid start_time"})
+    );
+    let r = c.call(ask(10, json!({"end_time": "later"}))).await;
+    assert_eq!(r["error"]["code"], "invalid_end_time");
+    let r = c
+        .call(ask(11, json!({"start_time": minutes_ago(-5)})))
+        .await;
+    assert_eq!(r["result"], json!([]));
+    // `EventProcessor` asserts on a context with entities.
+    let r = c
+        .call(ask(
+            12,
+            json!({"context_id": run.id.to_string(), "entity_ids": ["light.a"]}),
+        ))
+        .await;
+    assert_eq!(
+        r["error"],
+        json!({"code": "unknown_error", "message": "Unknown error"})
+    );
+    let r = c.call(ask(13, json!({"entity_ids": ["light"]}))).await;
+    assert_eq!(r["error"]["code"], "unknown_error");
+    let r = c.call(ask(14, json!({"entity_ids": "light.a"}))).await;
+    assert_eq!(
+        r["error"],
+        json!({"code": "invalid_format",
+               "message": "expected list for dictionary value @ data['entity_ids']. Got 'light.a'"})
+    );
+    let r = c.call(ask(15, json!({"entity_ids": [1]}))).await;
+    assert_eq!(r["error"]["code"], "invalid_format");
+    let r = c
+        .call(json!({"id": 16, "type": "logbook/get_events"}))
+        .await;
+    assert_eq!(
+        r["error"]["message"],
+        "required key not provided @ data['start_time']. Got None"
+    );
+    let r = c.call(ask(17, json!({"surprise": 1}))).await;
+    assert_eq!(r["error"]["code"], "invalid_format");
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+/// `logbook/event_stream`: the result, the past as a partial message and
+/// the closing one, then live rows in 350 ms groups.
+#[tokio::test]
+async fn logbook_stream_sends_the_past_then_follows() {
+    let (s, dir) = recording_server("logbook-stream").await;
+    let mut c = Client::authed(&s, &token(&s.auth).0).await;
+    let run = logbook_history(&s.hass);
+    let id = |s: &str| EntityId::parse(s).unwrap();
+
+    c.send(json!({"id": 200, "type": "logbook/event_stream", "start_time": minutes_ago(5)}))
+        .await;
+    assert_eq!(
+        c.recv().await,
+        json!({"id": 200, "type": "result", "success": true, "result": null})
+    );
+    let past = c.recv().await;
+    assert_eq!(
+        (past["id"].clone(), past["type"].clone()),
+        (json!(200), json!("event"))
+    );
+    assert_eq!(past["event"]["partial"], true, "{past}");
+    assert_eq!(
+        bare_all(&past["event"]["events"])
+            .iter()
+            .map(|r| r.get("entity_id").or(r.get("name")).unwrap().clone())
+            .collect::<Vec<_>>(),
+        [
+            "Home Assistant",
+            "light.a",
+            "sensor.washer",
+            "automation.washer_done"
+        ]
+    );
+    let (start, end) = (
+        past["event"]["start_time"].as_f64().unwrap(),
+        past["event"]["end_time"].as_f64().unwrap(),
+    );
+    assert!(start < end);
+    // The closing message: nothing newer, and not partial.
+    let closing = c.recv().await;
+    assert_eq!(closing["event"]["events"], json!([]));
+    assert!(closing["event"].get("partial").is_none(), "{closing}");
+    let newest = past["event"]["events"].as_array().unwrap().last().unwrap()["when"]
+        .as_f64()
+        .unwrap();
+    assert!((closing["event"]["start_time"].as_f64().unwrap() - newest).abs() < 1e-3);
+    assert_eq!(closing["event"]["end_time"], past["event"]["end_time"]);
+
+    // Live: the changes within one group arrive as one message, in order;
+    // continuous sensors and counters don't.
+    s.hass
+        .set_state(id("light.a"), "on", attrs(json!({"icon": "mdi:lamp"})));
+    s.hass.set_state(
+        id("sensor.power"),
+        "3",
+        attrs(json!({"unit_of_measurement": "W"})),
+    );
+    s.hass
+        .set_state(id("counter.visits"), "3", Attributes::new());
+    s.hass
+        .set_state(id("sensor.washer"), "running", Attributes::new());
+    let live = c.recv().await;
+    assert_eq!(live["id"], 200);
+    assert!(live["event"].get("start_time").is_none(), "{live}");
+    assert_eq!(
+        bare_all(&live["event"]["events"]),
+        [
+            json!({"state": "on", "entity_id": "light.a", "icon": "mdi:lamp"}),
+            json!({"state": "running", "entity_id": "sensor.washer"}),
+        ]
+    );
+    // An event, with the context it was fired in.
+    let next = triggered(&s.hass, json!({"name": "Again", "source": "time"}));
+    let live = c.recv().await;
+    assert_eq!(
+        bare_all(&live["event"]["events"]),
+        [
+            json!({"name": "Again", "message": "triggered by time", "source": "time",
+                "entity_id": null, "context_id": next.id.to_string(), "domain": "automation"})
+        ]
+    );
+    // A change caused by that automation names it.
+    s.hass.set_state_with_context(
+        id("light.a"),
+        "off",
+        attrs(json!({"icon": "mdi:lamp"})),
+        Some(ha_core::Context::new().with_parent(&next)),
+    );
+    let live = c.recv().await;
+    assert_eq!(
+        bare_all(&live["event"]["events"]),
+        [
+            json!({"state": "off", "entity_id": "light.a", "icon": "mdi:lamp",
+                "context_event_type": "automation_triggered", "context_domain": "automation",
+                "context_name": "Again", "context_message": "triggered by time",
+                "context_source": "time"})
+        ]
+    );
+    assert_eq!(
+        c.call(json!({"id": 201, "type": "unsubscribe_events", "subscription": 200}))
+            .await["success"],
+        true
+    );
+    let _ = run;
+
+    // Filtered to an entity: its past, and only its live rows.
+    c.send(
+        json!({"id": 202, "type": "logbook/event_stream", "start_time": minutes_ago(5),
+                  "entity_ids": ["light.a"]}),
+    )
+    .await;
+    assert_eq!(c.recv().await["result"], Value::Null);
+    let past = c.recv().await;
+    assert_eq!(past["event"]["partial"], true);
+    assert_eq!(
+        past["event"]["events"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|r| r["entity_id"].clone())
+            .collect::<Vec<_>>(),
+        ["light.a", "light.a", "light.a"]
+    );
+    assert_eq!(c.recv().await["event"]["events"], json!([]));
+    s.hass
+        .set_state(id("sensor.washer"), "idle", Attributes::new());
+    s.hass
+        .set_state(id("light.a"), "on", attrs(json!({"icon": "mdi:lamp"})));
+    let live = c.recv().await;
+    assert_eq!(
+        live["event"]["events"].as_array().unwrap().len(),
+        1,
+        "{live}"
+    );
+    assert_eq!(live["event"]["events"][0]["entity_id"], "light.a");
+    assert_eq!(
+        c.call(json!({"id": 203, "type": "unsubscribe_events", "subscription": 202}))
+            .await["success"],
+        true
+    );
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+/// The stream's other shapes: windows that are over, big ones split in
+/// two, empty answers, and HA's checks.
+#[tokio::test]
+async fn logbook_stream_windows_and_checks() {
+    let (s, dir) = recording_server("logbook-windows").await;
+    let mut c = Client::authed(&s, &token(&s.auth).0).await;
+    logbook_history(&s.hass);
+    let days_ago = |d: i64| minutes_ago(d * 24 * 60);
+    let stream = |id: u64, extra: Value| {
+        let mut m = json!({"id": id, "type": "logbook/event_stream"});
+        for (k, v) in extra.as_object().unwrap() {
+            m[k] = v.clone();
+        }
+        m
+    };
+
+    // A window that is over: one message, empty is still an answer.
+    c.send(stream(
+        1,
+        json!({"start_time": minutes_ago(120), "end_time": minutes_ago(60)}),
+    ))
+    .await;
+    assert_eq!(c.recv().await["result"], Value::Null);
+    let r = c.recv().await;
+    assert_eq!(r["event"]["events"], json!([]));
+    assert!(r["event"].get("partial").is_none());
+    let (a, b) = (
+        r["event"]["start_time"].as_f64().unwrap(),
+        r["event"]["end_time"].as_f64().unwrap(),
+    );
+    assert!((b - a - 3600.0).abs() < 1.0);
+    // Its subscription exists, so it can be cancelled.
+    assert_eq!(
+        c.call(json!({"id": 2, "type": "unsubscribe_events", "subscription": 1}))
+            .await["success"],
+        true
+    );
+
+    // Over, with rows.
+    c.send(stream(
+        3,
+        json!({"start_time": minutes_ago(5),
+        "end_time": (jiff::Timestamp::now() - jiff::SignedDuration::from_millis(1)).to_string()}),
+    ))
+    .await;
+    assert_eq!(c.recv().await["result"], Value::Null);
+    let r = c.recv().await;
+    assert_eq!(r["event"]["events"].as_array().unwrap().len(), 4, "{r}");
+    assert!(r["event"].get("partial").is_none());
+
+    // Over and big (more than 25 h, no filter): the recent day is sent
+    // only if it has rows, then the rest, not partial.
+    c.send(stream(
+        4,
+        json!({"start_time": days_ago(3), "end_time": minutes_ago(1)}),
+    ))
+    .await;
+    assert_eq!(c.recv().await["result"], Value::Null);
+    let r = c.recv().await;
+    assert_eq!(r["event"]["events"], json!([]), "{r}");
+    assert!(r["event"].get("partial").is_none());
+    let (a, b) = (
+        r["event"]["start_time"].as_f64().unwrap(),
+        r["event"]["end_time"].as_f64().unwrap(),
+    );
+    // The older part: from the start to a day before the end.
+    assert!(
+        (b - a - (2.0 * 24.0 - 1.0 / 60.0) * 3600.0).abs() < 2.0,
+        "{r}"
+    );
+    // A filtered window is never split.
+    c.send(stream(
+        5,
+        json!({"start_time": days_ago(3), "end_time": minutes_ago(1),
+                            "entity_ids": ["light.a"]}),
+    ))
+    .await;
+    assert_eq!(c.recv().await["result"], Value::Null);
+    let r = c.recv().await;
+    let (a, b) = (
+        r["event"]["start_time"].as_f64().unwrap(),
+        r["event"]["end_time"].as_f64().unwrap(),
+    );
+    assert!(
+        (b - a - (3.0 * 24.0 - 1.0 / 60.0) * 3600.0).abs() < 2.0,
+        "{r}"
+    );
+
+    // Live and big: the recent day (partial, it has rows), the rest
+    // (partial, sent though empty), then the closing message.
+    c.send(stream(6, json!({"start_time": days_ago(3)}))).await;
+    assert_eq!(c.recv().await["result"], Value::Null);
+    let recent = c.recv().await;
+    assert_eq!(recent["event"]["partial"], true);
+    assert_eq!(
+        recent["event"]["events"].as_array().unwrap().len(),
+        4,
+        "{recent}"
+    );
+    let (a, b) = (
+        recent["event"]["start_time"].as_f64().unwrap(),
+        recent["event"]["end_time"].as_f64().unwrap(),
+    );
+    assert!((b - a - 24.0 * 3600.0).abs() < 1e-3);
+    let older = c.recv().await;
+    assert_eq!(older["event"]["events"], json!([]));
+    assert_eq!(older["event"]["partial"], true);
+    assert_eq!(older["event"]["end_time"], recent["event"]["start_time"]);
+    let closing = c.recv().await;
+    assert_eq!(closing["event"]["events"], json!([]));
+    assert!(closing["event"].get("partial").is_none());
+    assert_eq!(
+        c.call(json!({"id": 7, "type": "unsubscribe_events", "subscription": 6}))
+            .await["success"],
+        true
+    );
+
+    // Nothing to show for a continuous sensor: the result, then an empty
+    // message that is not registered for unsubscribing.
+    c.send(stream(
+        8,
+        json!({"start_time": minutes_ago(5), "entity_ids": ["sensor.power"]}),
+    ))
+    .await;
+    assert_eq!(c.recv().await["result"], Value::Null);
+    let r = c.recv().await;
+    assert_eq!(r["event"]["events"], json!([]));
+    assert!(r["event"].get("partial").is_none());
+    let r = c
+        .call(json!({"id": 9, "type": "unsubscribe_events", "subscription": 8}))
+        .await;
+    assert_eq!(r["error"]["code"], "not_found");
+    // Unless a device is asked for too.
+    c.send(stream(
+        10,
+        json!({"start_time": minutes_ago(5), "end_time": minutes_ago(1),
+                             "entity_ids": ["sensor.power"], "device_ids": ["d"]}),
+    ))
+    .await;
+    assert_eq!(c.recv().await["result"], Value::Null);
+    assert_eq!(c.recv().await["event"]["events"], json!([]));
+
+    // After `end_time`, nothing more is sent.
+    c.send(stream(
+        11,
+        json!({"start_time": minutes_ago(5),
+        "end_time": (jiff::Timestamp::now() + jiff::SignedDuration::from_millis(900)).to_string(),
+        "entity_ids": ["light.a"]}),
+    ))
+    .await;
+    assert_eq!(c.recv().await["result"], Value::Null);
+    assert_eq!(c.recv().await["event"]["partial"], true);
+    assert_eq!(c.recv().await["event"]["events"], json!([]));
+    let id = |s: &str| EntityId::parse(s).unwrap();
+    s.hass
+        .set_state(id("light.a"), "on", attrs(json!({"icon": "mdi:lamp"})));
+    assert_eq!(c.recv().await["event"]["events"][0]["state"], "on");
+    // (Read while waiting, so the heartbeat is answered.)
+    assert!(
+        tokio::time::timeout(Duration::from_millis(900), c.recv())
+            .await
+            .is_err()
+    );
+    s.hass
+        .set_state(id("light.a"), "off", attrs(json!({"icon": "mdi:lamp"})));
+    assert!(
+        tokio::time::timeout(Duration::from_millis(800), c.recv())
+            .await
+            .is_err()
+    );
+
+    // The checks.
+    let r = c
+        .call(stream(12, json!({"start_time": minutes_ago(-5)})))
+        .await;
+    assert_eq!(
+        r["error"],
+        json!({"code": "invalid_start_time", "message": "Invalid start_time"})
+    );
+    let r = c.call(stream(13, json!({"start_time": "soon"}))).await;
+    assert_eq!(r["error"]["code"], "invalid_start_time");
+    let r = c
+        .call(stream(
+            14,
+            json!({"start_time": minutes_ago(5), "end_time": minutes_ago(10)}),
+        ))
+        .await;
+    assert_eq!(
+        r["error"],
+        json!({"code": "invalid_end_time", "message": "Invalid end_time"})
+    );
+    let r = c
+        .call(stream(
+            15,
+            json!({"start_time": minutes_ago(5), "end_time": "later"}),
+        ))
+        .await;
+    assert_eq!(r["error"]["code"], "invalid_end_time");
+    // `context_id` is `get_events`'s alone.
+    let r = c
+        .call(stream(
+            16,
+            json!({"start_time": minutes_ago(5), "context_id": "x"}),
+        ))
+        .await;
+    assert_eq!(r["error"]["code"], "invalid_format");
+    // Live with nothing recorded: the first message is sent anyway (so the
+    // client isn't left waiting on it), partial, then the closing one.
+    c.send(stream(
+        17,
+        json!({"start_time": minutes_ago(5), "entity_ids": ["light.nobody"]}),
+    ))
+    .await;
+    assert_eq!(c.recv().await["result"], Value::Null);
+    let r = c.recv().await;
+    assert_eq!(r["event"]["events"], json!([]));
+    assert_eq!(r["event"]["partial"], true);
+    let r = c.recv().await;
+    assert_eq!(r["event"]["events"], json!([]));
+    assert!(r["event"].get("partial").is_none());
+    assert_eq!(
+        c.call(json!({"id": 18, "type": "unsubscribe_events", "subscription": 17}))
+            .await["success"],
+        true
+    );
+    let _ = std::fs::remove_dir_all(dir);
+}

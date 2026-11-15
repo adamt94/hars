@@ -14,6 +14,7 @@ workspace = true
 ha-core.workspace = true
 jiff = "0.2.43"
 parking_lot = "0.12.5"
+serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
 smol_str = "0.3.2"
 tokio = { version = "1.54.1", features = ["rt", "sync", "time"] }

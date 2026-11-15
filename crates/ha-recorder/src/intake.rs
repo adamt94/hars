@@ -17,8 +17,12 @@
 //! - **D4.** A logbook row's `context_*` fields are worked out now, from a
 //!   bounded map of recent contexts, instead of by query-time joins
 //!   (`logbook/processor.py`'s `ContextAugmenter`).
+//! - **Live rows.** While a logbook stream follows, the rows it would show
+//!   are also handed to it ([`crate::live`]), whether or not the store takes
+//!   them.
 
 use crate::format::{EventRow, HAS_UNIT, REMOVED, Row, StateRow, VISIBLE};
+use crate::live::Live;
 use ha_core::{Context, ContextId, EntityId, Event, EventKind, Hass, State};
 use smol_str::SmolStr;
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -175,6 +179,14 @@ struct Effects {
     last: Option<(EntityId, Last)>,
 }
 
+/// A row to write, what admitting it changes, and the row the live
+/// streams get (if they follow and it is one they show).
+struct Prepared {
+    row: Row,
+    effects: Effects,
+    live: Option<Row>,
+}
+
 /// Turns the recorder's events into rows.
 pub(crate) struct Intake {
     hass: Hass,
@@ -183,6 +195,7 @@ pub(crate) struct Intake {
     /// Entities already warned about for oversized attributes.
     oversized: HashSet<EntityId>,
     buf: Vec<u8>,
+    live: Arc<Live>,
 }
 
 impl Intake {
@@ -193,7 +206,13 @@ impl Intake {
             contexts: Contexts::new(CONTEXTS),
             oversized: HashSet::new(),
             buf: Vec::new(),
+            live: Arc::default(),
         }
+    }
+
+    /// Where the live streams subscribe.
+    pub(crate) fn live(&self) -> Arc<Live> {
+        self.live.clone()
     }
 
     /// Record `event`'s row, if it has one, through `admit`. What later
@@ -201,9 +220,13 @@ impl Intake {
     /// first row) changes only if `admit` takes the row: a row the store
     /// drops (its backlog full) leaves no trace.
     pub(crate) fn record(&mut self, event: &Event, admit: impl FnOnce(Row) -> bool) {
-        if let Some((row, effects)) = self.prepare(event)
-            && admit(row)
-        {
+        let Some(Prepared { row, effects, live }) = self.prepare(event) else {
+            return;
+        };
+        if let Some(live) = live {
+            self.live.publish(live);
+        }
+        if admit(row) {
             if let Some((ctx, origin)) = effects.see {
                 self.contexts.see(&ctx, origin);
             }
@@ -224,7 +247,7 @@ impl Intake {
         out
     }
 
-    fn prepare(&mut self, event: &Event) -> Option<(Row, Effects)> {
+    fn prepare(&mut self, event: &Event) -> Option<Prepared> {
         let ts = event.time_fired.as_microsecond();
         let ctx = &event.context;
         match &event.kind {
@@ -254,15 +277,16 @@ impl Intake {
                         context: ctx.id.to_bytes(),
                         aug: None,
                     });
-                    return Some((
+                    return Some(Prepared {
                         row,
-                        Effects {
+                        effects: Effects {
                             see: None,
                             last: None,
                         },
-                    ));
+                        live: None,
+                    });
                 };
-                self.state_row(entity_id, old_state.is_some(), new)
+                self.state_row(entity_id, old_state.as_deref(), new)
             }
             EventKind::CallService {
                 domain,
@@ -287,7 +311,13 @@ impl Intake {
                     context: ctx.id.to_bytes(),
                     aug: None,
                 });
-                Some((row, Effects { see, last: None }))
+                let effects = Effects { see, last: None };
+                // Never a logbook row: it only links contexts.
+                Some(Prepared {
+                    row,
+                    effects,
+                    live: None,
+                })
             }
             EventKind::Custom { name, data } if name == "automation_triggered" => {
                 let aug = self.contexts.augment(ctx);
@@ -323,7 +353,7 @@ impl Intake {
                     aug,
                 });
                 let see = Some((ctx.clone(), Origin::Fields(Arc::from(fields))));
-                Some((row, Effects { see, last: None }))
+                Some(self.shown(row, Effects { see, last: None }))
             }
             EventKind::HomeassistantStart {} | EventKind::HomeassistantStop {} => {
                 let (event_type, message) = match event.kind {
@@ -345,7 +375,7 @@ impl Intake {
                     aug,
                 });
                 let see = Some((ctx.clone(), Origin::Fields(Arc::from(fields))));
-                Some((row, Effects { see, last: None }))
+                Some(self.shown(row, Effects { see, last: None }))
             }
             _ => None,
         }
@@ -354,9 +384,10 @@ impl Intake {
     fn state_row(
         &mut self,
         entity_id: &EntityId,
-        had_old: bool,
+        old: Option<&State>,
         new: &State,
-    ) -> Option<(Row, Effects)> {
+    ) -> Option<Prepared> {
+        let had_old = old.is_some();
         let ts = new.last_updated.as_microsecond();
         let last_changed = new.last_changed.as_microsecond();
         let has_unit = self.attributes(new);
@@ -397,6 +428,28 @@ impl Intake {
                 },
             )),
         };
+        // Live, HA looks at the event's old state, not our previous row
+        // (`_is_state_filtered`): the first change after a start shows.
+        let live = (self.live.wanted()
+            && old.is_some_and(|o| o.state != new.state)
+            && last_changed == ts
+            && !crate::logbook::continuous(entity_id.domain(), &new.attributes))
+        .then(|| {
+            Row::State(StateRow {
+                entity_id: entity_id.as_str().into(),
+                ts,
+                last_changed,
+                state: new.state.clone(),
+                attributes: attributes.clone(),
+                flags: VISIBLE,
+                context: new.context.id.to_bytes(),
+                aug: if visible {
+                    aug.clone()
+                } else {
+                    self.contexts.augment(&new.context)
+                },
+            })
+        });
         let mut flags = 0;
         if visible {
             flags |= VISIBLE;
@@ -414,7 +467,13 @@ impl Intake {
             context: new.context.id.to_bytes(),
             aug,
         });
-        Some((row, effects))
+        Some(Prepared { row, effects, live })
+    }
+
+    /// `row` as a [`Prepared`] that live streams get too, if any follow.
+    fn shown(&self, row: Row, effects: Effects) -> Prepared {
+        let live = self.live.wanted().then(|| row.clone());
+        Prepared { row, effects, live }
     }
 
     /// Encode the recorded attributes as JSON text into `self.buf`;

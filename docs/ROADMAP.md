@@ -418,7 +418,18 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
       `{}` when the attributes are left out, removals as a `null` state);
       the stream sends the past, re-reads what the writer hadn't committed,
       then follows the live feed in 350 ms groups
-- [ ] WS `logbook/event_stream`, `logbook/get_events`
+- [x] WS `logbook/get_events` and `logbook/event_stream`: HA's rows (states,
+      `automation_triggered`, start/stop; `context_*` from the write-time
+      fields, D4) over the segment store, with the entity, device and
+      `context_id` selections, continuous sensors and counters left out, and
+      HA's checks and error codes. The stream sends the past (an unfiltered
+      window over 25 h in two parts, the recent day first, with HA's
+      `partial` flags), the closing message, then follows live in 350 ms
+      groups: the recorder's intake hands the streams the rows it works out
+      (same `context_*` fields as the stored row, one pass however many
+      clients follow, nothing worked out while none does). Left out: the
+      `logbook:` include/exclude YAML filters; a live row's `icon` is read
+      from the recorded attributes, not the state's
 - [ ] Acceptance: more-info history graphs and the Map trail render
 
 ### M7: Cutover
