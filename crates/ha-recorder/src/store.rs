@@ -28,7 +28,11 @@ use std::time::{Duration, Instant};
 
 const DAY_US: i64 = 86_400_000_000;
 /// First retry after a failed write; it doubles up to [`MAX_RETRY`].
-const FIRST_RETRY: Duration = Duration::from_secs(5);
+const FIRST_RETRY: Duration = if cfg!(test) {
+    Duration::from_millis(100)
+} else {
+    Duration::from_secs(5)
+};
 const MAX_RETRY: Duration = Duration::from_secs(300);
 /// Minimum time between "rows dropped" warnings.
 const DROP_LOG_EVERY: Duration = Duration::from_secs(60);
@@ -87,6 +91,9 @@ struct Shared {
     /// The last write failed; it is being retried.
     failing: AtomicBool,
     running: AtomicBool,
+    /// Rows are accepted. Cleared by `close` under the write lock, so no
+    /// row is queued behind the `Close` message.
+    accepting: RwLock<bool>,
     cap_warned: AtomicBool,
     /// Test hook: writes fail as on a full disk.
     #[cfg(test)]
@@ -95,7 +102,7 @@ struct Shared {
 
 enum Msg {
     Row(Row),
-    Flush(tokio::sync::oneshot::Sender<()>),
+    Flush(tokio::sync::oneshot::Sender<bool>),
     Purge(i64, tokio::sync::oneshot::Sender<()>),
     Close(tokio::sync::oneshot::Sender<()>),
 }
@@ -130,6 +137,7 @@ impl Store {
         let shared = Arc::new(Shared {
             segments: RwLock::new(segments),
             running: AtomicBool::new(true),
+            accepting: RwLock::new(true),
             ..Shared::default()
         });
         let (tx, rx) = mpsc::channel();
@@ -143,6 +151,7 @@ impl Store {
             pending: Vec::new(),
             buf: Vec::new(),
             retry: FIRST_RETRY,
+            retry_at: None,
         };
         let running = shared.clone();
         std::thread::Builder::new()
@@ -159,8 +168,12 @@ impl Store {
     }
 
     /// Queue a row. `false` if it was dropped: the backlog is full (logged
-    /// at most once a minute) or the writer has stopped.
+    /// at most once a minute) or the store is closed.
     pub fn record(&self, row: Row) -> bool {
+        let accepting = self.shared.accepting.read();
+        if !*accepting {
+            return false;
+        }
         if self.shared.backlog.fetch_add(1, Ordering::AcqRel) >= self.max_backlog {
             self.shared.backlog.fetch_sub(1, Ordering::AcqRel);
             let dropped = self.shared.dropped.fetch_add(1, Ordering::Relaxed) + 1;
@@ -182,11 +195,14 @@ impl Store {
     }
 
     /// Write the pending batch now (before a read, so it sees every row
-    /// recorded so far). Returns at once if the writer has stopped.
-    pub async fn flush(&self) {
+    /// recorded so far). `false` if rows are still unwritten: writes are
+    /// failing (the retry keeps its schedule) or the writer has stopped.
+    pub async fn flush(&self) -> bool {
         let (tx, rx) = tokio::sync::oneshot::channel();
         if self.tx.send(Msg::Flush(tx)).is_ok() {
-            let _ = rx.await;
+            rx.await.unwrap_or(false)
+        } else {
+            false
         }
     }
 
@@ -199,11 +215,18 @@ impl Store {
         }
     }
 
-    /// Write what's pending, `fdatasync` and stop the writer (the final
-    /// write). Later rows are refused.
+    /// Refuse new rows, write what's pending, `fdatasync` and stop the
+    /// writer (the final write). While writes fail this keeps retrying on
+    /// the backoff schedule, so the caller bounds it (the final-write
+    /// stage's 60 s).
     pub async fn close(&self) {
         let (tx, rx) = tokio::sync::oneshot::channel();
-        if self.tx.send(Msg::Close(tx)).is_ok() {
+        let sent = {
+            let mut accepting = self.shared.accepting.write();
+            *accepting = false;
+            self.tx.send(Msg::Close(tx)).is_ok()
+        };
+        if sent {
             let _ = rx.await;
         }
     }
@@ -211,7 +234,9 @@ impl Store {
     pub fn info(&self) -> Info {
         Info {
             backlog: self.shared.backlog.load(Ordering::Acquire),
-            recording: !self.shared.failing.load(Ordering::Acquire)
+            recording: *self.shared.accepting.read()
+                && self.shared.running.load(Ordering::Acquire)
+                && !self.shared.failing.load(Ordering::Acquire)
                 && self.shared.backlog.load(Ordering::Acquire) < self.max_backlog,
             thread_running: self.shared.running.load(Ordering::Acquire),
         }
@@ -236,56 +261,73 @@ impl Store {
     /// in `[from, to]` (µs), in write order. Rows outside the range can
     /// come too: callers filter. Blocking (reads files).
     pub fn scan(&self, from: i64, to: i64, mut f: impl FnMut(Rec<'_>)) {
-        for (path, base, len) in self.pick(|s| s.overlaps(from, to)) {
-            scan_file(&path, base, len, &mut f);
+        for seg in self.pick(|s| s.overlaps(from, to)) {
+            seg.scan(&mut f);
         }
     }
 
-    /// For each of `entities`, its newest state row before `before` (µs),
-    /// walking back from the newest segment that might hold it. Blocking.
+    /// For each of `entities`, its newest state row before `before` (µs).
+    /// Segments are read newest rows first and only while one could hold
+    /// a newer row than found so far: a clock step back can put older
+    /// times in a later segment. Blocking.
     pub fn last_before(&self, entities: &[&str], before: i64) -> Vec<StateRow> {
-        let mut missing: HashSet<&str> = entities.iter().copied().collect();
-        let mut found = Vec::new();
-        let candidates: Vec<(PathBuf, i64, u64, HashSet<SmolStr>)> = {
-            let segments = self.shared.segments.read();
-            segments
-                .iter()
-                .rev()
-                .filter(|s| s.min <= s.max && s.min < before)
-                .map(|s| (s.path.clone(), s.base, s.len, s.entities.clone()))
-                .collect()
-        };
-        for (path, base, len, present) in candidates {
-            if missing.is_empty() {
+        let wanted: HashSet<&str> = entities.iter().copied().collect();
+        // Per entity: (ts, seq, row); ties go to the later write.
+        let mut best: std::collections::HashMap<&str, (i64, u64, StateRow)> = Default::default();
+        let mut candidates =
+            self.pick(|s| s.min < before && wanted.iter().any(|e| s.entities.contains(*e)));
+        candidates.sort_unstable_by_key(|c| {
+            std::cmp::Reverse((c.max.min(before.saturating_sub(1)), c.seq))
+        });
+        for seg in candidates {
+            let hi = seg.max.min(before.saturating_sub(1));
+            let improves = |e: &str| best.get(e).is_none_or(|b| b.0 <= hi);
+            if !wanted.iter().any(|e| improves(e)) {
+                // Later candidates' rows are older still.
                 break;
             }
-            if !missing.iter().any(|e| present.contains(*e)) {
+            if !wanted
+                .iter()
+                .any(|e| seg.entities.contains(*e) && improves(e))
+            {
                 continue;
             }
-            let mut newest: std::collections::HashMap<&str, StateRow> = Default::default();
-            scan_file(&path, base, len, &mut |r| {
+            let seq = seg.seq;
+            seg.scan(&mut |r| {
                 if let Rec::State(s) = r
                     && s.ts < before
-                    && let Some(&e) = missing.get(s.entity_id)
-                    && newest.get(e).is_none_or(|n| n.ts <= s.ts)
+                    && let Some(&e) = wanted.get(s.entity_id)
+                    && best.get(e).is_none_or(|b| (b.0, b.1) <= (s.ts, seq))
                 {
-                    newest.insert(e, s.to_owned_row());
+                    best.insert(e, (s.ts, seq, s.to_owned_row()));
                 }
             });
-            for (e, row) in newest {
-                missing.remove(e);
-                found.push(row);
-            }
         }
-        found
+        best.into_values().map(|b| b.2).collect()
     }
 
-    fn pick(&self, keep: impl Fn(&Segment) -> bool) -> Vec<(PathBuf, i64, u64)> {
+    /// The segments `keep` picks, each opened while the index is locked:
+    /// a purge after this can unlink them, and the reads still see them.
+    fn pick(&self, keep: impl Fn(&Segment) -> bool) -> Vec<Pinned> {
         let segments = self.shared.segments.read();
         segments
             .iter()
             .filter(|s| keep(s))
-            .map(|s| (s.path.clone(), s.base, s.len))
+            .filter_map(|s| match std::fs::File::open(&s.path) {
+                Ok(file) => Some(Pinned {
+                    file,
+                    path: s.path.clone(),
+                    seq: s.seq,
+                    base: s.base,
+                    len: s.len,
+                    max: s.max,
+                    entities: s.entities.clone(),
+                }),
+                Err(e) => {
+                    tracing::error!("opening {}: {e}", s.path.display());
+                    None
+                }
+            })
             .collect()
     }
 
@@ -320,31 +362,36 @@ impl format::StateRec<'_> {
     }
 }
 
-fn read_prefix(path: &Path, len: u64) -> std::io::Result<Vec<u8>> {
-    let file = std::fs::File::open(path)?;
-    let mut buf = Vec::with_capacity(len as usize);
-    file.take(len).read_to_end(&mut buf)?;
-    Ok(buf)
+/// A segment picked for a read, held open.
+struct Pinned {
+    file: std::fs::File,
+    path: PathBuf,
+    seq: u64,
+    base: i64,
+    len: u64,
+    max: i64,
+    entities: HashSet<SmolStr>,
 }
 
-fn scan_file(path: &Path, base: i64, len: u64, f: &mut dyn FnMut(Rec<'_>)) {
-    let buf = match read_prefix(path, len) {
-        Ok(b) => b,
-        // Purged meanwhile.
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return,
-        Err(e) => {
-            tracing::error!("reading {}: {e}", path.display());
+impl Pinned {
+    fn scan(self, f: &mut dyn FnMut(Rec<'_>)) {
+        let mut buf = Vec::with_capacity(self.len as usize);
+        if let Err(e) = self.file.take(self.len).read_to_end(&mut buf) {
+            tracing::error!("reading {}: {e}", self.path.display());
             return;
         }
-    };
-    let mut dicts = ReadDicts::default();
-    let mut ok = true;
-    format::frames(&buf, |payload| {
-        if ok && !dicts.decode(base, payload, &mut *f) {
-            tracing::error!("{}: a malformed record; skipping the rest", path.display());
-            ok = false;
-        }
-    });
+        let mut dicts = ReadDicts::default();
+        format::frames(&buf, |payload| {
+            let ok = dicts.decode(self.base, payload, &mut *f);
+            if !ok {
+                tracing::error!(
+                    "{}: a malformed record; skipping the rest",
+                    self.path.display()
+                );
+            }
+            ok
+        });
+    }
 }
 
 fn seq_of(path: &Path) -> Option<u64> {
@@ -410,20 +457,31 @@ fn recover(dir: &Path) -> std::io::Result<(Vec<Segment>, u64)> {
             entities: HashSet::new(),
         };
         let mut dicts = ReadDicts::default();
-        let mut ok = true;
+        let (mut min, mut max) = (i64::MAX, i64::MIN);
+        let mut entities: Vec<SmolStr> = Vec::new();
+        // A frame counts only if all of it decodes: one that doesn't (a
+        // CRC-valid but malformed batch) ends the valid prefix like a torn
+        // one, and none of its rows reach the summary.
         let valid = format::frames(&bytes, |payload| {
+            let (mut lo, mut hi) = (i64::MAX, i64::MIN);
+            entities.clear();
+            let ok = dicts.decode(base, payload, |r| {
+                lo = lo.min(r.ts());
+                hi = hi.max(r.ts());
+                if let Rec::State(s) = r
+                    && !seg.entities.contains(s.entity_id)
+                {
+                    entities.push(s.entity_id.into());
+                }
+            });
             if ok {
-                ok = dicts.decode(base, payload, |r| {
-                    seg.min = seg.min.min(r.ts());
-                    seg.max = seg.max.max(r.ts());
-                    if let Rec::State(s) = r
-                        && !seg.entities.contains(s.entity_id)
-                    {
-                        seg.entities.insert(s.entity_id.into());
-                    }
-                });
+                min = min.min(lo);
+                max = max.max(hi);
+                seg.entities.extend(entities.drain(..));
             }
+            ok
         });
+        (seg.min, seg.max) = (min, max);
         if valid < bytes.len() {
             tracing::warn!(
                 "{}: cut {} bytes of a torn or corrupt tail",
@@ -434,9 +492,6 @@ fn recover(dir: &Path) -> std::io::Result<(Vec<Segment>, u64)> {
                 .write(true)
                 .open(&seg.path)?
                 .set_len(valid as u64)?;
-        }
-        if !ok {
-            tracing::error!("{}: a malformed record", seg.path.display());
         }
         seg.len = valid as u64;
         if seg.min > seg.max {
@@ -467,6 +522,10 @@ struct Writer {
     buf: Vec<u8>,
     /// The wait before the next retry of a failed write.
     retry: Duration,
+    /// While writes fail: the next attempt. Nothing writes before it, not
+    /// even a flush, so each failure (which frees disk by dropping the
+    /// oldest segment) keeps the backoff's pace.
+    retry_at: Option<Instant>,
 }
 
 impl Writer {
@@ -482,11 +541,10 @@ impl Writer {
                 Ok(Msg::Row(row)) => {
                     self.pending.push(row);
                     deadline.get_or_insert_with(|| Instant::now() + self.interval);
-                    continue;
                 }
                 Ok(Msg::Flush(reply)) => {
                     deadline = self.commit();
-                    let _ = reply.send(());
+                    let _ = reply.send(deadline.is_none());
                 }
                 Ok(Msg::Purge(cutoff, reply)) => {
                     deadline = self.commit();
@@ -494,14 +552,26 @@ impl Writer {
                     let _ = reply.send(());
                 }
                 Ok(Msg::Close(reply)) => {
-                    self.commit();
+                    // `close` stopped admissions before sending this, so
+                    // every accepted row is pending now. Keep retrying:
+                    // the caller's timeout decides when to give up.
+                    while let Some(at) = self.commit() {
+                        std::thread::sleep(at.saturating_duration_since(Instant::now()));
+                    }
                     self.close_segment();
                     let _ = reply.send(());
                     return;
                 }
                 Err(mpsc::RecvTimeoutError::Timeout) => deadline = self.commit(),
                 Err(mpsc::RecvTimeoutError::Disconnected) => {
-                    self.commit();
+                    // Dropped without `close`: one last try.
+                    self.retry_at = None;
+                    if self.commit().is_some() {
+                        tracing::error!(
+                            "the recorder stopped with {} rows unwritten",
+                            self.pending.len()
+                        );
+                    }
                     self.close_segment();
                     return;
                 }
@@ -510,10 +580,16 @@ impl Writer {
     }
 
     /// Write the pending batch as one frame. On failure the batch is kept
-    /// and the next attempt's time returned.
+    /// and the next attempt's time returned; before that time this only
+    /// returns it.
     fn commit(&mut self) -> Option<Instant> {
         if self.pending.is_empty() {
             return None;
+        }
+        if let Some(at) = self.retry_at
+            && Instant::now() < at
+        {
+            return Some(at);
         }
         match self.try_commit() {
             Ok(()) => {
@@ -524,6 +600,7 @@ impl Writer {
                     tracing::info!("the recorder is writing again");
                 }
                 self.retry = FIRST_RETRY;
+                self.retry_at = None;
                 None
             }
             Err(e) => {
@@ -535,9 +612,10 @@ impl Writer {
                 }
                 // Give the disk room: the oldest closed segment goes.
                 self.drop_oldest_closed();
-                let wait = self.retry;
+                let at = Instant::now() + self.retry;
                 self.retry = (self.retry * 2).min(MAX_RETRY);
-                Some(Instant::now() + wait)
+                self.retry_at = Some(at);
+                Some(at)
             }
         }
     }
@@ -560,21 +638,22 @@ impl Writer {
         let Some(open) = self.open.as_mut() else {
             unreachable!("opened above")
         };
-        let mut payload = std::mem::take(&mut self.buf);
-        payload.clear();
+        // One reused buffer: the frame head's room, then the payload.
+        let frame = &mut self.buf;
+        frame.clear();
+        frame.resize(format::FRAME_HEAD, 0);
         for row in &self.pending {
-            open.dicts.encode(open.base, row, &mut payload);
+            open.dicts.encode(open.base, row, frame);
         }
-        let mut frame = Vec::with_capacity(payload.len() + format::FRAME_HEAD);
-        format::frame(&payload, &mut frame);
-        self.buf = payload;
+        format::seal_frame(frame);
+        let frame = &self.buf;
         let written = (|| {
             #[cfg(test)]
             if self.shared.fail_writes.load(Ordering::Acquire) {
                 return Err(std::io::Error::other("no space left on device (test)"));
             }
             open.file.seek(SeekFrom::Start(open.len))?;
-            open.file.write_all(&frame)
+            open.file.write_all(frame)
         })();
         if let Err(e) = written {
             // No half frame stays behind, and the dictionaries now hold
@@ -656,17 +735,29 @@ impl Writer {
         self.open.as_ref().map(|o| o.seq)
     }
 
-    fn remove(&self, seq: u64) {
-        let mut segments = self.shared.segments.write();
-        if let Some(i) = segments.iter().position(|s| s.seq == seq) {
-            let seg = segments.remove(i);
-            drop(segments);
-            if let Err(e) = std::fs::remove_file(&seg.path)
-                && e.kind() != std::io::ErrorKind::NotFound
-            {
-                tracing::error!("removing {}: {e}", seg.path.display());
+    /// Unlink a segment, then forget it. `false` if the unlink failed: it
+    /// stays listed and readable, and its bytes still count.
+    fn remove(&self, seq: u64) -> bool {
+        let Some(path) = self
+            .shared
+            .segments
+            .read()
+            .iter()
+            .find(|s| s.seq == seq)
+            .map(|s| s.path.clone())
+        else {
+            return true;
+        };
+        match std::fs::remove_file(&path) {
+            Ok(()) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(e) => {
+                tracing::error!("removing {}: {e}", path.display());
+                return false;
             }
         }
+        self.shared.segments.write().retain(|s| s.seq != seq);
+        true
     }
 
     fn drop_oldest_closed(&mut self) {
@@ -695,7 +786,9 @@ impl Writer {
             if Some(seq) == self.open_seq() {
                 self.close_segment();
             }
-            self.remove(seq);
+            if !self.remove(seq) {
+                break;
+            }
         }
         self.enforce_cap();
         sync_dir(&self.dir);
@@ -724,7 +817,9 @@ impl Writer {
                     limit
                 );
             }
-            self.remove(seq);
+            if !self.remove(seq) {
+                return;
+            }
         }
     }
 }

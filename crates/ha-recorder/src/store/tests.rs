@@ -57,10 +57,22 @@ fn all(store: &Store) -> Vec<(String, i64, String)> {
     v
 }
 
+/// Flush until every row is written (failed writes retry on a backoff).
+async fn flush_until_written(store: &Store) {
+    let start = Instant::now();
+    while !store.flush().await {
+        assert!(start.elapsed() < Duration::from_secs(10), "never written");
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+}
+
 fn frames_in(path: &Path) -> usize {
     let bytes = std::fs::read(path).unwrap();
     let mut n = 0;
-    format::frames(&bytes, |_| n += 1);
+    format::frames(&bytes, |_| {
+        n += 1;
+        true
+    });
     n
 }
 
@@ -267,7 +279,7 @@ async fn a_full_disk_keeps_rows_and_recovers() {
         assert_eq!(kept, i <= 5, "row {i}");
     }
     assert_eq!(store.dropped(), 2);
-    store.flush().await;
+    assert!(!store.flush().await, "the flush reports the unwritten rows");
     assert!(!store.info().recording);
     assert_eq!(store.info().backlog, 5);
     assert_eq!(all(&store).len(), 1, "reads still answer");
@@ -278,9 +290,165 @@ async fn a_full_disk_keeps_rows_and_recovers() {
     );
 
     store.fail_writes(false);
-    store.flush().await;
+    flush_until_written(&store).await;
     assert!(store.info().recording);
     assert_eq!(store.info().backlog, 0);
     let states: Vec<String> = all(&store).into_iter().map(|r| r.2).collect();
     assert_eq!(states, ["0", "1", "2", "3", "4", "5"]);
+}
+
+/// Flushes during a write failure keep to the retry schedule: one failure,
+/// so one dropped segment, not one per read.
+#[tokio::test]
+async fn flushes_wait_for_the_retry_while_writes_fail() {
+    let dir = Dir::new("backoff");
+    let store = Store::open(dir.config()).unwrap();
+    for day in 0..4 {
+        store.record(state("sensor.a", T0 + day * DAY_US, "x"));
+        store.flush().await;
+    }
+    store.fail_writes(true);
+    store.record(state("sensor.a", T0 + 4 * DAY_US, "y"));
+    for _ in 0..20 {
+        assert!(!store.flush().await);
+    }
+    assert_eq!(store.segment_files().len(), 3, "one failure, one segment");
+    store.fail_writes(false);
+    flush_until_written(&store).await;
+    assert_eq!(all(&store).last().unwrap().2, "y");
+}
+
+/// Close keeps retrying a failing final write instead of dropping it, and
+/// refuses rows from the moment it is called.
+#[tokio::test]
+async fn close_retries_the_final_write() {
+    let dir = Dir::new("close");
+    let store = Arc::new(Store::open(dir.config()).unwrap());
+    store.fail_writes(true);
+    store.record(state("sensor.a", T0, "kept"));
+    let closing = tokio::spawn({
+        let store = store.clone();
+        async move { store.close().await }
+    });
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    assert!(!closing.is_finished(), "still retrying");
+    assert!(!store.record(state("sensor.a", T0 + 1, "late")));
+    assert!(!store.info().recording);
+    store.fail_writes(false);
+    tokio::time::timeout(Duration::from_secs(10), closing)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(store.info().backlog, 0);
+    assert!(!store.info().recording, "a closed store isn't recording");
+    drop(store);
+    let store = Store::open(dir.config()).unwrap();
+    let states: Vec<String> = all(&store).into_iter().map(|r| r.2).collect();
+    assert_eq!(states, ["kept"]);
+}
+
+/// A clock stepped back across a restart puts an older row in a later
+/// segment; the lookup still finds the newest.
+#[tokio::test]
+async fn last_before_survives_a_clock_step_back() {
+    let dir = Dir::new("stepback");
+    let hour = 3_600_000_000;
+    {
+        let store = Store::open(dir.config()).unwrap();
+        store.record(state("sensor.a", T0 + 4 * hour, "noon"));
+        store.close().await;
+    }
+    let store = Store::open(dir.config()).unwrap();
+    store.record(state("sensor.a", T0 + 3 * hour, "eleven"));
+    store.flush().await;
+    assert_eq!(store.segment_files().len(), 2);
+    let got = store.last_before(&["sensor.a"], T0 + 5 * hour);
+    assert_eq!(got.len(), 1);
+    assert_eq!(got[0].state, "noon");
+}
+
+/// Segments a read has picked stay readable when a purge unlinks them.
+#[tokio::test]
+async fn picked_segments_outlive_a_purge() {
+    let dir = Dir::new("pinned");
+    let store = Store::open(dir.config()).unwrap();
+    store.record(state("sensor.a", T0, "old"));
+    store.flush().await;
+    store.record(state("sensor.a", T0 + DAY_US, "new"));
+    store.flush().await;
+    let picked = store.pick(|_| true);
+    store.purge(T0 + 1).await;
+    assert_eq!(store.segment_files().len(), 1);
+    let mut states = Vec::new();
+    for seg in picked {
+        seg.scan(&mut |r| {
+            if let Rec::State(s) = r {
+                states.push(s.state.to_owned());
+            }
+        });
+    }
+    assert_eq!(states, ["old", "new"]);
+}
+
+/// A frame whose CRC is right but whose contents don't decode ends the
+/// valid prefix: it is cut, and none of its rows count.
+#[tokio::test]
+async fn a_malformed_frame_is_cut_whole() {
+    let dir = Dir::new("malformed");
+    std::fs::create_dir_all(&dir.0).unwrap();
+    let base = T0.div_euclid(DAY_US) * DAY_US;
+    let mut dicts = format::Dicts::default();
+    let mut file = format::header(base).to_vec();
+    let mut payload = Vec::new();
+    dicts.encode(base, &state("sensor.a", T0, "good"), &mut payload);
+    format::frame(&payload, &mut file);
+    let good_len = file.len();
+    payload.clear();
+    dicts.encode(base, &state("sensor.a", T0 - 100, "early"), &mut payload);
+    payload.push(0x7f); // no such tag
+    format::frame(&payload, &mut file);
+    payload.clear();
+    dicts.encode(base, &state("sensor.a", T0 + 100, "after"), &mut payload);
+    format::frame(&payload, &mut file);
+    let path = dir.0.join("00000001.seg");
+    std::fs::write(&path, &file).unwrap();
+
+    let store = Store::open(dir.config()).unwrap();
+    assert_eq!(std::fs::metadata(&path).unwrap().len(), good_len as u64);
+    assert_eq!(
+        store.oldest_ts(),
+        Some(T0),
+        "the bad frame's row isn't summarised"
+    );
+    let states: Vec<String> = all(&store).into_iter().map(|r| r.2).collect();
+    assert_eq!(states, ["good"]);
+}
+
+/// An unlink that fails leaves the segment listed and readable; the next
+/// purge removes it.
+#[cfg(unix)]
+#[tokio::test]
+async fn a_failed_unlink_keeps_the_segment() {
+    use std::os::unix::fs::PermissionsExt;
+    let dir = Dir::new("unlink");
+    let store = Store::open(dir.config()).unwrap();
+    store.record(state("sensor.a", T0, "old"));
+    store.flush().await;
+    store.record(state("sensor.a", T0 + DAY_US, "new"));
+    store.flush().await;
+    let mode = |m| std::fs::set_permissions(&dir.0, std::fs::Permissions::from_mode(m)).unwrap();
+    mode(0o555);
+    let probe = std::fs::File::create(dir.0.join("probe")).is_ok();
+    if probe {
+        // Running as root: permissions don't stop an unlink.
+        mode(0o755);
+        return;
+    }
+    store.purge(T0 + 1).await;
+    mode(0o755);
+    assert_eq!(store.segment_files().len(), 2, "still listed");
+    assert_eq!(all(&store).len(), 2, "still readable");
+    store.purge(T0 + 1).await;
+    assert_eq!(store.segment_files().len(), 1);
+    assert_eq!(dir.files(), ["00000002.seg"]);
 }

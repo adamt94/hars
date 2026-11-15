@@ -306,15 +306,25 @@ impl Dicts {
 }
 
 /// A frame around `payload`.
+#[cfg(test)]
 pub(crate) fn frame(payload: &[u8], out: &mut Vec<u8>) {
     out.extend_from_slice(&(payload.len() as u32).to_le_bytes());
     out.extend_from_slice(&crc32(payload).to_le_bytes());
     out.extend_from_slice(payload);
 }
 
+/// Make `buf` a frame in place: its first [`FRAME_HEAD`] bytes were
+/// reserved and the payload follows them.
+pub(crate) fn seal_frame(buf: &mut [u8]) {
+    let (head, payload) = buf.split_at_mut(FRAME_HEAD);
+    head[..4].copy_from_slice(&(payload.len() as u32).to_le_bytes());
+    head[4..].copy_from_slice(&crc32(payload).to_le_bytes());
+}
+
 /// Walk `b`'s frames from the header on, verifying each CRC, and return
-/// the length of the valid prefix: a short or corrupt frame ends it.
-pub(crate) fn frames<'a>(b: &'a [u8], mut f: impl FnMut(&'a [u8])) -> usize {
+/// the length of the valid prefix: a short or corrupt frame ends it, and
+/// so does one `f` rejects (returns `false` for).
+pub(crate) fn frames<'a>(b: &'a [u8], mut f: impl FnMut(&'a [u8]) -> bool) -> usize {
     let mut pos = HEADER;
     while let Some(head) = b.get(pos..pos + FRAME_HEAD) {
         let len = u32::from_le_bytes([head[0], head[1], head[2], head[3]]) as usize;
@@ -322,10 +332,9 @@ pub(crate) fn frames<'a>(b: &'a [u8], mut f: impl FnMut(&'a [u8])) -> usize {
         let Some(payload) = b.get(pos + FRAME_HEAD..pos + FRAME_HEAD + len) else {
             break;
         };
-        if crc32(payload) != crc {
+        if crc32(payload) != crc || !f(payload) {
             break;
         }
-        f(payload);
         pos += FRAME_HEAD + len;
     }
     pos.min(b.len())
@@ -507,7 +516,10 @@ mod tests {
         let mut rd = ReadDicts::default();
         let mut got = Vec::new();
         let mut ok = true;
-        let end = frames(&file, |p| ok &= rd.decode(base, p, |r| got.push(r)));
+        let end = frames(&file, |p| {
+            ok &= rd.decode(base, p, |r| got.push(r));
+            true
+        });
         assert!(ok);
         assert_eq!(end, file.len());
         assert_eq!(got.len(), rows.len());
@@ -545,7 +557,13 @@ mod tests {
         }
         let count = |b: &[u8]| {
             let mut n = 0;
-            (frames(b, |_| n += 1), n)
+            (
+                frames(b, |_| {
+                    n += 1;
+                    true
+                }),
+                n,
+            )
         };
         assert_eq!(count(&file), (ends[2], 3));
         assert_eq!(count(&file[..ends[2] - 1]), (ends[1], 2), "torn");
@@ -554,5 +572,16 @@ mod tests {
         assert_eq!(count(&bad), (ends[1], 2), "corrupt");
         assert_eq!(count(&file[..HEADER]), (HEADER, 0));
         assert_eq!(read_header(b"HSEG0002\0\0\0\0\0\0\0\0"), None);
+    }
+
+    #[test]
+    fn sealing_in_place_matches_framing_a_copy() {
+        let payload = b"some payload bytes";
+        let mut copy = Vec::new();
+        frame(payload, &mut copy);
+        let mut sealed = vec![0; FRAME_HEAD];
+        sealed.extend_from_slice(payload);
+        seal_frame(&mut sealed);
+        assert_eq!(sealed, copy);
     }
 }
