@@ -452,7 +452,7 @@ fn live_rows_follow_has_old_state_and_continuity() {
     // Nobody follows: nothing is worked out, but the store's row is the same.
     assert_eq!(state_row(intake.row(&changed(Some(&before), &on))).flags, 0);
 
-    let mut feed = live.subscribe();
+    let mut feed = live.subscribe(all());
     // The first change after a start shows live though it isn't VISIBLE in
     // the store (its previous row is from before the start).
     let off = state(
@@ -474,7 +474,7 @@ fn live_rows_follow_has_old_state_and_continuity() {
 
     // A restart: the entity's first row of this process, with an old state.
     let mut intake = Intake::new(Hass::new());
-    let mut feed = intake.live().subscribe();
+    let mut feed = intake.live().subscribe(all());
     let first = state_row(intake.row(&changed(Some(&on), &off)));
     assert_eq!(first.flags, 0, "history never shows it (D6)");
     let live_row = state_row(feed.try_recv().map(|r| (*r).clone()));
@@ -542,7 +542,7 @@ fn live_rows_follow_has_old_state_and_continuity() {
 #[test]
 fn live_rows_carry_the_context_fields_and_events() {
     let mut intake = Intake::new(Hass::new());
-    let mut feed = intake.live().subscribe();
+    let mut feed = intake.live().subscribe(all());
     let mut ui = ctx(1);
     ui.user_id = Some("u1".into());
     let call = Event::new(
@@ -596,4 +596,9 @@ fn live_rows_carry_the_context_fields_and_events() {
         ctx(5),
     ));
     assert!(!intake.live().wanted());
+}
+
+/// Every row, as an unfiltered stream follows them.
+fn all() -> Arc<crate::logbook::Filter> {
+    Arc::new(crate::logbook::Filter::new(&[], &[], None))
 }

@@ -382,7 +382,7 @@ fn start_stream(conn: &mut Conn, id: u64, recorder: &Arc<Recorder>, args: Args) 
     }
 
     // Live: follow first, so nothing between the read and the feed is lost.
-    let mut feed = recorder.subscribe_live();
+    let mut feed = recorder.subscribe_live(filter.clone());
     let setup = hass.clock().now().as_microsecond();
     // A write that timestamped its state before `setup` may still be
     // publishing it: wait, so the read below finds it (the live side
@@ -413,11 +413,6 @@ fn start_stream(conn: &mut Conn, id: u64, recorder: &Arc<Recorder>, args: Args) 
             .await
             .is_none()
         {
-            return;
-        }
-        // What queued during the reads: a queue that grew past the limit is
-        // dropped, as HA drops a client that falls behind.
-        if feed.backlog() > MAX_PENDING_LOGBOOK_EVENTS {
             return;
         }
         // Past `end`, nothing more is sent, whatever is still being grouped.
@@ -459,9 +454,6 @@ async fn follow(
         // Filtered as they arrive: the batch holds only what is shown.
         while batch.is_empty() {
             let Some(row) = feed.recv().await else { return };
-            if feed.backlog() > MAX_PENDING_LOGBOOK_EVENTS {
-                return;
-            }
             if wanted(&row) {
                 batch.push(row);
             }
@@ -474,9 +466,6 @@ async fn follow(
                 () = &mut group => break,
                 row = feed.recv() => {
                     let Some(row) = row else { return };
-                    if feed.backlog() > MAX_PENDING_LOGBOOK_EVENTS {
-                        return;
-                    }
                     if wanted(&row) {
                         batch.push(row);
                         if batch.len() > MAX_PENDING_LOGBOOK_EVENTS {

@@ -181,8 +181,8 @@ impl Recorder {
     /// returns; everything after is in the feed.
     ///
     /// [`sync`]: Recorder::sync
-    pub fn subscribe_live(&self) -> LiveFeed {
-        self.live.subscribe()
+    pub fn subscribe_live(&self, filter: Arc<crate::logbook::Filter>) -> LiveFeed {
+        self.live.subscribe(filter)
     }
 
     /// Wait until everything the bus fired before this call has been
