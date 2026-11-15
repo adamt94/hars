@@ -19,41 +19,76 @@ type StopHandler = (&'static str, Box<dyn FnOnce() -> StopFuture + Send>);
 /// Work `finish_stop` waits for ([`Hass::on_final_write`], [`Hass::on_close`]).
 #[derive(Default)]
 pub(crate) struct StopHandlers {
-    final_write: parking_lot::Mutex<Vec<StopHandler>>,
-    close: parking_lot::Mutex<Vec<StopHandler>>,
+    final_write: Stage,
+    close: Stage,
 }
 
-/// Run one stop stage's handlers together, for at most `timeout`; the
-/// ones still running then are named and abandoned.
-async fn run_stage(handlers: Vec<StopHandler>, timeout: Duration, stage: &str) {
-    if handlers.is_empty() {
-        return;
+/// One stop stage's handlers. Closed once the stage is over: a later
+/// registration is refused, not left behind.
+#[derive(Default)]
+struct Stage(parking_lot::Mutex<StageQueue>);
+
+#[derive(Default)]
+struct StageQueue {
+    closed: bool,
+    handlers: Vec<StopHandler>,
+}
+
+impl Stage {
+    fn push(&self, handler: StopHandler, stage: &str) {
+        let mut q = self.0.lock();
+        if q.closed {
+            tracing::warn!("{stage} is over; not running handler {}", handler.0);
+        } else {
+            q.handlers.push(handler);
+        }
     }
-    let mut set = tokio::task::JoinSet::new();
-    let mut running = std::collections::HashMap::new();
-    for (name, start) in handlers {
-        running.insert(set.spawn(start()).id(), name);
-    }
-    let deadline = tokio::time::Instant::now() + timeout;
-    loop {
-        match tokio::time::timeout_at(deadline, set.join_next_with_id()).await {
-            Ok(None) => return,
-            Ok(Some(Ok((id, ())))) => {
-                running.remove(&id);
+
+    /// Run the handlers together, for at most `timeout` from now. Ones
+    /// registered meanwhile (a handler adding another) join the same
+    /// wait. The ones still running at the deadline are named and
+    /// abandoned.
+    async fn run(&self, timeout: Duration, stage: &str) {
+        let deadline = tokio::time::Instant::now() + timeout;
+        let mut set = tokio::task::JoinSet::new();
+        let mut running = std::collections::HashMap::new();
+        loop {
+            let more = {
+                let mut q = self.0.lock();
+                if set.is_empty() && q.handlers.is_empty() {
+                    q.closed = true;
+                    return;
+                }
+                std::mem::take(&mut q.handlers)
+            };
+            for (name, start) in more {
+                // Called inside the task, so a panicking factory is caught
+                // like a panicking future.
+                running.insert(set.spawn(async move { start().await }).id(), name);
             }
-            Ok(Some(Err(e))) => {
-                let name = running.remove(&e.id()).unwrap_or("?");
-                tracing::error!("{stage} handler {name} failed: {e}");
-            }
-            Err(_) => {
-                let mut names: Vec<_> = running.into_values().collect();
-                names.sort_unstable();
-                tracing::warn!(
-                    "timed out after {timeout:?} waiting for {stage} handlers: {}; continuing",
-                    names.join(", ")
-                );
-                // Dropping the set aborts them.
-                return;
+            match tokio::time::timeout_at(deadline, set.join_next_with_id()).await {
+                Ok(None) => {}
+                Ok(Some(Ok((id, ())))) => {
+                    running.remove(&id);
+                }
+                Ok(Some(Err(e))) => {
+                    let name = running.remove(&e.id()).unwrap_or("?");
+                    tracing::error!("{stage} handler {name} failed: {e}");
+                }
+                Err(_) => {
+                    let mut names: Vec<_> = running.into_values().collect();
+                    let mut q = self.0.lock();
+                    q.closed = true;
+                    names.extend(q.handlers.drain(..).map(|h| h.0));
+                    drop(q);
+                    names.sort_unstable();
+                    tracing::warn!(
+                        "timed out after {timeout:?} waiting for {stage} handlers: {}; continuing",
+                        names.join(", ")
+                    );
+                    // Dropping the set aborts them.
+                    return;
+                }
             }
         }
     }
@@ -222,26 +257,28 @@ impl Hass {
     /// [`Hass::on_close`] handlers, then `STOPPED`.
     pub async fn finish_stop(&self) {
         self.enter(CoreState::FinalWrite, EventKind::HomeassistantFinalWrite {});
-        let handlers = std::mem::take(&mut *self.inner.stop.final_write.lock());
-        run_stage(handlers, FINAL_WRITE_TIMEOUT, "homeassistant_final_write").await;
+        let stop = &self.inner.stop;
+        stop.final_write
+            .run(FINAL_WRITE_TIMEOUT, "homeassistant_final_write")
+            .await;
         self.enter(CoreState::NotRunning, EventKind::HomeassistantClose {});
-        let handlers = std::mem::take(&mut *self.inner.stop.close.lock());
-        run_stage(handlers, CLOSE_TIMEOUT, "homeassistant_close").await;
+        stop.close.run(CLOSE_TIMEOUT, "homeassistant_close").await;
         self.set_core_state(CoreState::Stopped);
     }
 
     /// Run `start()` once `homeassistant_final_write` has fired, and have
-    /// [`Hass::finish_stop`] wait for it (up to 60 s, with the others).
+    /// [`Hass::finish_stop`] wait for it (up to 60 s, with the others). A
+    /// handler may register another; once the stage is over, registering
+    /// is refused with a warning.
     pub fn on_final_write<F, Fut>(&self, name: &'static str, start: F)
     where
         F: FnOnce() -> Fut + Send + 'static,
         Fut: Future<Output = ()> + Send + 'static,
     {
-        self.inner
-            .stop
-            .final_write
-            .lock()
-            .push((name, Box::new(move || Box::pin(start()) as StopFuture)));
+        self.inner.stop.final_write.push(
+            (name, Box::new(move || Box::pin(start()) as StopFuture)),
+            "homeassistant_final_write",
+        );
     }
 
     /// The same at `homeassistant_close` (up to 30 s).
@@ -250,11 +287,10 @@ impl Hass {
         F: FnOnce() -> Fut + Send + 'static,
         Fut: Future<Output = ()> + Send + 'static,
     {
-        self.inner
-            .stop
-            .close
-            .lock()
-            .push((name, Box::new(move || Box::pin(start()) as StopFuture)));
+        self.inner.stop.close.push(
+            (name, Box::new(move || Box::pin(start()) as StopFuture)),
+            "homeassistant_close",
+        );
     }
 
     fn enter(&self, state: CoreState, kind: EventKind) {
@@ -408,5 +444,38 @@ mod tests {
         let start = tokio::time::Instant::now();
         idle.finish_stop().await;
         assert_eq!(start.elapsed(), Duration::ZERO);
+    }
+
+    /// A factory that panics is one failed handler, not a failed stop;
+    /// a handler that registers another is waited for; registering after
+    /// the stage is refused.
+    #[tokio::test(start_paused = true)]
+    async fn stages_take_late_handlers_and_survive_panics() {
+        let hass = Hass::new();
+        let done = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let count = |done: &std::sync::Arc<std::sync::atomic::AtomicUsize>| {
+            let done = done.clone();
+            move || async move {
+                tokio::time::sleep(Duration::from_secs(3)).await;
+                done.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            }
+        };
+        #[allow(unreachable_code)]
+        hass.on_final_write("panics", || -> std::future::Ready<()> { panic!("factory") });
+        {
+            let (hass2, nested) = (hass.clone(), count(&done));
+            hass.on_final_write("outer", move || async move {
+                hass2.on_final_write("nested", nested);
+            });
+        }
+        hass.on_close("close", count(&done));
+        let start = tokio::time::Instant::now();
+        hass.finish_stop().await;
+        assert_eq!(done.load(std::sync::atomic::Ordering::SeqCst), 2);
+        assert_eq!(start.elapsed(), Duration::from_secs(6));
+        assert_eq!(hass.core_state(), CoreState::Stopped);
+
+        hass.on_final_write("late", count(&done));
+        assert!(hass.inner.stop.final_write.0.lock().handlers.is_empty());
     }
 }

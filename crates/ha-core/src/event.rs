@@ -83,7 +83,10 @@ impl Event {
     }
 }
 
-/// Picks the events a lossless subscriber wants.
+/// Picks the events a lossless subscriber wants. It runs on the firing
+/// thread with the bus locked (and, for a state change, the states map),
+/// so it must look only at the event it is given: reading `Hass` or firing
+/// from it deadlocks.
 pub type EventFilter = fn(&Event) -> bool;
 
 /// Fan-out event bus. Events are wrapped in `Arc` so each subscriber
@@ -113,7 +116,10 @@ impl EventBus {
     pub(crate) fn fire_shared(&self, event: Arc<Event>) {
         let mut lossless = self.lossless.lock();
         if !lossless.is_empty() {
-            lossless.retain(|(wants, tx)| !wants(&event) || tx.send(event.clone()).is_ok());
+            // A dropped feed goes before its filter runs, matching or not.
+            lossless.retain(|(wants, tx)| {
+                !tx.is_closed() && (!wants(&event) || tx.send(event.clone()).is_ok())
+            });
         }
         // No subscribers is not an error.
         let _ = self.tx.send(event);
@@ -132,8 +138,6 @@ impl EventBus {
     pub fn subscribe_lossless(&self, wants: EventFilter) -> EventFeed {
         let (tx, rx) = mpsc::unbounded_channel();
         let mut lossless = self.lossless.lock();
-        // Firing prunes only on matching events: drop dead feeds here too.
-        lossless.retain(|(_, tx)| !tx.is_closed());
         lossless.push((wants, tx));
         EventFeed { rx }
     }
@@ -254,10 +258,13 @@ mod tests {
     #[test]
     fn dropped_feeds_unsubscribe() {
         let bus = EventBus::default();
+        let _kept = bus.subscribe_lossless(|_| false);
         for _ in 0..10 {
             drop(bus.subscribe_lossless(|_| false));
         }
-        let _kept = bus.subscribe_lossless(|_| false);
+        assert_eq!(bus.lossless.lock().len(), 11);
+        // An event none of them wants still prunes the dropped ones.
+        bus.fire(custom("unwanted", 0));
         assert_eq!(bus.lossless.lock().len(), 1);
     }
 }
