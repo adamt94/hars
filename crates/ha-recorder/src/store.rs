@@ -561,6 +561,8 @@ impl Writer {
                         std::thread::sleep(at.saturating_duration_since(Instant::now()));
                     }
                     self.close_segment();
+                    // Before the reply: `info` must say so once `close` returns.
+                    self.shared.running.store(false, Ordering::Release);
                     let _ = reply.send(());
                     return;
                 }
