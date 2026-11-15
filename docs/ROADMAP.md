@@ -155,7 +155,7 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
   - [x] Config entries: `core.config_entries` imported as is (0600); the
         report marks each entry's integration as supported or not. Hue host/key,
         LIFX host, SwitchBot token/secret and mobile_app registration are used
-        as those integrations land
+        by the implemented integrations in M4/M5
 - [x] `configuration.yaml` loaded as HA loads it: `!include`, the
       `!include_dir_*` tags, `!secret`, `!env_var`; unsupported
       **automation** syntax makes that automation `unavailable`
@@ -165,8 +165,8 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
       entities register as restorable (hue scenes restore their last
       activation); registered entities nobody provides are `unavailable`
       with `restored: true`, as HA writes them at start
-- [ ] Restore for automations (on/off, `last_triggered`) and the IR climate
-      (target temperature/mode/fan, `assumed_state`), as those land. Pending
+- [x] Restore for automations (on/off, `last_triggered`; M3) and the IR
+      climate (target temperature/mode/fan, `assumed_state`; M4). Pending
       waits are not restored.
 
 ### M2: Auth + HTTP/WebSocket API for the official frontend
@@ -179,7 +179,9 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
       `/auth/token` (`authorization_code` + `refresh_token` + revoke, as
       urlencoded **or multipart**: the frontend sends `FormData`), client id /
       redirect validation (no outbound `<link rel=redirect_uri>` fetch), HS256
-      JWT access tokens, `Bearer` on every `/api/*`. State lives in HA's own
+      JWT access tokens, `Bearer` on protected REST routes. WebSocket uses
+      protocol auth; webhooks use secret ids; onboarding status is anonymous
+      (see [security policy](../SECURITY.md)). State lives in HA's own
       `.storage/{auth, auth_provider.homeassistant, onboarding}` files.
       `hars auth add` creates the owner until onboarding UI lands; binary
       2.33 → 2.64 MiB
@@ -205,8 +207,8 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
       when the frontend reconnects
 - [x] WS frontend: `frontend/{get,set,subscribe}_{user,system}_data` in HA's
       `.storage/frontend.*` files, `frontend/get_themes`,
-      `frontend/get_translations` and `frontend/get_icons` (empty until
-      translations and icons are bundled), `persistent_notification/subscribe`,
+      `frontend/get_translations` and `frontend/get_icons` (bundled English
+      translations and icons, described below), `persistent_notification/subscribe`,
       `repairs/list_issues`; the frontend's cold load gets every answer it
       waits for (test replays it)
 - [x] Bundle translations and icons (`frontend/get_translations`,

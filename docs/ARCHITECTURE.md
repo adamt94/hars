@@ -18,7 +18,7 @@ and budgets are in [PERF.md](PERF.md); decisions and their reasons are in
    Integrations are compiled in
    ([ADR 0005](adr/0005-integrations-compiled-in.md)).
 4. **Idle means idle.** Nothing polls when nothing happens. Timers sleep
-   until their deadline; an idle hars has no wakeups.
+   until their deadline; nothing wakes just to check for work.
 
 ## Crates
 
@@ -73,8 +73,11 @@ layer 0   ha-core   (no workspace dependencies)
    ([ADR 0007](adr/0007-transparent-huge-pages-off.md)).
 2. With arguments, runs an offline command (`auth add`, `import`) and exits.
    Otherwise starts a multi-thread tokio runtime.
-3. Loads `.storage/core.config` and `configuration.yaml`. All blocking file
-   I/O at start-up runs on `spawn_blocking`.
+3. If `HARS_FRONTEND` is set, loads the frontend's `index.html` synchronously
+   through `api_config()` before loading core config or starting the recorder.
+   Creating the config directory is also synchronous. These are current
+   exceptions to the no-blocking-I/O rule, not patterns for new code.
+   Loads `.storage/core.config` and `configuration.yaml` on `spawn_blocking`.
 4. Starts the **recorder** first, so every state written from here on is
    history, then shadow mode's log if `HARS_SHADOW=1`.
 5. Loads the registries, the restore state, `zone` and `person`, and the
@@ -95,8 +98,9 @@ layer 0   ha-core   (no workspace dependencies)
 - **`EntityId`** is `domain.object_id`, validated once at the edge and
   stored as a `SmolStr` (inline up to 23 bytes, so it almost never
   allocates).
-- **`State`** is an immutable snapshot, always an `Arc<State>`. The state
-  machine, the `state_changed` event and every API response share one
+- **`State`** is a snapshot shared as `Arc<State>`, immutable except for
+  the atomic `last_reported` timestamp (its JSON value freezes at first
+  serialisation, matching HA's cache). The state machine, the `state_changed` event and every API response share one
   allocation.
 - **`StateMachine`** is a `RwLock<HashMap<EntityId, Arc<State>>>`. A write
   that changes nothing returns the existing `Arc`, moves only
@@ -134,8 +138,8 @@ the event fires ([SHADOW.md](SHADOW.md)). `entity_id` targets are resolved by
 ### Config entries and integration setup
 
 Integrations start from HA's `core.config_entries`, imported as is. On a
-fresh install with no entries, `sun` starts, as HA's default configuration
-does. `ha_integrations::start` matches enabled entries to integrations by
+fresh install with no config-entries file, `sun` starts, as HA's default
+configuration does. `ha_integrations::start` matches enabled entries to integrations by
 domain and spawns one task per entry. Each integration's `run` function:
 
 1. gets a `SetupGuard` (`hass.setup_guard()`) and calls `done()` after its
@@ -156,8 +160,8 @@ that must reach disk at stop registers with `hass.on_final_write`.
   (`version`, `minor_version`, `key`, `data`) and HA's file names, so the
   files move between HA and hars. A write goes to a temp file, is synced,
   renamed over the old one, and the directory synced. Secrets are written
-  mode 0600. `Store` is blocking: call it at start-up or on
-  `spawn_blocking`.
+  mode 0600. `Store` is blocking: use `spawn_blocking` from async code,
+  including during start-up; offline CLI commands can call it directly.
 - **Delayed saves** (`DelayedSave`) are HA's `async_delay_save`: a change
   schedules a write after a quiet period (registries 10 s, or 180 s while
   starting; config entries 1 s; `person` 10 s), and `flush()` writes at
@@ -212,9 +216,9 @@ On SIGTERM or SIGINT, `main`:
 ### Time
 
 `ha_core::Clock` is either the system clock or a `SimulatedClock` that
-follows tokio's pausable time. Everything that reads the time (states,
-timers, sun maths, automations) takes it from `hass.clock()`, so tests run
-days of simulated time in milliseconds.
+follows tokio's pausable time. Entity timestamps, sun maths and automations
+use `hass.clock()`; timers use tokio's pausable monotonic time. Their tests
+run days of simulated time in milliseconds.
 
 ## API surface
 
@@ -225,8 +229,9 @@ All of it is in `ha-api`; `ha_api::router` builds it.
 | REST `/api/…` | `rest.rs`, `automation.rs`, `lib.rs` (`/api/config`) | Behind `auth::require_auth`; each route's permission is in `auth::required_permission` |
 | Auth `/auth/…` | `auth.rs` | Login flow, token, revoke; HA's `.storage/auth*` files |
 | WebSocket `/api/websocket` | `ws/` | Authenticates in the protocol; `ws/commands.rs::dispatch` matches the command type, then asks each domain's module (`ws/weather.rs`, `ws/history.rs`, …) |
-| Companion app webhook `/api/webhook/{id}` | `mobile_app/` | The webhook id is the credential; payloads are encrypted |
+| Companion app webhook `/api/webhook/{id}` | `mobile_app/` | The webhook id is the credential; encryption is required for registrations with `supports_encryption` enabled |
 | Frontend `/`, `/frontend_latest/…` | `frontend.rs` | Served from `HARS_FRONTEND` on disk with precompressed files ([ADR 0004](adr/0004-frontend-from-disk.md)) |
+| Onboarding status `/api/onboarding`, `/api/onboarding/installation_type` | `auth.rs` | Anonymous status only; owner creation still needs the CLI |
 | Brands `/api/brands/…` | `brands.rs` | Proxied from HA's CDN with HA's disk cache |
 
 How to add a command or a view:

@@ -13,7 +13,9 @@ both. Read [docs/PERF.md](docs/PERF.md) before your first change.
 
 - **Rust** through [rustup](https://rustup.rs). `rust-toolchain.toml` picks
   the stable toolchain with `rustfmt` and `clippy`.
-- **Python 3.11+**, for the script tests and the vector generators.
+- **Python 3.11+**, for the script tests and table generators. Running
+  Home Assistant itself for vectors needs **Python 3.14.2+** at the current
+  HA pin (see [the vector guide](scripts/vectors/README.md)).
 - **Docker**, to build the image, and on macOS to run the performance
   harness (it needs Linux).
 

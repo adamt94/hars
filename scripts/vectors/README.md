@@ -40,11 +40,13 @@ expected value was produced.
 ## Running one
 
 Each script runs in its own virtualenv with HA and its library at the pinned
-versions. No generator has been written yet (see the table below), so this
-is what running the future `hue.py` will look like:
+versions. HA 2026.6.1 requires Python 3.14.2 or later; use that interpreter
+for the virtualenv, even though the repository's script tests need only 3.11.
+No generator has been written yet (see the table below), so this is what
+running the future `hue.py` will look like:
 
 ```sh
-python3 -m venv .venv-hue
+python3.14 -m venv .venv-hue  # Python 3.14.2+ installed
 .venv-hue/bin/pip install homeassistant==2026.6.1 aiohue==4.8.1
 .venv-hue/bin/python -I scripts/vectors/hue.py
 cargo test -p ha-integrations hue

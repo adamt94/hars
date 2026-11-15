@@ -74,7 +74,7 @@ until answers; do
   fi
   sleep 0.002
 done
-start_ms=$(( ($(date +%s%N) - t0) / 1000000 ))
+start_ns=$(( $(date +%s%N) - t0 ))
 # The answer must come from our child, not another process on the port.
 kill -0 "$pid" 2>/dev/null || { echo "hars exited during start-up" >&2; exit 1; }
 
@@ -110,31 +110,9 @@ if [ "${PERF_DETAIL:-0}" = 1 ]; then
   grep -E '^(Rss|Pss_Anon|Pss_File|Anonymous|AnonHugePages):' /proc/"$pid"/smaps_rollup >&2
 fi
 
-awk -v size="$size" -v start="$start_ms" -v rss="$rss_kib" -v pss="$pss_kib" \
+awk -v size="$size" -v start_ns="$start_ns" -v rss="$rss_kib" -v pss="$pss_kib" \
     -v dt=$((ticks1 - ticks0)) -v hz="$hz" -v sw=$((sw1 - sw0)) -v q="$QUIET" \
     -v threads="$threads" -v w="$WARMUP" -v gate="${PERF_GATE:-0}" \
     -v max_bin="${MAX_BINARY_MIB:-15}" -v max_start="${MAX_START_MS:-1000}" \
     -v max_rss="${MAX_RSS_MIB:-20}" -v max_cpu="${MAX_CPU_PCT:-0.1}" \
-    -v max_wake="${MAX_WAKEUPS:-1}" '
-function check(name, value, limit, unit) {
-  if (value + 0 > limit + 0) {
-    printf "over budget: %s is %s %s, budget %s %s\n", name, value, unit, limit, unit > "/dev/stderr"
-    over = 1
-  }
-}
-BEGIN {
-  bin = size / 1048576; rss_m = rss / 1024; cpu = 100 * dt / hz / q; wake = sw / q
-  printf "| binary | start→/api/ | idle RSS | idle PSS | idle CPU | wakeups/s | threads | run |\n"
-  printf "|---|---|---|---|---|---|---|---|\n"
-  printf "| %.2f MiB | %d ms | %.1f MiB | %.1f MiB | %.3f %% | %.2f | %d | %ds warm-up, %ds quiet |\n",
-    bin, start, rss_m, pss / 1024, cpu, wake, threads, w, q
-  if (gate == 1) {
-    check("binary", sprintf("%.2f", bin), max_bin, "MiB")
-    check("start-up", start, max_start, "ms")
-    check("idle RSS", sprintf("%.1f", rss_m), max_rss, "MiB")
-    check("idle CPU", sprintf("%.3f", cpu), max_cpu, "%")
-    check("wakeups", sprintf("%.2f", wake), max_wake, "/s")
-    if (over) exit 3
-    print "within budget" > "/dev/stderr"
-  }
-}'
+    -v max_wake="${MAX_WAKEUPS:-1}" -f "$(dirname "$0")/perf-report.awk"

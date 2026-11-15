@@ -24,8 +24,15 @@ well.
 - `config/.storage` holds password hashes (bcrypt), refresh tokens and
   integrations' keys and tokens. hars writes those files readable by their
   owner only, as Home Assistant does. Backups contain them too.
-- Every `/api/*` call needs a token, as in Home Assistant; the companion
-  app's webhook is authenticated by its secret id and encrypted.
+- REST state, config, service and mobile registration routes require an
+  `Authorization: Bearer` access token. `/auth/*` provides login and token
+  exchange; `/api/onboarding` and `/api/onboarding/installation_type` are
+  anonymous status views. `/api/websocket` authenticates inside the WebSocket
+  protocol. Brands routes use their own access token.
+- Companion app webhooks use the secret webhook id as their credential.
+  Encryption is required when the registration has `supports_encryption`
+  enabled; registrations without that flag can send plaintext. Treat webhook
+  ids as passwords, including in URLs and logs.
 - hars is built for a home network. It has not been hardened for exposure to
   the internet, and remote access is not supported yet. Don't forward port
   8123 to it; use a VPN.

@@ -36,22 +36,24 @@ state change.
 
 1. **Share, don't copy.** Pass `Arc<State>`, `Arc<Event>` and other shared
    data by `Arc`. *Why:* one `state_changed` reaches the state machine, the
-   recorder, automations and every WebSocket client; an `Arc` makes that one
-   allocation instead of one per consumer.
+   recorder, automations and every WebSocket client; sharing keeps one state
+   and event payload instead of deep-copying them for each consumer.
 2. **No `String` clones on hot paths.** Use `EntityId` and `SmolStr` (inline
    up to 23 bytes) and borrow `&str`. *Why:* almost every id and state value
    fits inline, so a write allocates nothing for them; a `String` allocates
    every time.
-3. **Count allocations per event.** A state write allocates its `State` and
-   nothing per consumer; a matching entity filter allocates nothing (it keeps
-   byte offsets). Check a change with the `state_write`, `fan_out` and
+3. **Count allocations per event.** A changed write allocates a shared
+   `State` and `Event`; channel queues and consumers can allocate too. Avoid
+   per-consumer payload copies; a matching entity filter allocates nothing
+   (it keeps byte offsets). Check a change with the `state_write`, `fan_out` and
    `entity_filter` benches. *Why:* allocation is the main CPU cost at this
    size, and freed memory is not always returned to the OS.
 4. **Never poll.** Sleep until the next deadline (`tokio::time::sleep_until`
    on `hass.clock()`), or wait on a socket or channel. A device that must be
    polled is polled at Home Assistant's interval, no faster. *Why:* every
    timer wake costs CPU and keeps a small device's CPU out of its deep sleep
-   states. An idle hars has zero wakeups and must stay that way.
+   states. Between scheduled work, hars should have no wakeups. Sun updates,
+   restore dumps, heartbeats and device polls still wake at their deadlines.
 5. **Bound what can grow.** Queues to clients are bounded (the bus, 4096
    events; a WebSocket outbox, 4096 messages). Lossless feeds are unbounded,
    so only internal consumers that keep up may use them. *Why:* a slow
@@ -59,7 +61,9 @@ state change.
 6. **No blocking I/O on async threads.** File reads and writes, bcrypt and
    other slow work go on `spawn_blocking`. *Why:* a blocked worker stalls
    every task scheduled on it. Note that a blocking thread lingers for 10 s
-   after its last job, so measure idle after that.
+   after its last job, so measure idle after that. The synchronous frontend
+   load and config-directory creation at startup are existing exceptions
+   ([startup sequence](ARCHITECTURE.md#start-up)).
 7. **Hold nothing while idle.** If something is used once an hour, create it
    then and drop it after (`met` makes its HTTPS client per fetch). *Why:*
    idle RSS is the budget that matters most on small devices.
@@ -113,7 +117,10 @@ Options, as environment variables:
 
 - `PERF_GATE=1`: exit 3 if a number is over budget. `MAX_BINARY_MIB`,
   `MAX_START_MS`, `MAX_RSS_MIB`, `MAX_CPU_PCT` and `MAX_WAKEUPS` override
-  the budgets, for example to check the gate trips.
+  the budgets, for example to check the gate trips. Comparisons use raw
+  values; only the printed table is rounded. The boundary checks in
+  `scripts/test_perf_report.py` exercise the same `perf-report.awk` used
+  by the harness and CI.
 - `PERF_MET=1`: add a `met` entry for London, so a real forecast is fetched
   and held.
 - `PERF_CONFIG=DIR`: start from a copy of `DIR` instead of an empty config,

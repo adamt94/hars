@@ -127,5 +127,7 @@ The reference is `GET /api/config/automation/config/{id}` in
 ## Before you open the pull request
 
 - The command is listed in the [roadmap](../ROADMAP.md) item you tick.
-- If it runs per state change (a subscription), it is a hot path: add a
-  bench or a `perf.sh` row ([PERF.md](../PERF.md#what-a-pull-request-must-show)).
+- If it runs per state change (a subscription), it is a hot path: include
+  Criterion before/after evidence for the affected benches, adding a bench
+  if none covers it. A new subscription or background task also needs a
+  `perf.sh` row; follow the evidence table ([PERF.md](../PERF.md#what-a-pull-request-must-show)).

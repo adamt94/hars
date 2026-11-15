@@ -79,7 +79,8 @@ What it must do:
    `(5 << tries.min(7)).min(600)` seconds plus jitter). Before start it
    waits for `homeassistant_started` instead, as HA does.
 5. **Write states** with `hass.set_state(entity_id, state, attributes)`.
-   Writes that change nothing are free (no event), so don't diff yourself.
+   Writes that change nothing reuse the stored state and emit no event,
+   so don't diff yourself.
 6. **Sleep, don't poll.** After a write, wait for the next push, socket
    message or deadline. `met` sleeps 55–64 minutes between fetches, as HA
    does. Use `hass.clock()` and `tokio::time::sleep_until` so tests can run
@@ -150,7 +151,7 @@ manifest. Add the domain to `DOMAINS` in `scripts/gen-i18n.py` and
 ```sh
 # HA 2026.6.1 needs Python 3.14.2+; --python-version lets an older pip fetch it.
 pip download homeassistant==2026.6.1 --no-deps --only-binary=:all: \
-    --python-version 3.14 -d /tmp/ha-wheel
+    --python-version 3.14.2 -d /tmp/ha-wheel
 scripts/gen-i18n.py /tmp/ha-wheel/homeassistant-2026.6.1-py3-none-any.whl
 scripts/gen-manifests.py /tmp/ha-wheel/homeassistant-2026.6.1-py3-none-any.whl
 ```
@@ -192,7 +193,9 @@ Integrations add code, timers and sockets, so the pull request needs numbers
    one in `scripts/perf.sh`), then
    `PERF_CONFIG=that-dir scripts/perf.sh target/release/hars 15 60`.
    Idle wakeups should stay at 0 between its scheduled work.
-3. An entry in [perf/RESULTS.md](../perf/RESULTS.md) like the `met` one:
+3. If it changes a hot path (state processing or per-change fan-out), include
+   Criterion before/after results too; add a bench if none covers it.
+4. An entry in [perf/RESULTS.md](../perf/RESULTS.md) like the `met` one:
    what grew, why, and what was tried.
 
 ## 9. Finish

@@ -57,17 +57,17 @@ HA's: both would write `.storage`.
 
    ```sh
    IMAGE=ghcr.io/adamt94/homeassistant-rust
-   docker run --rm -v hars-shadow:/config -v /path/to/ha-config-copy:/ha:ro $IMAGE import /ha --dry-run
-   docker run --rm -v hars-shadow:/config -v /path/to/ha-config-copy:/ha:ro $IMAGE import /ha
+   docker run --rm -v "$PWD/shadow-config:/config" -v /path/to/ha-config-copy:/ha:ro $IMAGE import /ha --dry-run
+   docker run --rm -v "$PWD/shadow-config:/config" -v /path/to/ha-config-copy:/ha:ro $IMAGE import /ha
    ```
 
-   Read `import-report.json`: an automation reported `unavailable` will show
-   up as a *trigger missing* in the diff.
+   Read `shadow-config/import-report.json`: an automation reported
+   `unavailable` will show up as a *trigger missing* in the diff.
 2. Run it on another port, on the LAN so it can reach the devices:
 
    ```sh
-   docker run -d --name hars-shadow --network host --restart unless-stopped \
-     -e HARS_SHADOW=1 -e HARS_BIND=0.0.0.0:8124 -v hars-shadow:/config $IMAGE
+   docker run -d --name hars-shadow --network host --restart unless-stopped --stop-timeout 60 \
+     -e HARS_SHADOW=1 -e HARS_BIND=0.0.0.0:8124 -v "$PWD/shadow-config:/config" $IMAGE
    docker logs hars-shadow | grep "SHADOW MODE"
    ```
 
@@ -113,6 +113,7 @@ when it can't read its input (a log line that isn't JSON, other than one a
 crash cut off; a reversed window), so it never certifies input it didn't
 read. When `hars` was down (it prints each start it saw), leave the gap out
 with `--exclude START,END`; otherwise HA's calls in it count as missing. If you
-change an automation in HA, import again (`--force`) and start the week over.
+change an automation in HA, stop `hars-shadow`, import a fresh HA copy
+with `--force`, restart it and start the week over.
 
 `python3 -m unittest discover -s scripts` runs its tests.
