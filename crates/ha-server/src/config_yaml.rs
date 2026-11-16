@@ -61,7 +61,7 @@ pub fn ignored(config: &Yaml) -> Vec<(&str, Ignored)> {
                 None
             } else if !BARE_OK.contains(&domain) {
                 Some((key, Ignored::Unsupported))
-            } else if holds_something(v) {
+            } else if holds_something(domain, v) {
                 Some((key, Ignored::Options))
             } else {
                 None
@@ -71,13 +71,17 @@ pub fn ignored(config: &Yaml) -> Vec<(&str, Ignored)> {
 }
 
 /// Whether a value sets anything. Any option does, even `false` or `[]`;
-/// only an empty `themes:` doesn't (HA's default `frontend: themes:
-/// !include_dir_merge_named themes`, with no themes, is `{themes: {}}`).
-fn holds_something(v: &Yaml) -> bool {
+/// only `frontend`'s empty `themes` map doesn't (HA's default `frontend:
+/// themes: !include_dir_merge_named themes`, with no themes, is
+/// `{themes: {}}`).
+fn holds_something(domain: &str, v: &Yaml) -> bool {
+    let empty_themes = |k: &Yaml, v: &Yaml| {
+        domain == "frontend"
+            && k.as_str() == Some("themes")
+            && matches!(v, Yaml::Map(m) if m.is_empty())
+    };
     match v {
-        Yaml::Map(pairs) => pairs
-            .iter()
-            .any(|(k, v)| k.as_str() != Some("themes") || v.is_truthy()),
+        Yaml::Map(pairs) => pairs.iter().any(|(k, v)| !empty_themes(k, v)),
         v => v.is_truthy(),
     }
 }
@@ -166,7 +170,7 @@ mod tests {
     #[test]
     fn falsy_options_and_labelled_recorders_are_ignored() {
         let config = load(
-            "http:\n  ip_ban_enabled: false\nhomeassistant:\n  allowlist_external_dirs: []\nrecorder archive:\n  purge_keep_days: 3\nrecorder other:\n",
+            "http:\n  ip_ban_enabled: false\nhomeassistant:\n  allowlist_external_dirs: []\nrecorder archive:\n  purge_keep_days: 3\nrecorder other:\nfrontend:\n  themes: false\nzone:\n  themes: {}\n",
         );
         assert_eq!(
             ignored(&config),
@@ -174,6 +178,8 @@ mod tests {
                 ("http", Ignored::Options),
                 ("homeassistant", Ignored::Options),
                 ("recorder archive", Ignored::Options),
+                ("frontend", Ignored::Options),
+                ("zone", Ignored::Options),
             ]
         );
     }
