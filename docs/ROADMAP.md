@@ -178,7 +178,7 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
 - [x] `configuration.yaml` loaded as HA loads it: `!include`, the
       `!include_dir_*` tags, `!secret`, `!env_var`; unsupported
       **automation** syntax makes that automation `unavailable`
-- [ ] Unknown top-level `configuration.yaml` keys log a warning
+- [x] Unknown top-level `configuration.yaml` keys log a warning
 - [x] Restore state: `core.restore_state` (imported) loaded at start and
       dumped as HA dumps it (at start, every 15 min, at stop; 7-day expiry);
       entities register as restorable (hue scenes restore their last

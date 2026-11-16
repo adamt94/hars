@@ -78,6 +78,9 @@ layer 0   ha-core   (no workspace dependencies)
    Creating the config directory is also synchronous. These are current
    exceptions to the no-blocking-I/O rule, not patterns for new code.
    Loads `.storage/core.config` and `configuration.yaml` on `spawn_blocking`.
+   Each top-level `configuration.yaml` key hars ignores logs a warning
+   (`ha-server`'s `config_yaml.rs`): hars reads only `recorder:` and
+   `automation:`.
 4. Starts the **recorder** first, so every state written from here on is
    history, then shadow mode's log if `HARS_SHADOW=1`.
 5. Loads the registries, the restore state, `zone` and `person`, and the

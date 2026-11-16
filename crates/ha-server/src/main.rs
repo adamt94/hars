@@ -2,6 +2,7 @@
 
 use ha_core::Hass;
 
+mod config_yaml;
 mod import;
 mod shadow;
 use std::future::IntoFuture;
@@ -114,6 +115,9 @@ async fn run(thp_disabled: std::io::Result<bool>) -> anyhow::Result<()> {
             None
         })
     };
+    if let Some(config) = &config_yaml {
+        config_yaml::warn_ignored(config);
+    }
     // The recorder first, as HA's bootstrap sets it up first: every state
     // written from here on, and `homeassistant_start`, is history.
     let settings =
