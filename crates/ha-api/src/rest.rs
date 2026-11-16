@@ -2,8 +2,9 @@
 
 use axum::{
     Json, Router,
+    body::Bytes,
     extract::{Path, Query, State},
-    http::StatusCode,
+    http::{HeaderValue, StatusCode, header},
     response::{IntoResponse, Response},
     routing::{get, post},
 };
@@ -26,6 +27,9 @@ pub(crate) fn router(hass: Hass) -> Router {
         .with_state(hass)
 }
 
+#[cfg(test)]
+mod post_state_tests;
+
 async fn list_states(State(hass): State<Hass>) -> Json<Value> {
     Json(json!(hass.states().all()))
 }
@@ -41,23 +45,87 @@ async fn get_state(
         .ok_or(StatusCode::NOT_FOUND)
 }
 
-/// Same shape as Home Assistant's `POST /api/states/<entity_id>`.
+/// Home Assistant's `POST /api/states/<entity_id>` (`APIEntityStateView`).
+/// The body is read as JSON whatever its `Content-Type`, as HA's
+/// `request.text()` then `json_loads` does. Admins only (the auth layer).
 async fn post_state(
     State(hass): State<Hass>,
+    principal: Option<axum::Extension<ha_auth::Principal>>,
     Path(entity_id): Path<String>,
-    Json(body): Json<Value>,
-) -> Result<Json<Value>, StatusCode> {
-    let id = EntityId::parse(&entity_id).map_err(|_| StatusCode::BAD_REQUEST)?;
-    let state = body
-        .get("state")
-        .and_then(Value::as_str)
-        .ok_or(StatusCode::BAD_REQUEST)?;
-    let attributes: Attributes = body
-        .get("attributes")
-        .and_then(Value::as_object)
-        .cloned()
-        .unwrap_or_default();
-    Ok(Json(json!(hass.set_state(id, state, attributes))))
+    body: Bytes,
+) -> Response {
+    // `request.text()` fails on bytes that aren't UTF-8, outside HA's try.
+    let Ok(body) = std::str::from_utf8(&body) else {
+        return crate::internal_error();
+    };
+    let data: Value = if body.is_empty() {
+        Value::Null
+    } else {
+        match serde_json::from_str(body) {
+            Ok(v) => v,
+            Err(_) => return message(StatusCode::BAD_REQUEST, "Invalid JSON specified."),
+        }
+    };
+    let Value::Object(data) = data else {
+        return message(
+            StatusCode::BAD_REQUEST,
+            "State data should be a JSON object.",
+        );
+    };
+    let new_state = match data.get("state") {
+        None | Some(Value::Null) => {
+            return message(StatusCode::BAD_REQUEST, "No state specified.");
+        }
+        Some(v) => ha_core::py::str_json(v),
+    };
+    // `hass.states.async_set`: the state first, then the id, lower-cased.
+    if new_state.chars().count() > 255 {
+        return message(StatusCode::BAD_REQUEST, "Invalid state specified.");
+    }
+    let Ok(id) = EntityId::parse(&entity_id.to_lowercase()) else {
+        return message(StatusCode::BAD_REQUEST, "Invalid entity ID specified.");
+    };
+    // `attributes or {}`; anything else but a mapping makes `ReadOnlyDict`
+    // raise, and aiohttp answers 500.
+    let attributes: Attributes = match data.get("attributes") {
+        Some(Value::Object(m)) => m.clone(),
+        Some(v) if py_truthy(v) => return crate::internal_error(),
+        _ => Attributes::new(),
+    };
+    let force_update = data.get("force_update").is_some_and(py_truthy);
+    let mut context = Context::at(hass.clock().now());
+    if let Some(axum::Extension(p)) = principal {
+        context = context.with_user(p.user_id.as_str());
+    }
+    let is_new = hass.states().get(&id).is_none();
+    let state = if force_update {
+        hass.set_state_forced(id, new_state, attributes, Some(context))
+    } else {
+        hass.set_state_with_context(id, new_state, attributes, Some(context))
+    };
+    let status = if is_new {
+        StatusCode::CREATED
+    } else {
+        StatusCode::OK
+    };
+    let mut res = (status, Json(json!(state))).into_response();
+    // The path as it was sent, as HA's `f"/api/states/{entity_id}"`.
+    if let Ok(location) = HeaderValue::from_bytes(format!("/api/states/{entity_id}").as_bytes()) {
+        res.headers_mut().insert(header::LOCATION, location);
+    }
+    res
+}
+
+/// Python truthiness of a JSON value.
+fn py_truthy(v: &Value) -> bool {
+    match v {
+        Value::Null => false,
+        Value::Bool(b) => *b,
+        Value::Number(n) => n.as_f64().is_some_and(|f| f != 0.0),
+        Value::String(s) => !s.is_empty(),
+        Value::Array(a) => !a.is_empty(),
+        Value::Object(m) => !m.is_empty(),
+    }
 }
 
 /// Same shape as Home Assistant's `GET /api/services`.

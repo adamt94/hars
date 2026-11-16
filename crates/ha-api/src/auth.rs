@@ -32,8 +32,15 @@ pub(crate) fn routes(auth: Auth) -> Router {
                 .post(login_flow_step)
                 .delete(login_flow_abort),
         )
-        .route("/auth/token", axum::routing::post(token))
-        .route("/auth/revoke", axum::routing::post(revoke))
+        // HA's `cors_allowed` views: any origin may call them.
+        .route(
+            "/auth/token",
+            axum::routing::post(token).layer(axum::middleware::from_fn(crate::cors::allow_all)),
+        )
+        .route(
+            "/auth/revoke",
+            axum::routing::post(revoke).layer(axum::middleware::from_fn(crate::cors::allow_all)),
+        )
         // These bodies are a few hundred bytes; don't buffer megabytes for
         // anonymous callers.
         .layer(DefaultBodyLimit::max(MAX_BODY))
@@ -855,8 +862,9 @@ mod tests {
             .as_str()
             .unwrap()
             .to_owned();
+        // A new entity: 201, as HA.
         let r = send(&owner, Method::POST, "/api/states/sensor.x", write).await;
-        assert_eq!(r.status, StatusCode::OK);
+        assert_eq!(r.status, StatusCode::CREATED);
     }
 
     #[tokio::test]

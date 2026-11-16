@@ -253,7 +253,7 @@ All of it is in `ha-api`; `ha_api::router` builds it.
 | Surface | Where | Notes |
 |---|---|---|
 | REST `/api/…` | `rest.rs`, `automation.rs`, `lib.rs` (`/api/config`), `mobile_app::registration_routes` (`/api/mobile_app/registrations`) | Behind `auth::require_auth`; each route's permission is in `auth::required_permission` |
-| Auth `/auth/…` | `auth.rs` | Login flow, token, revoke; HA's `.storage/auth*` files |
+| Auth `/auth/…` | `auth.rs` | Login flow, token, revoke; HA's `.storage/auth*` files. `/auth/token` and `/auth/revoke` allow CORS from any origin (`cors.rs`, aiohttp_cors as HA sets it up) |
 | WebSocket `/api/websocket` | `ws/` | Authenticates in the protocol; `ws/commands.rs::dispatch` matches the command type, then asks each domain's module (`ws/weather.rs`, `ws/history.rs`, …) |
 | Companion app webhook `/api/webhook/{id}` | `mobile_app/` | The webhook id is the credential; encryption is required for registrations with `supports_encryption` enabled |
 | Companion app push channel (WS `mobile_app/push_notification_*`) | `ws/mobile_app.rs` | The commands only; the channels, the confirm timers and cloud push (through `ha-http`) are `ha_integrations::mobile_app::notify`'s, reached through `ApiConfig.mobile_app` |

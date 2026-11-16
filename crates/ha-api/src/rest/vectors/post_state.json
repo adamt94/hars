@@ -1,0 +1,1071 @@
+[
+ {
+  "note": "no Content-Type, new: 201",
+  "request": {
+   "method": "POST",
+   "path": "/api/states/light.a",
+   "body": "{\"state\": \"on\"}",
+   "user": "admin"
+  },
+  "status": 201,
+  "content_type": "application/json",
+  "body": {
+   "entity_id": "light.a",
+   "state": "on",
+   "attributes": {},
+   "last_changed": "<time>",
+   "last_reported": "<time>",
+   "last_updated": "<time>",
+   "context": {
+    "id": "<ulid>",
+    "parent_id": null,
+    "user_id": "<hex32>"
+   }
+  },
+  "location": "/api/states/light.a",
+  "light.a": {
+   "entity_id": "light.a",
+   "state": "on",
+   "attributes": {},
+   "last_changed": "<time>",
+   "last_reported": "<time>",
+   "last_updated": "<time>",
+   "context": {
+    "id": "<ulid>",
+    "parent_id": null,
+    "user_id": "<hex32>"
+   }
+  },
+  "moved": []
+ },
+ {
+  "note": "text/plain, existing: 200",
+  "request": {
+   "method": "POST",
+   "path": "/api/states/light.a",
+   "headers": {
+    "Content-Type": "text/plain"
+   },
+   "body": "{\"state\": \"off\", \"attributes\": {\"x\": 1}}",
+   "user": "admin"
+  },
+  "status": 200,
+  "content_type": "application/json",
+  "body": {
+   "entity_id": "light.a",
+   "state": "off",
+   "attributes": {
+    "x": 1
+   },
+   "last_changed": "<time>",
+   "last_reported": "<time>",
+   "last_updated": "<time>",
+   "context": {
+    "id": "<ulid>",
+    "parent_id": null,
+    "user_id": "<hex32>"
+   }
+  },
+  "location": "/api/states/light.a",
+  "light.a": {
+   "entity_id": "light.a",
+   "state": "off",
+   "attributes": {
+    "x": 1
+   },
+   "last_changed": "<time>",
+   "last_reported": "<time>",
+   "last_updated": "<time>",
+   "context": {
+    "id": "<ulid>",
+    "parent_id": null,
+    "user_id": "<hex32>"
+   }
+  },
+  "moved": [
+   "last_changed",
+   "last_updated",
+   "last_reported",
+   "context"
+  ]
+ },
+ {
+  "note": "same state and attributes",
+  "request": {
+   "method": "POST",
+   "path": "/api/states/light.a",
+   "headers": {
+    "Content-Type": "application/json"
+   },
+   "body": "{\"state\": \"off\", \"attributes\": {\"x\": 1}}",
+   "user": "admin"
+  },
+  "status": 200,
+  "content_type": "application/json",
+  "body": {
+   "entity_id": "light.a",
+   "state": "off",
+   "attributes": {
+    "x": 1
+   },
+   "last_changed": "<time>",
+   "last_reported": "<time>",
+   "last_updated": "<time>",
+   "context": {
+    "id": "<ulid>",
+    "parent_id": null,
+    "user_id": "<hex32>"
+   }
+  },
+  "location": "/api/states/light.a",
+  "light.a": {
+   "entity_id": "light.a",
+   "state": "off",
+   "attributes": {
+    "x": 1
+   },
+   "last_changed": "<time>",
+   "last_reported": "<time>",
+   "last_updated": "<time>",
+   "context": {
+    "id": "<ulid>",
+    "parent_id": null,
+    "user_id": "<hex32>"
+   }
+  },
+  "moved": []
+ },
+ {
+  "note": "force_update",
+  "request": {
+   "method": "POST",
+   "path": "/api/states/light.a",
+   "headers": {
+    "Content-Type": "application/json"
+   },
+   "body": "{\"state\": \"off\", \"attributes\": {\"x\": 1}, \"force_update\": true}",
+   "user": "admin"
+  },
+  "status": 200,
+  "content_type": "application/json",
+  "body": {
+   "entity_id": "light.a",
+   "state": "off",
+   "attributes": {
+    "x": 1
+   },
+   "last_changed": "<time>",
+   "last_reported": "<time>",
+   "last_updated": "<time>",
+   "context": {
+    "id": "<ulid>",
+    "parent_id": null,
+    "user_id": "<hex32>"
+   }
+  },
+  "location": "/api/states/light.a",
+  "light.a": {
+   "entity_id": "light.a",
+   "state": "off",
+   "attributes": {
+    "x": 1
+   },
+   "last_changed": "<time>",
+   "last_reported": "<time>",
+   "last_updated": "<time>",
+   "context": {
+    "id": "<ulid>",
+    "parent_id": null,
+    "user_id": "<hex32>"
+   }
+  },
+  "moved": [
+   "last_changed",
+   "last_updated",
+   "last_reported",
+   "context"
+  ]
+ },
+ {
+  "note": "empty body",
+  "request": {
+   "method": "POST",
+   "path": "/api/states/light.a",
+   "headers": {
+    "Content-Type": "application/json"
+   },
+   "body": "",
+   "user": "admin"
+  },
+  "status": 400,
+  "content_type": "application/json",
+  "body": {
+   "message": "State data should be a JSON object."
+  },
+  "location": null,
+  "light.a": {
+   "entity_id": "light.a",
+   "state": "off",
+   "attributes": {
+    "x": 1
+   },
+   "last_changed": "<time>",
+   "last_reported": "<time>",
+   "last_updated": "<time>",
+   "context": {
+    "id": "<ulid>",
+    "parent_id": null,
+    "user_id": "<hex32>"
+   }
+  },
+  "moved": []
+ },
+ {
+  "note": "invalid JSON",
+  "request": {
+   "method": "POST",
+   "path": "/api/states/light.a",
+   "headers": {
+    "Content-Type": "application/json"
+   },
+   "body": "{nope",
+   "user": "admin"
+  },
+  "status": 400,
+  "content_type": "application/json",
+  "body": {
+   "message": "Invalid JSON specified."
+  },
+  "location": null,
+  "light.a": {
+   "entity_id": "light.a",
+   "state": "off",
+   "attributes": {
+    "x": 1
+   },
+   "last_changed": "<time>",
+   "last_reported": "<time>",
+   "last_updated": "<time>",
+   "context": {
+    "id": "<ulid>",
+    "parent_id": null,
+    "user_id": "<hex32>"
+   }
+  },
+  "moved": []
+ },
+ {
+  "note": "not an object",
+  "request": {
+   "method": "POST",
+   "path": "/api/states/light.a",
+   "headers": {
+    "Content-Type": "application/json"
+   },
+   "body": "[1]",
+   "user": "admin"
+  },
+  "status": 400,
+  "content_type": "application/json",
+  "body": {
+   "message": "State data should be a JSON object."
+  },
+  "location": null,
+  "light.a": {
+   "entity_id": "light.a",
+   "state": "off",
+   "attributes": {
+    "x": 1
+   },
+   "last_changed": "<time>",
+   "last_reported": "<time>",
+   "last_updated": "<time>",
+   "context": {
+    "id": "<ulid>",
+    "parent_id": null,
+    "user_id": "<hex32>"
+   }
+  },
+  "moved": []
+ },
+ {
+  "note": "null",
+  "request": {
+   "method": "POST",
+   "path": "/api/states/light.a",
+   "headers": {
+    "Content-Type": "application/json"
+   },
+   "body": "null",
+   "user": "admin"
+  },
+  "status": 400,
+  "content_type": "application/json",
+  "body": {
+   "message": "State data should be a JSON object."
+  },
+  "location": null,
+  "light.a": {
+   "entity_id": "light.a",
+   "state": "off",
+   "attributes": {
+    "x": 1
+   },
+   "last_changed": "<time>",
+   "last_reported": "<time>",
+   "last_updated": "<time>",
+   "context": {
+    "id": "<ulid>",
+    "parent_id": null,
+    "user_id": "<hex32>"
+   }
+  },
+  "moved": []
+ },
+ {
+  "note": "no state",
+  "request": {
+   "method": "POST",
+   "path": "/api/states/light.a",
+   "headers": {
+    "Content-Type": "application/json"
+   },
+   "body": "{\"attributes\": {}}",
+   "user": "admin"
+  },
+  "status": 400,
+  "content_type": "application/json",
+  "body": {
+   "message": "No state specified."
+  },
+  "location": null,
+  "light.a": {
+   "entity_id": "light.a",
+   "state": "off",
+   "attributes": {
+    "x": 1
+   },
+   "last_changed": "<time>",
+   "last_reported": "<time>",
+   "last_updated": "<time>",
+   "context": {
+    "id": "<ulid>",
+    "parent_id": null,
+    "user_id": "<hex32>"
+   }
+  },
+  "moved": []
+ },
+ {
+  "note": "null state",
+  "request": {
+   "method": "POST",
+   "path": "/api/states/light.a",
+   "headers": {
+    "Content-Type": "application/json"
+   },
+   "body": "{\"state\": null}",
+   "user": "admin"
+  },
+  "status": 400,
+  "content_type": "application/json",
+  "body": {
+   "message": "No state specified."
+  },
+  "location": null,
+  "light.a": {
+   "entity_id": "light.a",
+   "state": "off",
+   "attributes": {
+    "x": 1
+   },
+   "last_changed": "<time>",
+   "last_reported": "<time>",
+   "last_updated": "<time>",
+   "context": {
+    "id": "<ulid>",
+    "parent_id": null,
+    "user_id": "<hex32>"
+   }
+  },
+  "moved": []
+ },
+ {
+  "note": "empty state",
+  "request": {
+   "method": "POST",
+   "path": "/api/states/light.a",
+   "headers": {
+    "Content-Type": "application/json"
+   },
+   "body": "{\"state\": \"\"}",
+   "user": "admin"
+  },
+  "status": 200,
+  "content_type": "application/json",
+  "body": {
+   "entity_id": "light.a",
+   "state": "",
+   "attributes": {},
+   "last_changed": "<time>",
+   "last_reported": "<time>",
+   "last_updated": "<time>",
+   "context": {
+    "id": "<ulid>",
+    "parent_id": null,
+    "user_id": "<hex32>"
+   }
+  },
+  "location": "/api/states/light.a",
+  "light.a": {
+   "entity_id": "light.a",
+   "state": "",
+   "attributes": {},
+   "last_changed": "<time>",
+   "last_reported": "<time>",
+   "last_updated": "<time>",
+   "context": {
+    "id": "<ulid>",
+    "parent_id": null,
+    "user_id": "<hex32>"
+   }
+  },
+  "moved": [
+   "last_changed",
+   "last_updated",
+   "last_reported",
+   "context"
+  ]
+ },
+ {
+  "note": "a number state",
+  "request": {
+   "method": "POST",
+   "path": "/api/states/light.a",
+   "headers": {
+    "Content-Type": "application/json"
+   },
+   "body": "{\"state\": 5}",
+   "user": "admin"
+  },
+  "status": 200,
+  "content_type": "application/json",
+  "body": {
+   "entity_id": "light.a",
+   "state": "5",
+   "attributes": {},
+   "last_changed": "<time>",
+   "last_reported": "<time>",
+   "last_updated": "<time>",
+   "context": {
+    "id": "<ulid>",
+    "parent_id": null,
+    "user_id": "<hex32>"
+   }
+  },
+  "location": "/api/states/light.a",
+  "light.a": {
+   "entity_id": "light.a",
+   "state": "5",
+   "attributes": {},
+   "last_changed": "<time>",
+   "last_reported": "<time>",
+   "last_updated": "<time>",
+   "context": {
+    "id": "<ulid>",
+    "parent_id": null,
+    "user_id": "<hex32>"
+   }
+  },
+  "moved": [
+   "last_changed",
+   "last_updated",
+   "last_reported",
+   "context"
+  ]
+ },
+ {
+  "note": "a bool state",
+  "request": {
+   "method": "POST",
+   "path": "/api/states/light.a",
+   "headers": {
+    "Content-Type": "application/json"
+   },
+   "body": "{\"state\": true}",
+   "user": "admin"
+  },
+  "status": 200,
+  "content_type": "application/json",
+  "body": {
+   "entity_id": "light.a",
+   "state": "True",
+   "attributes": {},
+   "last_changed": "<time>",
+   "last_reported": "<time>",
+   "last_updated": "<time>",
+   "context": {
+    "id": "<ulid>",
+    "parent_id": null,
+    "user_id": "<hex32>"
+   }
+  },
+  "location": "/api/states/light.a",
+  "light.a": {
+   "entity_id": "light.a",
+   "state": "True",
+   "attributes": {},
+   "last_changed": "<time>",
+   "last_reported": "<time>",
+   "last_updated": "<time>",
+   "context": {
+    "id": "<ulid>",
+    "parent_id": null,
+    "user_id": "<hex32>"
+   }
+  },
+  "moved": [
+   "last_changed",
+   "last_updated",
+   "last_reported",
+   "context"
+  ]
+ },
+ {
+  "note": "a float state",
+  "request": {
+   "method": "POST",
+   "path": "/api/states/light.a",
+   "headers": {
+    "Content-Type": "application/json"
+   },
+   "body": "{\"state\": 1.5}",
+   "user": "admin"
+  },
+  "status": 200,
+  "content_type": "application/json",
+  "body": {
+   "entity_id": "light.a",
+   "state": "1.5",
+   "attributes": {},
+   "last_changed": "<time>",
+   "last_reported": "<time>",
+   "last_updated": "<time>",
+   "context": {
+    "id": "<ulid>",
+    "parent_id": null,
+    "user_id": "<hex32>"
+   }
+  },
+  "location": "/api/states/light.a",
+  "light.a": {
+   "entity_id": "light.a",
+   "state": "1.5",
+   "attributes": {},
+   "last_changed": "<time>",
+   "last_reported": "<time>",
+   "last_updated": "<time>",
+   "context": {
+    "id": "<ulid>",
+    "parent_id": null,
+    "user_id": "<hex32>"
+   }
+  },
+  "moved": [
+   "last_changed",
+   "last_updated",
+   "last_reported",
+   "context"
+  ]
+ },
+ {
+  "note": "a small float",
+  "request": {
+   "method": "POST",
+   "path": "/api/states/light.a",
+   "headers": {
+    "Content-Type": "application/json"
+   },
+   "body": "{\"state\": 1e-7}",
+   "user": "admin"
+  },
+  "status": 200,
+  "content_type": "application/json",
+  "body": {
+   "entity_id": "light.a",
+   "state": "1e-07",
+   "attributes": {},
+   "last_changed": "<time>",
+   "last_reported": "<time>",
+   "last_updated": "<time>",
+   "context": {
+    "id": "<ulid>",
+    "parent_id": null,
+    "user_id": "<hex32>"
+   }
+  },
+  "location": "/api/states/light.a",
+  "light.a": {
+   "entity_id": "light.a",
+   "state": "1e-07",
+   "attributes": {},
+   "last_changed": "<time>",
+   "last_reported": "<time>",
+   "last_updated": "<time>",
+   "context": {
+    "id": "<ulid>",
+    "parent_id": null,
+    "user_id": "<hex32>"
+   }
+  },
+  "moved": [
+   "last_changed",
+   "last_updated",
+   "last_reported",
+   "context"
+  ]
+ },
+ {
+  "note": "a list state",
+  "request": {
+   "method": "POST",
+   "path": "/api/states/light.a",
+   "headers": {
+    "Content-Type": "application/json"
+   },
+   "body": "{\"state\": [1, \"it's\", null, false, {\"k\": 2.0}]}",
+   "user": "admin"
+  },
+  "status": 200,
+  "content_type": "application/json",
+  "body": {
+   "entity_id": "light.a",
+   "state": "[1, \"it's\", None, False, {'k': 2.0}]",
+   "attributes": {},
+   "last_changed": "<time>",
+   "last_reported": "<time>",
+   "last_updated": "<time>",
+   "context": {
+    "id": "<ulid>",
+    "parent_id": null,
+    "user_id": "<hex32>"
+   }
+  },
+  "location": "/api/states/light.a",
+  "light.a": {
+   "entity_id": "light.a",
+   "state": "[1, \"it's\", None, False, {'k': 2.0}]",
+   "attributes": {},
+   "last_changed": "<time>",
+   "last_reported": "<time>",
+   "last_updated": "<time>",
+   "context": {
+    "id": "<ulid>",
+    "parent_id": null,
+    "user_id": "<hex32>"
+   }
+  },
+  "moved": [
+   "last_changed",
+   "last_updated",
+   "last_reported",
+   "context"
+  ]
+ },
+ {
+  "note": "a falsy force_update",
+  "request": {
+   "method": "POST",
+   "path": "/api/states/light.a",
+   "headers": {
+    "Content-Type": "application/json"
+   },
+   "body": "{\"state\": \"x\", \"force_update\": 0}",
+   "user": "admin"
+  },
+  "status": 200,
+  "content_type": "application/json",
+  "body": {
+   "entity_id": "light.a",
+   "state": "x",
+   "attributes": {},
+   "last_changed": "<time>",
+   "last_reported": "<time>",
+   "last_updated": "<time>",
+   "context": {
+    "id": "<ulid>",
+    "parent_id": null,
+    "user_id": "<hex32>"
+   }
+  },
+  "location": "/api/states/light.a",
+  "light.a": {
+   "entity_id": "light.a",
+   "state": "x",
+   "attributes": {},
+   "last_changed": "<time>",
+   "last_reported": "<time>",
+   "last_updated": "<time>",
+   "context": {
+    "id": "<ulid>",
+    "parent_id": null,
+    "user_id": "<hex32>"
+   }
+  },
+  "moved": [
+   "last_changed",
+   "last_updated",
+   "last_reported",
+   "context"
+  ]
+ },
+ {
+  "note": "a truthy force_update",
+  "request": {
+   "method": "POST",
+   "path": "/api/states/light.a",
+   "headers": {
+    "Content-Type": "application/json"
+   },
+   "body": "{\"state\": \"x\", \"force_update\": \"yes\"}",
+   "user": "admin"
+  },
+  "status": 200,
+  "content_type": "application/json",
+  "body": {
+   "entity_id": "light.a",
+   "state": "x",
+   "attributes": {},
+   "last_changed": "<time>",
+   "last_reported": "<time>",
+   "last_updated": "<time>",
+   "context": {
+    "id": "<ulid>",
+    "parent_id": null,
+    "user_id": "<hex32>"
+   }
+  },
+  "location": "/api/states/light.a",
+  "light.a": {
+   "entity_id": "light.a",
+   "state": "x",
+   "attributes": {},
+   "last_changed": "<time>",
+   "last_reported": "<time>",
+   "last_updated": "<time>",
+   "context": {
+    "id": "<ulid>",
+    "parent_id": null,
+    "user_id": "<hex32>"
+   }
+  },
+  "moved": [
+   "last_changed",
+   "last_updated",
+   "last_reported",
+   "context"
+  ]
+ },
+ {
+  "note": "empty list attributes",
+  "request": {
+   "method": "POST",
+   "path": "/api/states/light.a",
+   "headers": {
+    "Content-Type": "application/json"
+   },
+   "body": "{\"state\": \"x\", \"attributes\": []}",
+   "user": "admin"
+  },
+  "status": 200,
+  "content_type": "application/json",
+  "body": {
+   "entity_id": "light.a",
+   "state": "x",
+   "attributes": {},
+   "last_changed": "<time>",
+   "last_reported": "<time>",
+   "last_updated": "<time>",
+   "context": {
+    "id": "<ulid>",
+    "parent_id": null,
+    "user_id": "<hex32>"
+   }
+  },
+  "location": "/api/states/light.a",
+  "light.a": {
+   "entity_id": "light.a",
+   "state": "x",
+   "attributes": {},
+   "last_changed": "<time>",
+   "last_reported": "<time>",
+   "last_updated": "<time>",
+   "context": {
+    "id": "<ulid>",
+    "parent_id": null,
+    "user_id": "<hex32>"
+   }
+  },
+  "moved": []
+ },
+ {
+  "note": "255 characters, more bytes",
+  "request": {
+   "method": "POST",
+   "path": "/api/states/light.a",
+   "headers": {
+    "Content-Type": "application/json"
+   },
+   "body": "{\"state\": \"\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\"}",
+   "user": "admin"
+  },
+  "status": 200,
+  "content_type": "application/json",
+  "body": {
+   "entity_id": "light.a",
+   "state": "ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé",
+   "attributes": {},
+   "last_changed": "<time>",
+   "last_reported": "<time>",
+   "last_updated": "<time>",
+   "context": {
+    "id": "<ulid>",
+    "parent_id": null,
+    "user_id": "<hex32>"
+   }
+  },
+  "location": "/api/states/light.a",
+  "light.a": {
+   "entity_id": "light.a",
+   "state": "ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé",
+   "attributes": {},
+   "last_changed": "<time>",
+   "last_reported": "<time>",
+   "last_updated": "<time>",
+   "context": {
+    "id": "<ulid>",
+    "parent_id": null,
+    "user_id": "<hex32>"
+   }
+  },
+  "moved": [
+   "last_changed",
+   "last_updated",
+   "last_reported",
+   "context"
+  ]
+ },
+ {
+  "note": "attributes not an object",
+  "request": {
+   "method": "POST",
+   "path": "/api/states/light.a",
+   "headers": {
+    "Content-Type": "application/json"
+   },
+   "body": "{\"state\": \"on\", \"attributes\": [1]}",
+   "user": "admin"
+  },
+  "status": 500,
+  "content_type": "text/plain; charset=utf-8",
+  "body": "500 Internal Server Error\n\nServer got itself in trouble",
+  "location": null,
+  "light.a": {
+   "entity_id": "light.a",
+   "state": "ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé",
+   "attributes": {},
+   "last_changed": "<time>",
+   "last_reported": "<time>",
+   "last_updated": "<time>",
+   "context": {
+    "id": "<ulid>",
+    "parent_id": null,
+    "user_id": "<hex32>"
+   }
+  },
+  "moved": []
+ },
+ {
+  "note": "null attributes",
+  "request": {
+   "method": "POST",
+   "path": "/api/states/light.a",
+   "headers": {
+    "Content-Type": "application/json"
+   },
+   "body": "{\"state\": \"on\", \"attributes\": null}",
+   "user": "admin"
+  },
+  "status": 200,
+  "content_type": "application/json",
+  "body": {
+   "entity_id": "light.a",
+   "state": "on",
+   "attributes": {},
+   "last_changed": "<time>",
+   "last_reported": "<time>",
+   "last_updated": "<time>",
+   "context": {
+    "id": "<ulid>",
+    "parent_id": null,
+    "user_id": "<hex32>"
+   }
+  },
+  "location": "/api/states/light.a",
+  "light.a": {
+   "entity_id": "light.a",
+   "state": "on",
+   "attributes": {},
+   "last_changed": "<time>",
+   "last_reported": "<time>",
+   "last_updated": "<time>",
+   "context": {
+    "id": "<ulid>",
+    "parent_id": null,
+    "user_id": "<hex32>"
+   }
+  },
+  "moved": [
+   "last_changed",
+   "last_updated",
+   "last_reported",
+   "context"
+  ]
+ },
+ {
+  "note": "a state too long",
+  "request": {
+   "method": "POST",
+   "path": "/api/states/light.a",
+   "headers": {
+    "Content-Type": "application/json"
+   },
+   "body": "{\"state\": \"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"}",
+   "user": "admin"
+  },
+  "status": 400,
+  "content_type": "application/json",
+  "body": {
+   "message": "Invalid state specified."
+  },
+  "location": null,
+  "light.a": {
+   "entity_id": "light.a",
+   "state": "on",
+   "attributes": {},
+   "last_changed": "<time>",
+   "last_reported": "<time>",
+   "last_updated": "<time>",
+   "context": {
+    "id": "<ulid>",
+    "parent_id": null,
+    "user_id": "<hex32>"
+   }
+  },
+  "moved": []
+ },
+ {
+  "note": "upper case",
+  "request": {
+   "method": "POST",
+   "path": "/api/states/light.Bad",
+   "headers": {
+    "Content-Type": "application/json"
+   },
+   "body": "{\"state\": \"on\"}",
+   "user": "admin"
+  },
+  "status": 201,
+  "content_type": "application/json",
+  "body": {
+   "entity_id": "light.bad",
+   "state": "on",
+   "attributes": {},
+   "last_changed": "<time>",
+   "last_reported": "<time>",
+   "last_updated": "<time>",
+   "context": {
+    "id": "<ulid>",
+    "parent_id": null,
+    "user_id": "<hex32>"
+   }
+  },
+  "location": "/api/states/light.Bad",
+  "light.a": {
+   "entity_id": "light.a",
+   "state": "on",
+   "attributes": {},
+   "last_changed": "<time>",
+   "last_reported": "<time>",
+   "last_updated": "<time>",
+   "context": {
+    "id": "<ulid>",
+    "parent_id": null,
+    "user_id": "<hex32>"
+   }
+  },
+  "moved": []
+ },
+ {
+  "note": "bad entity id",
+  "request": {
+   "method": "POST",
+   "path": "/api/states/light.a-b",
+   "headers": {
+    "Content-Type": "application/json"
+   },
+   "body": "{\"state\": \"on\"}",
+   "user": "admin"
+  },
+  "status": 400,
+  "content_type": "application/json",
+  "body": {
+   "message": "Invalid entity ID specified."
+  },
+  "location": null,
+  "light.a": {
+   "entity_id": "light.a",
+   "state": "on",
+   "attributes": {},
+   "last_changed": "<time>",
+   "last_reported": "<time>",
+   "last_updated": "<time>",
+   "context": {
+    "id": "<ulid>",
+    "parent_id": null,
+    "user_id": "<hex32>"
+   }
+  },
+  "moved": []
+ },
+ {
+  "note": "not an admin",
+  "request": {
+   "method": "POST",
+   "path": "/api/states/light.b",
+   "headers": {
+    "Content-Type": "application/json"
+   },
+   "body": "{\"state\": \"on\"}",
+   "user": "user"
+  },
+  "status": 401,
+  "content_type": "text/plain; charset=utf-8",
+  "body": "401: Unauthorized",
+  "location": null,
+  "light.a": {
+   "entity_id": "light.a",
+   "state": "on",
+   "attributes": {},
+   "last_changed": "<time>",
+   "last_reported": "<time>",
+   "last_updated": "<time>",
+   "context": {
+    "id": "<ulid>",
+    "parent_id": null,
+    "user_id": "<hex32>"
+   }
+  },
+  "moved": []
+ }
+]

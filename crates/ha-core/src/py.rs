@@ -57,6 +57,56 @@ pub fn repr_str(out: &mut String, s: &str) {
     out.push(quote);
 }
 
+/// Python's `str()` of a value `json.loads` (orjson) returned: a string as
+/// it is, anything else as its `repr` (`True`, `None`, `1.5`, `1e-07`,
+/// `[1, 'a']`, `{'k': 2.0}`).
+pub fn str_json(v: &serde_json::Value) -> std::borrow::Cow<'_, str> {
+    match v {
+        serde_json::Value::String(s) => std::borrow::Cow::Borrowed(s),
+        v => {
+            let mut out = String::new();
+            repr_json(&mut out, v);
+            std::borrow::Cow::Owned(out)
+        }
+    }
+}
+
+fn repr_json(out: &mut String, v: &serde_json::Value) {
+    use serde_json::Value;
+    match v {
+        Value::Null => out.push_str("None"),
+        Value::Bool(true) => out.push_str("True"),
+        Value::Bool(false) => out.push_str("False"),
+        Value::Number(n) => match (n.is_f64(), n.as_f64()) {
+            (true, Some(f)) => out.push_str(&repr_float(f)),
+            _ => out.push_str(&n.to_string()),
+        },
+        Value::String(s) => repr_str(out, s),
+        Value::Array(items) => {
+            out.push('[');
+            for (i, item) in items.iter().enumerate() {
+                if i > 0 {
+                    out.push_str(", ");
+                }
+                repr_json(out, item);
+            }
+            out.push(']');
+        }
+        Value::Object(map) => {
+            out.push('{');
+            for (i, (k, item)) in map.iter().enumerate() {
+                if i > 0 {
+                    out.push_str(", ");
+                }
+                repr_str(out, k);
+                out.push_str(": ");
+                repr_json(out, item);
+            }
+            out.push('}');
+        }
+    }
+}
+
 /// Python's `str.strip()` with no argument: Unicode whitespace and the
 /// separators U+1C–1F, which `str.isspace` also counts.
 pub fn strip(s: &str) -> &str {

@@ -336,7 +336,7 @@ impl Trackers {
             a.insert("icon".into(), json!(icon));
         }
         if force {
-            hass.set_state_forced(t.entity_id.clone(), state, a);
+            hass.set_state_forced(t.entity_id.clone(), state, a, None);
         } else {
             hass.set_state(t.entity_id.clone(), state, a);
         }

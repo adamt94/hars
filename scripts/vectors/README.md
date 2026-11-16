@@ -25,7 +25,7 @@ rule have no script yet; they are listed
 | `render_template.py` | `ha-core/src/template/vectors/` (renders, `_parse_result`, the environment's names, and Jinja's filters and tests over values of every kind) and `ha-api/src/ws/vectors/render_template.json` (whole `render_template` conversations) | HA 2026.6.1's `helpers/template` and `websocket_api` `handle_render_template` on Jinja 3.1.6, on a fresh `HomeAssistant` per case |
 | `template_functions.py` | `ha-core/src/template/vectors/functions.json` (HA's state, type cast, maths and time functions, lenient and strict, with the `listeners` each render reports) and `ha-api/src/ws/vectors/render_template_states.json` (`render_template` conversations reading states and the clock), from the home in `ha-core/src/template/vectors/home.json` (an input: states, time zone, display precision, `now`) | HA 2026.6.1's `helpers/template` (Jinja 3.1.6, ciso8601 2.3.3) and `handle_render_template`, on a fresh `HomeAssistant` holding the home for each render, in Europe/London with the clock stopped at the 2026 spring-forward |
 | `mobile_app_notify.py` | `ha-api/src/mobile_app/vectors/notify.json` (15 scenarios, 126 steps: service calls, the app's push channel commands, closed connections and 10 s passing, with every WebSocket message, relay request body, result, notify state and log line; and 20 `log_rate_limits` lines) | HA 2026.6.1's core with `http`, `websocket_api` and `mobile_app` (its `notify.py`, `push_notification.py`, `websocket_api.py`) and `notify`, on aiohttp 3.13.5, with a local server as the push relay |
-
+| `http.py` | `ha-api/src/cors/vectors/cors.json` (preflights and requests, with and without an `Origin`, to `/auth/token` and `/auth/revoke`: status, body and `Access-Control-*` headers) and `ha-api/src/rest/vectors/post_state.json` (`POST /api/states/<id>` with each kind of body and `Content-Type`, and the state after each step) | HA 2026.6.1's `http` (aiohttp 3.13.5, aiohttp_cors 0.8.1), `auth` and `api`, booted in a temporary directory with an admin and a non-admin user |
 | `automation_templates.py` | `ha-automation/src/vectors/templates.json` (19 scenarios: each one's states, entity registry entries, automations and steps, and the service calls with their rendered data, `automation_triggered` events, automation states and WARNING/ERROR log lines HA produced) | HA 2026.6.1's `automation` with `helpers/script.py`, `condition.py`, `trigger.py`, `service.py`, `event.py`, the `homeassistant` integration's `state`, `numeric_state` and `time` triggers and the `template` trigger, on Jinja 3.1.6 and voluptuous 0.15.2, in Europe/London, on a virtual-time event loop |
 
 `render_template.py` and `template_functions.py` write two crates'
@@ -89,6 +89,13 @@ python3.14 -m venv .venv  # Python 3.14.2+ installed
     securetar==2026.4.1 cronsim==2.7
 .venv/bin/python -I scripts/vectors/mobile_app_notify.py
 cargo test -p ha-api ws::mobile_app
+```
+
+For `http.py` (HA's own requirements are enough):
+
+```sh
+.venv/bin/python -I scripts/vectors/http.py
+cargo test -p ha-api cors:: rest::post_state
 ```
 
 For `automation_templates.py` (HA's own requirements are enough):

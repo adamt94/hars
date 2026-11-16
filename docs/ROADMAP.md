@@ -226,12 +226,13 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
       `WWW-Authenticate` header HA adds to 401s; the other onboarding flows
       (`google_translate`, `radio_browser`, `shopping_list`), as hars has
       none of those integrations
-- [ ] CORS for `/auth/token` and `/auth/revoke` (HA allows any origin)
+- [x] CORS for `/auth/token` and `/auth/revoke` (HA allows any origin)
 - [ ] Permissions beyond the built-in groups: custom group policies (users
       with only custom groups are refused for now), per-entity filtering, and
       admin-only services once services exist that need it
-- [ ] REST bodies parsed as JSON whatever the `Content-Type`, as HA does
-      (today a missing `application/json` is a 415)
+- [x] REST bodies parsed as JSON whatever the `Content-Type`, as HA does;
+      `POST /api/states/<id>` as HA answers it (201 for a new entity,
+      `Location`, `force_update`, its messages)
 - [x] REST `/api/config` (truthful `components` list, version, units, location),
       from HA's `.storage/core.config` (1.4)
 - [x] WS core: `auth`, `ping`, `supported_features` (**coalescing only once it

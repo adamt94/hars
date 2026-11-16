@@ -5,6 +5,7 @@ mod analytics;
 mod auth;
 mod automation;
 pub mod brands;
+mod cors;
 mod cv;
 mod frontend;
 mod frontend_data;
@@ -33,8 +34,8 @@ pub use ws::WHOAMI_URL;
 
 use axum::{
     Router,
-    http::{HeaderName, HeaderValue, header},
-    response::Response,
+    http::{HeaderName, HeaderValue, StatusCode, header},
+    response::{IntoResponse, Response},
 };
 use ha_auth::Auth;
 use ha_core::Hass;
@@ -231,6 +232,16 @@ pub fn router(hass: Hass, auth: Auth, config: &ApiConfig) -> Router {
         router = router.merge(frontend::routes(fe.clone(), auth, config.lovelace.clone()));
     }
     router.layer(axum::middleware::map_response(security_headers))
+}
+
+/// aiohttp's answer when a view raises.
+pub(crate) fn internal_error() -> Response {
+    (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        [(header::CONTENT_TYPE, "text/plain; charset=utf-8")],
+        "500 Internal Server Error\n\nServer got itself in trouble",
+    )
+        .into_response()
 }
 
 /// HA's `headers.py`: added to every response, errors included.

@@ -330,7 +330,7 @@ mod tests {
         assert!(Arc::ptr_eq(&first, &same));
         assert!(rx.try_recv().is_err());
         sim.jump_to("2026-01-01T00:01:40Z".parse().unwrap());
-        let forced = hass.set_state_forced(id.clone(), "home", Attributes::new());
+        let forced = hass.set_state_forced(id.clone(), "home", Attributes::new(), None);
         assert!(!Arc::ptr_eq(&first, &forced));
         assert!(forced.last_changed > first.last_changed);
         assert_eq!(forced.last_updated, forced.last_changed);

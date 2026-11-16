@@ -1,0 +1,313 @@
+[
+ {
+  "note": "a preflight",
+  "request": {
+   "method": "OPTIONS",
+   "path": "/auth/token",
+   "headers": {
+    "Origin": "https://example.org",
+    "Access-Control-Request-Method": "POST"
+   }
+  },
+  "status": 200,
+  "content_type": null,
+  "body": "",
+  "headers": {
+   "access-control-allow-methods": "POST",
+   "access-control-allow-origin": "https://example.org"
+  }
+ },
+ {
+  "note": "allowed request headers, in any case",
+  "request": {
+   "method": "OPTIONS",
+   "path": "/auth/token",
+   "headers": {
+    "Origin": "https://example.org",
+    "Access-Control-Request-Method": "POST",
+    "Access-Control-Request-Headers": "content-type, Authorization"
+   }
+  },
+  "status": 200,
+  "content_type": null,
+  "body": "",
+  "headers": {
+   "access-control-allow-headers": "AUTHORIZATION,CONTENT-TYPE",
+   "access-control-allow-methods": "POST",
+   "access-control-allow-origin": "https://example.org"
+  }
+ },
+ {
+  "note": "a request header not allowed",
+  "request": {
+   "method": "OPTIONS",
+   "path": "/auth/token",
+   "headers": {
+    "Origin": "https://example.org",
+    "Access-Control-Request-Method": "POST",
+    "Access-Control-Request-Headers": "X-Foo"
+   }
+  },
+  "status": 403,
+  "content_type": "text/plain; charset=utf-8",
+  "body": "CORS preflight request failed: headers are not allowed: X-FOO",
+  "headers": {}
+ },
+ {
+  "note": "spaces, empty items, several not allowed",
+  "request": {
+   "method": "OPTIONS",
+   "path": "/auth/token",
+   "headers": {
+    "Origin": "https://example.org",
+    "Access-Control-Request-Method": "POST",
+    "Access-Control-Request-Headers": " accept ,, x-b, X-A, origin, x-requested-with"
+   }
+  },
+  "status": 403,
+  "content_type": "text/plain; charset=utf-8",
+  "body": "CORS preflight request failed: headers are not allowed: X-A, X-B",
+  "headers": {}
+ },
+ {
+  "note": "any method",
+  "request": {
+   "method": "OPTIONS",
+   "path": "/auth/token",
+   "headers": {
+    "Origin": "https://example.org",
+    "Access-Control-Request-Method": "DELETE"
+   }
+  },
+  "status": 200,
+  "content_type": null,
+  "body": "",
+  "headers": {
+   "access-control-allow-methods": "DELETE",
+   "access-control-allow-origin": "https://example.org"
+  }
+ },
+ {
+  "note": "no requested method",
+  "request": {
+   "method": "OPTIONS",
+   "path": "/auth/token",
+   "headers": {
+    "Origin": "https://example.org"
+   }
+  },
+  "status": 403,
+  "content_type": "text/plain; charset=utf-8",
+  "body": "CORS preflight request failed: 'Access-Control-Request-Method' header is not specified",
+  "headers": {}
+ },
+ {
+  "note": "no origin",
+  "request": {
+   "method": "OPTIONS",
+   "path": "/auth/token",
+   "headers": {
+    "Access-Control-Request-Method": "POST"
+   }
+  },
+  "status": 403,
+  "content_type": "text/plain; charset=utf-8",
+  "body": "CORS preflight request failed: origin header is not specified in the request",
+  "headers": {}
+ },
+ {
+  "note": "neither",
+  "request": {
+   "method": "OPTIONS",
+   "path": "/auth/token"
+  },
+  "status": 403,
+  "content_type": "text/plain; charset=utf-8",
+  "body": "CORS preflight request failed: origin header is not specified in the request",
+  "headers": {}
+ },
+ {
+  "note": "a preflight",
+  "request": {
+   "method": "OPTIONS",
+   "path": "/auth/revoke",
+   "headers": {
+    "Origin": "https://example.org",
+    "Access-Control-Request-Method": "POST"
+   }
+  },
+  "status": 200,
+  "content_type": null,
+  "body": "",
+  "headers": {
+   "access-control-allow-methods": "POST",
+   "access-control-allow-origin": "https://example.org"
+  }
+ },
+ {
+  "note": "allowed request headers, in any case",
+  "request": {
+   "method": "OPTIONS",
+   "path": "/auth/revoke",
+   "headers": {
+    "Origin": "https://example.org",
+    "Access-Control-Request-Method": "POST",
+    "Access-Control-Request-Headers": "content-type, Authorization"
+   }
+  },
+  "status": 200,
+  "content_type": null,
+  "body": "",
+  "headers": {
+   "access-control-allow-headers": "AUTHORIZATION,CONTENT-TYPE",
+   "access-control-allow-methods": "POST",
+   "access-control-allow-origin": "https://example.org"
+  }
+ },
+ {
+  "note": "a request header not allowed",
+  "request": {
+   "method": "OPTIONS",
+   "path": "/auth/revoke",
+   "headers": {
+    "Origin": "https://example.org",
+    "Access-Control-Request-Method": "POST",
+    "Access-Control-Request-Headers": "X-Foo"
+   }
+  },
+  "status": 403,
+  "content_type": "text/plain; charset=utf-8",
+  "body": "CORS preflight request failed: headers are not allowed: X-FOO",
+  "headers": {}
+ },
+ {
+  "note": "spaces, empty items, several not allowed",
+  "request": {
+   "method": "OPTIONS",
+   "path": "/auth/revoke",
+   "headers": {
+    "Origin": "https://example.org",
+    "Access-Control-Request-Method": "POST",
+    "Access-Control-Request-Headers": " accept ,, x-b, X-A, origin, x-requested-with"
+   }
+  },
+  "status": 403,
+  "content_type": "text/plain; charset=utf-8",
+  "body": "CORS preflight request failed: headers are not allowed: X-A, X-B",
+  "headers": {}
+ },
+ {
+  "note": "any method",
+  "request": {
+   "method": "OPTIONS",
+   "path": "/auth/revoke",
+   "headers": {
+    "Origin": "https://example.org",
+    "Access-Control-Request-Method": "DELETE"
+   }
+  },
+  "status": 200,
+  "content_type": null,
+  "body": "",
+  "headers": {
+   "access-control-allow-methods": "DELETE",
+   "access-control-allow-origin": "https://example.org"
+  }
+ },
+ {
+  "note": "no requested method",
+  "request": {
+   "method": "OPTIONS",
+   "path": "/auth/revoke",
+   "headers": {
+    "Origin": "https://example.org"
+   }
+  },
+  "status": 403,
+  "content_type": "text/plain; charset=utf-8",
+  "body": "CORS preflight request failed: 'Access-Control-Request-Method' header is not specified",
+  "headers": {}
+ },
+ {
+  "note": "no origin",
+  "request": {
+   "method": "OPTIONS",
+   "path": "/auth/revoke",
+   "headers": {
+    "Access-Control-Request-Method": "POST"
+   }
+  },
+  "status": 403,
+  "content_type": "text/plain; charset=utf-8",
+  "body": "CORS preflight request failed: origin header is not specified in the request",
+  "headers": {}
+ },
+ {
+  "note": "neither",
+  "request": {
+   "method": "OPTIONS",
+   "path": "/auth/revoke"
+  },
+  "status": 403,
+  "content_type": "text/plain; charset=utf-8",
+  "body": "CORS preflight request failed: origin header is not specified in the request",
+  "headers": {}
+ },
+ {
+  "note": "a request from another origin",
+  "request": {
+   "method": "POST",
+   "path": "/auth/token",
+   "headers": {
+    "Origin": "https://example.org",
+    "Content-Type": "application/x-www-form-urlencoded"
+   },
+   "body": "grant_type=refresh_token&client_id=x&refresh_token=nope"
+  },
+  "status": 400,
+  "content_type": "application/json",
+  "body": {
+   "error": "invalid_request",
+   "error_description": "Invalid client id"
+  },
+  "headers": {
+   "access-control-allow-origin": "https://example.org"
+  }
+ },
+ {
+  "note": "no origin: no CORS headers",
+  "request": {
+   "method": "POST",
+   "path": "/auth/token",
+   "headers": {
+    "Content-Type": "application/x-www-form-urlencoded"
+   },
+   "body": "grant_type=refresh_token&client_id=x&refresh_token=nope"
+  },
+  "status": 400,
+  "content_type": "application/json",
+  "body": {
+   "error": "invalid_request",
+   "error_description": "Invalid client id"
+  },
+  "headers": {}
+ },
+ {
+  "note": "revoke from another origin",
+  "request": {
+   "method": "POST",
+   "path": "/auth/revoke",
+   "headers": {
+    "Origin": "https://example.org",
+    "Content-Type": "application/x-www-form-urlencoded"
+   },
+   "body": "token=nope"
+  },
+  "status": 200,
+  "content_type": null,
+  "body": "",
+  "headers": {
+   "access-control-allow-origin": "https://example.org"
+  }
+ }
+]

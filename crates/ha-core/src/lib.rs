@@ -285,19 +285,20 @@ impl Hass {
 
     /// HA's `force_update` write: `state_changed` fires even when nothing
     /// changed, and every timestamp moves (trackers whose location is
-    /// pushed).
+    /// pushed). `context` as in [`Hass::set_state_with_context`].
     pub fn set_state_forced(
         &self,
         entity_id: EntityId,
         state: impl Into<smol_str::SmolStr>,
         attributes: Attributes,
+        context: Option<Context>,
     ) -> Arc<State> {
         let inner = &*self.inner;
         inner.states.set(
             entity_id,
             state.into(),
             attributes,
-            None,
+            context,
             &inner.clock,
             &inner.bus,
             state::WriteMode::Force,
