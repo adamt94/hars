@@ -546,8 +546,11 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
       and logs the calls it *would* make and its `automation_triggered`
       events; `scripts/shadow-diff.py` compares them with HA's recorder
       database (service, targets, data within 1 s; triggers per automation)
-- [ ] Acceptance: shadow mode runs for a week beside the reference install
+- [x] Acceptance: shadow mode runs for a week beside the reference install
       with no differences, while the companion app stays connected to HA
+      (cut short and accepted by the maintainer: 23 hours, 2026-11-15/16,
+      213/213 triggers and 251/251 calls matched; the hallway brightness
+      automation's light was off at each of its times, so neither side ran it)
 - [x] Packaging: static musl binary in a `FROM scratch` image with tzdata
       (CA roots are compiled into the binary), a persistent volume and SIGTERM
       handling
@@ -558,11 +561,13 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
       installing is `docker compose up -d` and a browser (proven end to end
       in Chromium with the pinned frontend: owner, location, analytics,
       finish, dashboard, restart)
-- [ ] Acceptance: a documented cutover and rollback procedure (stop HA,
+- [x] Acceptance: a documented cutover and rollback procedure (stop HA,
       import a fresh copy, start `hars` on :8123; roll back by starting the
       untouched HA copy), proven on the reference install
-- [ ] Acceptance: RSS / CPU / start-up / wakeup numbers for the reference
+      ([`docs/SHADOW.md`](SHADOW.md#cutover); cut over 2026-11-16)
+- [x] Acceptance: RSS / CPU / start-up / wakeup numbers for the reference
       install, published beside the same numbers for HA on the same host
+      ([results](perf/RESULTS.md#reference-install-hars-and-ha-2026-11-16))
 
 ## Post-MVP
 - Remote access, SwitchBot webhooks

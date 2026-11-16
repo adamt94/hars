@@ -351,3 +351,34 @@ domain and for every state, the minute tick), HA's condition errors,
 `render_complex`, script variables and the limited environment. It is only
 paid in pages that run when an automation uses templates; an automation
 without templates takes the same path as before and makes no variables.
+
+### Reference install, hars and HA, 2026-11-16
+
+The reference install, on the host it runs on: Docker Desktop on an
+Apple-silicon Mac (linux/aarch64), bridge network, `TZ` set, the full
+inventory (Hue over its event stream, LIFX and SwitchBot Cloud polled, met,
+sun, the iPhone's registration, 4 automations). HA is
+`ghcr.io/home-assistant/home-assistant:stable` (2026.6.1); `hars` is the
+static musl image built from fd9ba06 under `--memory 150m`.
+
+| | start-up | RSS | CPU | wakeups/s | threads |
+|---|---|---|---|---|---|
+| HA | 5.85 s | 203 MiB (427 MiB peak) | 0.199 % | 3.4 | 38 |
+| `hars`, shadow mode | | 12.1 MiB | 0.017 % | 0.64 | 4 |
+| `hars`, in charge | 0.39 s | 10.7 MiB | 0.023 % | 0.75 | 4 |
+
+- **Start-up**: container start (`docker inspect` `StartedAt`) to HA's
+  `homeassistant_started` event in its database, and to `hars`'s
+  `listening` log line, by which point its automations are set up; the
+  devices connect after.
+- **RSS, CPU, wakeups**: five quiet minutes each, from `/proc` of the main
+  process (CPU from `utime`+`stime`, wakeups as voluntary and involuntary
+  context switches summed over its threads). HA and `hars` in shadow mode were
+  measured side by side on 2026-11-15, 15 minutes after `hars` started; `hars`
+  in charge on 2026-11-16, 5 minutes after the cutover. HA's peak is
+  `VmHWM`, reached during its start-up.
+
+Against HA on the same host and devices: about 1/19th of the memory, 1/9th of
+the CPU, a fifth of the wakeups and 1/15th of the start-up time. The wakeups
+are the device traffic: the Hue event stream and the LIFX and SwitchBot
+polls, which HA does too. Within the [budgets](../PERF.md#budgets).

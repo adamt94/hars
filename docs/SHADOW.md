@@ -117,3 +117,61 @@ change an automation in HA, stop `hars-shadow`, import a fresh HA copy
 with `--force`, restart it and start the week over.
 
 `python3 -m unittest discover -s scripts` runs its tests.
+
+## Cutover
+
+When the diff is clean, `hars` takes over from HA on HA's own port, so the
+browsers and the companion app find it at the address they already use. It
+gets a fresh import: HA's tokens, registries and restore state have moved on
+since the shadow's.
+
+1. Run the diff one last time, with HA still running. Leave out the first
+   minutes after `hars-shadow` started (`--exclude`): HA's calls from a run
+   that began before `hars` was up count as missing.
+2. Stop both, and make sure neither starts again by itself (a restart of
+   Docker would otherwise bring HA back beside `hars`, and both would send
+   commands). HA can take minutes to write its database at stop:
+
+   ```sh
+   docker stop -t 60 hars-shadow && docker update --restart=no hars-shadow
+   docker stop -t 240 homeassistant && docker update --restart=no homeassistant
+   ```
+
+3. With HA stopped, copy its config directory and import the copy into a
+   new, empty config for `hars` (not the shadow's):
+
+   ```sh
+   cp -a /path/to/ha-config /path/to/ha-config-cutover
+   docker run --rm -v "$PWD/config:/config" -v /path/to/ha-config-cutover:/ha:ro $IMAGE import /ha
+   ```
+
+4. Start `hars` without `HARS_SHADOW`, on the port HA used, and check that
+   the log has no `SHADOW MODE` line:
+
+   ```sh
+   docker run -d --name hars --network host --restart unless-stopped --stop-timeout 60 \
+     -v "$PWD/config:/config" $IMAGE
+   docker logs hars
+   ```
+
+5. Check it: every automation is `on`, the inventory's entities have live
+   states (an entity HA had `unavailable` or `unknown` comes up the same), a
+   command that changes nothing (`light.turn_off` on a light that is off) is
+   accepted by each kind of device, and the companion app, opened, connects
+   without logging in again.
+
+### Rolling back
+
+HA's config directory is untouched, so going back is starting it again:
+
+```sh
+docker stop hars && docker update --restart=no hars
+docker update --restart=unless-stopped homeassistant && docker start homeassistant
+```
+
+HA carries on from the moment it stopped: it has none of the history,
+states or logins made while `hars` ran. The app's existing session works on
+both, because its refresh token and signing key were imported, not reissued.
+
+This was done on the reference install on 2026-11-16, after 23 hours of
+shadow mode with no differences.
