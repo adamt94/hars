@@ -67,7 +67,7 @@ async fn matches_home_assistant() {
     let light = EntityId::parse("light.a").unwrap();
     let mut before: Option<Value> = None;
     let steps: Vec<Value> = serde_json::from_str(VECTORS).unwrap();
-    assert_eq!(steps.len(), 26);
+    assert_eq!(steps.len(), 31);
     for (n, step) in steps.iter().enumerate() {
         // A tick between steps, so a moved time shows.
         sim.jump_to(

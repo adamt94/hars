@@ -886,6 +886,214 @@
   "moved": []
  },
  {
+  "note": "attributes as key/value pairs",
+  "request": {
+   "method": "POST",
+   "path": "/api/states/light.a",
+   "headers": {
+    "Content-Type": "application/json"
+   },
+   "body": "{\"state\": \"on\", \"attributes\": [[\"x\", 1], [\"y\", [2]], [\"x\", 3]]}",
+   "user": "admin"
+  },
+  "status": 200,
+  "content_type": "application/json",
+  "body": {
+   "entity_id": "light.a",
+   "state": "on",
+   "attributes": {
+    "x": 3,
+    "y": [
+     2
+    ]
+   },
+   "last_changed": "<time>",
+   "last_reported": "<time>",
+   "last_updated": "<time>",
+   "context": {
+    "id": "<ulid>",
+    "parent_id": null,
+    "user_id": "<hex32>"
+   }
+  },
+  "location": "/api/states/light.a",
+  "light.a": {
+   "entity_id": "light.a",
+   "state": "on",
+   "attributes": {
+    "x": 3,
+    "y": [
+     2
+    ]
+   },
+   "last_changed": "<time>",
+   "last_reported": "<time>",
+   "last_updated": "<time>",
+   "context": {
+    "id": "<ulid>",
+    "parent_id": null,
+    "user_id": "<hex32>"
+   }
+  },
+  "moved": [
+   "last_changed",
+   "last_updated",
+   "last_reported",
+   "context"
+  ]
+ },
+ {
+  "note": "a two-character string is a pair too",
+  "request": {
+   "method": "POST",
+   "path": "/api/states/light.a",
+   "headers": {
+    "Content-Type": "application/json"
+   },
+   "body": "{\"state\": \"on\", \"attributes\": [\"ab\", [\"c\", null]]}",
+   "user": "admin"
+  },
+  "status": 200,
+  "content_type": "application/json",
+  "body": {
+   "entity_id": "light.a",
+   "state": "on",
+   "attributes": {
+    "a": "b",
+    "c": null
+   },
+   "last_changed": "<time>",
+   "last_reported": "<time>",
+   "last_updated": "<time>",
+   "context": {
+    "id": "<ulid>",
+    "parent_id": null,
+    "user_id": "<hex32>"
+   }
+  },
+  "location": "/api/states/light.a",
+  "light.a": {
+   "entity_id": "light.a",
+   "state": "on",
+   "attributes": {
+    "a": "b",
+    "c": null
+   },
+   "last_changed": "<time>",
+   "last_reported": "<time>",
+   "last_updated": "<time>",
+   "context": {
+    "id": "<ulid>",
+    "parent_id": null,
+    "user_id": "<hex32>"
+   }
+  },
+  "moved": [
+   "last_updated",
+   "last_reported",
+   "context"
+  ]
+ },
+ {
+  "note": "a pair too short",
+  "request": {
+   "method": "POST",
+   "path": "/api/states/light.a",
+   "headers": {
+    "Content-Type": "application/json"
+   },
+   "body": "{\"state\": \"on\", \"attributes\": [[\"x\"]]}",
+   "user": "admin"
+  },
+  "status": 500,
+  "content_type": "text/plain; charset=utf-8",
+  "body": "500 Internal Server Error\n\nServer got itself in trouble",
+  "location": null,
+  "light.a": {
+   "entity_id": "light.a",
+   "state": "on",
+   "attributes": {
+    "a": "b",
+    "c": null
+   },
+   "last_changed": "<time>",
+   "last_reported": "<time>",
+   "last_updated": "<time>",
+   "context": {
+    "id": "<ulid>",
+    "parent_id": null,
+    "user_id": "<hex32>"
+   }
+  },
+  "moved": []
+ },
+ {
+  "note": "a key that can't be hashed",
+  "request": {
+   "method": "POST",
+   "path": "/api/states/light.a",
+   "headers": {
+    "Content-Type": "application/json"
+   },
+   "body": "{\"state\": \"on\", \"attributes\": [[[\"x\"], 1]]}",
+   "user": "admin"
+  },
+  "status": 500,
+  "content_type": "text/plain; charset=utf-8",
+  "body": "500 Internal Server Error\n\nServer got itself in trouble",
+  "location": null,
+  "light.a": {
+   "entity_id": "light.a",
+   "state": "on",
+   "attributes": {
+    "a": "b",
+    "c": null
+   },
+   "last_changed": "<time>",
+   "last_reported": "<time>",
+   "last_updated": "<time>",
+   "context": {
+    "id": "<ulid>",
+    "parent_id": null,
+    "user_id": "<hex32>"
+   }
+  },
+  "moved": []
+ },
+ {
+  "note": "a string",
+  "request": {
+   "method": "POST",
+   "path": "/api/states/light.a",
+   "headers": {
+    "Content-Type": "application/json"
+   },
+   "body": "{\"state\": \"on\", \"attributes\": \"ab\"}",
+   "user": "admin"
+  },
+  "status": 500,
+  "content_type": "text/plain; charset=utf-8",
+  "body": "500 Internal Server Error\n\nServer got itself in trouble",
+  "location": null,
+  "light.a": {
+   "entity_id": "light.a",
+   "state": "on",
+   "attributes": {
+    "a": "b",
+    "c": null
+   },
+   "last_changed": "<time>",
+   "last_reported": "<time>",
+   "last_updated": "<time>",
+   "context": {
+    "id": "<ulid>",
+    "parent_id": null,
+    "user_id": "<hex32>"
+   }
+  },
+  "moved": []
+ },
+ {
   "note": "null attributes",
   "request": {
    "method": "POST",
@@ -926,7 +1134,6 @@
    }
   },
   "moved": [
-   "last_changed",
    "last_updated",
    "last_reported",
    "context"

@@ -85,10 +85,14 @@ async fn post_state(
     let Ok(id) = EntityId::parse(&entity_id.to_lowercase()) else {
         return message(StatusCode::BAD_REQUEST, "Invalid entity ID specified.");
     };
-    // `attributes or {}`; anything else but a mapping makes `ReadOnlyDict`
-    // raise, and aiohttp answers 500.
+    // `attributes or {}`, then `ReadOnlyDict(attributes)`: a mapping, or
+    // what `dict()` takes from a list; anything else raises (aiohttp's 500).
     let attributes: Attributes = match data.get("attributes") {
         Some(Value::Object(m)) => m.clone(),
+        Some(Value::Array(items)) if !items.is_empty() => match dict_from_pairs(items) {
+            Some(m) => m,
+            None => return crate::internal_error(),
+        },
         Some(v) if py_truthy(v) => return crate::internal_error(),
         _ => Attributes::new(),
     };
@@ -114,6 +118,33 @@ async fn post_state(
         res.headers_mut().insert(header::LOCATION, location);
     }
     res
+}
+
+/// Python's `dict(items)` for a JSON list: each item a `[key, value]` pair
+/// or a two-character string, later keys winning. `None` where `dict()`
+/// raises, and for keys that aren't strings (HA would keep `1` as a key;
+/// hars's attributes are keyed by strings).
+fn dict_from_pairs(items: &[Value]) -> Option<Attributes> {
+    let mut out = Attributes::new();
+    for item in items {
+        match item {
+            Value::Array(pair) => match pair.as_slice() {
+                [Value::String(k), v] => {
+                    out.insert(k.clone(), v.clone());
+                }
+                _ => return None,
+            },
+            Value::String(s) => {
+                let mut chars = s.chars();
+                let (Some(k), Some(v), None) = (chars.next(), chars.next(), chars.next()) else {
+                    return None;
+                };
+                out.insert(k.to_string(), Value::String(v.to_string()));
+            }
+            _ => return None,
+        }
+    }
+    Some(out)
 }
 
 /// Python truthiness of a JSON value.
