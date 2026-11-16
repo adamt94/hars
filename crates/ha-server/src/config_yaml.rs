@@ -3,8 +3,11 @@
 
 use ha_core::yaml::Yaml;
 
-/// The keys whose contents hars reads.
-const READ: &[&str] = &["automation", "recorder"];
+/// Whether hars reads a key's contents: `recorder:` exactly, and every
+/// `automation` key (HA collects `automation <label>:` too).
+fn is_read(key: &str, domain: &str) -> bool {
+    key == "recorder" || domain == "automation"
+}
 
 /// Domains where a bare key (`default_config:`, `frontend:`) changes nothing
 /// in hars: hars runs them without being asked, or (`script`, `scene`) an
@@ -23,7 +26,7 @@ const BARE_OK: &[&str] = &[
     "mobile_app",
     "onboarding",
     "person",
-    "persistent_notification",
+    "recorder",
     "repairs",
     "scene",
     "script",
@@ -54,7 +57,7 @@ pub fn ignored(config: &Yaml) -> Vec<(&str, Ignored)> {
         .filter_map(|(k, v)| {
             let key = k.as_str()?;
             let domain = key.split(' ').next().unwrap_or(key);
-            if READ.contains(&domain) {
+            if is_read(key, domain) {
                 None
             } else if !BARE_OK.contains(&domain) {
                 Some((key, Ignored::Unsupported))
@@ -67,12 +70,14 @@ pub fn ignored(config: &Yaml) -> Vec<(&str, Ignored)> {
         .collect()
 }
 
-/// Whether a value sets anything: HA's default `frontend: themes:
-/// !include_dir_merge_named themes` with no themes is `{themes: {}}`, which
-/// sets nothing.
+/// Whether a value sets anything. Any option does, even `false` or `[]`;
+/// only an empty `themes:` doesn't (HA's default `frontend: themes:
+/// !include_dir_merge_named themes`, with no themes, is `{themes: {}}`).
 fn holds_something(v: &Yaml) -> bool {
     match v {
-        Yaml::Map(pairs) => pairs.iter().any(|(_, v)| v.is_truthy()),
+        Yaml::Map(pairs) => pairs
+            .iter()
+            .any(|(k, v)| k.as_str() != Some("themes") || v.is_truthy()),
         v => v.is_truthy(),
     }
 }
@@ -127,13 +132,16 @@ mod tests {
 
     #[test]
     fn unknown_domains_are_ignored_even_when_bare() {
-        let config = load("mqtt:\nsensor:\n  - platform: template\nlogger:\n  default: info\n");
+        let config = load(
+            "mqtt:\nsensor:\n  - platform: template\nlogger:\n  default: info\npersistent_notification:\n",
+        );
         assert_eq!(
             ignored(&config),
             vec![
                 ("mqtt", Ignored::Unsupported),
                 ("sensor", Ignored::Unsupported),
                 ("logger", Ignored::Unsupported),
+                ("persistent_notification", Ignored::Unsupported),
             ]
         );
     }
@@ -151,6 +159,21 @@ mod tests {
                 ("http", Ignored::Options),
                 ("script", Ignored::Options),
                 ("light 2", Ignored::Unsupported),
+            ]
+        );
+    }
+
+    #[test]
+    fn falsy_options_and_labelled_recorders_are_ignored() {
+        let config = load(
+            "http:\n  ip_ban_enabled: false\nhomeassistant:\n  allowlist_external_dirs: []\nrecorder archive:\n  purge_keep_days: 3\nrecorder other:\n",
+        );
+        assert_eq!(
+            ignored(&config),
+            vec![
+                ("http", Ignored::Options),
+                ("homeassistant", Ignored::Options),
+                ("recorder archive", Ignored::Options),
             ]
         );
     }
