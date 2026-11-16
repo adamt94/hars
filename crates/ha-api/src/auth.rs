@@ -35,11 +35,11 @@ pub(crate) fn routes(auth: Auth) -> Router {
         // HA's `cors_allowed` views: any origin may call them.
         .route(
             "/auth/token",
-            axum::routing::post(token).layer(axum::middleware::from_fn(crate::cors::allow_all)),
+            crate::cors::allow_all(axum::routing::post(token)),
         )
         .route(
             "/auth/revoke",
-            axum::routing::post(revoke).layer(axum::middleware::from_fn(crate::cors::allow_all)),
+            crate::cors::allow_all(axum::routing::post(revoke)),
         )
         // These bodies are a few hundred bytes; don't buffer megabytes for
         // anonymous callers.

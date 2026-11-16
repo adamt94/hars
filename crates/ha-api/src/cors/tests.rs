@@ -2,7 +2,8 @@
 //! `scripts/vectors/http.py`, holds what Home Assistant 2026.6.1 (aiohttp_cors
 //! 0.8.1) answered to preflights and requests on `/auth/token` and
 //! `/auth/revoke`; these send the same requests to hars and compare the
-//! status, `Content-Type`, body and every `Access-Control-*`/`Vary` header.
+//! status, `Content-Type`, body and every `Access-Control-*`, `Vary` and
+//! `Allow` header.
 
 use axum::body::Body;
 use axum::extract::ConnectInfo;
@@ -20,7 +21,7 @@ async fn matches_home_assistant() {
         &crate::ApiConfig::default(),
     );
     let steps: Vec<Value> = serde_json::from_str(VECTORS).unwrap();
-    assert_eq!(steps.len(), 19);
+    assert_eq!(steps.len(), 25);
     for step in &steps {
         let note = step["note"].as_str().unwrap();
         let r = &step["request"];
@@ -45,7 +46,7 @@ async fn matches_home_assistant() {
         assert_eq!(content_type, step["content_type"].as_str(), "{what}");
         let mut cors = serde_json::Map::new();
         for (k, v) in res.headers() {
-            if k.as_str().starts_with("access-control-") || k == "vary" {
+            if k.as_str().starts_with("access-control-") || k == "vary" || k == "allow" {
                 cors.insert(k.as_str().into(), v.to_str().unwrap().into());
             }
         }

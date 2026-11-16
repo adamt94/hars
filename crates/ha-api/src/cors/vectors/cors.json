@@ -309,5 +309,92 @@
   "headers": {
    "access-control-allow-origin": "https://example.org"
   }
+ },
+ {
+  "note": "a method the view lacks, from another origin",
+  "request": {
+   "method": "GET",
+   "path": "/auth/token",
+   "headers": {
+    "Origin": "https://example.org"
+   }
+  },
+  "status": 405,
+  "content_type": "text/plain; charset=utf-8",
+  "body": "405: Method Not Allowed",
+  "headers": {
+   "allow": "OPTIONS,POST"
+  }
+ },
+ {
+  "note": "a method the view lacks",
+  "request": {
+   "method": "GET",
+   "path": "/auth/token"
+  },
+  "status": 405,
+  "content_type": "text/plain; charset=utf-8",
+  "body": "405: Method Not Allowed",
+  "headers": {
+   "allow": "OPTIONS,POST"
+  }
+ },
+ {
+  "note": "a method the view lacks, from another origin",
+  "request": {
+   "method": "PUT",
+   "path": "/auth/token",
+   "headers": {
+    "Origin": "https://example.org"
+   }
+  },
+  "status": 405,
+  "content_type": "text/plain; charset=utf-8",
+  "body": "405: Method Not Allowed",
+  "headers": {
+   "allow": "OPTIONS,POST"
+  }
+ },
+ {
+  "note": "a method the view lacks",
+  "request": {
+   "method": "PUT",
+   "path": "/auth/token"
+  },
+  "status": 405,
+  "content_type": "text/plain; charset=utf-8",
+  "body": "405: Method Not Allowed",
+  "headers": {
+   "allow": "OPTIONS,POST"
+  }
+ },
+ {
+  "note": "a method the view lacks, from another origin",
+  "request": {
+   "method": "DELETE",
+   "path": "/auth/token",
+   "headers": {
+    "Origin": "https://example.org"
+   }
+  },
+  "status": 405,
+  "content_type": "text/plain; charset=utf-8",
+  "body": "405: Method Not Allowed",
+  "headers": {
+   "allow": "OPTIONS,POST"
+  }
+ },
+ {
+  "note": "a method the view lacks",
+  "request": {
+   "method": "DELETE",
+   "path": "/auth/token"
+  },
+  "status": 405,
+  "content_type": "text/plain; charset=utf-8",
+  "body": "405: Method Not Allowed",
+  "headers": {
+   "allow": "OPTIONS,POST"
+  }
  }
 ]

@@ -12,8 +12,8 @@ writes, to crates/ha-api/src/:
 
 - `cors/vectors/cors.json`: preflights and requests, with and without an
   `Origin`, to `/auth/token` and `/auth/revoke` (the views HA marks
-  `cors_allowed`): the status, the body, and every `Access-Control-*` and
-  `Vary` header of the reply;
+  `cors_allowed`), and methods those views lack: the status, the body, and
+  every `Access-Control-*`, `Vary` and `Allow` header of the reply;
 - `rest/vectors/post_state.json`: `POST /api/states/<entity_id>` with each
   kind of body and `Content-Type` (HA reads the body as JSON whatever the
   type), the status, the body, the `Location` header, and the state
@@ -152,7 +152,7 @@ def cors_headers(headers):
     out = {
         k.lower(): v
         for k, v in sorted(headers.items(), key=lambda kv: kv[0].lower())
-        if k.lower().startswith("access-control-") or k.lower() == "vary"
+        if k.lower().startswith("access-control-") or k.lower() in ("vary", "allow")
     }
     if "access-control-allow-headers" in out:
         out["access-control-allow-headers"] = sorted_list(
@@ -241,6 +241,13 @@ async def cors(run):
     for path, headers, body, note in requests:
         request, status, reply, got = await run.send("POST", path, headers, body)
         steps.append(cors_step(note, request, status, reply, got))
+    for method in ("GET", "PUT", "DELETE"):
+        for headers, note in (
+            ({"Origin": ORIGIN}, "a method the view lacks, from another origin"),
+            (None, "a method the view lacks"),
+        ):
+            request, status, reply, got = await run.send(method, "/auth/token", headers)
+            steps.append(cors_step(note, request, status, reply, got))
     return steps
 
 

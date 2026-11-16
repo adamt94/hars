@@ -4,9 +4,10 @@
 
 use axum::{
     extract::Request,
-    http::{HeaderMap, HeaderValue, Method, StatusCode, header},
-    middleware::Next,
+    http::{HeaderMap, HeaderValue, StatusCode, header},
+    middleware::{Next, from_fn},
     response::{IntoResponse, Response},
+    routing::MethodRouter,
 };
 
 /// HA's `ALLOWED_CORS_HEADERS`, upper-cased as aiohttp_cors compares them.
@@ -18,12 +19,20 @@ const ALLOWED_HEADERS: [&str; 5] = [
     "AUTHORIZATION",
 ];
 
-/// A route layer: `OPTIONS` is the preflight; any other request from an
-/// `Origin` gets `Access-Control-Allow-Origin` set to it, errors included.
-pub(crate) async fn allow_all(req: Request, next: Next) -> Response {
-    if req.method() == Method::OPTIONS {
-        return preflight(req.headers());
-    }
+/// A `POST`-only view with CORS from any origin: `OPTIONS` is the
+/// preflight, a `POST` from an `Origin` gets `Access-Control-Allow-Origin`
+/// set to it (errors included), and any other method is aiohttp's 405,
+/// which aiohttp_cors leaves alone.
+pub(crate) fn allow_all<S>(post: MethodRouter<S>) -> MethodRouter<S>
+where
+    S: Clone + Send + Sync + 'static,
+{
+    post.route_layer(from_fn(allow_origin))
+        .options(|headers: HeaderMap| async move { preflight(&headers) })
+        .fallback(|| async { method_not_allowed() })
+}
+
+async fn allow_origin(req: Request, next: Next) -> Response {
     let origin = req.headers().get(header::ORIGIN).cloned();
     let mut res = next.run(req).await;
     if let Some(origin) = origin {
@@ -74,6 +83,20 @@ fn preflight(headers: &HeaderMap) -> Response {
         }
     }
     res
+}
+
+/// aiohttp's `HTTPMethodNotAllowed` for a view with only `post` (and the
+/// preflight route aiohttp_cors adds).
+fn method_not_allowed() -> Response {
+    (
+        StatusCode::METHOD_NOT_ALLOWED,
+        [
+            (header::CONTENT_TYPE, "text/plain; charset=utf-8"),
+            (header::ALLOW, "OPTIONS,POST"),
+        ],
+        "405: Method Not Allowed",
+    )
+        .into_response()
 }
 
 /// aiohttp's `HTTPForbidden(text=...)`.
