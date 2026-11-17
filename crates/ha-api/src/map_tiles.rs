@@ -5,8 +5,9 @@
 //!
 //! The relay exists because OSM's tile servers block a browser that sends
 //! no `Referer`, and HA's `index.html` sets `referrer: same-origin`, so the
-//! browser can't fetch them directly. OSM accepts an application
-//! `User-Agent` in its place, which only a server can send. Tiles aren't
+//! browser sends none to another site. It does send one to `hars` (same
+//! origin), and OSM's tile policy asks a relay to keep it, so its origin
+//! goes upstream along with `hars`'s own `User-Agent`. Tiles aren't
 //! stored: the upstream caching headers are passed on, so the browser
 //! caches them, and its revalidations are passed upstream.
 
@@ -30,12 +31,15 @@ const TIMEOUT: Duration = Duration::from_secs(10);
 
 /// The request headers passed upstream, and the response headers passed back.
 const REQUEST_HEADERS: [header::HeaderName; 2] = [header::IF_NONE_MATCH, header::IF_MODIFIED_SINCE];
-const RESPONSE_HEADERS: [header::HeaderName; 5] = [
+/// `Age` and `Date` too, so the tile's freshness counts from when OSM made it.
+const RESPONSE_HEADERS: [header::HeaderName; 7] = [
     header::CONTENT_TYPE,
     header::CACHE_CONTROL,
     header::EXPIRES,
     header::ETAG,
     header::LAST_MODIFIED,
+    header::AGE,
+    header::DATE,
 ];
 
 pub struct MapTiles {
@@ -71,6 +75,17 @@ fn tile(z: &str, x: &str, y: &str) -> Option<(u8, u32, u32)> {
     (x < side && y < side).then_some((z, x as u32, y as u32))
 }
 
+/// The page's origin from its `Referer` (`http://host:8123/`): what OSM asks
+/// a website to send, without the page's path.
+fn referer_origin(headers: &HeaderMap) -> Option<String> {
+    let referer = headers.get(header::REFERER)?.to_str().ok()?;
+    let (scheme, rest) = referer.split_once("://")?;
+    let authority = rest.split(['/', '?', '#']).next()?;
+    let ok =
+        matches!(scheme, "http" | "https") && !authority.is_empty() && !authority.contains('@');
+    ok.then(|| format!("{scheme}://{authority}/"))
+}
+
 async fn serve(
     State(tiles): State<Arc<MapTiles>>,
     Path((z, x, y)): Path<(String, String, String)>,
@@ -80,13 +95,16 @@ async fn serve(
         return StatusCode::NOT_FOUND.into_response();
     };
     let url = format!("{}/{z}/{x}/{y}.png", tiles.upstream);
-    let forward: Vec<(header::HeaderName, String)> = REQUEST_HEADERS
+    let mut forward: Vec<(header::HeaderName, String)> = REQUEST_HEADERS
         .iter()
         .filter_map(|name| {
             let value = headers.get(name)?.to_str().ok()?;
             Some((name.clone(), value.to_owned()))
         })
         .collect();
+    if let Some(origin) = referer_origin(&headers) {
+        forward.push((header::REFERER, origin));
+    }
     let res = match tiles.client.get(&url, &forward).await {
         Ok(res) => res,
         Err(e) => {
@@ -155,7 +173,8 @@ mod tests {
                         "/1/0/1.png" => (
                             "200 OK",
                             "Content-Type: image/png\r\nCache-Control: max-age=600\r\n\
-                             ETag: \"t1\"\r\nSet-Cookie: a=b\r\n",
+                             ETag: \"t1\"\r\nAge: 590\r\nDate: Tue, 17 Nov 2026 10:00:00 GMT\r\n\
+                             Set-Cookie: a=b\r\n",
                             b"PNG",
                         ),
                         "/2/0/0.png" => ("503 Service Unavailable", "", b""),
@@ -174,7 +193,7 @@ mod tests {
     }
 
     async fn get(router: &Router, uri: &str, etag: Option<&str>) -> Response {
-        let mut req = Request::get(uri);
+        let mut req = Request::get(uri).header("referer", "http://192.168.1.10:8123/map?x=1");
         if let Some(e) = etag {
             req = req.header("if-none-match", e);
         }
@@ -196,6 +215,8 @@ mod tests {
         assert_eq!(h["content-type"], "image/png");
         assert_eq!(h["cache-control"], "max-age=600");
         assert_eq!(h["etag"], "\"t1\"");
+        assert_eq!(h["age"], "590");
+        assert_eq!(h["date"], "Tue, 17 Nov 2026 10:00:00 GMT");
         assert!(h.get("set-cookie").is_none());
         let body = axum::body::to_bytes(res.into_body(), 1 << 20)
             .await
@@ -205,6 +226,11 @@ mod tests {
         let first = seen.lock()[0].clone();
         assert!(first.starts_with("get /1/0/1.png http/1.1"), "{first}");
         assert!(first.contains("user-agent: hars/"), "{first}");
+        // The page's origin, as OSM asks a relay to keep it; not its path.
+        assert!(
+            first.contains("referer: http://192.168.1.10:8123/\r\n"),
+            "{first}"
+        );
 
         // The browser's revalidation goes upstream; a 304 comes back.
         let res = get(&router, "/hars/map_tiles/1/0/1", Some("\"t1\"")).await;
@@ -240,6 +266,27 @@ mod tests {
             );
         }
         assert_eq!(seen.lock().len(), asked);
+    }
+
+    #[test]
+    fn referers_are_cut_to_their_origin() {
+        let origin = |r: &str| {
+            let mut h = HeaderMap::new();
+            h.insert(header::REFERER, r.parse().unwrap());
+            referer_origin(&h)
+        };
+        assert_eq!(
+            origin("https://ha.example:8123/lovelace/0#x").as_deref(),
+            Some("https://ha.example:8123/")
+        );
+        assert_eq!(
+            origin("http://192.168.1.10:8123?a").as_deref(),
+            Some("http://192.168.1.10:8123/")
+        );
+        assert_eq!(origin("http://user:pw@host/"), None);
+        assert_eq!(origin("file:///x"), None);
+        assert_eq!(origin("nonsense"), None);
+        assert_eq!(referer_origin(&HeaderMap::new()), None);
     }
 
     #[test]

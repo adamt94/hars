@@ -13,16 +13,20 @@ plus a new renderer, and it comes with a frontend that expects a newer core.
 
 OSM's raster tiles have no overlay, but they block a browser that sends no
 `Referer` (with an "Access blocked" PNG and HTTP 200). HA's `index.html`
-sets `referrer: same-origin`, so the browser sends none. OSM accepts an
-application `User-Agent` instead, and only a server can set one.
+sets `referrer: same-origin`, so the browser sends none to another site.
+It does send one to its own origin. OSM's tile policy asks for a clear
+application `User-Agent`, and asks a relay to keep the website's
+`Referer`.
 
 ## Decision
 
 - `hars` serves `GET /hars/map_tiles/{z}/{x}/{y}` (`ha-api/src/map_tiles.rs`).
   It fetches the tile from `tile.openstreetmap.org` as `hars/<version>`, with
-  at most two connections, as OSM's tile policy allows.
+  at most two connections, as OSM's tile policy allows. The browser's
+  `Referer` goes upstream cut to its origin (`http://<host>:8123/`), so the
+  page's path stays local.
 - It stores nothing. The upstream caching headers (`Cache-Control`, `ETag`,
-  …) pass to the browser, so the browser caches the tiles, and its
+  `Age`, `Date`, …) pass to the browser, so the browser caches the tiles, and its
   revalidations go upstream as conditional requests.
 - The image build rewrites the frontend's one tile layer to use that URL,
   with OSM's attribution (`scripts/patch_frontend_map.py`). The script fails
