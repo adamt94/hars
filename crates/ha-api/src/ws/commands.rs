@@ -192,6 +192,21 @@ fn panels(is_admin: bool, dashboards: Vec<(String, Value)>) -> Value {
         ),
         panel("profile", None, None, true, false),
         panel("notfound", None, None, true, false),
+        // `history/__init__.py` and `logbook/__init__.py`.
+        panel(
+            "history",
+            Some("history"),
+            Some("mdi:chart-box"),
+            true,
+            false,
+        ),
+        panel(
+            "logbook",
+            Some("logbook"),
+            Some("mdi:format-list-bulleted-type"),
+            true,
+            false,
+        ),
         panel("lovelace", None, None, true, false),
     ];
     // Each dashboard is a panel; one at `lovelace` replaces the default.

@@ -294,6 +294,22 @@ async fn startup_commands_have_has_shapes() {
     }
     assert_eq!(panels["lovelace"]["config"], Value::Null);
     assert_eq!(panels["home"]["show_in_sidebar"], false);
+    // The sidebar's History and Logbook entries, as `history` and `logbook`
+    // register them.
+    for (p, icon) in [
+        ("history", "mdi:chart-box"),
+        ("logbook", "mdi:format-list-bulleted-type"),
+    ] {
+        assert_eq!(
+            panels[p],
+            json!({
+                "component_name": p, "icon": icon, "title": p,
+                "default_visible": true, "config": null, "url_path": p,
+                "require_admin": false, "config_panel_domain": null,
+                "show_in_sidebar": true,
+            }),
+        );
+    }
 
     let me = c.call(json!({"id": 4, "type": "auth/current_user"})).await["result"].clone();
     assert_eq!(me["name"], "adam");
