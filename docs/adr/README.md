@@ -16,6 +16,7 @@ supersedes the old one; don't rewrite history.
 | [0007](0007-transparent-huge-pages-off.md) | Turn transparent huge pages off by re-exec | 2026-11-13 |
 | [0008](0008-vectors-from-home-assistant.md) | Expected values come from running Home Assistant's code | 2026-11-15 |
 | [0009](0009-mvp-reference-install.md) | The MVP is a reference install; cutover after a shadow week | 2026-11-13 |
+| [0010](0010-map-tiles-from-osm.md) | Map tiles from OpenStreetMap, relayed by hars | 2026-11-17 |
 
 Template for a new record (`NNNN-short-name.md`):
 

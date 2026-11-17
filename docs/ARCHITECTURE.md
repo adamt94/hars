@@ -260,6 +260,7 @@ All of it is in `ha-api`; `ha_api::router` builds it.
 | Frontend `/`, `/frontend_latest/…` | `frontend.rs` | Served from `HARS_FRONTEND` on disk with precompressed files ([ADR 0004](adr/0004-frontend-from-disk.md)) |
 | Onboarding `/api/onboarding/…` | `onboarding.rs` | HA's views, registered only while a step is left. The status, installation type, `users` and `integration/wait` views are anonymous; the other steps need a `Bearer` token |
 | Brands `/api/brands/…` | `brands.rs` | Proxied from HA's CDN with HA's disk cache |
+| Map tiles `/hars/map_tiles/…` | `map_tiles.rs` | Not HA's: OpenStreetMap tiles relayed for the frontend's maps, which the image build points here ([ADR 0010](adr/0010-map-tiles-from-osm.md)) |
 
 How to add a command or a view:
 [guides/add-an-api-command.md](guides/add-an-api-command.md).
@@ -278,7 +279,7 @@ first reproduce the current pin before being updated to the new one.
 | Thing | Pinned version |
 |---|---|
 | Home Assistant core (behaviour, `.storage` shapes, import) | **2026.6.1** |
-| Frontend served by hars | **`home-assistant-frontend` 20260527.4** (what 2026.6.1 ships; `Dockerfile` checks its sha256) |
+| Frontend served by hars | **`home-assistant-frontend` 20260527.4** (what 2026.6.1 ships; `Dockerfile` checks its sha256), with its map tile layer pointed at OpenStreetMap ([ADR 0010](adr/0010-map-tiles-from-osm.md)) |
 | iOS companion app | **2026.9.0** on iOS 27 |
 | Test time zone and units | Europe/London (for its DST transitions), metric |
 

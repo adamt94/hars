@@ -8,7 +8,8 @@
 # The official frontend, pinned to the release HA 2026.6.1 ships. It is served
 # from disk. Source maps are dropped. The ES5 build stays: the index loads it
 # for any browser older than its `isModern` cut-off (Safari < 26, iOS < 18.5,
-# Firefox < 140).
+# Firefox < 140). Its map tiles are pointed at hars's OpenStreetMap relay:
+# CARTO's tiles now carry an "API KEY REQUIRED" overlay (docs/adr/0010).
 FROM alpine:3 AS frontend
 ARG FRONTEND_VERSION=20260527.4
 ARG FRONTEND_SHA256=a85e6dbb007962a157bcd6b5c1ce98ed8872f966732773e4b6008444d1b10e18
@@ -19,6 +20,8 @@ RUN apk add --no-cache curl unzip && \
     unzip -q /frontend.whl 'hass_frontend/*' -d /out && \
     rm -rf /out/hass_frontend/__init__.py /out/hass_frontend/py.typed && \
     find /out/hass_frontend -name '*.map' -o -name '*.map.br' -o -name '*.map.gz' | xargs rm -f
+COPY scripts/patch_frontend_map.py /patch_frontend_map.py
+RUN apk add --no-cache python3 && python3 /patch_frontend_map.py /out/hass_frontend
 
 FROM rust:1-alpine AS build
 RUN apk add --no-cache musl-dev ca-certificates tzdata

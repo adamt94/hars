@@ -14,6 +14,7 @@ mod labs;
 #[rustfmt::skip]
 mod i18n_data;
 mod lovelace;
+pub mod map_tiles;
 mod mobile_app;
 #[rustfmt::skip]
 mod manifests_data;
@@ -80,6 +81,8 @@ pub struct ApiConfig {
     pub weather: Arc<ha_integrations::weather::Weather>,
     /// Brand images and their access tokens.
     pub brands: Option<Arc<brands::Brands>>,
+    /// The map's background tiles, relayed from OpenStreetMap.
+    pub map_tiles: Option<Arc<map_tiles::MapTiles>>,
     /// The automations, from `configuration.yaml`.
     pub automations: Option<ha_automation::Automations>,
     /// The companion apps' registrations (`mobile_app`).
@@ -227,6 +230,9 @@ pub fn router(hass: Hass, auth: Auth, config: &ApiConfig) -> Router {
         .merge(ws::routes(shared));
     if let Some(b) = &config.brands {
         router = router.merge(brands::routes(b.clone(), auth.clone()));
+    }
+    if let Some(t) = &config.map_tiles {
+        router = router.merge(map_tiles::routes(t.clone()));
     }
     if let Some(fe) = &config.frontend {
         router = router.merge(frontend::routes(fe.clone(), auth, config.lovelace.clone()));

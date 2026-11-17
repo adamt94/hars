@@ -222,6 +222,13 @@ async fn run(thp_disabled: std::io::Result<bool>) -> anyhow::Result<()> {
             None
         }
     };
+    api_config.map_tiles = match ha_api::map_tiles::MapTiles::new(ha_api::map_tiles::UPSTREAM) {
+        Ok(t) => Some(t),
+        Err(e) => {
+            tracing::error!("map tiles: {e}");
+            None
+        }
+    };
     // The flows onboarding starts once the location is set (met's).
     api_config.onboarding = Some(ha_integrations::onboarding::Onboarding::new(
         &hass,
