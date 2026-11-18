@@ -26,7 +26,7 @@ Ten crates in `crates/`. `ha-server` builds the only binary, `hars`.
 
 | Crate | Job | Home Assistant equivalent |
 |---|---|---|
-| `ha-core` | `Hass`, the state machine, the event bus and lossless feeds, services and schemas, lifecycle stages, `.storage` files, restore state, the clock, YAML loading, `slugify`, shadow mode's gate, Jinja templates (on `minijinja`) | `core.py`, `helpers/storage.py`, `helpers/restore_state.py`, `util/yaml`, `helpers/template` |
+| `ha-core` | `Hass`, the state machine, the event bus and lossless feeds, services and schemas, lifecycle stages, `.storage` files, restore state, the clock, YAML loading and writing, `slugify`, shadow mode's gate, Jinja templates (on `minijinja`) | `core.py`, `helpers/storage.py`, `helpers/restore_state.py`, `util/yaml`, `helpers/template` |
 | `ha-auth` | Users, credentials, login flows, refresh and access tokens, permissions | `auth/` |
 | `ha-registry` | Entity, device, area, floor and label registries; target expansion (device/area/floor/label to entities) | `helpers/*_registry.py` |
 | `ha-http` | The one outbound HTTP(S) client: HTTP/1.1, rustls with compiled-in roots, timeouts, server-sent events | `aiohttp` client session |

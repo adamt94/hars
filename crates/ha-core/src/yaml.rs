@@ -1209,5 +1209,8 @@ fn resolve_plain(v: &str) -> Result<Yaml, YamlError> {
     Ok(Yaml::Str(v.to_owned()))
 }
 
+mod dump;
+pub use dump::dump;
+
 #[cfg(test)]
 mod tests;

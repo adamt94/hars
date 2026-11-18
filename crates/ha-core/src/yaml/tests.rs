@@ -234,3 +234,113 @@ fn includes_and_secrets_stay_in_bounds() {
     assert_eq!(got.to_json(), json!({"real": 1}));
     let _ = std::fs::remove_dir_all(&root);
 }
+
+/// A vector's typed value as ours ([`typed`] backwards).
+fn untyped(v: &Value) -> Yaml {
+    let (kind, payload) = (v[0].as_str().unwrap(), &v[1]);
+    let text = || payload.as_str().unwrap();
+    let items = || payload.as_array().unwrap().iter().map(untyped).collect();
+    match kind {
+        "null" => Yaml::Null,
+        "bool" => Yaml::Bool(payload.as_bool().unwrap()),
+        "int" => match text().parse::<i128>() {
+            Ok(i) => Yaml::Int(i),
+            Err(_) => Yaml::BigInt(text().to_owned()),
+        },
+        "float" => Yaml::Float(match text() {
+            "inf" => f64::INFINITY,
+            "-inf" => f64::NEG_INFINITY,
+            "nan" => f64::NAN,
+            s => s.parse().unwrap(),
+        }),
+        "str" => Yaml::Str(text().to_owned()),
+        "bytes" => {
+            use base64::Engine;
+            Yaml::Bytes(
+                base64::engine::general_purpose::STANDARD
+                    .decode(text())
+                    .unwrap(),
+            )
+        }
+        "date" => Yaml::Date(text().parse().unwrap()),
+        "datetime" => {
+            // Python's isoformat: an offset, if aware, after the time.
+            let (civil, offset) = match text()[11..].rfind(['+', '-']) {
+                Some(i) => {
+                    let (civil, off) = text().split_at(11 + i);
+                    let sign = if off.starts_with('-') { -1 } else { 1 };
+                    let (h, m) = off[1..].split_once(':').unwrap();
+                    let secs = h.parse::<i32>().unwrap() * 3600 + m.parse::<i32>().unwrap() * 60;
+                    (civil, Some(sign * secs))
+                }
+                None => (text(), None),
+            };
+            Yaml::DateTime(civil.parse().unwrap(), offset)
+        }
+        "seq" => Yaml::Seq(items()),
+        "set" => Yaml::Set(items()),
+        "tuple" => Yaml::Tuple(items()),
+        "map" => Yaml::Map(
+            payload
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|kv| (untyped(&kv[0]), untyped(&kv[1])))
+                .collect(),
+        ),
+        "input" => Yaml::Input(text().to_owned()),
+        other => panic!("unknown type {other}"),
+    }
+}
+
+/// Against `vectors/dump.json`, made by `scripts/vectors/yaml_dump.py`
+/// running HA 2026.6.1's `homeassistant.util.yaml.dump`: 859 values (every
+/// kind of string as a value, a list item and a key; numbers, dates,
+/// nesting) written byte for byte as HA writes them, and 18 documents
+/// loaded and written back, as an editor save does to `automations.yaml`.
+#[test]
+fn dumps_as_ha() {
+    let vectors: Value = serde_json::from_str(include_str!("vectors/dump.json")).unwrap();
+    let mut failures = Vec::new();
+    let values = vectors["values"].as_array().unwrap();
+    for case in values {
+        let got = dump(&untyped(&case["typed"])).map_err(|e| e.to_string());
+        if got.as_deref().ok() != case["dump"].as_str() {
+            failures.push(format!(
+                "{}\n  HA:   {:?}\n  hars: {:?}",
+                case["typed"], case["dump"], got
+            ));
+        }
+    }
+    let documents = vectors["documents"].as_array().unwrap();
+    for case in documents {
+        let name = case["name"].as_str().unwrap();
+        // HA writes the mapping the file named once and used twice with
+        // an anchor and an alias; ours is a copy at each use (see
+        // `dump`'s docs).
+        if name == "anchors" {
+            let got = parse(case["yaml"].as_str().unwrap()).and_then(|y| dump(&y));
+            assert_eq!(
+                got.as_deref(),
+                Ok("- a: 1\n- a: 1\n- x: some text\n  y: some text\n")
+            );
+            continue;
+        }
+        let got = parse(case["yaml"].as_str().unwrap())
+            .and_then(|y| dump(&y))
+            .map_err(|e| e.to_string());
+        if got.as_deref().ok() != case["dump"].as_str() {
+            failures.push(format!(
+                "document {name}\n  HA:   {:?}\n  hars: {:?}",
+                case["dump"], got
+            ));
+        }
+    }
+    assert!(
+        failures.is_empty(),
+        "{} of {} differ from HA:\n{}",
+        failures.len(),
+        values.len() + documents.len(),
+        failures.join("\n")
+    );
+}
