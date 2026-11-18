@@ -2285,6 +2285,190 @@
    }
   },
   {
+   "name": "big_numbers",
+   "doc": "HA reads the body with orjson: an integer past 64 bits becomes a float, and is written as one.",
+   "file": "- id: kitchen_off\n  alias: Kitchen lights - off at 11:30pm\n  description: Turn off the kitchen light and lamp every night at 11:30pm.\n  mode: single\n  triggers:\n  - trigger: time\n    at: \"23:30:00\"\n  actions:\n  - action: light.turn_off\n    target:\n      entity_id:\n      - light.kitchen\n      - light.lamp\n    data:\n      transition: 10\n- id: hall_motion\n  alias: Hallway lights - motion on when dark\n  description: Turn on hallway lights when motion is detected below 30 lux, using dim overnight and gentle morning levels.\n  mode: restart\n  triggers:\n  - trigger: state\n    entity_id: binary_sensor.hall_motion\n    to: \"on\"\n  conditions:\n  - condition: numeric_state\n    entity_id: sensor.hall_illuminance\n    below: 30\n  - condition: time\n    after: \"06:30:00\"\n    before: \"23:00:00\"\n  actions:\n  - action: light.turn_on\n    target:\n      entity_id: light.hall\n    data:\n      brightness_pct: 60\n",
+   "start": [
+    {
+     "kind": "registry",
+     "data": {
+      "action": "create",
+      "entity_id": "automation.kitchen_lights_off_at_11_30pm"
+     }
+    },
+    {
+     "kind": "state",
+     "entity_id": "automation.kitchen_lights_off_at_11_30pm",
+     "old": null,
+     "new": {
+      "state": "on",
+      "attributes": {
+       "id": "kitchen_off",
+       "last_triggered": null,
+       "mode": "single",
+       "current": 0,
+       "friendly_name": "Kitchen lights - off at 11:30pm"
+      }
+     }
+    },
+    {
+     "kind": "registry",
+     "data": {
+      "action": "create",
+      "entity_id": "automation.hallway_lights_motion_on_when_dark"
+     }
+    },
+    {
+     "kind": "state",
+     "entity_id": "automation.hallway_lights_motion_on_when_dark",
+     "old": null,
+     "new": {
+      "state": "on",
+      "attributes": {
+       "id": "hall_motion",
+       "last_triggered": null,
+       "mode": "restart",
+       "current": 0,
+       "friendly_name": "Hallway lights - motion on when dark"
+      }
+     }
+    }
+   ],
+   "steps": [
+    {
+     "request": {
+      "method": "POST",
+      "id": "big",
+      "user": "admin",
+      "sent": "{\"alias\": \"Big\", \"triggers\": [{\"trigger\": \"time\", \"at\": \"10:00:00\"}], \"actions\": [{\"action\": \"light.turn_on\", \"data\": {\"most\": 18446744073709551615, \"past\": 18446744073709551617, \"least\": -9223372036854775808, \"below\": -9223372036854775809, \"e\": 1E2, \"f\": 0.1}}]}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "body": "{\"result\":\"ok\"}",
+     "file": "- id: kitchen_off\n  alias: Kitchen lights - off at 11:30pm\n  description: Turn off the kitchen light and lamp every night at 11:30pm.\n  mode: single\n  triggers:\n  - trigger: time\n    at: '23:30:00'\n  actions:\n  - action: light.turn_off\n    target:\n      entity_id:\n      - light.kitchen\n      - light.lamp\n    data:\n      transition: 10\n- id: hall_motion\n  alias: Hallway lights - motion on when dark\n  description: Turn on hallway lights when motion is detected below 30 lux, using\n    dim overnight and gentle morning levels.\n  mode: restart\n  triggers:\n  - trigger: state\n    entity_id: binary_sensor.hall_motion\n    to: 'on'\n  conditions:\n  - condition: numeric_state\n    entity_id: sensor.hall_illuminance\n    below: 30\n  - condition: time\n    after: 06:30:00\n    before: '23:00:00'\n  actions:\n  - action: light.turn_on\n    target:\n      entity_id: light.hall\n    data:\n      brightness_pct: 60\n- id: big\n  alias: Big\n  triggers:\n  - trigger: time\n    at: '10:00:00'\n  actions:\n  - action: light.turn_on\n    data:\n      most: 18446744073709551615\n      past: 1.8446744073709552e+19\n      least: -9223372036854775808\n      below: -9.223372036854776e+18\n      e: 100.0\n      f: 0.1\n",
+     "events": [
+      {
+       "kind": "registry",
+       "data": {
+        "action": "create",
+        "entity_id": "automation.big"
+       }
+      },
+      {
+       "kind": "state",
+       "entity_id": "automation.big",
+       "old": null,
+       "new": {
+        "state": "on",
+        "attributes": {
+         "id": "big",
+         "last_triggered": null,
+         "mode": "single",
+         "current": 0,
+         "friendly_name": "Big"
+        }
+       }
+      },
+      {
+       "kind": "reloaded",
+       "data": {},
+       "user": false
+      }
+     ]
+    },
+    {
+     "request": {
+      "method": "GET",
+      "id": "big",
+      "user": "admin"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "body": "{\"id\":\"big\",\"alias\":\"Big\",\"triggers\":[{\"trigger\":\"time\",\"at\":\"10:00:00\"}],\"actions\":[{\"action\":\"light.turn_on\",\"data\":{\"most\":18446744073709551615,\"past\":1.8446744073709552e+19,\"least\":-9223372036854775808,\"below\":-9.223372036854776e+18,\"e\":100.0,\"f\":0.1}}]}",
+     "events": []
+    },
+    {
+     "request": {
+      "method": "POST",
+      "id": "big",
+      "user": "admin",
+      "sent": "{\"alias\": \"Big\", \"triggers\": [], \"actions\": [], \"x\": 1e400}"
+     },
+     "status": 400,
+     "content_type": "application/json",
+     "body": "{\"message\":\"Invalid JSON specified\"}",
+     "events": []
+    }
+   ],
+   "registry": [
+    {
+     "entity_id": "automation.kitchen_lights_off_at_11_30pm",
+     "unique_id": "kitchen_off",
+     "name": null,
+     "original_name": "Kitchen lights - off at 11:30pm",
+     "object_id_base": "Kitchen lights - off at 11:30pm",
+     "capabilities": {
+      "id": "kitchen_off"
+     },
+     "options": {}
+    },
+    {
+     "entity_id": "automation.hallway_lights_motion_on_when_dark",
+     "unique_id": "hall_motion",
+     "name": null,
+     "original_name": "Hallway lights - motion on when dark",
+     "object_id_base": "Hallway lights - motion on when dark",
+     "capabilities": {
+      "id": "hall_motion"
+     },
+     "options": {}
+    },
+    {
+     "entity_id": "automation.big",
+     "unique_id": "big",
+     "name": null,
+     "original_name": "Big",
+     "object_id_base": "Big",
+     "capabilities": {
+      "id": "big"
+     },
+     "options": {}
+    }
+   ],
+   "final": {
+    "automation.kitchen_lights_off_at_11_30pm": {
+     "state": "on",
+     "attributes": {
+      "id": "kitchen_off",
+      "last_triggered": null,
+      "mode": "single",
+      "current": 0,
+      "friendly_name": "Kitchen lights - off at 11:30pm"
+     }
+    },
+    "automation.hallway_lights_motion_on_when_dark": {
+     "state": "on",
+     "attributes": {
+      "id": "hall_motion",
+      "last_triggered": null,
+      "mode": "restart",
+      "current": 0,
+      "friendly_name": "Hallway lights - motion on when dark"
+     }
+    },
+    "automation.big": {
+     "state": "on",
+     "attributes": {
+      "id": "big",
+      "last_triggered": null,
+      "mode": "single",
+      "current": 0,
+      "friendly_name": "Big"
+     }
+    }
+   }
+  },
+  {
    "name": "invalid_bodies",
    "doc": "Bodies HA refuses: nothing is written.",
    "file": "- id: kitchen_off\n  alias: Kitchen lights - off at 11:30pm\n  description: Turn off the kitchen light and lamp every night at 11:30pm.\n  mode: single\n  triggers:\n  - trigger: time\n    at: \"23:30:00\"\n  actions:\n  - action: light.turn_off\n    target:\n      entity_id:\n      - light.kitchen\n      - light.lamp\n    data:\n      transition: 10\n- id: hall_motion\n  alias: Hallway lights - motion on when dark\n  description: Turn on hallway lights when motion is detected below 30 lux, using dim overnight and gentle morning levels.\n  mode: restart\n  triggers:\n  - trigger: state\n    entity_id: binary_sensor.hall_motion\n    to: \"on\"\n  conditions:\n  - condition: numeric_state\n    entity_id: sensor.hall_illuminance\n    below: 30\n  - condition: time\n    after: \"06:30:00\"\n    before: \"23:00:00\"\n  actions:\n  - action: light.turn_on\n    target:\n      entity_id: light.hall\n    data:\n      brightness_pct: 60\n",
@@ -2429,6 +2613,78 @@
      "status": 500,
      "content_type": "text/plain; charset=utf-8",
      "body": "500 Internal Server Error\n\nServer got itself in trouble",
+     "events": []
+    },
+    {
+     "request": {
+      "method": "POST",
+      "id": "kitchen_off",
+      "user": "admin",
+      "sent": "{\"id\": null, \"triggers\": [], \"actions\": []}"
+     },
+     "status": 400,
+     "content_type": "application/json",
+     "body": "{\"message\":\"Message malformed: expected str for dictionary value @ data['id']\"}",
+     "events": []
+    },
+    {
+     "request": {
+      "method": "POST",
+      "id": "kitchen_off",
+      "user": "admin",
+      "sent": "{\"id\": 5, \"triggers\": [], \"actions\": []}"
+     },
+     "status": 400,
+     "content_type": "application/json",
+     "body": "{\"message\":\"Message malformed: expected str for dictionary value @ data['id']\"}",
+     "events": []
+    },
+    {
+     "request": {
+      "method": "POST",
+      "id": "bad",
+      "user": "admin",
+      "sent": "{\"alias\": [], \"triggers\": [], \"actions\": []}"
+     },
+     "status": 400,
+     "content_type": "application/json",
+     "body": "{\"message\":\"Message malformed: value should be a string for dictionary value @ data['alias']\"}",
+     "events": []
+    },
+    {
+     "request": {
+      "method": "POST",
+      "id": "bad",
+      "user": "admin",
+      "sent": "{\"alias\": null, \"triggers\": [], \"actions\": []}"
+     },
+     "status": 400,
+     "content_type": "application/json",
+     "body": "{\"message\":\"Message malformed: string value is None for dictionary value @ data['alias']\"}",
+     "events": []
+    },
+    {
+     "request": {
+      "method": "POST",
+      "id": "bad",
+      "user": "admin",
+      "sent": "{\"alias\": 5, \"description\": null, \"triggers\": [], \"actions\": []}"
+     },
+     "status": 400,
+     "content_type": "application/json",
+     "body": "{\"message\":\"Message malformed: string value is None for dictionary value @ data['description']\"}",
+     "events": []
+    },
+    {
+     "request": {
+      "method": "POST",
+      "id": "bad",
+      "user": "admin",
+      "sent": "{\"description\": {\"a\": 1}, \"triggers\": [], \"actions\": []}"
+     },
+     "status": 400,
+     "content_type": "application/json",
+     "body": "{\"message\":\"Message malformed: value should be a string for dictionary value @ data['description']\"}",
      "events": []
     },
     {

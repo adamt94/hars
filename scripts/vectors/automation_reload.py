@@ -323,9 +323,12 @@ SCENARIOS = [
     ),
     (
         "numeric_id",
-        "An `id` that isn't a string (YAML reads `id: 5` as a number): HA drops the "
-        "automation altogether, and it has no place in the list.",
-        [auto(5, "Five"), auto(None, None, entity=DOOR, light="light.porch"), HALL],
+        "An `id` that isn't a string (YAML reads `id: 5` as a number), or an alias or "
+        "description that isn't text (`description:` with nothing after it): HA drops "
+        "the automation altogether, and it has no place in the list.",
+        [auto(5, "Five"), dict(auto("d", "No description"), description=None),
+         dict(auto("a", None), alias=["a", "list"]), dict(auto(None, "Null id"), id=None),
+         auto(None, None, entity=DOOR, light="light.porch"), HALL],
         [*pulse(), *pulse(DOOR),
          write([auto(5, "Five"), auto("5", "Five again"),
                 auto(None, None, entity=DOOR, light="light.porch"), HALL]),

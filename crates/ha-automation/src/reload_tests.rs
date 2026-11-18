@@ -10,9 +10,9 @@
 //! registry rows and states at the end. HA's ERROR lines are compared per
 //! step.
 //!
-//! Not compared: why a config is invalid (hars says `could not be
-//! validated` where HA names the stage) and a YAML error's text past
-//! `Failed to load configuration:`.
+//! Not compared: how an invalid automation's log line names it and says
+//! why (hars says `could not be validated` where HA names the stage) and
+//! a YAML error's text past `Failed to load configuration:`.
 
 use super::template_tests::{Logs, ONE_AT_A_TIME, advance, settle};
 use super::*;
@@ -36,12 +36,13 @@ fn state_json(s: Option<&Arc<State>>) -> Value {
     }
 }
 
-/// HA's validation error up to the automation's name: the stage it
-/// failed at and the reason are worded by each engine.
+/// HA's validation error, as compared: that an automation is invalid.
+/// How it is named (Python's text of whatever the alias is), the stage
+/// it failed at and the reason are worded by each engine.
 fn log_text(msg: &str) -> String {
-    match (msg.find("' "), msg.contains("and has been disabled:")) {
-        (Some(i), true) => format!("{}' is invalid", &msg[..i]),
-        _ => msg.to_owned(),
+    match msg.contains("and has been disabled:") {
+        true => "an automation is invalid".to_owned(),
+        false => msg.to_owned(),
     }
 }
 

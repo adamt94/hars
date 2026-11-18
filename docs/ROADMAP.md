@@ -349,8 +349,9 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
       writes it into `automations.yaml` with HA's key order and HA's YAML
       writer (`ha_core::yaml::dump`, byte for byte) and reloads that id;
       `DELETE` takes the entry out, then the registry row and the entity.
-      All 18 scenarios of `scripts/vectors/automation_editor.py` match. An
-      `id` that isn't a string drops its automation, as in HA
+      All 19 scenarios of `scripts/vectors/automation_editor.py` match. An
+      automation whose `id` isn't a string, or whose alias or description
+      isn't text, is dropped, as in HA
 - [ ] The Settings panel, so the editor's pages can be opened (they need
       `config/entity_registry/list|get|update` and the category and
       blueprint lists too); traces
