@@ -197,6 +197,42 @@
      "unique_id": "sw-1",
      "previous_unique_id": null,
      "unit_of_measurement": null
+    },
+    {
+     "aliases": [],
+     "aliases_v2": [
+      null
+     ],
+     "area_id": null,
+     "categories": {},
+     "capabilities": null,
+     "config_entry_id": "0000000000000000000000000000000e",
+     "config_subentry_id": null,
+     "created_at": "2026-11-10T16:00:00+00:00",
+     "device_class": null,
+     "device_id": "0000000000000000000000000000000d",
+     "disabled_by": null,
+     "entity_category": null,
+     "entity_id": "sensor.kitchen_light_power",
+     "hidden_by": null,
+     "icon": null,
+     "id": "00000000000000000000000000000006",
+     "has_entity_name": false,
+     "labels": [],
+     "modified_at": "2026-11-10T16:00:00+00:00",
+     "name": null,
+     "object_id_base": null,
+     "options": {},
+     "original_device_class": null,
+     "original_icon": null,
+     "original_name": "Kitchen Light Power",
+     "platform": "hue",
+     "suggested_object_id": "kitchen_light_power",
+     "supported_features": 0,
+     "translation_key": null,
+     "unique_id": "aa:bb-3",
+     "previous_unique_id": null,
+     "unit_of_measurement": null
     }
    ],
    "deleted_entities": []
@@ -229,6 +265,46 @@
      }
     ]
    }
+  },
+  "core.device_registry": {
+   "devices": [
+    {
+     "area_id": null,
+     "config_entries": [
+      "0000000000000000000000000000000e"
+     ],
+     "config_entries_subentries": {
+      "0000000000000000000000000000000e": [
+       null
+      ]
+     },
+     "configuration_url": null,
+     "connections": [],
+     "created_at": "2026-11-10T16:00:00+00:00",
+     "disabled_by": null,
+     "entry_type": null,
+     "hw_version": null,
+     "id": "0000000000000000000000000000000d",
+     "identifiers": [
+      [
+       "hue",
+       "dev-1"
+      ]
+     ],
+     "labels": [],
+     "manufacturer": null,
+     "model": null,
+     "model_id": null,
+     "modified_at": "2026-11-10T16:00:00+00:00",
+     "name_by_user": null,
+     "name": "Kitchen Light",
+     "primary_config_entry": "0000000000000000000000000000000e",
+     "serial_number": null,
+     "sw_version": null,
+     "via_device_id": null
+    }
+   ],
+   "deleted_devices": []
   }
  },
  "steps": [
@@ -365,6 +441,29 @@
       "platform": "demo",
       "translation_key": null,
       "unique_id": "sw-1"
+     },
+     {
+      "area_id": null,
+      "categories": {},
+      "config_entry_id": "0000000000000000000000000000000e",
+      "config_subentry_id": null,
+      "created_at": "<ts>",
+      "device_id": "0000000000000000000000000000000d",
+      "disabled_by": null,
+      "entity_category": null,
+      "entity_id": "sensor.kitchen_light_power",
+      "has_entity_name": false,
+      "hidden_by": null,
+      "icon": null,
+      "id": "00000000000000000000000000000006",
+      "labels": [],
+      "modified_at": "<ts>",
+      "name": null,
+      "options": {},
+      "original_name": "Power",
+      "platform": "hue",
+      "translation_key": null,
+      "unique_id": "aa:bb-3"
      }
     ]
    },
@@ -503,6 +602,29 @@
       "platform": "demo",
       "translation_key": null,
       "unique_id": "sw-1"
+     },
+     {
+      "area_id": null,
+      "categories": {},
+      "config_entry_id": "0000000000000000000000000000000e",
+      "config_subentry_id": null,
+      "created_at": "<ts>",
+      "device_id": "0000000000000000000000000000000d",
+      "disabled_by": null,
+      "entity_category": null,
+      "entity_id": "sensor.kitchen_light_power",
+      "has_entity_name": false,
+      "hidden_by": null,
+      "icon": null,
+      "id": "00000000000000000000000000000006",
+      "labels": [],
+      "modified_at": "<ts>",
+      "name": null,
+      "options": {},
+      "original_name": "Power",
+      "platform": "hue",
+      "translation_key": null,
+      "unique_id": "aa:bb-3"
      }
     ]
    },
@@ -723,6 +845,106 @@
    "user": "admin",
    "ws": {
     "id": 7,
+    "type": "config/entity_registry/get",
+    "entity_id": "sensor.kitchen_light_power"
+   },
+   "reply": {
+    "id": 7,
+    "type": "result",
+    "success": true,
+    "result": {
+     "area_id": null,
+     "categories": {},
+     "config_entry_id": "0000000000000000000000000000000e",
+     "config_subentry_id": null,
+     "created_at": "<ts>",
+     "device_id": "0000000000000000000000000000000d",
+     "disabled_by": null,
+     "entity_category": null,
+     "entity_id": "sensor.kitchen_light_power",
+     "has_entity_name": false,
+     "hidden_by": null,
+     "icon": null,
+     "id": "00000000000000000000000000000006",
+     "labels": [],
+     "modified_at": "<ts>",
+     "name": null,
+     "options": {},
+     "original_name": "Power",
+     "platform": "hue",
+     "translation_key": null,
+     "unique_id": "aa:bb-3",
+     "aliases": [
+      null
+     ],
+     "capabilities": null,
+     "device_class": null,
+     "original_device_class": null,
+     "original_icon": null
+    }
+   },
+   "events": []
+  },
+  {
+   "user": "admin",
+   "ws": {
+    "id": 8,
+    "type": "config/entity_registry/get",
+    "entity_id": "LIGHT.Hall"
+   },
+   "reply": {
+    "id": 8,
+    "type": "result",
+    "success": true,
+    "result": {
+     "area_id": "hallway",
+     "categories": {
+      "helpers": "cat_h"
+     },
+     "config_entry_id": null,
+     "config_subentry_id": null,
+     "created_at": "<ts>",
+     "device_id": null,
+     "disabled_by": null,
+     "entity_category": null,
+     "entity_id": "light.hall",
+     "has_entity_name": true,
+     "hidden_by": null,
+     "icon": "mdi:lamp",
+     "id": "00000000000000000000000000000003",
+     "labels": [
+      "night"
+     ],
+     "modified_at": "<ts>",
+     "name": "Hallway light",
+     "options": {
+      "conversation": {
+       "should_expose": true
+      }
+     },
+     "original_name": "Hall",
+     "platform": "hue",
+     "translation_key": "hall",
+     "unique_id": "aa:bb-1",
+     "aliases": [
+      "hall lamp"
+     ],
+     "capabilities": {
+      "supported_color_modes": [
+       "brightness"
+      ]
+     },
+     "device_class": null,
+     "original_device_class": null,
+     "original_icon": "mdi:lightbulb"
+    }
+   },
+   "events": []
+  },
+  {
+   "user": "admin",
+   "ws": {
+    "id": 9,
     "type": "config/entity_registry/get_entries",
     "entity_ids": [
      "light.hall",
@@ -731,7 +953,7 @@
     ]
    },
    "reply": {
-    "id": 7,
+    "id": 9,
     "type": "result",
     "success": true,
     "result": {
@@ -817,17 +1039,234 @@
   {
    "user": "admin",
    "ws": {
-    "id": 8,
-    "type": "config/entity_registry/update",
-    "entity_id": "automation.hall_motion",
-    "categories": {
-     "automation": null
-    },
-    "labels": [],
-    "area_id": null
+    "id": 10,
+    "type": "config/entity_registry/get_entries",
+    "entity_ids": "light.hall, light.nope,AUTOMATION.hall_motion"
    },
    "reply": {
-    "id": 8,
+    "id": 10,
+    "type": "result",
+    "success": true,
+    "result": {
+     "light.hall": {
+      "area_id": "hallway",
+      "categories": {
+       "helpers": "cat_h"
+      },
+      "config_entry_id": null,
+      "config_subentry_id": null,
+      "created_at": "<ts>",
+      "device_id": null,
+      "disabled_by": null,
+      "entity_category": null,
+      "entity_id": "light.hall",
+      "has_entity_name": true,
+      "hidden_by": null,
+      "icon": "mdi:lamp",
+      "id": "00000000000000000000000000000003",
+      "labels": [
+       "night"
+      ],
+      "modified_at": "<ts>",
+      "name": "Hallway light",
+      "options": {
+       "conversation": {
+        "should_expose": true
+       }
+      },
+      "original_name": "Hall",
+      "platform": "hue",
+      "translation_key": "hall",
+      "unique_id": "aa:bb-1",
+      "aliases": [
+       "hall lamp"
+      ],
+      "capabilities": {
+       "supported_color_modes": [
+        "brightness"
+       ]
+      },
+      "device_class": null,
+      "original_device_class": null,
+      "original_icon": "mdi:lightbulb"
+     },
+     "light.nope": null,
+     "automation.hall_motion": {
+      "area_id": null,
+      "categories": {},
+      "config_entry_id": null,
+      "config_subentry_id": null,
+      "created_at": "<ts>",
+      "device_id": null,
+      "disabled_by": null,
+      "entity_category": null,
+      "entity_id": "automation.hall_motion",
+      "has_entity_name": false,
+      "hidden_by": null,
+      "icon": null,
+      "id": "00000000000000000000000000000001",
+      "labels": [],
+      "modified_at": "<ts>",
+      "name": null,
+      "options": {},
+      "original_name": "Hall motion",
+      "platform": "automation",
+      "translation_key": null,
+      "unique_id": "hall",
+      "aliases": [
+       null
+      ],
+      "capabilities": {
+       "id": "hall"
+      },
+      "device_class": null,
+      "original_device_class": null,
+      "original_icon": null
+     }
+    }
+   },
+   "events": []
+  },
+  {
+   "user": "admin",
+   "ws": {
+    "id": 11,
+    "type": "config/entity_registry/get_entries",
+    "entity_ids": []
+   },
+   "reply": {
+    "id": 11,
+    "type": "result",
+    "success": true,
+    "result": {}
+   },
+   "events": []
+  },
+  {
+   "user": "admin",
+   "ws": {
+    "id": 12,
+    "type": "config/entity_registry/get_entries",
+    "entity_ids": [
+     "not an id"
+    ]
+   },
+   "reply": {
+    "id": 12,
+    "type": "result",
+    "success": false,
+    "error": {
+     "code": "invalid_format",
+     "message": "Entity ID not an id is an invalid entity ID for dictionary value @ data['entity_ids']. Got ['not an id']"
+    }
+   },
+   "events": []
+  },
+  {
+   "user": "admin",
+   "ws": {
+    "id": 13,
+    "type": "config/entity_registry/get_entries",
+    "entity_ids": 5
+   },
+   "reply": {
+    "id": 13,
+    "type": "result",
+    "success": false,
+    "error": {
+     "code": "unknown_error",
+     "message": "Unknown error"
+    }
+   },
+   "events": []
+  },
+  {
+   "user": "admin",
+   "ws": {
+    "id": 14,
+    "type": "config/entity_registry/get_entries"
+   },
+   "reply": {
+    "id": 14,
+    "type": "result",
+    "success": false,
+    "error": {
+     "code": "invalid_format",
+     "message": "required key not provided @ data['entity_ids']. Got None"
+    }
+   },
+   "events": []
+  },
+  {
+   "user": "user",
+   "ws": {
+    "id": 3,
+    "type": "config/entity_registry/get_entries",
+    "entity_ids": [
+     "light.hall"
+    ]
+   },
+   "reply": {
+    "id": 3,
+    "type": "result",
+    "success": true,
+    "result": {
+     "light.hall": {
+      "area_id": "hallway",
+      "categories": {
+       "helpers": "cat_h"
+      },
+      "config_entry_id": null,
+      "config_subentry_id": null,
+      "created_at": "<ts>",
+      "device_id": null,
+      "disabled_by": null,
+      "entity_category": null,
+      "entity_id": "light.hall",
+      "has_entity_name": true,
+      "hidden_by": null,
+      "icon": "mdi:lamp",
+      "id": "00000000000000000000000000000003",
+      "labels": [
+       "night"
+      ],
+      "modified_at": "<ts>",
+      "name": "Hallway light",
+      "options": {
+       "conversation": {
+        "should_expose": true
+       }
+      },
+      "original_name": "Hall",
+      "platform": "hue",
+      "translation_key": "hall",
+      "unique_id": "aa:bb-1",
+      "aliases": [
+       "hall lamp"
+      ],
+      "capabilities": {
+       "supported_color_modes": [
+        "brightness"
+       ]
+      },
+      "device_class": null,
+      "original_device_class": null,
+      "original_icon": "mdi:lightbulb"
+     }
+    }
+   },
+   "events": []
+  },
+  {
+   "user": "admin",
+   "ws": {
+    "id": 15,
+    "type": "config/entity_registry/update",
+    "entity_id": "AUTOMATION.Hall_Motion",
+    "labels": []
+   },
+   "reply": {
+    "id": 15,
     "type": "result",
     "success": true,
     "result": {
@@ -870,7 +1309,60 @@
   {
    "user": "admin",
    "ws": {
-    "id": 9,
+    "id": 16,
+    "type": "config/entity_registry/update",
+    "entity_id": "automation.hall_motion",
+    "categories": {
+     "automation": null
+    },
+    "labels": [],
+    "area_id": null
+   },
+   "reply": {
+    "id": 16,
+    "type": "result",
+    "success": true,
+    "result": {
+     "entity_entry": {
+      "area_id": null,
+      "categories": {},
+      "config_entry_id": null,
+      "config_subentry_id": null,
+      "created_at": "<ts>",
+      "device_id": null,
+      "disabled_by": null,
+      "entity_category": null,
+      "entity_id": "automation.hall_motion",
+      "has_entity_name": false,
+      "hidden_by": null,
+      "icon": null,
+      "id": "00000000000000000000000000000001",
+      "labels": [],
+      "modified_at": "<ts>",
+      "name": null,
+      "options": {},
+      "original_name": "Hall motion",
+      "platform": "automation",
+      "translation_key": null,
+      "unique_id": "hall",
+      "aliases": [
+       null
+      ],
+      "capabilities": {
+       "id": "hall"
+      },
+      "device_class": null,
+      "original_device_class": null,
+      "original_icon": null
+     }
+    }
+   },
+   "events": []
+  },
+  {
+   "user": "admin",
+   "ws": {
+    "id": 17,
     "type": "config/entity_registry/update",
     "entity_id": "automation.hall_motion",
     "categories": {
@@ -878,7 +1370,7 @@
     }
    },
    "reply": {
-    "id": 9,
+    "id": 17,
     "type": "result",
     "success": true,
     "result": {
@@ -978,7 +1470,7 @@
   {
    "user": "admin",
    "ws": {
-    "id": 10,
+    "id": 18,
     "type": "config/entity_registry/update",
     "entity_id": "automation.hall_motion",
     "labels": [
@@ -987,7 +1479,7 @@
     ]
    },
    "reply": {
-    "id": 10,
+    "id": 18,
     "type": "result",
     "success": true,
     "result": {
@@ -1093,13 +1585,13 @@
   {
    "user": "admin",
    "ws": {
-    "id": 11,
+    "id": 19,
     "type": "config/entity_registry/update",
     "entity_id": "automation.hall_motion",
     "area_id": "hallway"
    },
    "reply": {
-    "id": 11,
+    "id": 19,
     "type": "result",
     "success": true,
     "result": {
@@ -1205,7 +1697,7 @@
   {
    "user": "admin",
    "ws": {
-    "id": 12,
+    "id": 20,
     "type": "config/entity_registry/update",
     "entity_id": "automation.hall_motion",
     "categories": {
@@ -1218,7 +1710,7 @@
     "area_id": "hallway"
    },
    "reply": {
-    "id": 12,
+    "id": 20,
     "type": "result",
     "success": true,
     "result": {
@@ -1330,7 +1822,7 @@
   {
    "user": "admin",
    "ws": {
-    "id": 13,
+    "id": 21,
     "type": "config/entity_registry/update",
     "entity_id": "automation.hall_motion",
     "categories": {
@@ -1339,7 +1831,7 @@
     }
    },
    "reply": {
-    "id": 13,
+    "id": 21,
     "type": "result",
     "success": true,
     "result": {
@@ -1446,14 +1938,14 @@
   {
    "user": "admin",
    "ws": {
-    "id": 14,
+    "id": 22,
     "type": "config/entity_registry/update",
     "entity_id": "automation.hall_motion",
     "labels": [],
     "area_id": null
    },
    "reply": {
-    "id": 14,
+    "id": 22,
     "type": "result",
     "success": true,
     "result": {
@@ -1556,12 +2048,12 @@
   {
    "user": "admin",
    "ws": {
-    "id": 15,
+    "id": 23,
     "type": "config/entity_registry/update",
     "entity_id": "automation.hall_motion"
    },
    "reply": {
-    "id": 15,
+    "id": 23,
     "type": "result",
     "success": true,
     "result": {
@@ -1606,7 +2098,7 @@
   {
    "user": "admin",
    "ws": {
-    "id": 16,
+    "id": 24,
     "type": "config/entity_registry/update",
     "entity_id": "light.hall",
     "area_id": "an area nobody made",
@@ -1617,7 +2109,7 @@
     ]
    },
    "reply": {
-    "id": 16,
+    "id": 24,
     "type": "result",
     "success": true,
     "result": {
@@ -1738,12 +2230,12 @@
   {
    "user": "admin",
    "ws": {
-    "id": 17,
+    "id": 25,
     "type": "config/entity_registry/get",
     "entity_id": "automation.hall_motion"
    },
    "reply": {
-    "id": 17,
+    "id": 25,
     "type": "result",
     "success": true,
     "result": {
@@ -1786,7 +2278,7 @@
   {
    "user": "user",
    "ws": {
-    "id": 3,
+    "id": 4,
     "type": "config/entity_registry/update",
     "entity_id": "automation.hall_motion",
     "labels": [
@@ -1794,7 +2286,7 @@
     ]
    },
    "reply": {
-    "id": 3,
+    "id": 4,
     "type": "result",
     "success": false,
     "error": {
@@ -1807,7 +2299,7 @@
   {
    "user": "admin",
    "ws": {
-    "id": 18,
+    "id": 26,
     "type": "config/entity_registry/update",
     "entity_id": "light.nope",
     "labels": [
@@ -1815,7 +2307,7 @@
     ]
    },
    "reply": {
-    "id": 18,
+    "id": 26,
     "type": "result",
     "success": false,
     "error": {
@@ -1828,14 +2320,14 @@
   {
    "user": "admin",
    "ws": {
-    "id": 19,
+    "id": 27,
     "type": "config/entity_registry/update",
     "labels": [
      "a"
     ]
    },
    "reply": {
-    "id": 19,
+    "id": 27,
     "type": "result",
     "success": false,
     "error": {
@@ -1848,13 +2340,13 @@
   {
    "user": "admin",
    "ws": {
-    "id": 20,
+    "id": 28,
     "type": "config/entity_registry/update",
     "entity_id": "automation.hall_motion",
     "labels": "a"
    },
    "reply": {
-    "id": 20,
+    "id": 28,
     "type": "result",
     "success": false,
     "error": {
@@ -1867,7 +2359,7 @@
   {
    "user": "admin",
    "ws": {
-    "id": 21,
+    "id": 29,
     "type": "config/entity_registry/update",
     "entity_id": "automation.hall_motion",
     "labels": [
@@ -1875,7 +2367,7 @@
     ]
    },
    "reply": {
-    "id": 21,
+    "id": 29,
     "type": "result",
     "success": false,
     "error": {
@@ -1888,13 +2380,13 @@
   {
    "user": "admin",
    "ws": {
-    "id": 22,
+    "id": 30,
     "type": "config/entity_registry/update",
     "entity_id": "automation.hall_motion",
     "area_id": 5
    },
    "reply": {
-    "id": 22,
+    "id": 30,
     "type": "result",
     "success": false,
     "error": {
@@ -1907,7 +2399,7 @@
   {
    "user": "admin",
    "ws": {
-    "id": 23,
+    "id": 31,
     "type": "config/entity_registry/update",
     "entity_id": "automation.hall_motion",
     "categories": [
@@ -1915,7 +2407,7 @@
     ]
    },
    "reply": {
-    "id": 23,
+    "id": 31,
     "type": "result",
     "success": false,
     "error": {
@@ -1928,7 +2420,7 @@
   {
    "user": "admin",
    "ws": {
-    "id": 24,
+    "id": 32,
     "type": "config/entity_registry/update",
     "entity_id": "automation.hall_motion",
     "categories": {
@@ -1936,7 +2428,7 @@
     }
    },
    "reply": {
-    "id": 24,
+    "id": 32,
     "type": "result",
     "success": false,
     "error": {
@@ -1949,7 +2441,7 @@
   {
    "user": "admin",
    "ws": {
-    "id": 25,
+    "id": 33,
     "type": "config/entity_registry/update",
     "entity_id": "automation.hall_motion",
     "categories": {
@@ -1957,7 +2449,7 @@
     }
    },
    "reply": {
-    "id": 25,
+    "id": 33,
     "type": "result",
     "success": false,
     "error": {
@@ -1970,13 +2462,13 @@
   {
    "user": "admin",
    "ws": {
-    "id": 26,
+    "id": 34,
     "type": "config/entity_registry/update",
     "entity_id": "automation.hall_motion",
     "nope": 1
    },
    "reply": {
-    "id": 26,
+    "id": 34,
     "type": "result",
     "success": false,
     "error": {
@@ -1989,12 +2481,12 @@
   {
    "user": "admin",
    "ws": {
-    "id": 27,
+    "id": 35,
     "type": "config/category_registry/list",
     "scope": "automation"
    },
    "reply": {
-    "id": 27,
+    "id": 35,
     "type": "result",
     "success": true,
     "result": [
@@ -2019,12 +2511,12 @@
   {
    "user": "admin",
    "ws": {
-    "id": 28,
+    "id": 36,
     "type": "config/category_registry/list",
     "scope": "script"
    },
    "reply": {
-    "id": 28,
+    "id": 36,
     "type": "result",
     "success": true,
     "result": [
@@ -2042,12 +2534,12 @@
   {
    "user": "user",
    "ws": {
-    "id": 4,
+    "id": 5,
     "type": "config/category_registry/list",
     "scope": "automation"
    },
    "reply": {
-    "id": 4,
+    "id": 5,
     "type": "result",
     "success": true,
     "result": [
@@ -2072,11 +2564,11 @@
   {
    "user": "admin",
    "ws": {
-    "id": 29,
+    "id": 37,
     "type": "config/category_registry/list"
    },
    "reply": {
-    "id": 29,
+    "id": 37,
     "type": "result",
     "success": false,
     "error": {
@@ -2089,12 +2581,12 @@
   {
    "user": "admin",
    "ws": {
-    "id": 30,
+    "id": 38,
     "type": "config/category_registry/list",
     "scope": 5
    },
    "reply": {
-    "id": 30,
+    "id": 38,
     "type": "result",
     "success": false,
     "error": {
@@ -2107,13 +2599,13 @@
   {
    "user": "admin",
    "ws": {
-    "id": 31,
+    "id": 39,
     "type": "config/category_registry/list",
     "scope": "automation",
     "extra": 1
    },
    "reply": {
-    "id": 31,
+    "id": 39,
     "type": "result",
     "success": false,
     "error": {

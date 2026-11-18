@@ -12,7 +12,8 @@ categories; disabled, hidden; with options and capabilities) and a
 category registry, then sends each message below over a real
 WebSocket. It writes crates/ha-api/src/ws/vectors/entity_registry.json:
 
-- `stores`: `core.entity_registry` and `core.category_registry` as HA had
+- `stores`: `core.entity_registry`, `core.device_registry` and
+  `core.category_registry` as HA had
   them before the first message (what hars loads), their times and the
   categories' ids replaced by fixed ones;
 - `steps`: each message (`user`: who sent it), its reply, the
@@ -36,6 +37,7 @@ import shutil
 import socket
 import sys
 import tempfile
+from types import MappingProxyType
 
 PINNED = {"homeassistant": "2026.6.1", "aiohttp": "3.13.5"}
 OUT = pathlib.Path(__file__).resolve().parents[2] / "crates/ha-api/src/ws/vectors"
@@ -53,8 +55,19 @@ STEPS = [
     ("admin", {"type": "config/entity_registry/get", "entity_id": "light.nope"}),
     ("admin", {"type": "config/entity_registry/get", "entity_id": "not an id"}),
     ("admin", {"type": "config/entity_registry/get"}),
+    ("admin", {"type": "config/entity_registry/get", "entity_id": "sensor.kitchen_light_power"}),
+    ("admin", {"type": "config/entity_registry/get", "entity_id": "LIGHT.Hall"}),
     ("admin", {"type": "config/entity_registry/get_entries",
                "entity_ids": [LIGHT, "light.nope", AUTO]}),
+    ("admin", {"type": "config/entity_registry/get_entries",
+               "entity_ids": "light.hall, light.nope,AUTOMATION.hall_motion"}),
+    ("admin", {"type": "config/entity_registry/get_entries", "entity_ids": []}),
+    ("admin", {"type": "config/entity_registry/get_entries", "entity_ids": ["not an id"]}),
+    ("admin", {"type": "config/entity_registry/get_entries", "entity_ids": 5}),
+    ("admin", {"type": "config/entity_registry/get_entries"}),
+    ("user", {"type": "config/entity_registry/get_entries", "entity_ids": [LIGHT]}),
+    ("admin", {"type": "config/entity_registry/update", "entity_id": "AUTOMATION.Hall_Motion",
+               "labels": []}),
     # What the automation editor sends after saving a new automation:
     # nothing changes, so no event.
     ("admin", {"type": "config/entity_registry/update", "entity_id": AUTO,
@@ -99,6 +112,8 @@ STEPS = [
     ("admin", {"type": "config/category_registry/list"}),
     ("admin", {"type": "config/category_registry/list", "scope": 5}),
     ("admin", {"type": "config/category_registry/list", "scope": "automation", "extra": 1}),
+    # Blueprints (the `blueprint` component isn't set up here: its command
+    # is unknown, so only who may ask is shown by hars's own test).
 ]
 
 
@@ -122,6 +137,7 @@ ULID = re.compile(r"^[0-9A-HJKMNP-TV-Z]{26}$")
 STAMPS = ("created_at", "modified_at")
 # What the stores hars loads hold where HA's are random or the time.
 THEN = "2026-11-10T16:00:00+00:00"
+DEVICE_ID = "0" * 31 + "d"
 CATEGORY_IDS = ["01M7QYB0J64RQX9K1AEP1VY6G7", "01M7QYB0J63K8M369AGWZZ93X6",
                 "01M7QYB0J61GDSZ6Y4TMTMR9DH"]
 
@@ -159,8 +175,9 @@ async def main():
     check_versions()
     from homeassistant import bootstrap, core, loader
     from homeassistant.auth import auth_manager_from_config
-    from homeassistant.config_entries import ConfigEntries
+    from homeassistant.config_entries import ConfigEntries, ConfigEntry
     from homeassistant.helpers import category_registry as cr
+    from homeassistant.helpers import device_registry as dr
     from homeassistant.helpers import entity_registry as er
     from homeassistant.helpers.json import json_dumps
     from homeassistant.setup import async_setup_component
@@ -209,6 +226,20 @@ async def main():
             disabled_by=er.RegistryEntryDisabler.INTEGRATION)
         row("switch", "demo", "sw-1", suggested_object_id="hidden_one",
             original_name="Hidden one", hidden_by=er.RegistryEntryHider.USER)
+        # An entity named the old way, with its device's name in front:
+        # HA answers with the name without it.
+        entry = ConfigEntry(
+            data={}, discovery_keys=MappingProxyType({}), domain="hue", minor_version=1,
+            options={}, source="user", subentries_data=None, title="Hue", unique_id=None,
+            version=1, entry_id="0" * 31 + "e",
+        )
+        hass.config_entries._entries[entry.entry_id] = entry
+        device = dr.async_get(hass).async_get_or_create(
+            config_entry_id=entry.entry_id, identifiers={("hue", "dev-1")},
+            name="Kitchen Light")
+        device_id = device.id
+        row("sensor", "hue", "aa:bb-3", suggested_object_id="kitchen_light_power",
+            original_name="Kitchen Light Power", device_id=device.id, config_entry=entry)
         # Replace the random ids by fixed ones, in the order made.
         import attr
 
@@ -223,6 +254,8 @@ async def main():
                 json.loads(json_dumps(entities._data_to_save())), iter(())),
             "core.category_registry": fixed(
                 json.loads(json_dumps(categories._data_to_save())), iter(CATEGORY_IDS)),
+            "core.device_registry": fixed(
+                json.loads(json_dumps(dr.async_get(hass)._data_to_save())), iter(())),
         }
 
         events = []
@@ -289,6 +322,8 @@ async def main():
     OUT.mkdir(parents=True, exist_ok=True)
     data = {"stores": stores, "steps": steps}
     text = json.dumps(data, indent=1, ensure_ascii=False) + "\n"
+    # The device's id is random: a fixed one everywhere.
+    text = text.replace(device_id, DEVICE_ID)
     (OUT / "entity_registry.json").write_text(text)
 
 

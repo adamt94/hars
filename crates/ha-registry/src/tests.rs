@@ -564,3 +564,34 @@ fn empty_overrides_fall_back() {
     assert_eq!(s.attributes["friendly_name"], "Original");
     assert_eq!(s.attributes["icon"], "mdi:a");
 }
+
+/// `core.category_registry` is only listed from: whatever shape it has,
+/// loading goes on, with the categories it can read.
+#[test]
+fn an_odd_category_file_never_stops_the_load() {
+    let dir = std::env::temp_dir().join(format!("hars-categories-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(dir.join(".storage")).unwrap();
+    let file = dir.join(".storage").join(CATEGORY_KEY);
+    for text in [
+        r#"{"data": []}"#,
+        r#"[]"#,
+        r#"{"data": {"categories": []}}"#,
+        r#"{"data": null}"#,
+        "5",
+        "{not json",
+        "",
+    ] {
+        std::fs::write(&file, text).unwrap();
+        let r = Registries::load(&dir).unwrap();
+        assert!(r.categories.is_empty(), "{text}");
+    }
+    std::fs::write(
+        &file,
+        r#"{"version": 1, "data": {"categories": {"automation": [{"category_id": "c", "name": "Lights"}]}}}"#,
+    )
+    .unwrap();
+    let r = Registries::load(&dir).unwrap();
+    assert_eq!(r.categories["automation"][0]["name"], "Lights");
+    std::fs::remove_dir_all(&dir).unwrap();
+}

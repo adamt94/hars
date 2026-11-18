@@ -18,13 +18,18 @@ use super::{Conn, Invalid, only_keys};
 use ha_auth::Permission;
 use serde_json::{Map, Value, json};
 
-/// `cv.entity_id`.
-fn entity_id(msg: &Map<String, Value>) -> Result<&str, Invalid> {
+/// `cv.entity_id`: a valid id, lower-cased.
+fn entity_id(msg: &Map<String, Value>) -> Result<String, Invalid> {
     let at = "for dictionary value @ data['entity_id']";
     match msg.get("entity_id") {
         None => Err("required key not provided @ data['entity_id']".into()),
-        Some(Value::String(s)) if ha_core::EntityId::parse(s).is_ok() => Ok(s),
-        Some(Value::String(s)) => Err(format!("Entity ID {s} is an invalid entity ID {at}")),
+        Some(Value::String(s)) => {
+            let id = s.to_lowercase();
+            match ha_core::EntityId::parse(&id) {
+                Ok(_) => Ok(id),
+                Err(_) => Err(format!("Entity ID {s} is an invalid entity ID {at}")),
+            }
+        }
         Some(other) => Err(format!("Entity ID {other} is an invalid entity ID {at}")),
     }
 }
@@ -38,7 +43,9 @@ fn get(conn: &Conn, id: u64, msg: &Map<String, Value>) -> Result<(), Invalid> {
     let entity_id = entity_id(msg)?;
     let r = conn.shared.config.registries();
     match r.entities.iter().find(|e| e.entity_id == entity_id) {
-        Some(e) => conn.out.result(id, Value::Object(e.extended_json())),
+        Some(e) => conn
+            .out
+            .result(id, Value::Object(e.extended_json(r.device_name_of(e)))),
         None => not_found(conn, id),
     };
     Ok(())
@@ -46,28 +53,39 @@ fn get(conn: &Conn, id: u64, msg: &Map<String, Value>) -> Result<(), Invalid> {
 
 fn get_entries(conn: &Conn, id: u64, msg: &Map<String, Value>) -> Result<(), Invalid> {
     only_keys(msg, &["entity_ids"])?;
-    let ids = match msg.get("entity_ids") {
+    // `cv.entity_ids`: a list, or one string with commas between ids;
+    // each id trimmed and lower-cased.
+    let ids: Vec<String> = match msg.get("entity_ids") {
         None => return Err("required key not provided @ data['entity_ids']".into()),
-        Some(Value::Array(ids)) => ids,
+        Some(Value::String(s)) => s.split(',').map(|i| i.trim().to_owned()).collect(),
+        Some(Value::Array(ids)) => ids
+            .iter()
+            .map(|i| match i {
+                Value::String(s) => s.clone(),
+                other => other.to_string(),
+            })
+            .collect(),
+        // HA iterates whatever it is given: anything else raises.
         Some(_) => {
-            return Err("expected a list for dictionary value @ data['entity_ids']".into());
+            conn.out.error(json!(id), "unknown_error", "Unknown error");
+            return Ok(());
         }
     };
     let r = conn.shared.config.registries();
     let mut out = Map::new();
-    for (i, entity_id) in ids.iter().enumerate() {
-        let Some(entity_id) = entity_id
-            .as_str()
-            .filter(|s| ha_core::EntityId::parse(s).is_ok())
-        else {
+    for written in ids {
+        let entity_id = written.to_lowercase();
+        if ha_core::EntityId::parse(&entity_id).is_err() {
             return Err(format!(
-                "Entity ID {entity_id} is an invalid entity ID @ data['entity_ids'][{i}]"
+                "Entity ID {written} is an invalid entity ID for dictionary value @ data['entity_ids']"
             ));
-        };
+        }
         let row = r.entities.iter().find(|e| e.entity_id == entity_id);
         out.insert(
-            entity_id.to_owned(),
-            row.map_or(Value::Null, |e| Value::Object(e.extended_json())),
+            entity_id,
+            row.map_or(Value::Null, |e| {
+                Value::Object(e.extended_json(r.device_name_of(e)))
+            }),
         );
     }
     conn.out.result(id, Value::Object(out));
@@ -92,6 +110,7 @@ fn update(conn: &Conn, id: u64, msg: &Map<String, Value>) -> Result<(), Invalid>
     allowed.extend(UNSUPPORTED);
     only_keys(msg, &allowed)?;
     let entity_id = entity_id(msg)?;
+    let entity_id = entity_id.as_str();
     // `vol.Any(str, None)`.
     let area_id = match msg.get("area_id") {
         None => None,
@@ -147,18 +166,15 @@ fn update(conn: &Conn, id: u64, msg: &Map<String, Value>) -> Result<(), Invalid>
         not_found(conn, id);
         return Ok(());
     };
-    let find = |entity_id: &str| {
-        registry
-            .snapshot()
-            .entities
-            .iter()
-            .find(|e| e.entity_id == entity_id)
-            .cloned()
+    let extended = |entity_id: &str| {
+        let r = registry.snapshot();
+        let row = r.entities.iter().find(|e| e.entity_id == entity_id)?;
+        Some(row.extended_json(r.device_name_of(row)))
     };
-    let Some(row) = find(entity_id) else {
+    if extended(entity_id).is_none() {
         not_found(conn, id);
         return Ok(());
-    };
+    }
     if let Some(key) = UNSUPPORTED.iter().find(|k| msg.contains_key(**k)) {
         conn.out.error(
             json!(id),
@@ -167,32 +183,18 @@ fn update(conn: &Conn, id: u64, msg: &Map<String, Value>) -> Result<(), Invalid>
         );
         return Ok(());
     }
-    // Only the scopes named change: a category sets its scope, `null`
-    // clears it.
-    let categories = categories.map(|named| {
-        let mut all = row.categories.object();
-        for (scope, category) in named {
-            if category.is_null() {
-                all.remove(scope);
-            } else {
-                all.insert(scope.clone(), category.clone());
-            }
-        }
-        all
-    });
     registry.update_entity(
         entity_id,
         ha_registry::EntityPatch {
             area_id,
-            categories,
+            // Only the scopes named change.
+            categories: categories.cloned(),
             labels,
             ..Default::default()
         },
     );
-    match find(entity_id) {
-        Some(row) => conn
-            .out
-            .result(id, json!({"entity_entry": row.extended_json()})),
+    match extended(entity_id) {
+        Some(row) => conn.out.result(id, json!({"entity_entry": row})),
         None => not_found(conn, id),
     };
     Ok(())
@@ -241,20 +243,33 @@ pub(super) fn dispatch(
     Some(match ty {
         "config/entity_registry/list" => only_keys(msg, &[]).map(|()| {
             let r = conn.shared.config.registries();
-            let rows: Vec<Value> = r
-                .entities
-                .iter()
-                .map(|e| Value::Object(e.partial_json()))
-                .collect();
-            conn.out.result(id, json!(rows));
+            conn.out.result(id, r.entities_partial());
         }),
         "config/entity_registry/get" => get(conn, id, msg),
         "config/entity_registry/get_entries" => get_entries(conn, id, msg),
         "config/entity_registry/update" => update(conn, id, msg),
         "config/category_registry/list" => categories(conn, id, msg),
-        // `blueprint/list`: every blueprint of a domain, by path.
-        "blueprint/list" => only_keys(msg, &["domain"]).map(|()| {
-            conn.out.result(id, json!({}));
+        // `blueprint/list` (admin): every blueprint of a domain, by path.
+        "blueprint/list" => only_keys(msg, &["domain"]).and_then(|()| {
+            // `cv.string`.
+            match msg.get("domain") {
+                None => return Err("required key not provided @ data['domain']".into()),
+                Some(Value::Null) => {
+                    return Err("string value is None for dictionary value @ data['domain']".into());
+                }
+                Some(Value::Array(_) | Value::Object(_)) => {
+                    return Err(
+                        "value should be a string for dictionary value @ data['domain']".into(),
+                    );
+                }
+                Some(_) => {}
+            }
+            if conn.principal.permission < Permission::Admin {
+                conn.out.error(json!(id), "unauthorized", "Unauthorized");
+            } else {
+                conn.out.result(id, json!({}));
+            }
+            Ok(())
         }),
         _ => return None,
     })

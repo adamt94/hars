@@ -3269,7 +3269,11 @@ async fn entity_registry_commands_match_ha() {
     let dir = std::env::temp_dir().join(format!("hars-ws-registry-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(dir.join(".storage")).unwrap();
-    for (key, minor) in [("core.entity_registry", 22), ("core.category_registry", 2)] {
+    for (key, minor) in [
+        ("core.entity_registry", 22),
+        ("core.device_registry", 12),
+        ("core.category_registry", 2),
+    ] {
         let store = json!({"version": 1, "minor_version": minor, "key": key,
                            "data": all["stores"][key]});
         std::fs::write(dir.join(".storage").join(key), store.to_string()).unwrap();
@@ -3370,7 +3374,8 @@ async fn entity_registry_commands_match_ha() {
         all["steps"].as_array().unwrap().len(),
         failures.join("\n")
     );
-    // hars's own answers: no blueprints, and the fields it can't change.
+    // hars's own answers: no blueprints (for admins, as HA's command
+    // is), and the fields it can't change.
     assert_eq!(
         admin
             .call(json!({"id": 900, "type": "blueprint/list", "domain": "automation"}))
@@ -3378,8 +3383,19 @@ async fn entity_registry_commands_match_ha() {
         json!({})
     );
     assert_eq!(
+        user.call(json!({"id": 900, "type": "blueprint/list", "domain": "automation"}))
+            .await["error"]["code"],
+        "unauthorized"
+    );
+    assert_eq!(
         admin
-            .call(json!({"id": 901, "type": "config/entity_registry/update",
+            .call(json!({"id": 902, "type": "blueprint/list"}))
+            .await["error"]["message"],
+        "required key not provided @ data['domain']. Got None"
+    );
+    assert_eq!(
+        admin
+            .call(json!({"id": 903, "type": "config/entity_registry/update",
                          "entity_id": "light.hall", "name": "New name"}))
             .await["error"],
         json!({"code": "not_supported", "message": "hars can't change an entity's name yet"})

@@ -41,6 +41,8 @@ const STORES: &[(&str, bool)] = &[
     (ha_registry::AREA_KEY, false),
     (ha_registry::FLOOR_KEY, false),
     (ha_registry::LABEL_KEY, false),
+    // The names of the categories the automation list groups by.
+    (ha_registry::CATEGORY_KEY, false),
 ];
 
 /// Integrations `hars` implements, by domain; their config entries are

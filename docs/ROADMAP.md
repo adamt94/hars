@@ -359,7 +359,7 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
       entity id, disabling, hiding, aliases and options are refused: hars's
       entities don't follow a registry change yet),
       `config/category_registry/list` (read from the store) and
-      `blueprint/list` (none). All 35 steps of
+      `blueprint/list` (none). All 44 steps of
       `scripts/vectors/entity_registry_ws.py` match; in Chromium with the
       pinned frontend an automation is renamed and saved from the editor.
       Other Settings pages open but have gaps: adding integrations and

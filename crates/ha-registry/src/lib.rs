@@ -344,11 +344,18 @@ pub struct Entity {
 
 impl Entity {
     /// `RegistryEntry.as_partial_dict`: a row of
-    /// `config/entity_registry/list`.
-    pub fn partial_json(&self) -> Map<String, Value> {
+    /// `config/entity_registry/list`. `device_name` is the entity's
+    /// device's `name_by_user or name`: an entity named the old way, with
+    /// that name in front, is answered without it
+    /// (`original_name_unprefixed`).
+    pub fn partial_json(&self, device_name: Option<&str>) -> Map<String, Value> {
+        let unprefixed = (!self.has_entity_name && self.device_id.is_some())
+            .then(|| strip_prefix(self.original_name.as_deref()?, device_name?))
+            .flatten();
         let mut m = Map::new();
         m.insert("area_id".into(), json!(self.area_id));
-        m.insert("categories".into(), Value::Object(self.categories.object()));
+        // As stored: a `null` stays one.
+        m.insert("categories".into(), self.categories.value());
         m.insert("config_entry_id".into(), json!(self.config_entry_id));
         m.insert("config_subentry_id".into(), json!(self.config_subentry_id));
         m.insert("created_at".into(), timestamp(&self.created_at));
@@ -364,7 +371,10 @@ impl Entity {
         m.insert("modified_at".into(), timestamp(&self.modified_at));
         m.insert("name".into(), json!(self.name));
         m.insert("options".into(), Value::Object(self.options.object()));
-        m.insert("original_name".into(), json!(self.original_name));
+        m.insert(
+            "original_name".into(),
+            json!(unprefixed.or_else(|| self.original_name.clone())),
+        );
         m.insert("platform".into(), json!(self.platform));
         m.insert("translation_key".into(), json!(self.translation_key));
         m.insert("unique_id".into(), json!(self.unique_id));
@@ -373,8 +383,8 @@ impl Entity {
 
     /// `RegistryEntry.extended_dict`: what `config/entity_registry/get`
     /// and `update` answer.
-    pub fn extended_json(&self) -> Map<String, Value> {
-        let mut m = self.partial_json();
+    pub fn extended_json(&self, device_name: Option<&str>) -> Map<String, Value> {
+        let mut m = self.partial_json(device_name);
         m.insert("aliases".into(), json!(self.aliases_v2));
         m.insert(
             "capabilities".into(),
@@ -710,8 +720,9 @@ fn categories(config_dir: &Path) -> Map<String, Value> {
         return Map::new();
     };
     match serde_json::from_str::<Value>(&text) {
-        Ok(mut v) => match v["data"]["categories"].take() {
-            Value::Object(scopes) => scopes,
+        // Whatever shape the file has, only a mapping of scopes is used.
+        Ok(v) => match v.get("data").and_then(|d| d.get("categories")) {
+            Some(Value::Object(scopes)) => scopes.clone(),
             _ => Map::new(),
         },
         Err(e) => {
@@ -1050,6 +1061,34 @@ impl Registries {
             // Written only if still absent (an integration may write first).
             hass.set_state_if_absent(id, "unavailable", e.unavailable_attributes());
         }
+    }
+
+    /// The entity's device's `name_by_user or name`, for
+    /// [`Entity::partial_json`].
+    pub fn device_name_of(&self, entity: &Entity) -> Option<&str> {
+        let id = entity.device_id.as_deref()?;
+        self.devices.iter().find(|d| d.id == id)?.display_name()
+    }
+
+    /// `config/entity_registry/list`: every row, as
+    /// [`Entity::partial_json`].
+    pub fn entities_partial(&self) -> Value {
+        // Indexed once per call: linear in entities + devices.
+        let devices: HashMap<&str, &Device> =
+            self.devices.iter().map(|d| (d.id.as_str(), &**d)).collect();
+        let rows: Vec<Value> = self
+            .entities
+            .iter()
+            .map(|e| {
+                let name = e
+                    .device_id
+                    .as_deref()
+                    .and_then(|id| devices.get(id))
+                    .and_then(|d| d.display_name());
+                Value::Object(e.partial_json(name))
+            })
+            .collect();
+        Value::Array(rows)
     }
 
     /// `config/entity_registry/list_for_display`: enabled entities only.

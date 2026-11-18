@@ -41,7 +41,8 @@ pub struct Registry {
 pub struct EntityPatch {
     /// The user's area (`config/entity_registry/update`).
     pub area_id: Option<Option<String>>,
-    /// The user's categories, by scope: the whole mapping.
+    /// The user's categories to change, by scope: a category sets its
+    /// scope, `null` clears it, the other scopes stay.
     pub categories: Option<Map<String, Value>>,
     /// The user's labels: a set (the order given is kept, repeats
     /// dropped).
@@ -831,11 +832,21 @@ fn apply(row: &mut Entity, patch: &EntityPatch) -> Map<String, Value> {
         }
     }
     set(&mut changes, "area_id", &mut row.area_id, &patch.area_id);
-    if let Some(categories) = &patch.categories {
+    if let Some(named) = &patch.categories {
+        // Merged here, in the write, so two updates of different scopes
+        // can't undo each other.
         let old = row.categories.object();
-        if &old != categories {
+        let mut new = old.clone();
+        for (scope, category) in named {
+            if category.is_null() {
+                new.remove(scope);
+            } else {
+                new.insert(scope.clone(), category.clone());
+            }
+        }
+        if old != new {
             changes.insert("categories".into(), Value::Object(old));
-            row.categories = RawJson::new(&Value::Object(categories.clone()));
+            row.categories = RawJson::new(&Value::Object(new));
         }
     }
     if let Some(labels) = &patch.labels {
