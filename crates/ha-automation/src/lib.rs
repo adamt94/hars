@@ -368,17 +368,18 @@ struct ReloadState {
 }
 
 /// Ends a reload's turn, also if its call is dropped half way.
-struct ReloadTurn<'a>(&'a Reloads, HashSet<Option<String>>);
+struct ReloadTurn(Arc<Shared>, HashSet<Option<String>>);
 
-impl Drop for ReloadTurn<'_> {
+impl Drop for ReloadTurn {
     fn drop(&mut self) {
-        let mut s = self.0.state.lock();
+        let reloads = &self.0.reloads;
+        let mut s = reloads.state.lock();
         s.running = false;
         for t in &self.1 {
             s.pending.remove(t);
         }
         drop(s);
-        self.0.changed.notify_waiters();
+        reloads.changed.notify_waiters();
     }
 }
 
@@ -431,7 +432,8 @@ fn py_eq(a: &Value, b: &Value) -> bool {
         (Value::Array(a), Value::Array(b)) => {
             a.len() == b.len() && a.iter().zip(b).all(|(v, w)| py_eq(v, w))
         }
-        (Value::Number(x), Value::Number(y)) if x == y => true,
+        // Integers exactly (Python's are); floats and mixes by value.
+        (Value::Number(x), Value::Number(y)) if !x.is_f64() && !y.is_f64() => x == y,
         _ => match (number(a), number(b)) {
             (Some(x), Some(y)) => x == y,
             _ => a == b,
@@ -1523,6 +1525,15 @@ async fn parse_all(items: &[Value], orders: Vec<config::Order>) -> Vec<Result<Co
     }
 }
 
+/// Wait until runs told to stop have stopped (HA's `Script.async_stop`
+/// in `async_will_remove_from_hass`): a removed automation's actions
+/// are over before what replaces it starts.
+async fn stopped(runs: Vec<JoinHandle<()>>) {
+    for run in runs {
+        let _ = run.await;
+    }
+}
+
 /// HA's validation logs each automation that can't run, every time the
 /// file is read.
 fn log_invalid(news: &[New]) {
@@ -1772,18 +1783,23 @@ impl Automations {
     /// and runs stop, what it was is kept for the one that may replace it
     /// (`async_restore_entity_removed`), and its state goes: to the
     /// registry's `unavailable` placeholder if it has a row, else
-    /// altogether.
-    fn remove(&self, a: &Arc<Automation>) {
+    /// altogether. Returns its runs, told to stop: the reload waits for
+    /// them before it adds what replaces them.
+    fn remove(&self, a: &Arc<Automation>) -> Vec<JoinHandle<()>> {
         let shared = &self.shared;
         let hass = &shared.hass;
-        {
+        let stopping: Vec<JoinHandle<()>> = {
             let mut live = a.live.lock();
             live.enabled = false;
             live.removed = true;
             live.attached.clear();
             live.generation += 1;
-            a.stop_runs(&mut live);
-        }
+            live.runs
+                .drain(..)
+                .filter_map(|r| r.handle)
+                .inspect(JoinHandle::abort)
+                .collect()
+        };
         // Reads the state as it still is.
         hass.restore().unregister(hass, a.entity_id.as_str());
         shared.automations.lock().retain(|x| !Arc::ptr_eq(x, a));
@@ -1805,6 +1821,7 @@ impl Automations {
                 hass.remove_state(&a.entity_id);
             }
         }
+        stopping
     }
 
     /// What `automation.reload` reads the automations with.
@@ -1870,11 +1887,23 @@ impl Automations {
                 return Ok(());
             }
         }
-        let _turn = ReloadTurn(reloads, targets.unwrap_or_default());
-        self.reload_now(id, context).await
+        let turn = ReloadTurn(self.shared.clone(), targets.unwrap_or_default());
+        // Reading the file can be given up (the turn ends); replacing the
+        // automations can't: it runs as its own task, to the end, whatever
+        // becomes of this call (it may be an action of a run it stops).
+        let news = self.read().await?;
+        let (me, id, context) = (self.clone(), id.map(str::to_owned), context.clone());
+        let replaced = tokio::spawn(async move {
+            let _turn = turn;
+            me.replace(news, id.as_deref(), &context).await;
+        });
+        replaced
+            .await
+            .map_err(|e| ServiceError::Unknown(e.to_string()))
     }
 
-    async fn reload_now(&self, id: Option<&str>, context: &Context) -> Result<(), ServiceError> {
+    /// The config as it is now, parsed.
+    async fn read(&self) -> Result<Vec<New>, ServiceError> {
         let shared = &self.shared;
         let loader = shared.loader.read().clone();
         let Some(loader) = loader else {
@@ -1890,6 +1919,13 @@ impl Automations {
         let news = news(&json, &raw, parsed);
         // HA validates the whole file again, whatever is reloaded.
         log_invalid(&news);
+        Ok(news)
+    }
+
+    /// Replace the automations that differ from `news`, all of them or
+    /// the one with `id`, then fire `automation_reloaded`.
+    async fn replace(&self, news: Vec<New>, id: Option<&str>, context: &Context) {
+        let shared = &self.shared;
         let automations = self.list();
         let none = Registries::default();
         match id {
@@ -1908,7 +1944,7 @@ impl Automations {
                 };
                 if !unchanged {
                     if let Some(a) = existing {
-                        self.remove(a);
+                        stopped(self.remove(a)).await;
                     }
                     for n in wanted {
                         self.add(n, &none);
@@ -1949,11 +1985,13 @@ impl Automations {
                         break;
                     }
                 }
+                let mut stopping = Vec::new();
                 for (a, kept) in automations.iter().zip(kept) {
                     if !kept {
-                        self.remove(a);
+                        stopping.extend(self.remove(a));
                     }
                 }
+                stopped(stopping).await;
                 for (n, matched) in news.into_iter().zip(matched) {
                     if !matched {
                         self.add(n, &none);
@@ -1969,7 +2007,6 @@ impl Automations {
             shared.hass.clock().now(),
             context.clone(),
         ));
-        Ok(())
     }
 
     /// The entity registry's sensor display precision, for templates'

@@ -427,6 +427,10 @@ fn raw_configs_compare_as_python_dicts() {
     assert!(!eq(r#"{"a": 1}"#, r#"{"a": 1, "b": null}"#));
     assert!(!eq(r#"[1, 2]"#, r#"[2, 1]"#));
     assert!(!eq(r#"{"a": null}"#, r#"{"a": false}"#));
+    // Integers past what a float holds are still told apart.
+    assert!(!eq("9007199254740992", "9007199254740993"));
+    assert!(eq("9007199254740993", "9007199254740993"));
+    assert!(eq("2", "2.0"));
 }
 
 /// A reload whose call is dropped half way ends its turn: the next one
@@ -456,4 +460,69 @@ async fn a_dropped_reload_does_not_block_the_next() {
     )
     .await;
     assert_eq!(done, Ok(Ok(())));
+}
+
+/// An automation that reloads itself, changed on disk: the reload stops
+/// the very run that called it and still finishes (it replaces the
+/// automations in a task of its own). The old run's next action never
+/// happens; the new config is what runs from then on.
+#[tokio::test(start_paused = true)]
+async fn an_automation_can_reload_itself() {
+    let _one = ONE_AT_A_TIME.lock().await;
+    let hass = Hass::new();
+    hass.services()
+        .register("light", "turn_on", SupportsResponse::None, |_| async {
+            Ok(None)
+        });
+    let motion = EntityId::parse("binary_sensor.hall_motion").unwrap();
+    hass.set_state(motion.clone(), "off", Map::new());
+    let config = |actions: &str| {
+        file(&format!(
+            r#"[{{"id": "self", "alias": "Self", "triggers": [{{"trigger": "state",
+                "entity_id": "binary_sensor.hall_motion", "to": "on"}}], "actions": {actions}}}]"#
+        ))
+    };
+    let on_disk = Arc::new(PMutex::new(config(
+        r#"[{"action": "automation.reload"},
+            {"action": "light.turn_on", "target": {"entity_id": "light.old"}}]"#,
+    )));
+    let autos = one(&hass, &on_disk).await;
+    *on_disk.lock() =
+        config(r#"[{"action": "light.turn_on", "target": {"entity_id": "light.new"}}]"#);
+    let mut bus = hass.bus().subscribe();
+    let seen = |bus: &mut tokio::sync::broadcast::Receiver<Arc<Event>>| {
+        let mut out = Vec::new();
+        while let Ok(e) = bus.try_recv() {
+            match &e.kind {
+                EventKind::CallService {
+                    domain,
+                    service_data,
+                    ..
+                } if domain == "light" => out.push(service_data["entity_id"].to_string()),
+                EventKind::Custom { name, .. } if name == "automation_reloaded" => {
+                    out.push("reloaded".to_owned());
+                }
+                _ => {}
+            }
+        }
+        out
+    };
+    hass.set_state(motion.clone(), "on", Map::new());
+    settle().await;
+    assert_eq!(seen(&mut bus), ["reloaded"]);
+    let now = autos.by_entity("automation.self").unwrap();
+    assert_eq!(now.live.lock().runs.len(), 0);
+    let state = hass.states().get(&now.entity_id).unwrap();
+    assert_eq!(
+        (state.state.as_str(), &state.attributes["current"]),
+        ("on", &json!(0))
+    );
+    // The next reload isn't stuck behind that one.
+    assert_eq!(autos.reload(None, &Context::new()).await, Ok(()));
+    assert_eq!(seen(&mut bus), ["reloaded"]);
+    hass.set_state(motion.clone(), "off", Map::new());
+    settle().await;
+    hass.set_state(motion, "on", Map::new());
+    settle().await;
+    assert_eq!(seen(&mut bus), [r#"["light.new"]"#]);
 }

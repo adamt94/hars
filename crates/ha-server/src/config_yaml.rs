@@ -1,7 +1,41 @@
-//! The top-level `configuration.yaml` keys hars doesn't act on, so start-up
-//! can say so rather than drop them silently.
+//! `configuration.yaml`: loading it, and the top-level keys hars doesn't
+//! act on, so start-up can say so rather than drop them silently.
 
 use ha_core::yaml::Yaml;
+use std::path::Path;
+
+/// `configuration.yaml` as loaded (its includes and secrets resolved), or
+/// `None` if there is no such file. Blocking.
+pub fn load(dir: &Path) -> Result<Option<Yaml>, ha_core::yaml::YamlError> {
+    let file = dir.join("configuration.yaml");
+    if !file.is_file() {
+        return Ok(None);
+    }
+    let secrets = ha_core::yaml::Secrets {
+        config_dir: dir.to_owned(),
+    };
+    ha_core::yaml::load_file(&file, Some(&secrets)).map(Some)
+}
+
+/// What `automation.reload` reads: the file's automations as they are
+/// now, or why HA's `load_yaml_config_file` would refuse the file (it is
+/// gone, doesn't parse, or isn't a mapping; an empty one is no
+/// automations). Blocking.
+pub fn automations(dir: &Path) -> Result<Vec<Yaml>, String> {
+    match load(dir) {
+        Ok(Some(config @ (Yaml::Map(_) | Yaml::Null))) => {
+            Ok(ha_automation::from_config_yaml(&config))
+        }
+        Ok(Some(_)) => {
+            Err("The configuration file configuration.yaml does not contain a dictionary".into())
+        }
+        Ok(None) => Err(format!(
+            "Config file not found: {}",
+            dir.join("configuration.yaml").display()
+        )),
+        Err(e) => Err(e.to_string()),
+    }
+}
 
 /// Whether hars reads a key's contents: `recorder:` exactly, and every
 /// `automation` key (HA collects `automation <label>:` too).
@@ -116,6 +150,46 @@ mod tests {
         let config = ha_core::yaml::load_file(&file, None).unwrap();
         std::fs::remove_dir_all(&dir).unwrap();
         config
+    }
+
+    /// What a reload reads, for each state the file can be in.
+    #[test]
+    fn a_reload_refuses_a_file_ha_would_refuse() {
+        let dir = std::env::temp_dir().join(format!(
+            "hars-config-reload-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("configuration.yaml");
+        assert_eq!(
+            automations(&dir),
+            Err(format!("Config file not found: {}", file.display()))
+        );
+        let read = |text: &str| {
+            std::fs::write(&file, text).unwrap();
+            automations(&dir)
+        };
+        assert_eq!(read("").map(|a| a.len()), Ok(0));
+        assert_eq!(read("default_config:\n").map(|a| a.len()), Ok(0));
+        assert_eq!(
+            read("automation:\n- alias: a\nautomation two:\n- alias: b\n").map(|a| a.len()),
+            Ok(2)
+        );
+        // Valid YAML that isn't a mapping must not read as "no
+        // automations": that would remove them all.
+        for text in ["[]\n", "oops\n", "- automation: []\n"] {
+            assert_eq!(
+                read(text),
+                Err(
+                    "The configuration file configuration.yaml does not contain a dictionary"
+                        .into()
+                ),
+                "{text:?}"
+            );
+        }
+        assert!(read("automation: [unclosed\n").is_err());
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]

@@ -99,7 +99,7 @@ async fn run(thp_disabled: std::io::Result<bool>) -> anyhow::Result<()> {
     // automations later.
     let config_yaml = {
         let dir = config_dir.clone();
-        let loaded = tokio::task::spawn_blocking(move || load_config_yaml(&dir)).await?;
+        let loaded = tokio::task::spawn_blocking(move || config_yaml::load(&dir)).await?;
         loaded.unwrap_or_else(|e| {
             tracing::error!("configuration.yaml: {e}");
             None
@@ -201,15 +201,8 @@ async fn run(thp_disabled: std::io::Result<bool>) -> anyhow::Result<()> {
             automations.set_loader(std::sync::Arc::new(move || {
                 let dir = dir.clone();
                 Box::pin(async move {
-                    let loaded = tokio::task::spawn_blocking(move || {
-                        let file = dir.join("configuration.yaml");
-                        match load_config_yaml(&dir) {
-                            Ok(Some(config)) => Ok(ha_automation::from_config_yaml(&config)),
-                            Ok(None) => Err(format!("Config file not found: {}", file.display())),
-                            Err(e) => Err(e.to_string()),
-                        }
-                    })
-                    .await;
+                    let loaded =
+                        tokio::task::spawn_blocking(move || config_yaml::automations(&dir)).await;
                     loaded.unwrap_or_else(|e| Err(e.to_string()))
                 })
             }));
@@ -438,21 +431,6 @@ fn api_config() -> anyhow::Result<ha_api::ApiConfig> {
         frontend: Some(std::sync::Arc::new(frontend)),
         ..Default::default()
     })
-}
-
-/// `configuration.yaml` as loaded (its includes and secrets resolved), or
-/// `None` if there is no such file. Blocking.
-fn load_config_yaml(
-    dir: &std::path::Path,
-) -> Result<Option<ha_core::yaml::Yaml>, ha_core::yaml::YamlError> {
-    let file = dir.join("configuration.yaml");
-    if !file.is_file() {
-        return Ok(None);
-    }
-    let secrets = ha_core::yaml::Secrets {
-        config_dir: dir.to_owned(),
-    };
-    ha_core::yaml::load_file(&file, Some(&secrets)).map(Some)
 }
 
 /// `HARS_CONFIG`: HA's config directory (`/config` in the Docker image). Its
