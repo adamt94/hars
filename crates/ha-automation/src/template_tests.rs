@@ -18,7 +18,7 @@ use std::time::Duration;
 
 /// Template tests share the render threads' in-flight count: one at a
 /// time.
-static ONE_AT_A_TIME: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+pub(super) static ONE_AT_A_TIME: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
 /// The loggers the vectors record.
 const LOGGERS: &[&str] = &[
@@ -34,11 +34,11 @@ const LOGGERS: &[&str] = &[
 ];
 
 /// A log line: level, logger, message, time.
-type Line = (tracing::Level, String, String, jiff::Timestamp);
+pub(super) type Line = (tracing::Level, String, String, jiff::Timestamp);
 
 /// Log lines, as a layer captures them.
 #[derive(Clone)]
-struct Logs(Arc<PMutex<Vec<Line>>>, ha_core::Clock);
+pub(super) struct Logs(pub(super) Arc<PMutex<Vec<Line>>>, pub(super) ha_core::Clock);
 
 #[derive(Default)]
 struct Fields {
@@ -74,7 +74,7 @@ impl<S: tracing::Subscriber> tracing_subscriber::Layer<S> for Logs {
 
 /// Let everything due run: spawned tasks, and the renders they wait for
 /// (on threads of their own, which a paused clock doesn't wait for).
-async fn settle() {
+pub(super) async fn settle() {
     let mut quiet = 0;
     while quiet < 3 {
         for _ in 0..50 {
@@ -94,7 +94,7 @@ async fn settle() {
 /// render runs from tokio's blocking pool, which holds a paused clock
 /// still). Sleeps round up to whole milliseconds: the last 2 ms are
 /// advanced exactly.
-async fn advance(hass: &Hass, s: f64) {
+pub(super) async fn advance(hass: &Hass, s: f64) {
     let at = hass.clock().now() + jiff::SignedDuration::from_secs_f64(s);
     let d = Duration::from_secs_f64(s);
     if d > Duration::from_millis(2) {

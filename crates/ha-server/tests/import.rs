@@ -25,6 +25,24 @@ fn read_json(path: &Path) -> Value {
     serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap()
 }
 
+/// An automation's entity registry row, as HA 2026.6.1 writes it.
+fn automation_row(id: &str, alias: &str) -> Value {
+    json!({
+        "aliases": [], "aliases_v2": [null], "area_id": null, "categories": {},
+        "capabilities": {"id": id}, "config_entry_id": null, "config_subentry_id": null,
+        "created_at": "2026-06-06T19:42:30.014344+00:00", "device_class": null,
+        "device_id": null, "disabled_by": null, "entity_category": null,
+        "entity_id": format!("automation.{}", alias.to_lowercase()), "hidden_by": null,
+        "icon": null, "id": format!("{id:0>32}"), "has_entity_name": false, "labels": [],
+        "modified_at": "2026-07-25T20:31:50.773133+00:00", "name": null,
+        "object_id_base": alias, "options": {"conversation": {"should_expose": false}},
+        "original_device_class": null, "original_icon": null, "original_name": alias,
+        "platform": "automation", "suggested_object_id": null, "supported_features": 0,
+        "translation_key": null, "unique_id": id, "previous_unique_id": null,
+        "unit_of_measurement": null
+    })
+}
+
 fn write_store(dir: &Path, key: &str, version: u32, minor: u32, data: Value) {
     let v = json!({"version": version, "minor_version": minor, "key": key, "data": data});
     std::fs::write(
@@ -99,7 +117,10 @@ fn ha_config(dir: &Path) -> String {
         "core.entity_registry",
         1,
         22,
-        json!({"entities": [], "deleted_entities": []}),
+        // The rows HA made for the two automations below: hars finds
+        // them as they are, so the file is not written again.
+        json!({"entities": [automation_row("ok", "Fine"), automation_row("wait", "Waiting")],
+               "deleted_entities": []}),
     );
     write_store(
         dir,

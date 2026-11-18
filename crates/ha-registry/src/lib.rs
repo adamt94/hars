@@ -341,6 +341,38 @@ pub struct Entity {
 }
 
 impl Entity {
+    /// What a registered entity nobody provides shows
+    /// (`RegistryEntry.write_unavailable_state`): `restored`, then what
+    /// the registry knows of it. Its state is `unavailable`.
+    pub fn unavailable_attributes(&self) -> Map<String, Value> {
+        let mut a = Map::new();
+        a.insert("restored".into(), Value::Bool(true));
+        if let Some(caps) = &self.capabilities {
+            a.extend(caps.object());
+        }
+        // Python's `or`: an empty override falls back too.
+        let or = |a: &Option<String>, b: &Option<String>| {
+            a.clone().filter(|s| !s.is_empty()).or_else(|| b.clone())
+        };
+        if let Some(dc) = or(&self.device_class, &self.original_device_class) {
+            a.insert("device_class".into(), json!(dc));
+        }
+        if let Some(icon) = or(&self.icon, &self.original_icon) {
+            a.insert("icon".into(), json!(icon));
+        }
+        if let Some(name) = or(&self.name, &self.original_name) {
+            a.insert("friendly_name".into(), Value::String(name));
+        }
+        // `is not None`: 0 is written too.
+        if !self.supported_features.is_null() {
+            a.insert("supported_features".into(), self.supported_features.clone());
+        }
+        if let Some(u) = &self.unit_of_measurement {
+            a.insert("unit_of_measurement".into(), json!(u));
+        }
+        a
+    }
+
     fn domain(&self) -> &str {
         self.entity_id.split('.').next().unwrap_or_default()
     }
@@ -943,32 +975,7 @@ impl Registries {
                 continue;
             }
             // Written only if still absent (an integration may write first).
-            let mut a = Map::new();
-            a.insert("restored".into(), Value::Bool(true));
-            if let Some(caps) = &e.capabilities {
-                a.extend(caps.object());
-            }
-            // Python's `or`: an empty override falls back too.
-            let or = |a: &Option<String>, b: &Option<String>| {
-                a.clone().filter(|s| !s.is_empty()).or_else(|| b.clone())
-            };
-            if let Some(dc) = or(&e.device_class, &e.original_device_class) {
-                a.insert("device_class".into(), json!(dc));
-            }
-            if let Some(icon) = or(&e.icon, &e.original_icon) {
-                a.insert("icon".into(), json!(icon));
-            }
-            if let Some(name) = or(&e.name, &e.original_name) {
-                a.insert("friendly_name".into(), Value::String(name));
-            }
-            // `is not None`: 0 is written too.
-            if !e.supported_features.is_null() {
-                a.insert("supported_features".into(), e.supported_features.clone());
-            }
-            if let Some(u) = &e.unit_of_measurement {
-                a.insert("unit_of_measurement".into(), json!(u));
-            }
-            hass.set_state_if_absent(id, "unavailable", a);
+            hass.set_state_if_absent(id, "unavailable", e.unavailable_attributes());
         }
     }
 

@@ -355,6 +355,12 @@ fn call_service(conn: &mut Conn, id: u64, msg: &Map<String, Value>) -> Result<()
                     "translation_domain": r.domain,
                 }),
             ),
+            // One raised with no translation carries only its message.
+            Err(ServiceError::Validation(r)) if r.key.is_empty() => out.error(
+                json!(id),
+                "service_validation_error",
+                &format!("Validation error: {}", r.message),
+            ),
             Err(ServiceError::Validation(r)) => out.error_with(
                 json!(id),
                 json!({

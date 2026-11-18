@@ -16,6 +16,14 @@
 //!   on waking: a clock stepped back never fires early, one stepped forward
 //!   fires late, as HA's timers do. Nothing polls.
 //!
+//! - `automation.reload` ([`Automations::reload`]) reads the config again
+//!   and replaces only the automations whose name or raw config changed
+//!   (HA's `_async_process_config`): a replaced one is removed (its
+//!   triggers and runs stop, its state becomes the registry's
+//!   `unavailable` placeholder, or goes if it has no id) and added again,
+//!   restoring on/off and `last_triggered` from what it was. Checked by
+//!   `vectors/reload.json`, made by `scripts/vectors/automation_reload.py`.
+//!
 //! Templates, as HA's scripts use them (checked by `vectors/templates.json`,
 //! made by `scripts/vectors/automation_templates.py`):
 //! - **Variables.** A run's templates see `this` (the automation's state
@@ -252,6 +260,8 @@ struct Live {
     attaching: bool,
     /// The context the entity writes with, and when it was set.
     context: Option<(Context, jiff::Timestamp)>,
+    /// A reload took it away: it writes no more states and starts no run.
+    removed: bool,
 }
 
 enum Attached {
@@ -291,7 +301,11 @@ enum Fire {
 pub struct Automation {
     shared: Weak<Shared>,
     pub entity_id: EntityId,
+    /// The name shown: the registry's, else `config_name`.
     pub name: String,
+    /// HA's `_automation_name`: the alias, else `automation <place in the
+    /// list>`. What a reload compares.
+    config_name: String,
     pub unique_id: Option<String>,
     /// The config as loaded, as JSON text in its YAML key order (`None`
     /// if HA couldn't encode it either).
@@ -316,6 +330,129 @@ struct Shared {
     attach_chain: Mutex<Option<tokio::sync::oneshot::Receiver<()>>>,
     /// The live entity registry, once wired (`Automations::set_registry`).
     registry: RwLock<Option<Arc<ha_registry::Registry>>>,
+    /// What `automation.reload` reads (`Automations::set_loader`).
+    loader: RwLock<Option<Loader>>,
+    /// Who may call `automation.reload` (`Automations::set_admin_check`).
+    admin: RwLock<Option<AdminCheck>>,
+    reloads: Reloads,
+}
+
+/// What `automation.reload` reads: the automations in `configuration.yaml`
+/// as it is now ([`from_config_yaml`]), or why it can't be loaded.
+pub type Loader = Arc<
+    dyn Fn() -> std::pin::Pin<
+            Box<dyn Future<Output = Result<Vec<ha_core::yaml::Yaml>, String>> + Send>,
+        > + Send
+        + Sync,
+>;
+
+/// Whether the user with this id is an admin; `None` if there is no such
+/// user.
+pub type AdminCheck = Arc<dyn Fn(&str) -> Option<bool> + Send + Sync>;
+
+/// HA's `ReloadServiceHelper`: reloads run one at a time, and a call
+/// waiting behind two others for the same automations is served by the
+/// second.
+#[derive(Default)]
+struct Reloads {
+    state: Mutex<ReloadState>,
+    changed: tokio::sync::Notify,
+}
+
+#[derive(Default)]
+struct ReloadState {
+    running: bool,
+    /// The unique ids (`None`: an automation without one) reloads were
+    /// asked for and haven't finished.
+    pending: HashSet<Option<String>>,
+}
+
+/// Ends a reload's turn, also if its call is dropped half way.
+struct ReloadTurn<'a>(&'a Reloads, HashSet<Option<String>>);
+
+impl Drop for ReloadTurn<'_> {
+    fn drop(&mut self) {
+        let mut s = self.0.state.lock();
+        s.running = false;
+        for t in &self.1 {
+            s.pending.remove(t);
+        }
+        drop(s);
+        self.0.changed.notify_waiters();
+    }
+}
+
+/// One automation of the list, parsed.
+struct New {
+    /// HA's `_automation_name`.
+    name: String,
+    unique_id: Option<String>,
+    raw: Option<String>,
+    config: Result<Config, String>,
+}
+
+/// The items of an `automation:` list as [`New`]s, their names from
+/// their places in it.
+fn news(items: &[Value], raw: &[Option<String>], parsed: Vec<Result<Config, String>>) -> Vec<New> {
+    items
+        .iter()
+        .zip(raw)
+        .zip(parsed)
+        .enumerate()
+        .map(|(n, ((item, raw), config))| New {
+            name: item
+                .get("alias")
+                .and_then(Value::as_str)
+                .filter(|a| !a.is_empty())
+                .map_or_else(|| format!("automation {n}"), str::to_owned),
+            unique_id: match item.get("id") {
+                Some(Value::String(s)) => Some(s.clone()),
+                Some(Value::Number(num)) => Some(num.to_string()),
+                _ => None,
+            },
+            raw: raw.clone(),
+            config,
+        })
+        .collect()
+}
+
+/// Python's `==` on what JSON holds: mappings whatever their order, and
+/// `1 == 1.0 == True`.
+fn py_eq(a: &Value, b: &Value) -> bool {
+    let number = |v: &Value| match v {
+        Value::Bool(b) => Some(f64::from(u8::from(*b))),
+        Value::Number(n) => n.as_f64(),
+        _ => None,
+    };
+    match (a, b) {
+        (Value::Object(a), Value::Object(b)) => {
+            a.len() == b.len() && a.iter().all(|(k, v)| b.get(k).is_some_and(|w| py_eq(v, w)))
+        }
+        (Value::Array(a), Value::Array(b)) => {
+            a.len() == b.len() && a.iter().zip(b).all(|(v, w)| py_eq(v, w))
+        }
+        (Value::Number(x), Value::Number(y)) if x == y => true,
+        _ => match (number(a), number(b)) {
+            (Some(x), Some(y)) => x == y,
+            _ => a == b,
+        },
+    }
+}
+
+/// HA's `automation_matches_config`: the same name and raw config. One
+/// HA couldn't encode never matches.
+fn matches(a: &Automation, new: &New) -> bool {
+    if a.config_name != new.name {
+        return false;
+    }
+    match (&a.raw, &new.raw) {
+        (Some(x), Some(y)) if x == y => true,
+        (Some(x), Some(y)) => match (serde_json::from_str(x), serde_json::from_str(y)) {
+            (Ok(x), Ok(y)) => py_eq(&x, &y),
+            _ => false,
+        },
+        _ => false,
+    }
 }
 
 /// A rendering attachment's place in [`Shared::attach_chain`]: the one
@@ -631,6 +768,9 @@ impl Automation {
 
     /// Write the entity's state, with `context` or the entity's recent one.
     fn write(&self, live: &mut Live, context: Option<Context>) {
+        if live.removed {
+            return;
+        }
         let Some(hass) = self.hass() else { return };
         let state = match (&self.config, live.enabled) {
             (Err(_), _) => "unavailable",
@@ -897,6 +1037,9 @@ impl Automation {
         let log = logger(&self.entity_id);
         let now = hass.clock().now();
         let mut live = self.live.lock();
+        if live.removed {
+            return;
+        }
         Self::set_context(&mut live, &ctx, now);
         if !live.runs.is_empty() {
             match cfg.mode {
@@ -1380,6 +1523,20 @@ async fn parse_all(items: &[Value], orders: Vec<config::Order>) -> Vec<Result<Co
     }
 }
 
+/// HA's validation logs each automation that can't run, every time the
+/// file is read.
+fn log_invalid(news: &[New]) {
+    for n in news {
+        if let Err(e) = &n.config {
+            tracing::error!(
+                logger = "homeassistant.components.automation",
+                "Automation with alias '{}' could not be validated and has been disabled: {e}",
+                n.name
+            );
+        }
+    }
+}
+
 impl Automations {
     /// Make the automations (the items of HA's `automation:` config) and
     /// write their states, restored as HA restores them. Triggers attach at
@@ -1388,7 +1545,7 @@ impl Automations {
     pub async fn setup(hass: &Hass, registries: &Registries, items: &[Value]) -> Self {
         let raw: Vec<Option<String>> = items.iter().map(|v| Some(v.to_string())).collect();
         let orders = vec![config::Order::default(); items.len()];
-        Self::setup_raw(hass, registries, items, &raw, orders).await
+        Self::setup_raw(hass, registries, None, items, &raw, orders).await
     }
 
     /// [`Automations::setup`] from YAML as loaded, keeping each item's raw
@@ -1398,30 +1555,69 @@ impl Automations {
         registries: &Registries,
         items: &[ha_core::yaml::Yaml],
     ) -> Self {
-        let json: Vec<Value> = items.iter().map(|y| y.to_json()).collect();
-        let raw: Vec<Option<String>> = items
-            .iter()
-            .map(|y| migrate_actions(y).to_json_text())
-            .collect();
-        let orders = items.iter().map(config::Order::of).collect();
-        Self::setup_raw(hass, registries, &json, &raw, orders).await
+        let (json, raw, orders) = Self::loaded(items);
+        Self::setup_raw(hass, registries, None, &json, &raw, orders).await
+    }
+
+    /// [`Automations::setup_yaml`] with the live entity registry: an
+    /// automation with an id gets its registry row, as HA's entity
+    /// platform makes it (the name, `capabilities: {id}`), and its entity
+    /// id from it.
+    pub async fn setup_live(
+        hass: &Hass,
+        registry: Arc<ha_registry::Registry>,
+        items: &[ha_core::yaml::Yaml],
+    ) -> Self {
+        let (json, raw, orders) = Self::loaded(items);
+        Self::setup_raw(
+            hass,
+            &Registries::default(),
+            Some(registry),
+            &json,
+            &raw,
+            orders,
+        )
+        .await
+    }
+
+    /// YAML items as what [`Automations::setup_raw`] takes: the JSON, the
+    /// raw configs in YAML key order and the variables' orders.
+    fn loaded(
+        items: &[ha_core::yaml::Yaml],
+    ) -> (Vec<Value>, Vec<Option<String>>, Vec<config::Order>) {
+        (
+            items.iter().map(|y| y.to_json()).collect(),
+            items
+                .iter()
+                .map(|y| migrate_actions(y).to_json_text())
+                .collect(),
+            items.iter().map(config::Order::of).collect(),
+        )
     }
 
     async fn setup_raw(
         hass: &Hass,
         registries: &Registries,
+        registry: Option<Arc<ha_registry::Registry>>,
         items: &[Value],
         raw: &[Option<String>],
         orders: Vec<config::Order>,
     ) -> Self {
         let parsed = parse_all(items, orders).await;
+        let mut home = Home::new(hass.clone());
+        if let Some(r) = &registry {
+            home.display_precision = Some(r.display_precision());
+        }
         let shared = Arc::new(Shared {
             hass: hass.clone(),
             listeners: Arc::default(),
             automations: Mutex::default(),
-            home: RwLock::new(Home::new(hass.clone())),
+            home: RwLock::new(home),
             attach_chain: Mutex::default(),
-            registry: RwLock::default(),
+            registry: RwLock::new(registry),
+            loader: RwLock::default(),
+            admin: RwLock::default(),
+            reloads: Reloads::default(),
         });
         // The state feed, to the listeners, one change at a time.
         {
@@ -1443,81 +1639,337 @@ impl Automations {
                 }
             });
         }
-        let restore = hass.restore();
-        let mut taken = HashSet::new();
-        let mut seen_ids = HashSet::new();
-        for (n, (item, config)) in items.iter().zip(parsed).enumerate() {
-            let alias = item.get("alias").and_then(Value::as_str).map(str::to_owned);
-            let name = alias.unwrap_or_else(|| format!("automation {n}"));
-            let unique_id = match item.get("id") {
-                Some(Value::String(s)) => Some(s.clone()),
-                Some(Value::Number(num)) => Some(num.to_string()),
-                _ => None,
-            };
-            if let Some(u) = &unique_id
-                && !seen_ids.insert(u.clone())
-            {
-                tracing::error!(
-                    logger = "homeassistant.components.automation",
-                    "Platform automation does not generate unique IDs. ID {u} already exists - ignoring"
-                );
-                continue;
-            }
-            let Some((entity_id, registry_name)) =
-                entity_id_for(hass, registries, unique_id.as_deref(), &name, &taken)
-            else {
-                continue;
-            };
-            taken.insert(entity_id.as_str().to_owned());
-            let name = registry_name.unwrap_or(name);
-            if let Err(e) = &config {
-                tracing::error!(
-                    logger = "homeassistant.components.automation",
-                    "Automation with alias '{name}' could not be validated and has been disabled: {e}"
-                );
-            }
-            // Restore: on/off and `last_triggered`; `initial_state` wins.
-            let mut live = Live::default();
-            if let Ok(c) = &config {
-                let last = restore.last_state(entity_id.as_str());
-                live.enabled = match &last {
-                    Some(s) => s["state"] == "on",
-                    None => true,
-                };
-                if let Some(i) = c.initial_state {
-                    live.enabled = i;
-                }
-                if last.is_none() {
-                    tracing::debug!(
-                        logger = logger(&entity_id),
-                        "Automation {entity_id} not in state storage, state True from default is used"
-                    );
-                }
-                live.last_triggered = last
-                    .as_ref()
-                    .and_then(|s| s["attributes"]["last_triggered"].as_str())
-                    .and_then(|t| t.parse::<jiff::Timestamp>().ok());
-                restore.register(entity_id.as_str(), None);
-            }
-            let a = Arc::new(Automation {
-                shared: Arc::downgrade(&shared),
-                entity_id,
-                name,
-                unique_id,
-                raw: raw[n].clone(),
-                config: config.map(Arc::new),
-                live: Mutex::new(live),
-                gate: tokio::sync::Mutex::new(()),
-            });
-            {
-                let mut live = a.live.lock();
-                a.write(&mut live, None);
-            }
-            shared.automations.lock().push(a);
-        }
         let me = Self { shared };
+        let news = news(items, raw, parsed);
+        log_invalid(&news);
+        for new in news {
+            me.add(new, registries);
+        }
         me.register_services();
+        me.register_reload();
         me
+    }
+
+    /// Add one automation (HA's `async_add_entities` for it): its entity
+    /// id, from the registry row of its id (made if it has none) or from
+    /// its name; its state, restored as HA restores it; its triggers, if
+    /// the core is running. `None` if its id is in use or the registry has
+    /// it disabled. `registries` is where ids are looked up while no live
+    /// registry is wired.
+    fn add(&self, new: New, registries: &Registries) -> Option<Arc<Automation>> {
+        let shared = &self.shared;
+        let hass = &shared.hass;
+        let New {
+            name: config_name,
+            unique_id,
+            raw,
+            config,
+        } = new;
+        if let Some(u) = &unique_id
+            && let Some(other) = self
+                .list()
+                .iter()
+                .find(|a| a.unique_id.as_deref() == Some(u))
+        {
+            tracing::error!(
+                logger = "homeassistant.components.automation",
+                "Platform automation does not generate unique IDs. ID {u} already exists - ignoring {}",
+                other.entity_id
+            );
+            return None;
+        }
+        let registry = shared.registry.read().clone();
+        let (entity_id, registry_name) = match (&unique_id, &registry) {
+            (Some(u), Some(registry)) => {
+                // What HA's entity platform passes for every entity.
+                let patch = ha_registry::EntityPatch {
+                    capabilities: Some(Some(json!({"id": u}))),
+                    config_entry_id: Some(None),
+                    device_id: Some(None),
+                    entity_category: Some(None),
+                    has_entity_name: Some(false),
+                    object_id_base: Some(Some(config_name.clone())),
+                    original_device_class: Some(None),
+                    original_icon: Some(None),
+                    original_name: Some(Some(config_name.clone())),
+                    supported_features: Some(0),
+                    translation_key: Some(None),
+                    unit_of_measurement: Some(None),
+                    ..Default::default()
+                };
+                let row = registry.get_or_create_entity(DOMAIN, DOMAIN, u, None, patch);
+                if row.disabled_by.is_some() {
+                    return None;
+                }
+                (EntityId::parse(&row.entity_id).ok()?, row.name.clone())
+            }
+            (_, Some(registry)) => entity_id_for(
+                hass,
+                &registry.snapshot(),
+                None,
+                &config_name,
+                &HashSet::new(),
+            )?,
+            (_, None) => entity_id_for(
+                hass,
+                registries,
+                unique_id.as_deref(),
+                &config_name,
+                &HashSet::new(),
+            )?,
+        };
+        let name = registry_name
+            .filter(|n| !n.is_empty())
+            .unwrap_or_else(|| config_name.clone());
+        // Restore: on/off and `last_triggered`; `initial_state` wins.
+        let restore = hass.restore();
+        let mut live = Live::default();
+        if let Ok(c) = &config {
+            let last = restore.last_state(entity_id.as_str());
+            live.enabled = match &last {
+                Some(s) => s["state"] == "on",
+                None => true,
+            };
+            if let Some(i) = c.initial_state {
+                live.enabled = i;
+            }
+            if last.is_none() {
+                tracing::debug!(
+                    logger = logger(&entity_id),
+                    "Automation {entity_id} not in state storage, state True from default is used"
+                );
+            }
+            live.last_triggered = last
+                .as_ref()
+                .and_then(|s| s["attributes"]["last_triggered"].as_str())
+                .and_then(|t| t.parse::<jiff::Timestamp>().ok());
+            restore.register(entity_id.as_str(), None);
+        }
+        let a = Arc::new(Automation {
+            shared: Arc::downgrade(shared),
+            entity_id,
+            name,
+            config_name,
+            unique_id,
+            raw,
+            config: config.map(Arc::new),
+            live: Mutex::new(live),
+            gate: tokio::sync::Mutex::new(()),
+        });
+        {
+            let mut live = a.live.lock();
+            a.write(&mut live, None);
+        }
+        shared.automations.lock().push(a.clone());
+        // Before the core runs, triggers attach at `started`.
+        if hass.core_state() == ha_core::CoreState::Running {
+            a.attach();
+        }
+        Some(a)
+    }
+
+    /// Take an automation away (HA's `Entity.async_remove`): its triggers
+    /// and runs stop, what it was is kept for the one that may replace it
+    /// (`async_restore_entity_removed`), and its state goes: to the
+    /// registry's `unavailable` placeholder if it has a row, else
+    /// altogether.
+    fn remove(&self, a: &Arc<Automation>) {
+        let shared = &self.shared;
+        let hass = &shared.hass;
+        {
+            let mut live = a.live.lock();
+            live.enabled = false;
+            live.removed = true;
+            live.attached.clear();
+            live.generation += 1;
+            a.stop_runs(&mut live);
+        }
+        // Reads the state as it still is.
+        hass.restore().unregister(hass, a.entity_id.as_str());
+        shared.automations.lock().retain(|x| !Arc::ptr_eq(x, a));
+        let row = shared.registries().and_then(|r| {
+            r.entities
+                .iter()
+                .find(|e| e.entity_id == a.entity_id.as_str())
+                .cloned()
+        });
+        match row {
+            Some(row) => {
+                hass.set_state(
+                    a.entity_id.clone(),
+                    "unavailable",
+                    row.unavailable_attributes(),
+                );
+            }
+            None => {
+                hass.remove_state(&a.entity_id);
+            }
+        }
+    }
+
+    /// What `automation.reload` reads the automations with.
+    pub fn set_loader(&self, loader: Loader) {
+        *self.shared.loader.write() = Some(loader);
+    }
+
+    /// Who may call `automation.reload` (HA's admin services): without
+    /// it, anyone.
+    pub fn set_admin_check(&self, check: AdminCheck) {
+        *self.shared.admin.write() = Some(check);
+    }
+
+    /// `automation.reload` (HA's `reload_service_handler` behind its
+    /// `ReloadServiceHelper`): read the config again and replace the
+    /// automations that differ, all of them or only the one with `id`,
+    /// then fire `automation_reloaded` with `context`. One whose name and
+    /// config are unchanged is left alone: no state is written, its
+    /// triggers and runs go on.
+    pub async fn reload(&self, id: Option<&str>, context: &Context) -> Result<(), ServiceError> {
+        // `if automation_id := …`: an empty id is none.
+        let id = id.filter(|i| !i.is_empty());
+        let reloads = &self.shared.reloads;
+        // A reload in hand may have read a stale file: after it.
+        {
+            let changed = reloads.changed.notified();
+            tokio::pin!(changed);
+            let running = {
+                let s = reloads.state.lock();
+                if s.running {
+                    changed.as_mut().enable();
+                }
+                s.running
+            };
+            if running {
+                changed.await;
+            }
+        }
+        let mut targets: Option<HashSet<Option<String>>> = None;
+        loop {
+            let changed = reloads.changed.notified();
+            tokio::pin!(changed);
+            {
+                let mut s = reloads.state.lock();
+                if targets.is_none() {
+                    let t: HashSet<Option<String>> = match id {
+                        Some(id) => HashSet::from([Some(id.to_owned())]),
+                        None => self.list().iter().map(|a| a.unique_id.clone()).collect(),
+                    };
+                    s.pending.extend(t.iter().cloned());
+                    targets = Some(t);
+                }
+                if !s.running {
+                    s.running = true;
+                    break;
+                }
+                changed.as_mut().enable();
+            }
+            // Another call reloads: if it covers these, that will do.
+            changed.await;
+            let s = reloads.state.lock();
+            if targets.iter().flatten().all(|t| !s.pending.contains(t)) {
+                return Ok(());
+            }
+        }
+        let _turn = ReloadTurn(reloads, targets.unwrap_or_default());
+        self.reload_now(id, context).await
+    }
+
+    async fn reload_now(&self, id: Option<&str>, context: &Context) -> Result<(), ServiceError> {
+        let shared = &self.shared;
+        let loader = shared.loader.read().clone();
+        let Some(loader) = loader else {
+            return Err(ServiceError::Failed(
+                "automations can't be reloaded: no configuration is loaded".into(),
+            ));
+        };
+        let items = loader().await.map_err(|e| {
+            ServiceError::validation("", "", None, format!("Failed to load configuration: {e}"))
+        })?;
+        let (json, raw, orders) = Self::loaded(&items);
+        let parsed = parse_all(&json, orders).await;
+        let news = news(&json, &raw, parsed);
+        // HA validates the whole file again, whatever is reloaded.
+        log_invalid(&news);
+        let automations = self.list();
+        let none = Registries::default();
+        match id {
+            Some(id) => {
+                // `_async_process_single_config`.
+                let wanted: Vec<New> = news
+                    .into_iter()
+                    .filter(|n| n.unique_id.as_deref() == Some(id))
+                    .collect();
+                let existing = automations
+                    .iter()
+                    .find(|a| a.unique_id.as_deref() == Some(id));
+                let unchanged = match (existing, wanted.first()) {
+                    (Some(a), Some(n)) => matches(a, n),
+                    _ => false,
+                };
+                if !unchanged {
+                    if let Some(a) = existing {
+                        self.remove(a);
+                    }
+                    for n in wanted {
+                        self.add(n, &none);
+                    }
+                }
+            }
+            None => {
+                // `_async_process_config`'s `find_matches`: each
+                // automation and each config matches at most once; for
+                // an id written twice, its last config is the one
+                // compared.
+                let truthy = |u: &Option<String>| u.as_deref().filter(|u| !u.is_empty()).is_some();
+                let mut with_id: std::collections::HashMap<&str, usize> = news
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, n)| truthy(&n.unique_id))
+                    .filter_map(|(i, n)| Some((n.unique_id.as_deref()?, i)))
+                    .collect();
+                let mut kept = vec![false; automations.len()];
+                let mut matched = vec![false; news.len()];
+                for (ai, a) in automations.iter().enumerate() {
+                    if truthy(&a.unique_id) {
+                        let ci = a.unique_id.as_deref().and_then(|u| with_id.remove(u));
+                        if let Some(ci) = ci
+                            && matches(a, &news[ci])
+                        {
+                            kept[ai] = true;
+                            matched[ci] = true;
+                        }
+                        continue;
+                    }
+                    for (ci, n) in news.iter().enumerate() {
+                        if truthy(&n.unique_id) || matched[ci] || !matches(a, n) {
+                            continue;
+                        }
+                        kept[ai] = true;
+                        matched[ci] = true;
+                        break;
+                    }
+                }
+                for (a, kept) in automations.iter().zip(kept) {
+                    if !kept {
+                        self.remove(a);
+                    }
+                }
+                for (n, matched) in news.into_iter().zip(matched) {
+                    if !matched {
+                        self.add(n, &none);
+                    }
+                }
+            }
+        }
+        shared.hass.bus().fire(Event::new(
+            EventKind::Custom {
+                name: "automation_reloaded".into(),
+                data: json!({}),
+            },
+            shared.hass.clock().now(),
+            context.clone(),
+        ));
+        Ok(())
     }
 
     /// The entity registry's sensor display precision, for templates'
@@ -1655,6 +2107,37 @@ impl Automations {
         }
     }
 
+    /// `automation.reload`: an admin service; `id` (a string) is all it
+    /// takes.
+    fn register_reload(&self) {
+        let weak = Arc::downgrade(&self.shared);
+        self.shared.hass.services().register_with_schema(
+            DOMAIN,
+            "reload",
+            Some(Schema::new().optional("id", Kind::StrictStr)),
+            SupportsResponse::None,
+            move |call| {
+                let me = weak.upgrade().map(|shared| Automations { shared });
+                async move {
+                    let Some(me) = me else { return Ok(None) };
+                    // `async_register_admin_service`: a call with no user
+                    // is the system's.
+                    let check = me.shared.admin.read().clone();
+                    if let (Some(user), Some(check)) = (&call.context.user_id, check) {
+                        match check(user) {
+                            Some(true) => {}
+                            Some(false) => return Err(ServiceError::Failed("Unauthorized".into())),
+                            None => return Err(ServiceError::Failed("UnknownUser".into())),
+                        }
+                    }
+                    let id = call.data.get("id").and_then(Value::as_str);
+                    me.reload(id, &call.context).await?;
+                    Ok(None)
+                }
+            },
+        );
+    }
+
     fn set_enabled(&self, a: &Arc<Automation>, on: bool, stop_actions: bool, ctx: &Context) {
         {
             let mut live = a.live.lock();
@@ -1676,6 +2159,8 @@ impl Automations {
     }
 }
 
+#[cfg(test)]
+mod reload_tests;
 #[cfg(test)]
 mod template_tests;
 #[cfg(test)]

@@ -218,6 +218,16 @@ it, so changes are handled in order, as in HA's event loop. A `template`
 trigger is one task that listens only to what its last render read and
 sleeps otherwise (a minute tick while it reads the clock).
 
+`automation.reload` reads `configuration.yaml` again (the loader
+`ha-server` hands over, off the runtime) and compares each automation with
+its entry by name and raw config, as HA does: an unchanged one is left
+alone, with its triggers and runs; a changed one is removed (its triggers
+and runs stop, its last state goes to the restore cache, its entity shows
+the registry's `unavailable` placeholder) and made again, restoring on/off
+and `last_triggered` from that cache. Reloads run one at a time. An
+automation with an `id` has an entity registry row, made when it is first
+seen, which is where its entity id comes from.
+
 ### Shadow mode
 
 With `HARS_SHADOW=1`, `call_service` still validates and fires the event,

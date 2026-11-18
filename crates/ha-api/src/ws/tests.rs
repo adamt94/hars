@@ -486,6 +486,15 @@ async fn call_service_error_shapes() {
             ),
         ),
         ("unknown", ha_core::ServiceError::Unknown(String::new())),
+        (
+            "untranslated",
+            ha_core::ServiceError::validation(
+                "",
+                "",
+                None,
+                "Failed to load configuration: no".into(),
+            ),
+        ),
     ] {
         s.hass
             .services()
@@ -513,6 +522,13 @@ async fn call_service_error_shapes() {
     );
     let r = c.call(call(4, "unknown")).await;
     assert_eq!(r["error"], json!({"code": "unknown_error", "message": ""}));
+    // `error_message`: with no translation key, only the code and message.
+    let r = c.call(call(5, "untranslated")).await;
+    assert_eq!(
+        r["error"],
+        json!({"code": "service_validation_error",
+            "message": "Validation error: Failed to load configuration: no"})
+    );
 }
 
 #[tokio::test]

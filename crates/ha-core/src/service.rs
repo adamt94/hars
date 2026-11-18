@@ -87,7 +87,8 @@ impl ServiceError {
         })
     }
 
-    /// A `ServiceValidationError`.
+    /// A `ServiceValidationError`. An empty `key` is one raised with a
+    /// message only (no translation).
     pub fn validation(
         domain: &str,
         key: &str,

@@ -336,7 +336,17 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
       (admin; `automations.yaml` read with HA's loader, the entry in file key
       order, `Resource not found`) and WS `automation/config` (the raw entry);
       saving and deleting answer that hars doesn't support it yet
-- [ ] `automation.reload`, editor saves, traces
+- [x] `automation.reload` (admin only; all automations, or one by `id`):
+      `configuration.yaml` is read again and only the automations whose
+      name or config changed are replaced, with HA's state and registry
+      sequence (the registry's `unavailable` placeholder, the row's name
+      updated, then the new entity with its on/off and `last_triggered`
+      restored), then `automation_reloaded`. An unchanged one keeps its
+      triggers and runs and writes nothing. Automations with an `id` get
+      their entity registry row (`capabilities: {id}`) at start too. All 25
+      scenarios of `scripts/vectors/automation_reload.py` match
+- [ ] Editor saves (`POST`/`DELETE /api/config/automation/config/<id>`),
+      traces
 - [x] Inventory triggers/conditions/actions/modes with HA 2026.6.1 semantics,
       matched against HA's own engine on 36 scenario vectors:
   - [x] `numeric_state` fires on crossing only; covers threshold equality,

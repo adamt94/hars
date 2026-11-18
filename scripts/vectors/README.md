@@ -27,6 +27,7 @@ rule have no script yet; they are listed
 | `mobile_app_notify.py` | `ha-api/src/mobile_app/vectors/notify.json` (15 scenarios, 126 steps: service calls, the app's push channel commands, closed connections and 10 s passing, with every WebSocket message, relay request body, result, notify state and log line; and 20 `log_rate_limits` lines) | HA 2026.6.1's core with `http`, `websocket_api` and `mobile_app` (its `notify.py`, `push_notification.py`, `websocket_api.py`) and `notify`, on aiohttp 3.13.5, with a local server as the push relay |
 | `http.py` | `ha-api/src/cors/vectors/cors.json` (preflights and requests, with and without an `Origin`, to `/auth/token` and `/auth/revoke`: status, body and `Access-Control-*` headers) and `ha-api/src/rest/vectors/post_state.json` (`POST /api/states/<id>` with each kind of body and `Content-Type`, and the state after each step) | HA 2026.6.1's `http` (aiohttp 3.13.5, aiohttp_cors 0.8.1), `auth` and `api`, booted in a temporary directory with an admin and a non-admin user |
 | `automation_templates.py` | `ha-automation/src/vectors/templates.json` (19 scenarios: each one's states, entity registry entries, automations and steps, and the service calls with their rendered data, `automation_triggered` events, automation states and WARNING/ERROR log lines HA produced) | HA 2026.6.1's `automation` with `helpers/script.py`, `condition.py`, `trigger.py`, `service.py`, `event.py`, the `homeassistant` integration's `state`, `numeric_state` and `time` triggers and the `template` trigger, on Jinja 3.1.6 and voluptuous 0.15.2, in Europe/London, on a virtual-time event loop |
+| `automation_reload.py` | `ha-automation/src/vectors/reload.json` (25 scenarios: the automations at start, the steps that rewrite `automations.yaml`, call `automation.reload` and the other `automation.*` services, write states and pass time, and what HA did in order: each automation's `state_changed` with its attributes, the `entity_registry_updated`, `automation_reloaded` and `automation_triggered` events, the actions' service calls, what a call raised and the ERROR log lines; then the automations' registry rows and states) | HA 2026.6.1's `automation` (its `reload` service and `ReloadServiceHelper`), the entity component's `async_prepare_reload`, the entity registry and `RestoreEntity`'s restore state, from a `configuration.yaml` that includes `automations.yaml`, in Europe/London, on a virtual-time event loop |
 
 `render_template.py` and `template_functions.py` write two crates'
 vectors because they are two halves of one behaviour: the engine's answers
@@ -98,11 +99,14 @@ For `http.py` (HA's own requirements are enough):
 cargo test -p ha-api cors:: rest::post_state
 ```
 
-For `automation_templates.py` (HA's own requirements are enough):
+For `automation_templates.py` and `automation_reload.py` (HA's own
+requirements are enough):
 
 ```sh
 .venv-template/bin/python -I scripts/vectors/automation_templates.py
 cargo test -p ha-automation template_tests
+.venv-template/bin/python -I scripts/vectors/automation_reload.py
+cargo test -p ha-automation reload_tests
 ```
 
 It runs each scenario on an event loop whose clock moves only when a step

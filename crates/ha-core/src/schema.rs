@@ -47,6 +47,8 @@ pub enum Kind {
     StrictBool,
     /// `dict`: a mapping.
     Dict,
+    /// `str` (strict: a JSON string only).
+    StrictStr,
 }
 
 /// Inclusive bounds, as `vol.Range`.
@@ -330,6 +332,10 @@ fn check(kind: &Kind, value: &Value) -> Checked {
         Kind::Dict => match value {
             Value::Object(_) => Ok(None),
             _ => err("expected dict".into()),
+        },
+        Kind::StrictStr => match value {
+            Value::String(_) => Ok(None),
+            _ => err("expected str".into()),
         },
         Kind::Enum(name, values) => match value {
             Value::String(v) if values.contains(&v.as_str()) => Ok(None),
