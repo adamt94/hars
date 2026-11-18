@@ -78,8 +78,8 @@ resource budget gate (`PERF_GATE=1 scripts/perf.sh`, see
   saved in the module's `vectors/` folder. A new vector set commits the
   script that made it in `scripts/vectors/` (`onboarding.py`,
   `render_template.py`, `mobile_app_notify.py`, `template_functions.py`,
-  `automation_templates.py`, `automation_reload.py`, `yaml_dump.py` and
-  `automation_editor.py`
+  `automation_templates.py`, `automation_reload.py`, `yaml_dump.py`,
+  `automation_editor.py` and `entity_registry_ws.py`
   so far); the sets made before that rule have none yet
   and are listed there as a backlog. The rules, a skeleton
   and the backlog are in [scripts/vectors/README.md](scripts/vectors/README.md).

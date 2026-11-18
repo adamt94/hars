@@ -1,0 +1,2127 @@
+{
+ "stores": {
+  "core.entity_registry": {
+   "entities": [
+    {
+     "aliases": [],
+     "aliases_v2": [
+      null
+     ],
+     "area_id": null,
+     "categories": {},
+     "capabilities": {
+      "id": "hall"
+     },
+     "config_entry_id": null,
+     "config_subentry_id": null,
+     "created_at": "2026-11-10T16:00:00+00:00",
+     "device_class": null,
+     "device_id": null,
+     "disabled_by": null,
+     "entity_category": null,
+     "entity_id": "automation.hall_motion",
+     "hidden_by": null,
+     "icon": null,
+     "id": "00000000000000000000000000000001",
+     "has_entity_name": false,
+     "labels": [],
+     "modified_at": "2026-11-10T16:00:00+00:00",
+     "name": null,
+     "object_id_base": null,
+     "options": {},
+     "original_device_class": null,
+     "original_icon": null,
+     "original_name": "Hall motion",
+     "platform": "automation",
+     "suggested_object_id": "hall_motion",
+     "supported_features": 0,
+     "translation_key": null,
+     "unique_id": "hall",
+     "previous_unique_id": null,
+     "unit_of_measurement": null
+    },
+    {
+     "aliases": [],
+     "aliases_v2": [
+      null
+     ],
+     "area_id": null,
+     "categories": {},
+     "capabilities": {
+      "id": "porch"
+     },
+     "config_entry_id": null,
+     "config_subentry_id": null,
+     "created_at": "2026-11-10T16:00:00+00:00",
+     "device_class": null,
+     "device_id": null,
+     "disabled_by": null,
+     "entity_category": null,
+     "entity_id": "automation.porch_door",
+     "hidden_by": null,
+     "icon": null,
+     "id": "00000000000000000000000000000002",
+     "has_entity_name": false,
+     "labels": [],
+     "modified_at": "2026-11-10T16:00:00+00:00",
+     "name": null,
+     "object_id_base": null,
+     "options": {},
+     "original_device_class": null,
+     "original_icon": null,
+     "original_name": "Porch door",
+     "platform": "automation",
+     "suggested_object_id": "porch_door",
+     "supported_features": 0,
+     "translation_key": null,
+     "unique_id": "porch",
+     "previous_unique_id": null,
+     "unit_of_measurement": null
+    },
+    {
+     "aliases": [],
+     "aliases_v2": [
+      "hall lamp"
+     ],
+     "area_id": "hallway",
+     "categories": {
+      "helpers": "cat_h"
+     },
+     "capabilities": {
+      "supported_color_modes": [
+       "brightness"
+      ]
+     },
+     "config_entry_id": null,
+     "config_subentry_id": null,
+     "created_at": "2026-11-10T16:00:00+00:00",
+     "device_class": null,
+     "device_id": null,
+     "disabled_by": null,
+     "entity_category": null,
+     "entity_id": "light.hall",
+     "hidden_by": null,
+     "icon": "mdi:lamp",
+     "id": "00000000000000000000000000000003",
+     "has_entity_name": true,
+     "labels": [
+      "night"
+     ],
+     "modified_at": "2026-11-10T16:00:00+00:00",
+     "name": "Hallway light",
+     "object_id_base": null,
+     "options": {
+      "conversation": {
+       "should_expose": true
+      }
+     },
+     "original_device_class": null,
+     "original_icon": "mdi:lightbulb",
+     "original_name": "Hall",
+     "platform": "hue",
+     "suggested_object_id": "hall",
+     "supported_features": 44,
+     "translation_key": "hall",
+     "unique_id": "aa:bb-1",
+     "previous_unique_id": null,
+     "unit_of_measurement": null
+    },
+    {
+     "aliases": [],
+     "aliases_v2": [
+      null
+     ],
+     "area_id": null,
+     "categories": {},
+     "capabilities": null,
+     "config_entry_id": null,
+     "config_subentry_id": null,
+     "created_at": "2026-11-10T16:00:00+00:00",
+     "device_class": null,
+     "device_id": null,
+     "disabled_by": "integration",
+     "entity_category": "diagnostic",
+     "entity_id": "sensor.hall_temperature",
+     "hidden_by": null,
+     "icon": null,
+     "id": "00000000000000000000000000000004",
+     "has_entity_name": false,
+     "labels": [],
+     "modified_at": "2026-11-10T16:00:00+00:00",
+     "name": null,
+     "object_id_base": null,
+     "options": {},
+     "original_device_class": "temperature",
+     "original_icon": null,
+     "original_name": "Hall temperature",
+     "platform": "hue",
+     "suggested_object_id": "hall_temperature",
+     "supported_features": 0,
+     "translation_key": null,
+     "unique_id": "aa:bb-2",
+     "previous_unique_id": null,
+     "unit_of_measurement": "°C"
+    },
+    {
+     "aliases": [],
+     "aliases_v2": [
+      null
+     ],
+     "area_id": null,
+     "categories": {},
+     "capabilities": null,
+     "config_entry_id": null,
+     "config_subentry_id": null,
+     "created_at": "2026-11-10T16:00:00+00:00",
+     "device_class": null,
+     "device_id": null,
+     "disabled_by": null,
+     "entity_category": null,
+     "entity_id": "switch.hidden_one",
+     "hidden_by": "user",
+     "icon": null,
+     "id": "00000000000000000000000000000005",
+     "has_entity_name": false,
+     "labels": [],
+     "modified_at": "2026-11-10T16:00:00+00:00",
+     "name": null,
+     "object_id_base": null,
+     "options": {},
+     "original_device_class": null,
+     "original_icon": null,
+     "original_name": "Hidden one",
+     "platform": "demo",
+     "suggested_object_id": "hidden_one",
+     "supported_features": 0,
+     "translation_key": null,
+     "unique_id": "sw-1",
+     "previous_unique_id": null,
+     "unit_of_measurement": null
+    }
+   ],
+   "deleted_entities": []
+  },
+  "core.category_registry": {
+   "categories": {
+    "automation": [
+     {
+      "category_id": "01M7QYB0J64RQX9K1AEP1VY6G7",
+      "created_at": "2026-11-10T16:00:00+00:00",
+      "icon": null,
+      "modified_at": "2026-11-10T16:00:00+00:00",
+      "name": "Lights"
+     },
+     {
+      "category_id": "01M7QYB0J63K8M369AGWZZ93X6",
+      "created_at": "2026-11-10T16:00:00+00:00",
+      "icon": null,
+      "modified_at": "2026-11-10T16:00:00+00:00",
+      "name": "Other"
+     }
+    ],
+    "script": [
+     {
+      "category_id": "01M7QYB0J61GDSZ6Y4TMTMR9DH",
+      "created_at": "2026-11-10T16:00:00+00:00",
+      "icon": null,
+      "modified_at": "2026-11-10T16:00:00+00:00",
+      "name": "Scripts"
+     }
+    ]
+   }
+  }
+ },
+ "steps": [
+  {
+   "user": "admin",
+   "ws": {
+    "id": 1,
+    "type": "config/entity_registry/list"
+   },
+   "reply": {
+    "id": 1,
+    "type": "result",
+    "success": true,
+    "result": [
+     {
+      "area_id": null,
+      "categories": {},
+      "config_entry_id": null,
+      "config_subentry_id": null,
+      "created_at": "<ts>",
+      "device_id": null,
+      "disabled_by": null,
+      "entity_category": null,
+      "entity_id": "automation.hall_motion",
+      "has_entity_name": false,
+      "hidden_by": null,
+      "icon": null,
+      "id": "00000000000000000000000000000001",
+      "labels": [],
+      "modified_at": "<ts>",
+      "name": null,
+      "options": {},
+      "original_name": "Hall motion",
+      "platform": "automation",
+      "translation_key": null,
+      "unique_id": "hall"
+     },
+     {
+      "area_id": null,
+      "categories": {},
+      "config_entry_id": null,
+      "config_subentry_id": null,
+      "created_at": "<ts>",
+      "device_id": null,
+      "disabled_by": null,
+      "entity_category": null,
+      "entity_id": "automation.porch_door",
+      "has_entity_name": false,
+      "hidden_by": null,
+      "icon": null,
+      "id": "00000000000000000000000000000002",
+      "labels": [],
+      "modified_at": "<ts>",
+      "name": null,
+      "options": {},
+      "original_name": "Porch door",
+      "platform": "automation",
+      "translation_key": null,
+      "unique_id": "porch"
+     },
+     {
+      "area_id": "hallway",
+      "categories": {
+       "helpers": "cat_h"
+      },
+      "config_entry_id": null,
+      "config_subentry_id": null,
+      "created_at": "<ts>",
+      "device_id": null,
+      "disabled_by": null,
+      "entity_category": null,
+      "entity_id": "light.hall",
+      "has_entity_name": true,
+      "hidden_by": null,
+      "icon": "mdi:lamp",
+      "id": "00000000000000000000000000000003",
+      "labels": [
+       "night"
+      ],
+      "modified_at": "<ts>",
+      "name": "Hallway light",
+      "options": {
+       "conversation": {
+        "should_expose": true
+       }
+      },
+      "original_name": "Hall",
+      "platform": "hue",
+      "translation_key": "hall",
+      "unique_id": "aa:bb-1"
+     },
+     {
+      "area_id": null,
+      "categories": {},
+      "config_entry_id": null,
+      "config_subentry_id": null,
+      "created_at": "<ts>",
+      "device_id": null,
+      "disabled_by": "integration",
+      "entity_category": "diagnostic",
+      "entity_id": "sensor.hall_temperature",
+      "has_entity_name": false,
+      "hidden_by": null,
+      "icon": null,
+      "id": "00000000000000000000000000000004",
+      "labels": [],
+      "modified_at": "<ts>",
+      "name": null,
+      "options": {},
+      "original_name": "Hall temperature",
+      "platform": "hue",
+      "translation_key": null,
+      "unique_id": "aa:bb-2"
+     },
+     {
+      "area_id": null,
+      "categories": {},
+      "config_entry_id": null,
+      "config_subentry_id": null,
+      "created_at": "<ts>",
+      "device_id": null,
+      "disabled_by": null,
+      "entity_category": null,
+      "entity_id": "switch.hidden_one",
+      "has_entity_name": false,
+      "hidden_by": "user",
+      "icon": null,
+      "id": "00000000000000000000000000000005",
+      "labels": [],
+      "modified_at": "<ts>",
+      "name": null,
+      "options": {},
+      "original_name": "Hidden one",
+      "platform": "demo",
+      "translation_key": null,
+      "unique_id": "sw-1"
+     }
+    ]
+   },
+   "events": []
+  },
+  {
+   "user": "user",
+   "ws": {
+    "id": 1,
+    "type": "config/entity_registry/list"
+   },
+   "reply": {
+    "id": 1,
+    "type": "result",
+    "success": true,
+    "result": [
+     {
+      "area_id": null,
+      "categories": {},
+      "config_entry_id": null,
+      "config_subentry_id": null,
+      "created_at": "<ts>",
+      "device_id": null,
+      "disabled_by": null,
+      "entity_category": null,
+      "entity_id": "automation.hall_motion",
+      "has_entity_name": false,
+      "hidden_by": null,
+      "icon": null,
+      "id": "00000000000000000000000000000001",
+      "labels": [],
+      "modified_at": "<ts>",
+      "name": null,
+      "options": {},
+      "original_name": "Hall motion",
+      "platform": "automation",
+      "translation_key": null,
+      "unique_id": "hall"
+     },
+     {
+      "area_id": null,
+      "categories": {},
+      "config_entry_id": null,
+      "config_subentry_id": null,
+      "created_at": "<ts>",
+      "device_id": null,
+      "disabled_by": null,
+      "entity_category": null,
+      "entity_id": "automation.porch_door",
+      "has_entity_name": false,
+      "hidden_by": null,
+      "icon": null,
+      "id": "00000000000000000000000000000002",
+      "labels": [],
+      "modified_at": "<ts>",
+      "name": null,
+      "options": {},
+      "original_name": "Porch door",
+      "platform": "automation",
+      "translation_key": null,
+      "unique_id": "porch"
+     },
+     {
+      "area_id": "hallway",
+      "categories": {
+       "helpers": "cat_h"
+      },
+      "config_entry_id": null,
+      "config_subentry_id": null,
+      "created_at": "<ts>",
+      "device_id": null,
+      "disabled_by": null,
+      "entity_category": null,
+      "entity_id": "light.hall",
+      "has_entity_name": true,
+      "hidden_by": null,
+      "icon": "mdi:lamp",
+      "id": "00000000000000000000000000000003",
+      "labels": [
+       "night"
+      ],
+      "modified_at": "<ts>",
+      "name": "Hallway light",
+      "options": {
+       "conversation": {
+        "should_expose": true
+       }
+      },
+      "original_name": "Hall",
+      "platform": "hue",
+      "translation_key": "hall",
+      "unique_id": "aa:bb-1"
+     },
+     {
+      "area_id": null,
+      "categories": {},
+      "config_entry_id": null,
+      "config_subentry_id": null,
+      "created_at": "<ts>",
+      "device_id": null,
+      "disabled_by": "integration",
+      "entity_category": "diagnostic",
+      "entity_id": "sensor.hall_temperature",
+      "has_entity_name": false,
+      "hidden_by": null,
+      "icon": null,
+      "id": "00000000000000000000000000000004",
+      "labels": [],
+      "modified_at": "<ts>",
+      "name": null,
+      "options": {},
+      "original_name": "Hall temperature",
+      "platform": "hue",
+      "translation_key": null,
+      "unique_id": "aa:bb-2"
+     },
+     {
+      "area_id": null,
+      "categories": {},
+      "config_entry_id": null,
+      "config_subentry_id": null,
+      "created_at": "<ts>",
+      "device_id": null,
+      "disabled_by": null,
+      "entity_category": null,
+      "entity_id": "switch.hidden_one",
+      "has_entity_name": false,
+      "hidden_by": "user",
+      "icon": null,
+      "id": "00000000000000000000000000000005",
+      "labels": [],
+      "modified_at": "<ts>",
+      "name": null,
+      "options": {},
+      "original_name": "Hidden one",
+      "platform": "demo",
+      "translation_key": null,
+      "unique_id": "sw-1"
+     }
+    ]
+   },
+   "events": []
+  },
+  {
+   "user": "admin",
+   "ws": {
+    "id": 2,
+    "type": "config/entity_registry/get",
+    "entity_id": "automation.hall_motion"
+   },
+   "reply": {
+    "id": 2,
+    "type": "result",
+    "success": true,
+    "result": {
+     "area_id": null,
+     "categories": {},
+     "config_entry_id": null,
+     "config_subentry_id": null,
+     "created_at": "<ts>",
+     "device_id": null,
+     "disabled_by": null,
+     "entity_category": null,
+     "entity_id": "automation.hall_motion",
+     "has_entity_name": false,
+     "hidden_by": null,
+     "icon": null,
+     "id": "00000000000000000000000000000001",
+     "labels": [],
+     "modified_at": "<ts>",
+     "name": null,
+     "options": {},
+     "original_name": "Hall motion",
+     "platform": "automation",
+     "translation_key": null,
+     "unique_id": "hall",
+     "aliases": [
+      null
+     ],
+     "capabilities": {
+      "id": "hall"
+     },
+     "device_class": null,
+     "original_device_class": null,
+     "original_icon": null
+    }
+   },
+   "events": []
+  },
+  {
+   "user": "admin",
+   "ws": {
+    "id": 3,
+    "type": "config/entity_registry/get",
+    "entity_id": "light.hall"
+   },
+   "reply": {
+    "id": 3,
+    "type": "result",
+    "success": true,
+    "result": {
+     "area_id": "hallway",
+     "categories": {
+      "helpers": "cat_h"
+     },
+     "config_entry_id": null,
+     "config_subentry_id": null,
+     "created_at": "<ts>",
+     "device_id": null,
+     "disabled_by": null,
+     "entity_category": null,
+     "entity_id": "light.hall",
+     "has_entity_name": true,
+     "hidden_by": null,
+     "icon": "mdi:lamp",
+     "id": "00000000000000000000000000000003",
+     "labels": [
+      "night"
+     ],
+     "modified_at": "<ts>",
+     "name": "Hallway light",
+     "options": {
+      "conversation": {
+       "should_expose": true
+      }
+     },
+     "original_name": "Hall",
+     "platform": "hue",
+     "translation_key": "hall",
+     "unique_id": "aa:bb-1",
+     "aliases": [
+      "hall lamp"
+     ],
+     "capabilities": {
+      "supported_color_modes": [
+       "brightness"
+      ]
+     },
+     "device_class": null,
+     "original_device_class": null,
+     "original_icon": "mdi:lightbulb"
+    }
+   },
+   "events": []
+  },
+  {
+   "user": "user",
+   "ws": {
+    "id": 2,
+    "type": "config/entity_registry/get",
+    "entity_id": "light.hall"
+   },
+   "reply": {
+    "id": 2,
+    "type": "result",
+    "success": true,
+    "result": {
+     "area_id": "hallway",
+     "categories": {
+      "helpers": "cat_h"
+     },
+     "config_entry_id": null,
+     "config_subentry_id": null,
+     "created_at": "<ts>",
+     "device_id": null,
+     "disabled_by": null,
+     "entity_category": null,
+     "entity_id": "light.hall",
+     "has_entity_name": true,
+     "hidden_by": null,
+     "icon": "mdi:lamp",
+     "id": "00000000000000000000000000000003",
+     "labels": [
+      "night"
+     ],
+     "modified_at": "<ts>",
+     "name": "Hallway light",
+     "options": {
+      "conversation": {
+       "should_expose": true
+      }
+     },
+     "original_name": "Hall",
+     "platform": "hue",
+     "translation_key": "hall",
+     "unique_id": "aa:bb-1",
+     "aliases": [
+      "hall lamp"
+     ],
+     "capabilities": {
+      "supported_color_modes": [
+       "brightness"
+      ]
+     },
+     "device_class": null,
+     "original_device_class": null,
+     "original_icon": "mdi:lightbulb"
+    }
+   },
+   "events": []
+  },
+  {
+   "user": "admin",
+   "ws": {
+    "id": 4,
+    "type": "config/entity_registry/get",
+    "entity_id": "light.nope"
+   },
+   "reply": {
+    "id": 4,
+    "type": "result",
+    "success": false,
+    "error": {
+     "code": "not_found",
+     "message": "Entity not found"
+    }
+   },
+   "events": []
+  },
+  {
+   "user": "admin",
+   "ws": {
+    "id": 5,
+    "type": "config/entity_registry/get",
+    "entity_id": "not an id"
+   },
+   "reply": {
+    "id": 5,
+    "type": "result",
+    "success": false,
+    "error": {
+     "code": "invalid_format",
+     "message": "Entity ID not an id is an invalid entity ID for dictionary value @ data['entity_id']. Got 'not an id'"
+    }
+   },
+   "events": []
+  },
+  {
+   "user": "admin",
+   "ws": {
+    "id": 6,
+    "type": "config/entity_registry/get"
+   },
+   "reply": {
+    "id": 6,
+    "type": "result",
+    "success": false,
+    "error": {
+     "code": "invalid_format",
+     "message": "required key not provided @ data['entity_id']. Got None"
+    }
+   },
+   "events": []
+  },
+  {
+   "user": "admin",
+   "ws": {
+    "id": 7,
+    "type": "config/entity_registry/get_entries",
+    "entity_ids": [
+     "light.hall",
+     "light.nope",
+     "automation.hall_motion"
+    ]
+   },
+   "reply": {
+    "id": 7,
+    "type": "result",
+    "success": true,
+    "result": {
+     "light.hall": {
+      "area_id": "hallway",
+      "categories": {
+       "helpers": "cat_h"
+      },
+      "config_entry_id": null,
+      "config_subentry_id": null,
+      "created_at": "<ts>",
+      "device_id": null,
+      "disabled_by": null,
+      "entity_category": null,
+      "entity_id": "light.hall",
+      "has_entity_name": true,
+      "hidden_by": null,
+      "icon": "mdi:lamp",
+      "id": "00000000000000000000000000000003",
+      "labels": [
+       "night"
+      ],
+      "modified_at": "<ts>",
+      "name": "Hallway light",
+      "options": {
+       "conversation": {
+        "should_expose": true
+       }
+      },
+      "original_name": "Hall",
+      "platform": "hue",
+      "translation_key": "hall",
+      "unique_id": "aa:bb-1",
+      "aliases": [
+       "hall lamp"
+      ],
+      "capabilities": {
+       "supported_color_modes": [
+        "brightness"
+       ]
+      },
+      "device_class": null,
+      "original_device_class": null,
+      "original_icon": "mdi:lightbulb"
+     },
+     "light.nope": null,
+     "automation.hall_motion": {
+      "area_id": null,
+      "categories": {},
+      "config_entry_id": null,
+      "config_subentry_id": null,
+      "created_at": "<ts>",
+      "device_id": null,
+      "disabled_by": null,
+      "entity_category": null,
+      "entity_id": "automation.hall_motion",
+      "has_entity_name": false,
+      "hidden_by": null,
+      "icon": null,
+      "id": "00000000000000000000000000000001",
+      "labels": [],
+      "modified_at": "<ts>",
+      "name": null,
+      "options": {},
+      "original_name": "Hall motion",
+      "platform": "automation",
+      "translation_key": null,
+      "unique_id": "hall",
+      "aliases": [
+       null
+      ],
+      "capabilities": {
+       "id": "hall"
+      },
+      "device_class": null,
+      "original_device_class": null,
+      "original_icon": null
+     }
+    }
+   },
+   "events": []
+  },
+  {
+   "user": "admin",
+   "ws": {
+    "id": 8,
+    "type": "config/entity_registry/update",
+    "entity_id": "automation.hall_motion",
+    "categories": {
+     "automation": null
+    },
+    "labels": [],
+    "area_id": null
+   },
+   "reply": {
+    "id": 8,
+    "type": "result",
+    "success": true,
+    "result": {
+     "entity_entry": {
+      "area_id": null,
+      "categories": {},
+      "config_entry_id": null,
+      "config_subentry_id": null,
+      "created_at": "<ts>",
+      "device_id": null,
+      "disabled_by": null,
+      "entity_category": null,
+      "entity_id": "automation.hall_motion",
+      "has_entity_name": false,
+      "hidden_by": null,
+      "icon": null,
+      "id": "00000000000000000000000000000001",
+      "labels": [],
+      "modified_at": "<ts>",
+      "name": null,
+      "options": {},
+      "original_name": "Hall motion",
+      "platform": "automation",
+      "translation_key": null,
+      "unique_id": "hall",
+      "aliases": [
+       null
+      ],
+      "capabilities": {
+       "id": "hall"
+      },
+      "device_class": null,
+      "original_device_class": null,
+      "original_icon": null
+     }
+    }
+   },
+   "events": []
+  },
+  {
+   "user": "admin",
+   "ws": {
+    "id": 9,
+    "type": "config/entity_registry/update",
+    "entity_id": "automation.hall_motion",
+    "categories": {
+     "automation": "cat_lights"
+    }
+   },
+   "reply": {
+    "id": 9,
+    "type": "result",
+    "success": true,
+    "result": {
+     "entity_entry": {
+      "area_id": null,
+      "categories": {
+       "automation": "cat_lights"
+      },
+      "config_entry_id": null,
+      "config_subentry_id": null,
+      "created_at": "<ts>",
+      "device_id": null,
+      "disabled_by": null,
+      "entity_category": null,
+      "entity_id": "automation.hall_motion",
+      "has_entity_name": false,
+      "hidden_by": null,
+      "icon": null,
+      "id": "00000000000000000000000000000001",
+      "labels": [],
+      "modified_at": "<ts>",
+      "name": null,
+      "options": {},
+      "original_name": "Hall motion",
+      "platform": "automation",
+      "translation_key": null,
+      "unique_id": "hall",
+      "aliases": [
+       null
+      ],
+      "capabilities": {
+       "id": "hall"
+      },
+      "device_class": null,
+      "original_device_class": null,
+      "original_icon": null
+     }
+    }
+   },
+   "events": [
+    {
+     "action": "update",
+     "entity_id": "automation.hall_motion",
+     "changes": {
+      "categories": {}
+     }
+    }
+   ],
+   "rows": {
+    "automation.hall_motion": {
+     "aliases": [],
+     "aliases_v2": [
+      null
+     ],
+     "area_id": null,
+     "categories": {
+      "automation": "cat_lights"
+     },
+     "capabilities": {
+      "id": "hall"
+     },
+     "config_entry_id": null,
+     "config_subentry_id": null,
+     "created_at": "<time>",
+     "device_class": null,
+     "device_id": null,
+     "disabled_by": null,
+     "entity_category": null,
+     "entity_id": "automation.hall_motion",
+     "hidden_by": null,
+     "icon": null,
+     "id": "00000000000000000000000000000001",
+     "has_entity_name": false,
+     "labels": [],
+     "modified_at": "<time>",
+     "name": null,
+     "object_id_base": null,
+     "options": {},
+     "original_device_class": null,
+     "original_icon": null,
+     "original_name": "Hall motion",
+     "platform": "automation",
+     "suggested_object_id": "hall_motion",
+     "supported_features": 0,
+     "translation_key": null,
+     "unique_id": "hall",
+     "previous_unique_id": null,
+     "unit_of_measurement": null
+    }
+   },
+   "moved": {
+    "automation.hall_motion": [
+     "modified_at"
+    ]
+   }
+  },
+  {
+   "user": "admin",
+   "ws": {
+    "id": 10,
+    "type": "config/entity_registry/update",
+    "entity_id": "automation.hall_motion",
+    "labels": [
+     "night",
+     "hall"
+    ]
+   },
+   "reply": {
+    "id": 10,
+    "type": "result",
+    "success": true,
+    "result": {
+     "entity_entry": {
+      "area_id": null,
+      "categories": {
+       "automation": "cat_lights"
+      },
+      "config_entry_id": null,
+      "config_subentry_id": null,
+      "created_at": "<ts>",
+      "device_id": null,
+      "disabled_by": null,
+      "entity_category": null,
+      "entity_id": "automation.hall_motion",
+      "has_entity_name": false,
+      "hidden_by": null,
+      "icon": null,
+      "id": "00000000000000000000000000000001",
+      "labels": [
+       "hall",
+       "night"
+      ],
+      "modified_at": "<ts>",
+      "name": null,
+      "options": {},
+      "original_name": "Hall motion",
+      "platform": "automation",
+      "translation_key": null,
+      "unique_id": "hall",
+      "aliases": [
+       null
+      ],
+      "capabilities": {
+       "id": "hall"
+      },
+      "device_class": null,
+      "original_device_class": null,
+      "original_icon": null
+     }
+    }
+   },
+   "events": [
+    {
+     "action": "update",
+     "entity_id": "automation.hall_motion",
+     "changes": {
+      "labels": []
+     }
+    }
+   ],
+   "rows": {
+    "automation.hall_motion": {
+     "aliases": [],
+     "aliases_v2": [
+      null
+     ],
+     "area_id": null,
+     "categories": {
+      "automation": "cat_lights"
+     },
+     "capabilities": {
+      "id": "hall"
+     },
+     "config_entry_id": null,
+     "config_subentry_id": null,
+     "created_at": "<time>",
+     "device_class": null,
+     "device_id": null,
+     "disabled_by": null,
+     "entity_category": null,
+     "entity_id": "automation.hall_motion",
+     "hidden_by": null,
+     "icon": null,
+     "id": "00000000000000000000000000000001",
+     "has_entity_name": false,
+     "labels": [
+      "hall",
+      "night"
+     ],
+     "modified_at": "<time>",
+     "name": null,
+     "object_id_base": null,
+     "options": {},
+     "original_device_class": null,
+     "original_icon": null,
+     "original_name": "Hall motion",
+     "platform": "automation",
+     "suggested_object_id": "hall_motion",
+     "supported_features": 0,
+     "translation_key": null,
+     "unique_id": "hall",
+     "previous_unique_id": null,
+     "unit_of_measurement": null
+    }
+   },
+   "moved": {
+    "automation.hall_motion": [
+     "modified_at"
+    ]
+   }
+  },
+  {
+   "user": "admin",
+   "ws": {
+    "id": 11,
+    "type": "config/entity_registry/update",
+    "entity_id": "automation.hall_motion",
+    "area_id": "hallway"
+   },
+   "reply": {
+    "id": 11,
+    "type": "result",
+    "success": true,
+    "result": {
+     "entity_entry": {
+      "area_id": "hallway",
+      "categories": {
+       "automation": "cat_lights"
+      },
+      "config_entry_id": null,
+      "config_subentry_id": null,
+      "created_at": "<ts>",
+      "device_id": null,
+      "disabled_by": null,
+      "entity_category": null,
+      "entity_id": "automation.hall_motion",
+      "has_entity_name": false,
+      "hidden_by": null,
+      "icon": null,
+      "id": "00000000000000000000000000000001",
+      "labels": [
+       "hall",
+       "night"
+      ],
+      "modified_at": "<ts>",
+      "name": null,
+      "options": {},
+      "original_name": "Hall motion",
+      "platform": "automation",
+      "translation_key": null,
+      "unique_id": "hall",
+      "aliases": [
+       null
+      ],
+      "capabilities": {
+       "id": "hall"
+      },
+      "device_class": null,
+      "original_device_class": null,
+      "original_icon": null
+     }
+    }
+   },
+   "events": [
+    {
+     "action": "update",
+     "entity_id": "automation.hall_motion",
+     "changes": {
+      "area_id": null
+     }
+    }
+   ],
+   "rows": {
+    "automation.hall_motion": {
+     "aliases": [],
+     "aliases_v2": [
+      null
+     ],
+     "area_id": "hallway",
+     "categories": {
+      "automation": "cat_lights"
+     },
+     "capabilities": {
+      "id": "hall"
+     },
+     "config_entry_id": null,
+     "config_subentry_id": null,
+     "created_at": "<time>",
+     "device_class": null,
+     "device_id": null,
+     "disabled_by": null,
+     "entity_category": null,
+     "entity_id": "automation.hall_motion",
+     "hidden_by": null,
+     "icon": null,
+     "id": "00000000000000000000000000000001",
+     "has_entity_name": false,
+     "labels": [
+      "hall",
+      "night"
+     ],
+     "modified_at": "<time>",
+     "name": null,
+     "object_id_base": null,
+     "options": {},
+     "original_device_class": null,
+     "original_icon": null,
+     "original_name": "Hall motion",
+     "platform": "automation",
+     "suggested_object_id": "hall_motion",
+     "supported_features": 0,
+     "translation_key": null,
+     "unique_id": "hall",
+     "previous_unique_id": null,
+     "unit_of_measurement": null
+    }
+   },
+   "moved": {
+    "automation.hall_motion": [
+     "modified_at"
+    ]
+   }
+  },
+  {
+   "user": "admin",
+   "ws": {
+    "id": 12,
+    "type": "config/entity_registry/update",
+    "entity_id": "automation.hall_motion",
+    "categories": {
+     "automation": "cat_other",
+     "helpers": "cat_h"
+    },
+    "labels": [
+     "hall"
+    ],
+    "area_id": "hallway"
+   },
+   "reply": {
+    "id": 12,
+    "type": "result",
+    "success": true,
+    "result": {
+     "entity_entry": {
+      "area_id": "hallway",
+      "categories": {
+       "automation": "cat_other",
+       "helpers": "cat_h"
+      },
+      "config_entry_id": null,
+      "config_subentry_id": null,
+      "created_at": "<ts>",
+      "device_id": null,
+      "disabled_by": null,
+      "entity_category": null,
+      "entity_id": "automation.hall_motion",
+      "has_entity_name": false,
+      "hidden_by": null,
+      "icon": null,
+      "id": "00000000000000000000000000000001",
+      "labels": [
+       "hall"
+      ],
+      "modified_at": "<ts>",
+      "name": null,
+      "options": {},
+      "original_name": "Hall motion",
+      "platform": "automation",
+      "translation_key": null,
+      "unique_id": "hall",
+      "aliases": [
+       null
+      ],
+      "capabilities": {
+       "id": "hall"
+      },
+      "device_class": null,
+      "original_device_class": null,
+      "original_icon": null
+     }
+    }
+   },
+   "events": [
+    {
+     "action": "update",
+     "entity_id": "automation.hall_motion",
+     "changes": {
+      "categories": {
+       "automation": "cat_lights"
+      },
+      "labels": [
+       "hall",
+       "night"
+      ]
+     }
+    }
+   ],
+   "rows": {
+    "automation.hall_motion": {
+     "aliases": [],
+     "aliases_v2": [
+      null
+     ],
+     "area_id": "hallway",
+     "categories": {
+      "automation": "cat_other",
+      "helpers": "cat_h"
+     },
+     "capabilities": {
+      "id": "hall"
+     },
+     "config_entry_id": null,
+     "config_subentry_id": null,
+     "created_at": "<time>",
+     "device_class": null,
+     "device_id": null,
+     "disabled_by": null,
+     "entity_category": null,
+     "entity_id": "automation.hall_motion",
+     "hidden_by": null,
+     "icon": null,
+     "id": "00000000000000000000000000000001",
+     "has_entity_name": false,
+     "labels": [
+      "hall"
+     ],
+     "modified_at": "<time>",
+     "name": null,
+     "object_id_base": null,
+     "options": {},
+     "original_device_class": null,
+     "original_icon": null,
+     "original_name": "Hall motion",
+     "platform": "automation",
+     "suggested_object_id": "hall_motion",
+     "supported_features": 0,
+     "translation_key": null,
+     "unique_id": "hall",
+     "previous_unique_id": null,
+     "unit_of_measurement": null
+    }
+   },
+   "moved": {
+    "automation.hall_motion": [
+     "modified_at"
+    ]
+   }
+  },
+  {
+   "user": "admin",
+   "ws": {
+    "id": 13,
+    "type": "config/entity_registry/update",
+    "entity_id": "automation.hall_motion",
+    "categories": {
+     "automation": null,
+     "never_set": null
+    }
+   },
+   "reply": {
+    "id": 13,
+    "type": "result",
+    "success": true,
+    "result": {
+     "entity_entry": {
+      "area_id": "hallway",
+      "categories": {
+       "helpers": "cat_h"
+      },
+      "config_entry_id": null,
+      "config_subentry_id": null,
+      "created_at": "<ts>",
+      "device_id": null,
+      "disabled_by": null,
+      "entity_category": null,
+      "entity_id": "automation.hall_motion",
+      "has_entity_name": false,
+      "hidden_by": null,
+      "icon": null,
+      "id": "00000000000000000000000000000001",
+      "labels": [
+       "hall"
+      ],
+      "modified_at": "<ts>",
+      "name": null,
+      "options": {},
+      "original_name": "Hall motion",
+      "platform": "automation",
+      "translation_key": null,
+      "unique_id": "hall",
+      "aliases": [
+       null
+      ],
+      "capabilities": {
+       "id": "hall"
+      },
+      "device_class": null,
+      "original_device_class": null,
+      "original_icon": null
+     }
+    }
+   },
+   "events": [
+    {
+     "action": "update",
+     "entity_id": "automation.hall_motion",
+     "changes": {
+      "categories": {
+       "automation": "cat_other",
+       "helpers": "cat_h"
+      }
+     }
+    }
+   ],
+   "rows": {
+    "automation.hall_motion": {
+     "aliases": [],
+     "aliases_v2": [
+      null
+     ],
+     "area_id": "hallway",
+     "categories": {
+      "helpers": "cat_h"
+     },
+     "capabilities": {
+      "id": "hall"
+     },
+     "config_entry_id": null,
+     "config_subentry_id": null,
+     "created_at": "<time>",
+     "device_class": null,
+     "device_id": null,
+     "disabled_by": null,
+     "entity_category": null,
+     "entity_id": "automation.hall_motion",
+     "hidden_by": null,
+     "icon": null,
+     "id": "00000000000000000000000000000001",
+     "has_entity_name": false,
+     "labels": [
+      "hall"
+     ],
+     "modified_at": "<time>",
+     "name": null,
+     "object_id_base": null,
+     "options": {},
+     "original_device_class": null,
+     "original_icon": null,
+     "original_name": "Hall motion",
+     "platform": "automation",
+     "suggested_object_id": "hall_motion",
+     "supported_features": 0,
+     "translation_key": null,
+     "unique_id": "hall",
+     "previous_unique_id": null,
+     "unit_of_measurement": null
+    }
+   },
+   "moved": {
+    "automation.hall_motion": [
+     "modified_at"
+    ]
+   }
+  },
+  {
+   "user": "admin",
+   "ws": {
+    "id": 14,
+    "type": "config/entity_registry/update",
+    "entity_id": "automation.hall_motion",
+    "labels": [],
+    "area_id": null
+   },
+   "reply": {
+    "id": 14,
+    "type": "result",
+    "success": true,
+    "result": {
+     "entity_entry": {
+      "area_id": null,
+      "categories": {
+       "helpers": "cat_h"
+      },
+      "config_entry_id": null,
+      "config_subentry_id": null,
+      "created_at": "<ts>",
+      "device_id": null,
+      "disabled_by": null,
+      "entity_category": null,
+      "entity_id": "automation.hall_motion",
+      "has_entity_name": false,
+      "hidden_by": null,
+      "icon": null,
+      "id": "00000000000000000000000000000001",
+      "labels": [],
+      "modified_at": "<ts>",
+      "name": null,
+      "options": {},
+      "original_name": "Hall motion",
+      "platform": "automation",
+      "translation_key": null,
+      "unique_id": "hall",
+      "aliases": [
+       null
+      ],
+      "capabilities": {
+       "id": "hall"
+      },
+      "device_class": null,
+      "original_device_class": null,
+      "original_icon": null
+     }
+    }
+   },
+   "events": [
+    {
+     "action": "update",
+     "entity_id": "automation.hall_motion",
+     "changes": {
+      "area_id": "hallway",
+      "labels": [
+       "hall"
+      ]
+     }
+    }
+   ],
+   "rows": {
+    "automation.hall_motion": {
+     "aliases": [],
+     "aliases_v2": [
+      null
+     ],
+     "area_id": null,
+     "categories": {
+      "helpers": "cat_h"
+     },
+     "capabilities": {
+      "id": "hall"
+     },
+     "config_entry_id": null,
+     "config_subentry_id": null,
+     "created_at": "<time>",
+     "device_class": null,
+     "device_id": null,
+     "disabled_by": null,
+     "entity_category": null,
+     "entity_id": "automation.hall_motion",
+     "hidden_by": null,
+     "icon": null,
+     "id": "00000000000000000000000000000001",
+     "has_entity_name": false,
+     "labels": [],
+     "modified_at": "<time>",
+     "name": null,
+     "object_id_base": null,
+     "options": {},
+     "original_device_class": null,
+     "original_icon": null,
+     "original_name": "Hall motion",
+     "platform": "automation",
+     "suggested_object_id": "hall_motion",
+     "supported_features": 0,
+     "translation_key": null,
+     "unique_id": "hall",
+     "previous_unique_id": null,
+     "unit_of_measurement": null
+    }
+   },
+   "moved": {
+    "automation.hall_motion": [
+     "modified_at"
+    ]
+   }
+  },
+  {
+   "user": "admin",
+   "ws": {
+    "id": 15,
+    "type": "config/entity_registry/update",
+    "entity_id": "automation.hall_motion"
+   },
+   "reply": {
+    "id": 15,
+    "type": "result",
+    "success": true,
+    "result": {
+     "entity_entry": {
+      "area_id": null,
+      "categories": {
+       "helpers": "cat_h"
+      },
+      "config_entry_id": null,
+      "config_subentry_id": null,
+      "created_at": "<ts>",
+      "device_id": null,
+      "disabled_by": null,
+      "entity_category": null,
+      "entity_id": "automation.hall_motion",
+      "has_entity_name": false,
+      "hidden_by": null,
+      "icon": null,
+      "id": "00000000000000000000000000000001",
+      "labels": [],
+      "modified_at": "<ts>",
+      "name": null,
+      "options": {},
+      "original_name": "Hall motion",
+      "platform": "automation",
+      "translation_key": null,
+      "unique_id": "hall",
+      "aliases": [
+       null
+      ],
+      "capabilities": {
+       "id": "hall"
+      },
+      "device_class": null,
+      "original_device_class": null,
+      "original_icon": null
+     }
+    }
+   },
+   "events": []
+  },
+  {
+   "user": "admin",
+   "ws": {
+    "id": 16,
+    "type": "config/entity_registry/update",
+    "entity_id": "light.hall",
+    "area_id": "an area nobody made",
+    "labels": [
+     "x",
+     "x",
+     "a"
+    ]
+   },
+   "reply": {
+    "id": 16,
+    "type": "result",
+    "success": true,
+    "result": {
+     "entity_entry": {
+      "area_id": "an area nobody made",
+      "categories": {
+       "helpers": "cat_h"
+      },
+      "config_entry_id": null,
+      "config_subentry_id": null,
+      "created_at": "<ts>",
+      "device_id": null,
+      "disabled_by": null,
+      "entity_category": null,
+      "entity_id": "light.hall",
+      "has_entity_name": true,
+      "hidden_by": null,
+      "icon": "mdi:lamp",
+      "id": "00000000000000000000000000000003",
+      "labels": [
+       "a",
+       "x"
+      ],
+      "modified_at": "<ts>",
+      "name": "Hallway light",
+      "options": {
+       "conversation": {
+        "should_expose": true
+       }
+      },
+      "original_name": "Hall",
+      "platform": "hue",
+      "translation_key": "hall",
+      "unique_id": "aa:bb-1",
+      "aliases": [
+       "hall lamp"
+      ],
+      "capabilities": {
+       "supported_color_modes": [
+        "brightness"
+       ]
+      },
+      "device_class": null,
+      "original_device_class": null,
+      "original_icon": "mdi:lightbulb"
+     }
+    }
+   },
+   "events": [
+    {
+     "action": "update",
+     "entity_id": "light.hall",
+     "changes": {
+      "area_id": "hallway",
+      "labels": [
+       "night"
+      ]
+     }
+    }
+   ],
+   "rows": {
+    "light.hall": {
+     "aliases": [],
+     "aliases_v2": [
+      "hall lamp"
+     ],
+     "area_id": "an area nobody made",
+     "categories": {
+      "helpers": "cat_h"
+     },
+     "capabilities": {
+      "supported_color_modes": [
+       "brightness"
+      ]
+     },
+     "config_entry_id": null,
+     "config_subentry_id": null,
+     "created_at": "<time>",
+     "device_class": null,
+     "device_id": null,
+     "disabled_by": null,
+     "entity_category": null,
+     "entity_id": "light.hall",
+     "hidden_by": null,
+     "icon": "mdi:lamp",
+     "id": "00000000000000000000000000000003",
+     "has_entity_name": true,
+     "labels": [
+      "a",
+      "x"
+     ],
+     "modified_at": "<time>",
+     "name": "Hallway light",
+     "object_id_base": null,
+     "options": {
+      "conversation": {
+       "should_expose": true
+      }
+     },
+     "original_device_class": null,
+     "original_icon": "mdi:lightbulb",
+     "original_name": "Hall",
+     "platform": "hue",
+     "suggested_object_id": "hall",
+     "supported_features": 44,
+     "translation_key": "hall",
+     "unique_id": "aa:bb-1",
+     "previous_unique_id": null,
+     "unit_of_measurement": null
+    }
+   },
+   "moved": {
+    "light.hall": [
+     "modified_at"
+    ]
+   }
+  },
+  {
+   "user": "admin",
+   "ws": {
+    "id": 17,
+    "type": "config/entity_registry/get",
+    "entity_id": "automation.hall_motion"
+   },
+   "reply": {
+    "id": 17,
+    "type": "result",
+    "success": true,
+    "result": {
+     "area_id": null,
+     "categories": {
+      "helpers": "cat_h"
+     },
+     "config_entry_id": null,
+     "config_subentry_id": null,
+     "created_at": "<ts>",
+     "device_id": null,
+     "disabled_by": null,
+     "entity_category": null,
+     "entity_id": "automation.hall_motion",
+     "has_entity_name": false,
+     "hidden_by": null,
+     "icon": null,
+     "id": "00000000000000000000000000000001",
+     "labels": [],
+     "modified_at": "<ts>",
+     "name": null,
+     "options": {},
+     "original_name": "Hall motion",
+     "platform": "automation",
+     "translation_key": null,
+     "unique_id": "hall",
+     "aliases": [
+      null
+     ],
+     "capabilities": {
+      "id": "hall"
+     },
+     "device_class": null,
+     "original_device_class": null,
+     "original_icon": null
+    }
+   },
+   "events": []
+  },
+  {
+   "user": "user",
+   "ws": {
+    "id": 3,
+    "type": "config/entity_registry/update",
+    "entity_id": "automation.hall_motion",
+    "labels": [
+     "a"
+    ]
+   },
+   "reply": {
+    "id": 3,
+    "type": "result",
+    "success": false,
+    "error": {
+     "code": "unauthorized",
+     "message": "Unauthorized"
+    }
+   },
+   "events": []
+  },
+  {
+   "user": "admin",
+   "ws": {
+    "id": 18,
+    "type": "config/entity_registry/update",
+    "entity_id": "light.nope",
+    "labels": [
+     "a"
+    ]
+   },
+   "reply": {
+    "id": 18,
+    "type": "result",
+    "success": false,
+    "error": {
+     "code": "not_found",
+     "message": "Entity not found"
+    }
+   },
+   "events": []
+  },
+  {
+   "user": "admin",
+   "ws": {
+    "id": 19,
+    "type": "config/entity_registry/update",
+    "labels": [
+     "a"
+    ]
+   },
+   "reply": {
+    "id": 19,
+    "type": "result",
+    "success": false,
+    "error": {
+     "code": "invalid_format",
+     "message": "required key not provided @ data['entity_id']. Got None"
+    }
+   },
+   "events": []
+  },
+  {
+   "user": "admin",
+   "ws": {
+    "id": 20,
+    "type": "config/entity_registry/update",
+    "entity_id": "automation.hall_motion",
+    "labels": "a"
+   },
+   "reply": {
+    "id": 20,
+    "type": "result",
+    "success": false,
+    "error": {
+     "code": "invalid_format",
+     "message": "expected a list for dictionary value @ data['labels']. Got 'a'"
+    }
+   },
+   "events": []
+  },
+  {
+   "user": "admin",
+   "ws": {
+    "id": 21,
+    "type": "config/entity_registry/update",
+    "entity_id": "automation.hall_motion",
+    "labels": [
+     1
+    ]
+   },
+   "reply": {
+    "id": 21,
+    "type": "result",
+    "success": false,
+    "error": {
+     "code": "invalid_format",
+     "message": "expected str @ data['labels'][0]. Got 1"
+    }
+   },
+   "events": []
+  },
+  {
+   "user": "admin",
+   "ws": {
+    "id": 22,
+    "type": "config/entity_registry/update",
+    "entity_id": "automation.hall_motion",
+    "area_id": 5
+   },
+   "reply": {
+    "id": 22,
+    "type": "result",
+    "success": false,
+    "error": {
+     "code": "invalid_format",
+     "message": "expected str for dictionary value @ data['area_id']. Got 5"
+    }
+   },
+   "events": []
+  },
+  {
+   "user": "admin",
+   "ws": {
+    "id": 23,
+    "type": "config/entity_registry/update",
+    "entity_id": "automation.hall_motion",
+    "categories": [
+     "automation"
+    ]
+   },
+   "reply": {
+    "id": 23,
+    "type": "result",
+    "success": false,
+    "error": {
+     "code": "invalid_format",
+     "message": "expected dictionary for dictionary value @ data['categories']. Got ['automation']"
+    }
+   },
+   "events": []
+  },
+  {
+   "user": "admin",
+   "ws": {
+    "id": 24,
+    "type": "config/entity_registry/update",
+    "entity_id": "automation.hall_motion",
+    "categories": {
+     "Not A Slug": "x"
+    }
+   },
+   "reply": {
+    "id": 24,
+    "type": "result",
+    "success": false,
+    "error": {
+     "code": "invalid_format",
+     "message": "invalid slug Not A Slug (try not_a_slug) for dictionary value @ data['categories']. Got {'Not A Slug': 'x'}"
+    }
+   },
+   "events": []
+  },
+  {
+   "user": "admin",
+   "ws": {
+    "id": 25,
+    "type": "config/entity_registry/update",
+    "entity_id": "automation.hall_motion",
+    "categories": {
+     "automation": 5
+    }
+   },
+   "reply": {
+    "id": 25,
+    "type": "result",
+    "success": false,
+    "error": {
+     "code": "invalid_format",
+     "message": "expected str for dictionary value @ data['categories']['automation']. Got 5"
+    }
+   },
+   "events": []
+  },
+  {
+   "user": "admin",
+   "ws": {
+    "id": 26,
+    "type": "config/entity_registry/update",
+    "entity_id": "automation.hall_motion",
+    "nope": 1
+   },
+   "reply": {
+    "id": 26,
+    "type": "result",
+    "success": false,
+    "error": {
+     "code": "invalid_format",
+     "message": "extra keys not allowed @ data['nope']. Got 1"
+    }
+   },
+   "events": []
+  },
+  {
+   "user": "admin",
+   "ws": {
+    "id": 27,
+    "type": "config/category_registry/list",
+    "scope": "automation"
+   },
+   "reply": {
+    "id": 27,
+    "type": "result",
+    "success": true,
+    "result": [
+     {
+      "category_id": "<ulid>",
+      "created_at": "<ts>",
+      "icon": null,
+      "modified_at": "<ts>",
+      "name": "Lights"
+     },
+     {
+      "category_id": "<ulid>",
+      "created_at": "<ts>",
+      "icon": null,
+      "modified_at": "<ts>",
+      "name": "Other"
+     }
+    ]
+   },
+   "events": []
+  },
+  {
+   "user": "admin",
+   "ws": {
+    "id": 28,
+    "type": "config/category_registry/list",
+    "scope": "script"
+   },
+   "reply": {
+    "id": 28,
+    "type": "result",
+    "success": true,
+    "result": [
+     {
+      "category_id": "<ulid>",
+      "created_at": "<ts>",
+      "icon": null,
+      "modified_at": "<ts>",
+      "name": "Scripts"
+     }
+    ]
+   },
+   "events": []
+  },
+  {
+   "user": "user",
+   "ws": {
+    "id": 4,
+    "type": "config/category_registry/list",
+    "scope": "automation"
+   },
+   "reply": {
+    "id": 4,
+    "type": "result",
+    "success": true,
+    "result": [
+     {
+      "category_id": "<ulid>",
+      "created_at": "<ts>",
+      "icon": null,
+      "modified_at": "<ts>",
+      "name": "Lights"
+     },
+     {
+      "category_id": "<ulid>",
+      "created_at": "<ts>",
+      "icon": null,
+      "modified_at": "<ts>",
+      "name": "Other"
+     }
+    ]
+   },
+   "events": []
+  },
+  {
+   "user": "admin",
+   "ws": {
+    "id": 29,
+    "type": "config/category_registry/list"
+   },
+   "reply": {
+    "id": 29,
+    "type": "result",
+    "success": false,
+    "error": {
+     "code": "invalid_format",
+     "message": "required key not provided @ data['scope']. Got None"
+    }
+   },
+   "events": []
+  },
+  {
+   "user": "admin",
+   "ws": {
+    "id": 30,
+    "type": "config/category_registry/list",
+    "scope": 5
+   },
+   "reply": {
+    "id": 30,
+    "type": "result",
+    "success": false,
+    "error": {
+     "code": "invalid_format",
+     "message": "expected str for dictionary value @ data['scope']. Got 5"
+    }
+   },
+   "events": []
+  },
+  {
+   "user": "admin",
+   "ws": {
+    "id": 31,
+    "type": "config/category_registry/list",
+    "scope": "automation",
+    "extra": 1
+   },
+   "reply": {
+    "id": 31,
+    "type": "result",
+    "success": false,
+    "error": {
+     "code": "invalid_format",
+     "message": "extra keys not allowed @ data['extra']. Got 1"
+    }
+   },
+   "events": []
+  }
+ ]
+}

@@ -39,6 +39,13 @@ pub struct Registry {
 /// as it is, `Some(None)` clears it.
 #[derive(Debug, Clone, Default)]
 pub struct EntityPatch {
+    /// The user's area (`config/entity_registry/update`).
+    pub area_id: Option<Option<String>>,
+    /// The user's categories, by scope: the whole mapping.
+    pub categories: Option<Map<String, Value>>,
+    /// The user's labels: a set (the order given is kept, repeats
+    /// dropped).
+    pub labels: Option<Vec<String>>,
     pub capabilities: Option<Option<Value>>,
     pub config_entry_id: Option<Option<String>>,
     pub device_class: Option<Option<String>>,
@@ -821,6 +828,30 @@ fn apply(row: &mut Entity, patch: &EntityPatch) -> Map<String, Value> {
         {
             changes.insert(key.into(), json!(field));
             field.clone_from(v);
+        }
+    }
+    set(&mut changes, "area_id", &mut row.area_id, &patch.area_id);
+    if let Some(categories) = &patch.categories {
+        let old = row.categories.object();
+        if &old != categories {
+            changes.insert("categories".into(), Value::Object(old));
+            row.categories = RawJson::new(&Value::Object(categories.clone()));
+        }
+    }
+    if let Some(labels) = &patch.labels {
+        // Sets in HA: the same labels in another order are no change.
+        let mut new: Vec<String> = Vec::with_capacity(labels.len());
+        for l in labels {
+            if !new.contains(l) {
+                new.push(l.clone());
+            }
+        }
+        let same = new.len() == row.labels.len() && new.iter().all(|l| row.labels.contains(l));
+        if !same {
+            let mut old = row.labels.clone();
+            old.sort_unstable();
+            changes.insert("labels".into(), json!(old));
+            row.labels = new;
         }
     }
     if let Some(caps) = &patch.capabilities {

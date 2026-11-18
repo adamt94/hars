@@ -8,13 +8,13 @@ data in Home Assistant's own file formats. A fresh install idles at about
 
 It is early software. **Works today:** setting up in the browser with Home
 Assistant's onboarding screens, the web UI and login, dashboards, history and
-logbook, the iOS companion app (including push notifications to it), YAML
-automations (state, numeric-state, time and template triggers, with
-templates in their conditions, variables and service calls: "it's 28°C in
-the lounge" to your phone), the `sun`, `met`, `hue`, `lifx`,
+logbook, the iOS companion app (including push notifications to it),
+automations in YAML or made and edited in Settings (state, numeric-state,
+time and template triggers, with templates in their conditions, variables
+and service calls: "it's 28°C in the lounge" to your phone), the `sun`, `met`, `hue`, `lifx`,
 `switchbot_cloud`, `mobile_app`, `person` and `zone` integrations, and
 importing a Home Assistant 2026.6 install. **Not yet:** adding
-integrations or editing automations from the UI, the `delay` and
+integrations from the UI, automation traces, the `delay` and
 `wait_template` actions, templates beyond states, time, maths and type
 casts (no areas, devices, labels, regex or JSON functions yet, and no live
 re-rendering of `render_template`), scripts, other kinds of notifications

@@ -13,6 +13,7 @@ mod commands;
 mod config;
 mod config_entries;
 mod entities;
+mod entity_registry;
 mod frontend;
 mod history;
 mod logbook;

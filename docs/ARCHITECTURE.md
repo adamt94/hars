@@ -272,6 +272,7 @@ All of it is in `ha-api`; `ha_api::router` builds it.
 | REST `/api/…` | `rest.rs`, `automation.rs`, `lib.rs` (`/api/config`), `mobile_app::registration_routes` (`/api/mobile_app/registrations`) | Behind `auth::require_auth`; each route's permission is in `auth::required_permission` |
 | Auth `/auth/…` | `auth.rs` | Login flow, token, revoke; HA's `.storage/auth*` files. `/auth/token` and `/auth/revoke` allow CORS from any origin (`cors.rs`, aiohttp_cors as HA sets it up) |
 | WebSocket `/api/websocket` | `ws/` | Authenticates in the protocol; `ws/commands.rs::dispatch` matches the command type, then asks each domain's module (`ws/weather.rs`, `ws/history.rs`, …) |
+| The frontend's Settings panel | `ws/entity_registry.rs`, `automation.rs`, `ws/automation.rs` | Registered for admins (`ws/commands.rs::panels`). hars answers what the automation pages ask for; the roadmap lists the pages that still have gaps |
 | Companion app webhook `/api/webhook/{id}` | `mobile_app/` | The webhook id is the credential; encryption is required for registrations with `supports_encryption` enabled |
 | Companion app push channel (WS `mobile_app/push_notification_*`) | `ws/mobile_app.rs` | The commands only; the channels, the confirm timers and cloud push (through `ha-http`) are `ha_integrations::mobile_app::notify`'s, reached through `ApiConfig.mobile_app` |
 | Frontend `/`, `/frontend_latest/…` | `frontend.rs` | Served from `HARS_FRONTEND` on disk with precompressed files ([ADR 0004](adr/0004-frontend-from-disk.md)) |

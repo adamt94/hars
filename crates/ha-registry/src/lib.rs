@@ -34,6 +34,8 @@ pub const DEVICE_KEY: &str = "core.device_registry";
 pub const AREA_KEY: &str = "core.area_registry";
 pub const FLOOR_KEY: &str = "core.floor_registry";
 pub const LABEL_KEY: &str = "core.label_registry";
+/// Read only (hars has no command that changes categories).
+pub const CATEGORY_KEY: &str = "core.category_registry";
 /// The stores, with their versions (major, minor).
 pub const STORES: [(&str, u32, u32); 5] = [
     (ENTITY_KEY, 1, 22),
@@ -341,6 +343,54 @@ pub struct Entity {
 }
 
 impl Entity {
+    /// `RegistryEntry.as_partial_dict`: a row of
+    /// `config/entity_registry/list`.
+    pub fn partial_json(&self) -> Map<String, Value> {
+        let mut m = Map::new();
+        m.insert("area_id".into(), json!(self.area_id));
+        m.insert("categories".into(), Value::Object(self.categories.object()));
+        m.insert("config_entry_id".into(), json!(self.config_entry_id));
+        m.insert("config_subentry_id".into(), json!(self.config_subentry_id));
+        m.insert("created_at".into(), timestamp(&self.created_at));
+        m.insert("device_id".into(), json!(self.device_id));
+        m.insert("disabled_by".into(), json!(self.disabled_by));
+        m.insert("entity_category".into(), json!(self.entity_category));
+        m.insert("entity_id".into(), json!(self.entity_id));
+        m.insert("has_entity_name".into(), json!(self.has_entity_name));
+        m.insert("hidden_by".into(), json!(self.hidden_by));
+        m.insert("icon".into(), json!(self.icon));
+        m.insert("id".into(), json!(self.id));
+        m.insert("labels".into(), json!(self.labels));
+        m.insert("modified_at".into(), timestamp(&self.modified_at));
+        m.insert("name".into(), json!(self.name));
+        m.insert("options".into(), Value::Object(self.options.object()));
+        m.insert("original_name".into(), json!(self.original_name));
+        m.insert("platform".into(), json!(self.platform));
+        m.insert("translation_key".into(), json!(self.translation_key));
+        m.insert("unique_id".into(), json!(self.unique_id));
+        m
+    }
+
+    /// `RegistryEntry.extended_dict`: what `config/entity_registry/get`
+    /// and `update` answer.
+    pub fn extended_json(&self) -> Map<String, Value> {
+        let mut m = self.partial_json();
+        m.insert("aliases".into(), json!(self.aliases_v2));
+        m.insert(
+            "capabilities".into(),
+            self.capabilities
+                .as_ref()
+                .map_or(Value::Null, RawJson::value),
+        );
+        m.insert("device_class".into(), json!(self.device_class));
+        m.insert(
+            "original_device_class".into(),
+            json!(self.original_device_class),
+        );
+        m.insert("original_icon".into(), json!(self.original_icon));
+        m
+    }
+
     /// What a registered entity nobody provides shows
     /// (`RegistryEntry.write_unavailable_state`): `restored`, then what
     /// the registry knows of it. Its state is `unavailable`.
@@ -616,6 +666,9 @@ pub struct Registries {
     pub area_minor: u32,
     pub floors: Vec<Floor>,
     pub labels: Vec<Label>,
+    /// `core.category_registry`'s `categories`: each scope's rows, as
+    /// stored.
+    pub categories: Arc<Map<String, Value>>,
 }
 
 fn store_minor(store: &Store) -> u32 {
@@ -647,6 +700,25 @@ fn check_minor(store: &Store, loaded: u32) -> std::io::Result<()> {
         )));
     }
     Ok(())
+}
+
+/// `core.category_registry`'s `categories`, or none if the file is
+/// missing or can't be read (hars only lists them).
+fn categories(config_dir: &Path) -> Map<String, Value> {
+    let file = config_dir.join(".storage").join(CATEGORY_KEY);
+    let Ok(text) = std::fs::read_to_string(file) else {
+        return Map::new();
+    };
+    match serde_json::from_str::<Value>(&text) {
+        Ok(mut v) => match v["data"]["categories"].take() {
+            Value::Object(scopes) => scopes,
+            _ => Map::new(),
+        },
+        Err(e) => {
+            tracing::error!("{CATEGORY_KEY} is not valid JSON: {e}");
+            Map::new()
+        }
+    }
 }
 
 fn store(dir: &Path, key: &'static str) -> Store {
@@ -720,6 +792,7 @@ impl Registries {
             area_minor,
             floors: floors.floors,
             labels: labels.labels,
+            categories: Arc::new(categories(config_dir)),
         };
         r.migrate(entity_minor, device_minor, area_minor, floor_minor);
         Ok(r)

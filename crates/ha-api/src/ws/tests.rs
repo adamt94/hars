@@ -294,6 +294,16 @@ async fn startup_commands_have_has_shapes() {
     }
     assert_eq!(panels["lovelace"]["config"], Value::Null);
     assert_eq!(panels["home"]["show_in_sidebar"], false);
+    // Settings, as `config` registers it: for admins.
+    assert_eq!(
+        panels["config"],
+        json!({
+            "component_name": "config", "icon": "mdi:cog", "title": "config",
+            "default_visible": true, "config": null, "url_path": "config",
+            "require_admin": true, "config_panel_domain": null,
+            "show_in_sidebar": true,
+        })
+    );
     // Nothing records here, so neither the components nor their panels.
     for p in ["recorder", "history", "logbook"] {
         assert!(
@@ -3211,4 +3221,167 @@ async fn read_only_users_render_templates() {
         .await;
     assert_eq!(r["success"], true);
     assert_eq!(c.recv().await["event"]["result"], 42);
+}
+
+/// A vector's value as compared: times, a category's id and the order of
+/// labels (a set in HA) taken out, as `scripts/vectors/entity_registry_ws.py`
+/// writes them.
+fn registry_scrub(v: &Value, key: Option<&str>) -> Value {
+    match v {
+        Value::Object(m) => Value::Object(
+            m.iter()
+                .map(|(k, v)| (k.clone(), registry_scrub(v, Some(k))))
+                .collect(),
+        ),
+        Value::Array(items) if key == Some("labels") => {
+            let mut items = items.clone();
+            items.sort_by_key(|i| i.to_string());
+            Value::Array(items)
+        }
+        Value::Array(items) => {
+            Value::Array(items.iter().map(|i| registry_scrub(i, None)).collect())
+        }
+        Value::Number(_) if matches!(key, Some("created_at" | "modified_at")) => json!("<ts>"),
+        Value::String(s) if s.parse::<jiff::Timestamp>().is_ok() && s.contains('T') => {
+            json!("<time>")
+        }
+        Value::String(s)
+            if s.len() == 26
+                && s.bytes()
+                    .all(|b| b.is_ascii_digit() || b.is_ascii_uppercase()) =>
+        {
+            json!("<ulid>")
+        }
+        other => other.clone(),
+    }
+}
+
+/// Against `vectors/entity_registry.json`, made by
+/// `scripts/vectors/entity_registry_ws.py` sending the messages to HA
+/// 2026.6.1 over a WebSocket: `config/entity_registry/list`, `get`,
+/// `get_entries` and `update` (the user's area, labels and categories) and
+/// `config/category_registry/list`, from an admin and from a user. Each
+/// reply, the `entity_registry_updated` events an update fires, and the
+/// row as stored afterwards.
+#[tokio::test]
+async fn entity_registry_commands_match_ha() {
+    let all: Value = serde_json::from_str(include_str!("vectors/entity_registry.json")).unwrap();
+    let dir = std::env::temp_dir().join(format!("hars-ws-registry-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(dir.join(".storage")).unwrap();
+    for (key, minor) in [("core.entity_registry", 22), ("core.category_registry", 2)] {
+        let store = json!({"version": 1, "minor_version": minor, "key": key,
+                           "data": all["stores"][key]});
+        std::fs::write(dir.join(".storage").join(key), store.to_string()).unwrap();
+    }
+    let registries = ha_registry::Registries::load(&dir).unwrap();
+    let hass = Hass::new();
+    let registry = ha_registry::Registry::in_memory(&hass, registries);
+    let s = server_on(
+        hass.clone(),
+        crate::ApiConfig {
+            registry: Some(registry.clone()),
+            ..Default::default()
+        },
+    )
+    .await;
+    // A second user, in HA's `system-users` group.
+    s.auth.add_user("user", "pw").unwrap();
+    const CLIENT: &str = "http://127.0.0.1:8123/";
+    let flow = s.auth.start_login_flow(CLIENT, None);
+    let login = s.auth.check_password("user", "pw").unwrap();
+    let code = s
+        .auth
+        .finish_login_flow(&flow, CLIENT, &login, None)
+        .unwrap();
+    let user = s
+        .auth
+        .exchange_code(Some(CLIENT), Some(&code), None)
+        .unwrap()
+        .access_token;
+    let user_id = s.auth.validate_access_token(&user, None).unwrap().user_id;
+    s.auth.set_user_groups(&user_id, &[ha_auth::GROUP_ID_USER]);
+    let mut admin = Client::authed(&s, &token(&s.auth).0).await;
+    let mut user = Client::authed(&s, &user).await;
+    let mut bus = hass.bus().subscribe();
+    let rows = |registry: &ha_registry::Registry| -> std::collections::BTreeMap<String, Value> {
+        registry
+            .snapshot()
+            .entities
+            .iter()
+            .map(|e| (e.entity_id.clone(), serde_json::to_value(&**e).unwrap()))
+            .collect()
+    };
+    let mut failures = Vec::new();
+    for step in all["steps"].as_array().unwrap() {
+        let before = rows(&registry);
+        let client = match step["user"].as_str().unwrap() {
+            "admin" => &mut admin,
+            _ => &mut user,
+        };
+        let reply = client.call(step["ws"].clone()).await;
+        let mut events = Vec::new();
+        while let Ok(e) = bus.try_recv() {
+            if let ha_core::EventKind::Custom { name, data } = &e.kind
+                && name == "entity_registry_updated"
+            {
+                events.push(registry_scrub(data, None));
+            }
+        }
+        let after = rows(&registry);
+        let changed: serde_json::Map<String, Value> = after
+            .iter()
+            .filter(|(k, v)| before.get(*k) != Some(v))
+            .map(|(k, v)| (k.clone(), registry_scrub(v, None)))
+            .collect();
+        let moved: serde_json::Map<String, Value> = changed
+            .keys()
+            .map(|k| {
+                let stamps: Vec<&str> = ["created_at", "modified_at"]
+                    .into_iter()
+                    .filter(|s| after[k][s] != before[k][s])
+                    .collect();
+                (k.clone(), json!(stamps))
+            })
+            .collect();
+        let mut got = json!({"reply": registry_scrub(&reply, None), "events": events});
+        if !changed.is_empty() {
+            got["rows"] = Value::Object(changed);
+            got["moved"] = Value::Object(moved);
+        }
+        let mut want = registry_scrub(step, None);
+        let want = want.as_object_mut().unwrap();
+        want.remove("user");
+        want.remove("ws");
+        if got != Value::Object(want.clone()) {
+            failures.push(format!(
+                "{} {}\n  HA:   {}\n  hars: {got}",
+                step["user"],
+                step["ws"],
+                Value::Object(want.clone())
+            ));
+        }
+    }
+    let _ = std::fs::remove_dir_all(&dir);
+    assert!(
+        failures.is_empty(),
+        "{} of {} steps differ from HA:\n{}",
+        failures.len(),
+        all["steps"].as_array().unwrap().len(),
+        failures.join("\n")
+    );
+    // hars's own answers: no blueprints, and the fields it can't change.
+    assert_eq!(
+        admin
+            .call(json!({"id": 900, "type": "blueprint/list", "domain": "automation"}))
+            .await["result"],
+        json!({})
+    );
+    assert_eq!(
+        admin
+            .call(json!({"id": 901, "type": "config/entity_registry/update",
+                         "entity_id": "light.hall", "name": "New name"}))
+            .await["error"],
+        json!({"code": "not_supported", "message": "hars can't change an entity's name yet"})
+    );
 }

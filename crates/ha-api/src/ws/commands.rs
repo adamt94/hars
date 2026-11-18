@@ -73,6 +73,7 @@ pub(super) fn dispatch(conn: &mut Conn, id: u64, ty: &str, msg: &Map<String, Val
             .or_else(|| super::sensor::dispatch(conn, id, ty, msg))
             .or_else(|| super::manifest::dispatch(conn, id, ty, msg))
             .or_else(|| super::automation::dispatch(conn, id, ty, msg))
+            .or_else(|| super::entity_registry::dispatch(conn, id, ty, msg))
             .or_else(|| super::mobile_app::dispatch(conn, id, ty, msg))
             .or_else(|| super::recorder::dispatch(conn, id, ty, msg))
             .or_else(|| super::history::dispatch(conn, id, ty, msg))
@@ -152,7 +153,7 @@ fn services(conn: &Conn) -> Value {
 
 /// The panels a default HA 2026.6.1 install registers that `hars` can
 /// serve. `home` is the frontend's default panel; `lovelace` without a
-/// config redirects there. `config` arrives with the settings commands.
+/// config redirects there.
 fn panels(is_admin: bool, recording: bool, dashboards: Vec<(String, Value)>) -> Value {
     let panel = |url: &str, title: Option<&str>, icon: Option<&str>, sidebar: bool, admin: bool| {
         (
@@ -197,6 +198,8 @@ fn panels(is_admin: bool, recording: bool, dashboards: Vec<(String, Value)>) -> 
         panel("profile", None, None, true, false),
         panel("notfound", None, None, true, false),
         panel("lovelace", None, None, true, false),
+        // Settings (`config/__init__.py`): for admins.
+        panel("config", Some("config"), Some("mdi:cog"), true, true),
     ];
     // `history/__init__.py` and `logbook/__init__.py`: there with the
     // recorder, as the components `get_config` lists.

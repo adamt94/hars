@@ -352,9 +352,22 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
       All 19 scenarios of `scripts/vectors/automation_editor.py` match. An
       automation whose `id` isn't a string, or whose alias or description
       isn't text, is dropped, as in HA
-- [ ] The Settings panel, so the editor's pages can be opened (they need
-      `config/entity_registry/list|get|update` and the category and
-      blueprint lists too); traces
+- [x] The Settings panel (`config`, for admins), so the automation list
+      and editor can be opened, with what their pages ask for: WS
+      `config/entity_registry/list`, `get`, `get_entries` and `update`
+      (the user's area, labels and categories; a name, an icon, a new
+      entity id, disabling, hiding, aliases and options are refused: hars's
+      entities don't follow a registry change yet),
+      `config/category_registry/list` (read from the store) and
+      `blueprint/list` (none). All 35 steps of
+      `scripts/vectors/entity_registry_ws.py` match; in Chromium with the
+      pinned frontend an automation is renamed and saved from the editor.
+      Other Settings pages open but have gaps: adding integrations and
+      helpers, users (`config/auth/list`), backups, system health, the
+      event tool (`/api/events`), exposing entities to Assist
+- [ ] Traces; the editor's `trigger_platforms/subscribe`,
+      `condition_platforms/subscribe` and `validate_config` (the pages work
+      without them)
 - [x] Inventory triggers/conditions/actions/modes with HA 2026.6.1 semantics,
       matched against HA's own engine on 36 scenario vectors:
   - [x] `numeric_state` fires on crossing only; covers threshold equality,
