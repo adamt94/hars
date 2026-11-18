@@ -1212,5 +1212,67 @@ fn resolve_plain(v: &str) -> Result<Yaml, YamlError> {
 mod dump;
 pub use dump::dump;
 
+impl Yaml {
+    /// A JSON text as Python's `json.loads` reads it: objects keep their
+    /// keys in the order written (a key written twice keeps its first
+    /// place and its last value). What the editor posts and HA then
+    /// writes to YAML in that order.
+    pub fn from_json_text(text: &str) -> Result<Yaml, serde_json::Error> {
+        struct Visitor;
+        impl<'de> serde::de::Visitor<'de> for Visitor {
+            type Value = Yaml;
+
+            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                f.write_str("a JSON value")
+            }
+            fn visit_unit<E>(self) -> Result<Yaml, E> {
+                Ok(Yaml::Null)
+            }
+            fn visit_bool<E>(self, v: bool) -> Result<Yaml, E> {
+                Ok(Yaml::Bool(v))
+            }
+            fn visit_i64<E>(self, v: i64) -> Result<Yaml, E> {
+                Ok(Yaml::Int(v.into()))
+            }
+            fn visit_u64<E>(self, v: u64) -> Result<Yaml, E> {
+                Ok(Yaml::Int(v.into()))
+            }
+            fn visit_f64<E>(self, v: f64) -> Result<Yaml, E> {
+                Ok(Yaml::Float(v))
+            }
+            fn visit_str<E>(self, v: &str) -> Result<Yaml, E> {
+                Ok(Yaml::Str(v.to_owned()))
+            }
+            fn visit_string<E>(self, v: String) -> Result<Yaml, E> {
+                Ok(Yaml::Str(v))
+            }
+            fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Yaml, A::Error> {
+                let mut items = Vec::new();
+                while let Some(item) = seq.next_element::<Json>()? {
+                    items.push(item.0);
+                }
+                Ok(Yaml::Seq(items))
+            }
+            fn visit_map<A: serde::de::MapAccess<'de>>(self, mut map: A) -> Result<Yaml, A::Error> {
+                let mut pairs: Vec<(Yaml, Yaml)> = Vec::new();
+                while let Some((key, value)) = map.next_entry::<String, Json>()? {
+                    match pairs.iter_mut().find(|(k, _)| k.as_str() == Some(&key)) {
+                        Some(pair) => pair.1 = value.0,
+                        None => pairs.push((Yaml::Str(key), value.0)),
+                    }
+                }
+                Ok(Yaml::Map(pairs))
+            }
+        }
+        struct Json(Yaml);
+        impl<'de> serde::Deserialize<'de> for Json {
+            fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+                d.deserialize_any(Visitor).map(Json)
+            }
+        }
+        serde_json::from_str::<Json>(text).map(|j| j.0)
+    }
+}
+
 #[cfg(test)]
 mod tests;

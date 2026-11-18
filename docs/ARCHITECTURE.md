@@ -228,6 +228,13 @@ and `last_triggered` from that cache. Reloads run one at a time. An
 automation with an `id` has an entity registry row, made when it is first
 seen, which is where its entity id comes from.
 
+The editor's saves (`ha-api`'s `automation.rs`) rewrite `automations.yaml`
+whole, as HA does: the file is loaded, the posted entry put in place of
+the one with its id (or at the end), and the list written with
+`ha_core::yaml::dump` to a temporary file renamed over the old one. Then
+`automation.reload` runs for that id. A delete removes the entry, then the
+automation's registry row and entity.
+
 ### Shadow mode
 
 With `HARS_SHADOW=1`, `call_service` still validates and fires the event,

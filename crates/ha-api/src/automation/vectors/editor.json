@@ -1,0 +1,2897 @@
+{
+ "scenarios": [
+  {
+   "name": "resave_unchanged",
+   "doc": "What the entry's GET answered, posted back: the whole file is written again in HA's style and the posted entry's keys in HA's order; nothing is reloaded but the event fires.",
+   "file": "- id: kitchen_off\n  alias: Kitchen lights - off at 11:30pm\n  description: Turn off the kitchen light and lamp every night at 11:30pm.\n  mode: single\n  triggers:\n  - trigger: time\n    at: \"23:30:00\"\n  actions:\n  - action: light.turn_off\n    target:\n      entity_id:\n      - light.kitchen\n      - light.lamp\n    data:\n      transition: 10\n- id: hall_motion\n  alias: Hallway lights - motion on when dark\n  description: Turn on hallway lights when motion is detected below 30 lux, using dim overnight and gentle morning levels.\n  mode: restart\n  triggers:\n  - trigger: state\n    entity_id: binary_sensor.hall_motion\n    to: \"on\"\n  conditions:\n  - condition: numeric_state\n    entity_id: sensor.hall_illuminance\n    below: 30\n  - condition: time\n    after: \"06:30:00\"\n    before: \"23:00:00\"\n  actions:\n  - action: light.turn_on\n    target:\n      entity_id: light.hall\n    data:\n      brightness_pct: 60\n",
+   "start": [
+    {
+     "kind": "registry",
+     "data": {
+      "action": "create",
+      "entity_id": "automation.kitchen_lights_off_at_11_30pm"
+     }
+    },
+    {
+     "kind": "state",
+     "entity_id": "automation.kitchen_lights_off_at_11_30pm",
+     "old": null,
+     "new": {
+      "state": "on",
+      "attributes": {
+       "id": "kitchen_off",
+       "last_triggered": null,
+       "mode": "single",
+       "current": 0,
+       "friendly_name": "Kitchen lights - off at 11:30pm"
+      }
+     }
+    },
+    {
+     "kind": "registry",
+     "data": {
+      "action": "create",
+      "entity_id": "automation.hallway_lights_motion_on_when_dark"
+     }
+    },
+    {
+     "kind": "state",
+     "entity_id": "automation.hallway_lights_motion_on_when_dark",
+     "old": null,
+     "new": {
+      "state": "on",
+      "attributes": {
+       "id": "hall_motion",
+       "last_triggered": null,
+       "mode": "restart",
+       "current": 0,
+       "friendly_name": "Hallway lights - motion on when dark"
+      }
+     }
+    }
+   ],
+   "steps": [
+    {
+     "request": {
+      "method": "GET",
+      "id": "kitchen_off",
+      "user": "admin"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "body": "{\"id\":\"kitchen_off\",\"alias\":\"Kitchen lights - off at 11:30pm\",\"description\":\"Turn off the kitchen light and lamp every night at 11:30pm.\",\"mode\":\"single\",\"triggers\":[{\"trigger\":\"time\",\"at\":\"23:30:00\"}],\"actions\":[{\"action\":\"light.turn_off\",\"target\":{\"entity_id\":[\"light.kitchen\",\"light.lamp\"]},\"data\":{\"transition\":10}}]}",
+     "events": []
+    },
+    {
+     "request": {
+      "method": "POST",
+      "id": "kitchen_off",
+      "user": "admin",
+      "sent": "{\"id\": \"kitchen_off\", \"alias\": \"Kitchen lights - off at 11:30pm\", \"description\": \"Turn off the kitchen light and lamp every night at 11:30pm.\", \"mode\": \"single\", \"triggers\": [{\"trigger\": \"time\", \"at\": \"23:30:00\"}], \"actions\": [{\"action\": \"light.turn_off\", \"target\": {\"entity_id\": [\"light.kitchen\", \"light.lamp\"]}, \"data\": {\"transition\": 10}}]}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "body": "{\"result\":\"ok\"}",
+     "file": "- id: kitchen_off\n  alias: Kitchen lights - off at 11:30pm\n  description: Turn off the kitchen light and lamp every night at 11:30pm.\n  triggers:\n  - trigger: time\n    at: '23:30:00'\n  actions:\n  - action: light.turn_off\n    target:\n      entity_id:\n      - light.kitchen\n      - light.lamp\n    data:\n      transition: 10\n  mode: single\n- id: hall_motion\n  alias: Hallway lights - motion on when dark\n  description: Turn on hallway lights when motion is detected below 30 lux, using\n    dim overnight and gentle morning levels.\n  mode: restart\n  triggers:\n  - trigger: state\n    entity_id: binary_sensor.hall_motion\n    to: 'on'\n  conditions:\n  - condition: numeric_state\n    entity_id: sensor.hall_illuminance\n    below: 30\n  - condition: time\n    after: 06:30:00\n    before: '23:00:00'\n  actions:\n  - action: light.turn_on\n    target:\n      entity_id: light.hall\n    data:\n      brightness_pct: 60\n",
+     "events": [
+      {
+       "kind": "reloaded",
+       "data": {},
+       "user": false
+      }
+     ]
+    },
+    {
+     "request": {
+      "method": "GET",
+      "id": "kitchen_off",
+      "user": "admin"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "body": "{\"id\":\"kitchen_off\",\"alias\":\"Kitchen lights - off at 11:30pm\",\"description\":\"Turn off the kitchen light and lamp every night at 11:30pm.\",\"triggers\":[{\"trigger\":\"time\",\"at\":\"23:30:00\"}],\"actions\":[{\"action\":\"light.turn_off\",\"target\":{\"entity_id\":[\"light.kitchen\",\"light.lamp\"]},\"data\":{\"transition\":10}}],\"mode\":\"single\"}",
+     "events": []
+    }
+   ],
+   "registry": [
+    {
+     "entity_id": "automation.kitchen_lights_off_at_11_30pm",
+     "unique_id": "kitchen_off",
+     "name": null,
+     "original_name": "Kitchen lights - off at 11:30pm",
+     "object_id_base": "Kitchen lights - off at 11:30pm",
+     "capabilities": {
+      "id": "kitchen_off"
+     },
+     "options": {}
+    },
+    {
+     "entity_id": "automation.hallway_lights_motion_on_when_dark",
+     "unique_id": "hall_motion",
+     "name": null,
+     "original_name": "Hallway lights - motion on when dark",
+     "object_id_base": "Hallway lights - motion on when dark",
+     "capabilities": {
+      "id": "hall_motion"
+     },
+     "options": {}
+    }
+   ],
+   "final": {
+    "automation.kitchen_lights_off_at_11_30pm": {
+     "state": "on",
+     "attributes": {
+      "id": "kitchen_off",
+      "last_triggered": null,
+      "mode": "single",
+      "current": 0,
+      "friendly_name": "Kitchen lights - off at 11:30pm"
+     }
+    },
+    "automation.hallway_lights_motion_on_when_dark": {
+     "state": "on",
+     "attributes": {
+      "id": "hall_motion",
+      "last_triggered": null,
+      "mode": "restart",
+      "current": 0,
+      "friendly_name": "Hallway lights - motion on when dark"
+     }
+    }
+   }
+  },
+  {
+   "name": "edit",
+   "doc": "A changed alias, description, time and data: the entity is made again under its entity id.",
+   "file": "- id: kitchen_off\n  alias: Kitchen lights - off at 11:30pm\n  description: Turn off the kitchen light and lamp every night at 11:30pm.\n  mode: single\n  triggers:\n  - trigger: time\n    at: \"23:30:00\"\n  actions:\n  - action: light.turn_off\n    target:\n      entity_id:\n      - light.kitchen\n      - light.lamp\n    data:\n      transition: 10\n- id: hall_motion\n  alias: Hallway lights - motion on when dark\n  description: Turn on hallway lights when motion is detected below 30 lux, using dim overnight and gentle morning levels.\n  mode: restart\n  triggers:\n  - trigger: state\n    entity_id: binary_sensor.hall_motion\n    to: \"on\"\n  conditions:\n  - condition: numeric_state\n    entity_id: sensor.hall_illuminance\n    below: 30\n  - condition: time\n    after: \"06:30:00\"\n    before: \"23:00:00\"\n  actions:\n  - action: light.turn_on\n    target:\n      entity_id: light.hall\n    data:\n      brightness_pct: 60\n",
+   "start": [
+    {
+     "kind": "registry",
+     "data": {
+      "action": "create",
+      "entity_id": "automation.kitchen_lights_off_at_11_30pm"
+     }
+    },
+    {
+     "kind": "state",
+     "entity_id": "automation.kitchen_lights_off_at_11_30pm",
+     "old": null,
+     "new": {
+      "state": "on",
+      "attributes": {
+       "id": "kitchen_off",
+       "last_triggered": null,
+       "mode": "single",
+       "current": 0,
+       "friendly_name": "Kitchen lights - off at 11:30pm"
+      }
+     }
+    },
+    {
+     "kind": "registry",
+     "data": {
+      "action": "create",
+      "entity_id": "automation.hallway_lights_motion_on_when_dark"
+     }
+    },
+    {
+     "kind": "state",
+     "entity_id": "automation.hallway_lights_motion_on_when_dark",
+     "old": null,
+     "new": {
+      "state": "on",
+      "attributes": {
+       "id": "hall_motion",
+       "last_triggered": null,
+       "mode": "restart",
+       "current": 0,
+       "friendly_name": "Hallway lights - motion on when dark"
+      }
+     }
+    }
+   ],
+   "steps": [
+    {
+     "request": {
+      "method": "POST",
+      "id": "kitchen_off",
+      "user": "admin",
+      "sent": "{\"id\": \"kitchen_off\", \"alias\": \"Kitchen lights - off at 11:45pm\", \"description\": \"Turn off the kitchen light and lamp every night.\\nSecond line: moved from 23:30 to 23:45 because the evening routine runs later on weekends and holidays.\", \"mode\": \"single\", \"triggers\": [{\"trigger\": \"time\", \"at\": \"23:45:00\"}], \"actions\": [{\"action\": \"light.turn_off\", \"target\": {\"entity_id\": [\"light.kitchen\", \"light.lamp\"]}, \"data\": {\"transition\": 10}}]}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "body": "{\"result\":\"ok\"}",
+     "file": "- id: kitchen_off\n  alias: Kitchen lights - off at 11:45pm\n  description: 'Turn off the kitchen light and lamp every night.\n\n    Second line: moved from 23:30 to 23:45 because the evening routine runs later\n    on weekends and holidays.'\n  triggers:\n  - trigger: time\n    at: '23:45:00'\n  actions:\n  - action: light.turn_off\n    target:\n      entity_id:\n      - light.kitchen\n      - light.lamp\n    data:\n      transition: 10\n  mode: single\n- id: hall_motion\n  alias: Hallway lights - motion on when dark\n  description: Turn on hallway lights when motion is detected below 30 lux, using\n    dim overnight and gentle morning levels.\n  mode: restart\n  triggers:\n  - trigger: state\n    entity_id: binary_sensor.hall_motion\n    to: 'on'\n  conditions:\n  - condition: numeric_state\n    entity_id: sensor.hall_illuminance\n    below: 30\n  - condition: time\n    after: 06:30:00\n    before: '23:00:00'\n  actions:\n  - action: light.turn_on\n    target:\n      entity_id: light.hall\n    data:\n      brightness_pct: 60\n",
+     "events": [
+      {
+       "kind": "state",
+       "entity_id": "automation.kitchen_lights_off_at_11_30pm",
+       "old": {
+        "state": "on",
+        "attributes": {
+         "id": "kitchen_off",
+         "last_triggered": null,
+         "mode": "single",
+         "current": 0,
+         "friendly_name": "Kitchen lights - off at 11:30pm"
+        }
+       },
+       "new": {
+        "state": "unavailable",
+        "attributes": {
+         "restored": true,
+         "id": "kitchen_off",
+         "friendly_name": "Kitchen lights - off at 11:30pm",
+         "supported_features": 0
+        }
+       }
+      },
+      {
+       "kind": "registry",
+       "data": {
+        "action": "update",
+        "entity_id": "automation.kitchen_lights_off_at_11_30pm",
+        "changes": {
+         "object_id_base": "Kitchen lights - off at 11:30pm",
+         "original_name": "Kitchen lights - off at 11:30pm"
+        }
+       }
+      },
+      {
+       "kind": "state",
+       "entity_id": "automation.kitchen_lights_off_at_11_30pm",
+       "old": {
+        "state": "unavailable",
+        "attributes": {
+         "restored": true,
+         "id": "kitchen_off",
+         "friendly_name": "Kitchen lights - off at 11:30pm",
+         "supported_features": 0
+        }
+       },
+       "new": {
+        "state": "on",
+        "attributes": {
+         "id": "kitchen_off",
+         "last_triggered": null,
+         "mode": "single",
+         "current": 0,
+         "friendly_name": "Kitchen lights - off at 11:45pm"
+        }
+       }
+      },
+      {
+       "kind": "reloaded",
+       "data": {},
+       "user": false
+      }
+     ]
+    },
+    {
+     "request": {
+      "method": "GET",
+      "id": "kitchen_off",
+      "user": "admin"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "body": "{\"id\":\"kitchen_off\",\"alias\":\"Kitchen lights - off at 11:45pm\",\"description\":\"Turn off the kitchen light and lamp every night.\\nSecond line: moved from 23:30 to 23:45 because the evening routine runs later on weekends and holidays.\",\"triggers\":[{\"trigger\":\"time\",\"at\":\"23:45:00\"}],\"actions\":[{\"action\":\"light.turn_off\",\"target\":{\"entity_id\":[\"light.kitchen\",\"light.lamp\"]},\"data\":{\"transition\":10}}],\"mode\":\"single\"}",
+     "events": []
+    }
+   ],
+   "registry": [
+    {
+     "entity_id": "automation.kitchen_lights_off_at_11_30pm",
+     "unique_id": "kitchen_off",
+     "name": null,
+     "original_name": "Kitchen lights - off at 11:45pm",
+     "object_id_base": "Kitchen lights - off at 11:45pm",
+     "capabilities": {
+      "id": "kitchen_off"
+     },
+     "options": {}
+    },
+    {
+     "entity_id": "automation.hallway_lights_motion_on_when_dark",
+     "unique_id": "hall_motion",
+     "name": null,
+     "original_name": "Hallway lights - motion on when dark",
+     "object_id_base": "Hallway lights - motion on when dark",
+     "capabilities": {
+      "id": "hall_motion"
+     },
+     "options": {}
+    }
+   ],
+   "final": {
+    "automation.kitchen_lights_off_at_11_30pm": {
+     "state": "on",
+     "attributes": {
+      "id": "kitchen_off",
+      "last_triggered": null,
+      "mode": "single",
+      "current": 0,
+      "friendly_name": "Kitchen lights - off at 11:45pm"
+     }
+    },
+    "automation.hallway_lights_motion_on_when_dark": {
+     "state": "on",
+     "attributes": {
+      "id": "hall_motion",
+      "last_triggered": null,
+      "mode": "restart",
+      "current": 0,
+      "friendly_name": "Hallway lights - motion on when dark"
+     }
+    }
+   }
+  },
+  {
+   "name": "edit_keeps_off",
+   "doc": "An automation turned off, then edited, stays off.",
+   "file": "- id: kitchen_off\n  alias: Kitchen lights - off at 11:30pm\n  description: Turn off the kitchen light and lamp every night at 11:30pm.\n  mode: single\n  triggers:\n  - trigger: time\n    at: \"23:30:00\"\n  actions:\n  - action: light.turn_off\n    target:\n      entity_id:\n      - light.kitchen\n      - light.lamp\n    data:\n      transition: 10\n- id: hall_motion\n  alias: Hallway lights - motion on when dark\n  description: Turn on hallway lights when motion is detected below 30 lux, using dim overnight and gentle morning levels.\n  mode: restart\n  triggers:\n  - trigger: state\n    entity_id: binary_sensor.hall_motion\n    to: \"on\"\n  conditions:\n  - condition: numeric_state\n    entity_id: sensor.hall_illuminance\n    below: 30\n  - condition: time\n    after: \"06:30:00\"\n    before: \"23:00:00\"\n  actions:\n  - action: light.turn_on\n    target:\n      entity_id: light.hall\n    data:\n      brightness_pct: 60\n",
+   "start": [
+    {
+     "kind": "registry",
+     "data": {
+      "action": "create",
+      "entity_id": "automation.kitchen_lights_off_at_11_30pm"
+     }
+    },
+    {
+     "kind": "state",
+     "entity_id": "automation.kitchen_lights_off_at_11_30pm",
+     "old": null,
+     "new": {
+      "state": "on",
+      "attributes": {
+       "id": "kitchen_off",
+       "last_triggered": null,
+       "mode": "single",
+       "current": 0,
+       "friendly_name": "Kitchen lights - off at 11:30pm"
+      }
+     }
+    },
+    {
+     "kind": "registry",
+     "data": {
+      "action": "create",
+      "entity_id": "automation.hallway_lights_motion_on_when_dark"
+     }
+    },
+    {
+     "kind": "state",
+     "entity_id": "automation.hallway_lights_motion_on_when_dark",
+     "old": null,
+     "new": {
+      "state": "on",
+      "attributes": {
+       "id": "hall_motion",
+       "last_triggered": null,
+       "mode": "restart",
+       "current": 0,
+       "friendly_name": "Hallway lights - motion on when dark"
+      }
+     }
+    }
+   ],
+   "steps": [
+    {
+     "request": {
+      "service": "turn_off",
+      "data": {
+       "entity_id": "automation.kitchen_lights_off_at_11_30pm"
+      }
+     },
+     "events": [
+      {
+       "kind": "state",
+       "entity_id": "automation.kitchen_lights_off_at_11_30pm",
+       "old": {
+        "state": "on",
+        "attributes": {
+         "id": "kitchen_off",
+         "last_triggered": null,
+         "mode": "single",
+         "current": 0,
+         "friendly_name": "Kitchen lights - off at 11:30pm"
+        }
+       },
+       "new": {
+        "state": "off",
+        "attributes": {
+         "id": "kitchen_off",
+         "last_triggered": null,
+         "mode": "single",
+         "current": 0,
+         "friendly_name": "Kitchen lights - off at 11:30pm"
+        }
+       }
+      }
+     ]
+    },
+    {
+     "request": {
+      "method": "POST",
+      "id": "kitchen_off",
+      "user": "admin",
+      "sent": "{\"id\": \"kitchen_off\", \"alias\": \"Kitchen lights - off at 11:30pm\", \"description\": \"Turn off the kitchen light and lamp every night at 11:30pm.\", \"mode\": \"restart\", \"triggers\": [{\"trigger\": \"time\", \"at\": \"23:30:00\"}], \"actions\": [{\"action\": \"light.turn_off\", \"target\": {\"entity_id\": [\"light.kitchen\", \"light.lamp\"]}, \"data\": {\"transition\": 10}}]}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "body": "{\"result\":\"ok\"}",
+     "file": "- id: kitchen_off\n  alias: Kitchen lights - off at 11:30pm\n  description: Turn off the kitchen light and lamp every night at 11:30pm.\n  triggers:\n  - trigger: time\n    at: '23:30:00'\n  actions:\n  - action: light.turn_off\n    target:\n      entity_id:\n      - light.kitchen\n      - light.lamp\n    data:\n      transition: 10\n  mode: restart\n- id: hall_motion\n  alias: Hallway lights - motion on when dark\n  description: Turn on hallway lights when motion is detected below 30 lux, using\n    dim overnight and gentle morning levels.\n  mode: restart\n  triggers:\n  - trigger: state\n    entity_id: binary_sensor.hall_motion\n    to: 'on'\n  conditions:\n  - condition: numeric_state\n    entity_id: sensor.hall_illuminance\n    below: 30\n  - condition: time\n    after: 06:30:00\n    before: '23:00:00'\n  actions:\n  - action: light.turn_on\n    target:\n      entity_id: light.hall\n    data:\n      brightness_pct: 60\n",
+     "events": [
+      {
+       "kind": "state",
+       "entity_id": "automation.kitchen_lights_off_at_11_30pm",
+       "old": {
+        "state": "off",
+        "attributes": {
+         "id": "kitchen_off",
+         "last_triggered": null,
+         "mode": "single",
+         "current": 0,
+         "friendly_name": "Kitchen lights - off at 11:30pm"
+        }
+       },
+       "new": {
+        "state": "unavailable",
+        "attributes": {
+         "restored": true,
+         "id": "kitchen_off",
+         "friendly_name": "Kitchen lights - off at 11:30pm",
+         "supported_features": 0
+        }
+       }
+      },
+      {
+       "kind": "state",
+       "entity_id": "automation.kitchen_lights_off_at_11_30pm",
+       "old": {
+        "state": "unavailable",
+        "attributes": {
+         "restored": true,
+         "id": "kitchen_off",
+         "friendly_name": "Kitchen lights - off at 11:30pm",
+         "supported_features": 0
+        }
+       },
+       "new": {
+        "state": "off",
+        "attributes": {
+         "id": "kitchen_off",
+         "last_triggered": null,
+         "mode": "restart",
+         "current": 0,
+         "friendly_name": "Kitchen lights - off at 11:30pm"
+        }
+       }
+      },
+      {
+       "kind": "reloaded",
+       "data": {},
+       "user": false
+      }
+     ]
+    }
+   ],
+   "registry": [
+    {
+     "entity_id": "automation.kitchen_lights_off_at_11_30pm",
+     "unique_id": "kitchen_off",
+     "name": null,
+     "original_name": "Kitchen lights - off at 11:30pm",
+     "object_id_base": "Kitchen lights - off at 11:30pm",
+     "capabilities": {
+      "id": "kitchen_off"
+     },
+     "options": {}
+    },
+    {
+     "entity_id": "automation.hallway_lights_motion_on_when_dark",
+     "unique_id": "hall_motion",
+     "name": null,
+     "original_name": "Hallway lights - motion on when dark",
+     "object_id_base": "Hallway lights - motion on when dark",
+     "capabilities": {
+      "id": "hall_motion"
+     },
+     "options": {}
+    }
+   ],
+   "final": {
+    "automation.kitchen_lights_off_at_11_30pm": {
+     "state": "off",
+     "attributes": {
+      "id": "kitchen_off",
+      "last_triggered": null,
+      "mode": "restart",
+      "current": 0,
+      "friendly_name": "Kitchen lights - off at 11:30pm"
+     }
+    },
+    "automation.hallway_lights_motion_on_when_dark": {
+     "state": "on",
+     "attributes": {
+      "id": "hall_motion",
+      "last_triggered": null,
+      "mode": "restart",
+      "current": 0,
+      "friendly_name": "Hallway lights - motion on when dark"
+     }
+    }
+   }
+  },
+  {
+   "name": "add_new",
+   "doc": "A new automation as the frontend posts it: appended, with the URL's id first; its entity id comes from its alias.",
+   "file": "- id: kitchen_off\n  alias: Kitchen lights - off at 11:30pm\n  description: Turn off the kitchen light and lamp every night at 11:30pm.\n  mode: single\n  triggers:\n  - trigger: time\n    at: \"23:30:00\"\n  actions:\n  - action: light.turn_off\n    target:\n      entity_id:\n      - light.kitchen\n      - light.lamp\n    data:\n      transition: 10\n- id: hall_motion\n  alias: Hallway lights - motion on when dark\n  description: Turn on hallway lights when motion is detected below 30 lux, using dim overnight and gentle morning levels.\n  mode: restart\n  triggers:\n  - trigger: state\n    entity_id: binary_sensor.hall_motion\n    to: \"on\"\n  conditions:\n  - condition: numeric_state\n    entity_id: sensor.hall_illuminance\n    below: 30\n  - condition: time\n    after: \"06:30:00\"\n    before: \"23:00:00\"\n  actions:\n  - action: light.turn_on\n    target:\n      entity_id: light.hall\n    data:\n      brightness_pct: 60\n",
+   "start": [
+    {
+     "kind": "registry",
+     "data": {
+      "action": "create",
+      "entity_id": "automation.kitchen_lights_off_at_11_30pm"
+     }
+    },
+    {
+     "kind": "state",
+     "entity_id": "automation.kitchen_lights_off_at_11_30pm",
+     "old": null,
+     "new": {
+      "state": "on",
+      "attributes": {
+       "id": "kitchen_off",
+       "last_triggered": null,
+       "mode": "single",
+       "current": 0,
+       "friendly_name": "Kitchen lights - off at 11:30pm"
+      }
+     }
+    },
+    {
+     "kind": "registry",
+     "data": {
+      "action": "create",
+      "entity_id": "automation.hallway_lights_motion_on_when_dark"
+     }
+    },
+    {
+     "kind": "state",
+     "entity_id": "automation.hallway_lights_motion_on_when_dark",
+     "old": null,
+     "new": {
+      "state": "on",
+      "attributes": {
+       "id": "hall_motion",
+       "last_triggered": null,
+       "mode": "restart",
+       "current": 0,
+       "friendly_name": "Hallway lights - motion on when dark"
+      }
+     }
+    }
+   ],
+   "steps": [
+    {
+     "request": {
+      "method": "POST",
+      "id": "1794680000000",
+      "user": "admin",
+      "sent": "{\"description\": \"\", \"mode\": \"single\", \"triggers\": [{\"trigger\": \"state\", \"entity_id\": [\"binary_sensor.hall_motion\"], \"to\": \"on\"}], \"conditions\": [], \"actions\": [{\"action\": \"light.turn_on\", \"metadata\": {}, \"data\": {\"brightness_pct\": 50}, \"target\": {\"entity_id\": \"light.hall\"}}], \"alias\": \"Hallway test: on at 50%\"}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "body": "{\"result\":\"ok\"}",
+     "file": "- id: kitchen_off\n  alias: Kitchen lights - off at 11:30pm\n  description: Turn off the kitchen light and lamp every night at 11:30pm.\n  mode: single\n  triggers:\n  - trigger: time\n    at: '23:30:00'\n  actions:\n  - action: light.turn_off\n    target:\n      entity_id:\n      - light.kitchen\n      - light.lamp\n    data:\n      transition: 10\n- id: hall_motion\n  alias: Hallway lights - motion on when dark\n  description: Turn on hallway lights when motion is detected below 30 lux, using\n    dim overnight and gentle morning levels.\n  mode: restart\n  triggers:\n  - trigger: state\n    entity_id: binary_sensor.hall_motion\n    to: 'on'\n  conditions:\n  - condition: numeric_state\n    entity_id: sensor.hall_illuminance\n    below: 30\n  - condition: time\n    after: 06:30:00\n    before: '23:00:00'\n  actions:\n  - action: light.turn_on\n    target:\n      entity_id: light.hall\n    data:\n      brightness_pct: 60\n- id: '1794680000000'\n  alias: 'Hallway test: on at 50%'\n  description: ''\n  triggers:\n  - trigger: state\n    entity_id:\n    - binary_sensor.hall_motion\n    to: 'on'\n  conditions: []\n  actions:\n  - action: light.turn_on\n    metadata: {}\n    data:\n      brightness_pct: 50\n    target:\n      entity_id: light.hall\n  mode: single\n",
+     "events": [
+      {
+       "kind": "registry",
+       "data": {
+        "action": "create",
+        "entity_id": "automation.hallway_test_on_at_50"
+       }
+      },
+      {
+       "kind": "state",
+       "entity_id": "automation.hallway_test_on_at_50",
+       "old": null,
+       "new": {
+        "state": "on",
+        "attributes": {
+         "id": "1794680000000",
+         "last_triggered": null,
+         "mode": "single",
+         "current": 0,
+         "friendly_name": "Hallway test: on at 50%"
+        }
+       }
+      },
+      {
+       "kind": "reloaded",
+       "data": {},
+       "user": false
+      }
+     ]
+    },
+    {
+     "request": {
+      "method": "GET",
+      "id": "1794680000000",
+      "user": "admin"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "body": "{\"id\":\"1794680000000\",\"alias\":\"Hallway test: on at 50%\",\"description\":\"\",\"triggers\":[{\"trigger\":\"state\",\"entity_id\":[\"binary_sensor.hall_motion\"],\"to\":\"on\"}],\"conditions\":[],\"actions\":[{\"action\":\"light.turn_on\",\"metadata\":{},\"data\":{\"brightness_pct\":50},\"target\":{\"entity_id\":\"light.hall\"}}],\"mode\":\"single\"}",
+     "events": []
+    }
+   ],
+   "registry": [
+    {
+     "entity_id": "automation.kitchen_lights_off_at_11_30pm",
+     "unique_id": "kitchen_off",
+     "name": null,
+     "original_name": "Kitchen lights - off at 11:30pm",
+     "object_id_base": "Kitchen lights - off at 11:30pm",
+     "capabilities": {
+      "id": "kitchen_off"
+     },
+     "options": {}
+    },
+    {
+     "entity_id": "automation.hallway_lights_motion_on_when_dark",
+     "unique_id": "hall_motion",
+     "name": null,
+     "original_name": "Hallway lights - motion on when dark",
+     "object_id_base": "Hallway lights - motion on when dark",
+     "capabilities": {
+      "id": "hall_motion"
+     },
+     "options": {}
+    },
+    {
+     "entity_id": "automation.hallway_test_on_at_50",
+     "unique_id": "1794680000000",
+     "name": null,
+     "original_name": "Hallway test: on at 50%",
+     "object_id_base": "Hallway test: on at 50%",
+     "capabilities": {
+      "id": "1794680000000"
+     },
+     "options": {}
+    }
+   ],
+   "final": {
+    "automation.kitchen_lights_off_at_11_30pm": {
+     "state": "on",
+     "attributes": {
+      "id": "kitchen_off",
+      "last_triggered": null,
+      "mode": "single",
+      "current": 0,
+      "friendly_name": "Kitchen lights - off at 11:30pm"
+     }
+    },
+    "automation.hallway_lights_motion_on_when_dark": {
+     "state": "on",
+     "attributes": {
+      "id": "hall_motion",
+      "last_triggered": null,
+      "mode": "restart",
+      "current": 0,
+      "friendly_name": "Hallway lights - motion on when dark"
+     }
+    },
+    "automation.hallway_test_on_at_50": {
+     "state": "on",
+     "attributes": {
+      "id": "1794680000000",
+      "last_triggered": null,
+      "mode": "single",
+      "current": 0,
+      "friendly_name": "Hallway test: on at 50%"
+     }
+    }
+   }
+  },
+  {
+   "name": "add_then_delete",
+   "doc": "Added, then deleted: its entity and registry row go; no reload event.",
+   "file": "- id: kitchen_off\n  alias: Kitchen lights - off at 11:30pm\n  description: Turn off the kitchen light and lamp every night at 11:30pm.\n  mode: single\n  triggers:\n  - trigger: time\n    at: \"23:30:00\"\n  actions:\n  - action: light.turn_off\n    target:\n      entity_id:\n      - light.kitchen\n      - light.lamp\n    data:\n      transition: 10\n- id: hall_motion\n  alias: Hallway lights - motion on when dark\n  description: Turn on hallway lights when motion is detected below 30 lux, using dim overnight and gentle morning levels.\n  mode: restart\n  triggers:\n  - trigger: state\n    entity_id: binary_sensor.hall_motion\n    to: \"on\"\n  conditions:\n  - condition: numeric_state\n    entity_id: sensor.hall_illuminance\n    below: 30\n  - condition: time\n    after: \"06:30:00\"\n    before: \"23:00:00\"\n  actions:\n  - action: light.turn_on\n    target:\n      entity_id: light.hall\n    data:\n      brightness_pct: 60\n",
+   "start": [
+    {
+     "kind": "registry",
+     "data": {
+      "action": "create",
+      "entity_id": "automation.kitchen_lights_off_at_11_30pm"
+     }
+    },
+    {
+     "kind": "state",
+     "entity_id": "automation.kitchen_lights_off_at_11_30pm",
+     "old": null,
+     "new": {
+      "state": "on",
+      "attributes": {
+       "id": "kitchen_off",
+       "last_triggered": null,
+       "mode": "single",
+       "current": 0,
+       "friendly_name": "Kitchen lights - off at 11:30pm"
+      }
+     }
+    },
+    {
+     "kind": "registry",
+     "data": {
+      "action": "create",
+      "entity_id": "automation.hallway_lights_motion_on_when_dark"
+     }
+    },
+    {
+     "kind": "state",
+     "entity_id": "automation.hallway_lights_motion_on_when_dark",
+     "old": null,
+     "new": {
+      "state": "on",
+      "attributes": {
+       "id": "hall_motion",
+       "last_triggered": null,
+       "mode": "restart",
+       "current": 0,
+       "friendly_name": "Hallway lights - motion on when dark"
+      }
+     }
+    }
+   ],
+   "steps": [
+    {
+     "request": {
+      "method": "POST",
+      "id": "1794680000000",
+      "user": "admin",
+      "sent": "{\"description\": \"\", \"mode\": \"single\", \"triggers\": [{\"trigger\": \"state\", \"entity_id\": [\"binary_sensor.hall_motion\"], \"to\": \"on\"}], \"conditions\": [], \"actions\": [{\"action\": \"light.turn_on\", \"metadata\": {}, \"data\": {\"brightness_pct\": 50}, \"target\": {\"entity_id\": \"light.hall\"}}], \"alias\": \"Hallway test: on at 50%\"}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "body": "{\"result\":\"ok\"}",
+     "file": "- id: kitchen_off\n  alias: Kitchen lights - off at 11:30pm\n  description: Turn off the kitchen light and lamp every night at 11:30pm.\n  mode: single\n  triggers:\n  - trigger: time\n    at: '23:30:00'\n  actions:\n  - action: light.turn_off\n    target:\n      entity_id:\n      - light.kitchen\n      - light.lamp\n    data:\n      transition: 10\n- id: hall_motion\n  alias: Hallway lights - motion on when dark\n  description: Turn on hallway lights when motion is detected below 30 lux, using\n    dim overnight and gentle morning levels.\n  mode: restart\n  triggers:\n  - trigger: state\n    entity_id: binary_sensor.hall_motion\n    to: 'on'\n  conditions:\n  - condition: numeric_state\n    entity_id: sensor.hall_illuminance\n    below: 30\n  - condition: time\n    after: 06:30:00\n    before: '23:00:00'\n  actions:\n  - action: light.turn_on\n    target:\n      entity_id: light.hall\n    data:\n      brightness_pct: 60\n- id: '1794680000000'\n  alias: 'Hallway test: on at 50%'\n  description: ''\n  triggers:\n  - trigger: state\n    entity_id:\n    - binary_sensor.hall_motion\n    to: 'on'\n  conditions: []\n  actions:\n  - action: light.turn_on\n    metadata: {}\n    data:\n      brightness_pct: 50\n    target:\n      entity_id: light.hall\n  mode: single\n",
+     "events": [
+      {
+       "kind": "registry",
+       "data": {
+        "action": "create",
+        "entity_id": "automation.hallway_test_on_at_50"
+       }
+      },
+      {
+       "kind": "state",
+       "entity_id": "automation.hallway_test_on_at_50",
+       "old": null,
+       "new": {
+        "state": "on",
+        "attributes": {
+         "id": "1794680000000",
+         "last_triggered": null,
+         "mode": "single",
+         "current": 0,
+         "friendly_name": "Hallway test: on at 50%"
+        }
+       }
+      },
+      {
+       "kind": "reloaded",
+       "data": {},
+       "user": false
+      }
+     ]
+    },
+    {
+     "request": {
+      "method": "DELETE",
+      "id": "1794680000000",
+      "user": "admin"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "body": "{\"result\":\"ok\"}",
+     "file": "- id: kitchen_off\n  alias: Kitchen lights - off at 11:30pm\n  description: Turn off the kitchen light and lamp every night at 11:30pm.\n  mode: single\n  triggers:\n  - trigger: time\n    at: '23:30:00'\n  actions:\n  - action: light.turn_off\n    target:\n      entity_id:\n      - light.kitchen\n      - light.lamp\n    data:\n      transition: 10\n- id: hall_motion\n  alias: Hallway lights - motion on when dark\n  description: Turn on hallway lights when motion is detected below 30 lux, using\n    dim overnight and gentle morning levels.\n  mode: restart\n  triggers:\n  - trigger: state\n    entity_id: binary_sensor.hall_motion\n    to: 'on'\n  conditions:\n  - condition: numeric_state\n    entity_id: sensor.hall_illuminance\n    below: 30\n  - condition: time\n    after: 06:30:00\n    before: '23:00:00'\n  actions:\n  - action: light.turn_on\n    target:\n      entity_id: light.hall\n    data:\n      brightness_pct: 60\n",
+     "events": [
+      {
+       "kind": "registry",
+       "data": {
+        "action": "remove",
+        "entity_id": "automation.hallway_test_on_at_50"
+       }
+      },
+      {
+       "kind": "state",
+       "entity_id": "automation.hallway_test_on_at_50",
+       "old": {
+        "state": "on",
+        "attributes": {
+         "id": "1794680000000",
+         "last_triggered": null,
+         "mode": "single",
+         "current": 0,
+         "friendly_name": "Hallway test: on at 50%"
+        }
+       },
+       "new": null
+      }
+     ]
+    },
+    {
+     "request": {
+      "method": "GET",
+      "id": "1794680000000",
+      "user": "admin"
+     },
+     "status": 404,
+     "content_type": "application/json",
+     "body": "{\"message\":\"Resource not found\"}",
+     "events": []
+    }
+   ],
+   "registry": [
+    {
+     "entity_id": "automation.kitchen_lights_off_at_11_30pm",
+     "unique_id": "kitchen_off",
+     "name": null,
+     "original_name": "Kitchen lights - off at 11:30pm",
+     "object_id_base": "Kitchen lights - off at 11:30pm",
+     "capabilities": {
+      "id": "kitchen_off"
+     },
+     "options": {}
+    },
+    {
+     "entity_id": "automation.hallway_lights_motion_on_when_dark",
+     "unique_id": "hall_motion",
+     "name": null,
+     "original_name": "Hallway lights - motion on when dark",
+     "object_id_base": "Hallway lights - motion on when dark",
+     "capabilities": {
+      "id": "hall_motion"
+     },
+     "options": {}
+    }
+   ],
+   "final": {
+    "automation.kitchen_lights_off_at_11_30pm": {
+     "state": "on",
+     "attributes": {
+      "id": "kitchen_off",
+      "last_triggered": null,
+      "mode": "single",
+      "current": 0,
+      "friendly_name": "Kitchen lights - off at 11:30pm"
+     }
+    },
+    "automation.hallway_lights_motion_on_when_dark": {
+     "state": "on",
+     "attributes": {
+      "id": "hall_motion",
+      "last_triggered": null,
+      "mode": "restart",
+      "current": 0,
+      "friendly_name": "Hallway lights - motion on when dark"
+     }
+    }
+   }
+  },
+  {
+   "name": "delete",
+   "doc": "Deleting an automation, then again (now unknown: a 400, not a 404).",
+   "file": "- id: kitchen_off\n  alias: Kitchen lights - off at 11:30pm\n  description: Turn off the kitchen light and lamp every night at 11:30pm.\n  mode: single\n  triggers:\n  - trigger: time\n    at: \"23:30:00\"\n  actions:\n  - action: light.turn_off\n    target:\n      entity_id:\n      - light.kitchen\n      - light.lamp\n    data:\n      transition: 10\n- id: hall_motion\n  alias: Hallway lights - motion on when dark\n  description: Turn on hallway lights when motion is detected below 30 lux, using dim overnight and gentle morning levels.\n  mode: restart\n  triggers:\n  - trigger: state\n    entity_id: binary_sensor.hall_motion\n    to: \"on\"\n  conditions:\n  - condition: numeric_state\n    entity_id: sensor.hall_illuminance\n    below: 30\n  - condition: time\n    after: \"06:30:00\"\n    before: \"23:00:00\"\n  actions:\n  - action: light.turn_on\n    target:\n      entity_id: light.hall\n    data:\n      brightness_pct: 60\n",
+   "start": [
+    {
+     "kind": "registry",
+     "data": {
+      "action": "create",
+      "entity_id": "automation.kitchen_lights_off_at_11_30pm"
+     }
+    },
+    {
+     "kind": "state",
+     "entity_id": "automation.kitchen_lights_off_at_11_30pm",
+     "old": null,
+     "new": {
+      "state": "on",
+      "attributes": {
+       "id": "kitchen_off",
+       "last_triggered": null,
+       "mode": "single",
+       "current": 0,
+       "friendly_name": "Kitchen lights - off at 11:30pm"
+      }
+     }
+    },
+    {
+     "kind": "registry",
+     "data": {
+      "action": "create",
+      "entity_id": "automation.hallway_lights_motion_on_when_dark"
+     }
+    },
+    {
+     "kind": "state",
+     "entity_id": "automation.hallway_lights_motion_on_when_dark",
+     "old": null,
+     "new": {
+      "state": "on",
+      "attributes": {
+       "id": "hall_motion",
+       "last_triggered": null,
+       "mode": "restart",
+       "current": 0,
+       "friendly_name": "Hallway lights - motion on when dark"
+      }
+     }
+    }
+   ],
+   "steps": [
+    {
+     "request": {
+      "method": "DELETE",
+      "id": "hall_motion",
+      "user": "admin"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "body": "{\"result\":\"ok\"}",
+     "file": "- id: kitchen_off\n  alias: Kitchen lights - off at 11:30pm\n  description: Turn off the kitchen light and lamp every night at 11:30pm.\n  mode: single\n  triggers:\n  - trigger: time\n    at: '23:30:00'\n  actions:\n  - action: light.turn_off\n    target:\n      entity_id:\n      - light.kitchen\n      - light.lamp\n    data:\n      transition: 10\n",
+     "events": [
+      {
+       "kind": "registry",
+       "data": {
+        "action": "remove",
+        "entity_id": "automation.hallway_lights_motion_on_when_dark"
+       }
+      },
+      {
+       "kind": "state",
+       "entity_id": "automation.hallway_lights_motion_on_when_dark",
+       "old": {
+        "state": "on",
+        "attributes": {
+         "id": "hall_motion",
+         "last_triggered": null,
+         "mode": "restart",
+         "current": 0,
+         "friendly_name": "Hallway lights - motion on when dark"
+        }
+       },
+       "new": null
+      }
+     ]
+    },
+    {
+     "request": {
+      "method": "DELETE",
+      "id": "hall_motion",
+      "user": "admin"
+     },
+     "status": 400,
+     "content_type": "application/json",
+     "body": "{\"message\":\"Resource not found\"}",
+     "events": []
+    },
+    {
+     "request": {
+      "method": "DELETE",
+      "id": "never_was",
+      "user": "admin"
+     },
+     "status": 400,
+     "content_type": "application/json",
+     "body": "{\"message\":\"Resource not found\"}",
+     "events": []
+    }
+   ],
+   "registry": [
+    {
+     "entity_id": "automation.kitchen_lights_off_at_11_30pm",
+     "unique_id": "kitchen_off",
+     "name": null,
+     "original_name": "Kitchen lights - off at 11:30pm",
+     "object_id_base": "Kitchen lights - off at 11:30pm",
+     "capabilities": {
+      "id": "kitchen_off"
+     },
+     "options": {}
+    }
+   ],
+   "final": {
+    "automation.kitchen_lights_off_at_11_30pm": {
+     "state": "on",
+     "attributes": {
+      "id": "kitchen_off",
+      "last_triggered": null,
+      "mode": "single",
+      "current": 0,
+      "friendly_name": "Kitchen lights - off at 11:30pm"
+     }
+    }
+   }
+  },
+  {
+   "name": "delete_then_add_again",
+   "doc": "Deleted while off, then added again under the same id.",
+   "file": "- id: kitchen_off\n  alias: Kitchen lights - off at 11:30pm\n  description: Turn off the kitchen light and lamp every night at 11:30pm.\n  mode: single\n  triggers:\n  - trigger: time\n    at: \"23:30:00\"\n  actions:\n  - action: light.turn_off\n    target:\n      entity_id:\n      - light.kitchen\n      - light.lamp\n    data:\n      transition: 10\n- id: hall_motion\n  alias: Hallway lights - motion on when dark\n  description: Turn on hallway lights when motion is detected below 30 lux, using dim overnight and gentle morning levels.\n  mode: restart\n  triggers:\n  - trigger: state\n    entity_id: binary_sensor.hall_motion\n    to: \"on\"\n  conditions:\n  - condition: numeric_state\n    entity_id: sensor.hall_illuminance\n    below: 30\n  - condition: time\n    after: \"06:30:00\"\n    before: \"23:00:00\"\n  actions:\n  - action: light.turn_on\n    target:\n      entity_id: light.hall\n    data:\n      brightness_pct: 60\n",
+   "start": [
+    {
+     "kind": "registry",
+     "data": {
+      "action": "create",
+      "entity_id": "automation.kitchen_lights_off_at_11_30pm"
+     }
+    },
+    {
+     "kind": "state",
+     "entity_id": "automation.kitchen_lights_off_at_11_30pm",
+     "old": null,
+     "new": {
+      "state": "on",
+      "attributes": {
+       "id": "kitchen_off",
+       "last_triggered": null,
+       "mode": "single",
+       "current": 0,
+       "friendly_name": "Kitchen lights - off at 11:30pm"
+      }
+     }
+    },
+    {
+     "kind": "registry",
+     "data": {
+      "action": "create",
+      "entity_id": "automation.hallway_lights_motion_on_when_dark"
+     }
+    },
+    {
+     "kind": "state",
+     "entity_id": "automation.hallway_lights_motion_on_when_dark",
+     "old": null,
+     "new": {
+      "state": "on",
+      "attributes": {
+       "id": "hall_motion",
+       "last_triggered": null,
+       "mode": "restart",
+       "current": 0,
+       "friendly_name": "Hallway lights - motion on when dark"
+      }
+     }
+    }
+   ],
+   "steps": [
+    {
+     "request": {
+      "service": "turn_off",
+      "data": {
+       "entity_id": "automation.kitchen_lights_off_at_11_30pm"
+      }
+     },
+     "events": [
+      {
+       "kind": "state",
+       "entity_id": "automation.kitchen_lights_off_at_11_30pm",
+       "old": {
+        "state": "on",
+        "attributes": {
+         "id": "kitchen_off",
+         "last_triggered": null,
+         "mode": "single",
+         "current": 0,
+         "friendly_name": "Kitchen lights - off at 11:30pm"
+        }
+       },
+       "new": {
+        "state": "off",
+        "attributes": {
+         "id": "kitchen_off",
+         "last_triggered": null,
+         "mode": "single",
+         "current": 0,
+         "friendly_name": "Kitchen lights - off at 11:30pm"
+        }
+       }
+      }
+     ]
+    },
+    {
+     "request": {
+      "method": "DELETE",
+      "id": "kitchen_off",
+      "user": "admin"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "body": "{\"result\":\"ok\"}",
+     "file": "- id: hall_motion\n  alias: Hallway lights - motion on when dark\n  description: Turn on hallway lights when motion is detected below 30 lux, using\n    dim overnight and gentle morning levels.\n  mode: restart\n  triggers:\n  - trigger: state\n    entity_id: binary_sensor.hall_motion\n    to: 'on'\n  conditions:\n  - condition: numeric_state\n    entity_id: sensor.hall_illuminance\n    below: 30\n  - condition: time\n    after: 06:30:00\n    before: '23:00:00'\n  actions:\n  - action: light.turn_on\n    target:\n      entity_id: light.hall\n    data:\n      brightness_pct: 60\n",
+     "events": [
+      {
+       "kind": "registry",
+       "data": {
+        "action": "remove",
+        "entity_id": "automation.kitchen_lights_off_at_11_30pm"
+       }
+      },
+      {
+       "kind": "state",
+       "entity_id": "automation.kitchen_lights_off_at_11_30pm",
+       "old": {
+        "state": "off",
+        "attributes": {
+         "id": "kitchen_off",
+         "last_triggered": null,
+         "mode": "single",
+         "current": 0,
+         "friendly_name": "Kitchen lights - off at 11:30pm"
+        }
+       },
+       "new": null
+      }
+     ]
+    },
+    {
+     "request": {
+      "method": "POST",
+      "id": "kitchen_off",
+      "user": "admin",
+      "sent": "{\"id\": \"kitchen_off\", \"alias\": \"Kitchen lights - off at 11:30pm\", \"description\": \"Turn off the kitchen light and lamp every night at 11:30pm.\", \"mode\": \"single\", \"triggers\": [{\"trigger\": \"time\", \"at\": \"23:30:00\"}], \"actions\": [{\"action\": \"light.turn_off\", \"target\": {\"entity_id\": [\"light.kitchen\", \"light.lamp\"]}, \"data\": {\"transition\": 10}}]}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "body": "{\"result\":\"ok\"}",
+     "file": "- id: hall_motion\n  alias: Hallway lights - motion on when dark\n  description: Turn on hallway lights when motion is detected below 30 lux, using\n    dim overnight and gentle morning levels.\n  mode: restart\n  triggers:\n  - trigger: state\n    entity_id: binary_sensor.hall_motion\n    to: 'on'\n  conditions:\n  - condition: numeric_state\n    entity_id: sensor.hall_illuminance\n    below: 30\n  - condition: time\n    after: 06:30:00\n    before: '23:00:00'\n  actions:\n  - action: light.turn_on\n    target:\n      entity_id: light.hall\n    data:\n      brightness_pct: 60\n- id: kitchen_off\n  alias: Kitchen lights - off at 11:30pm\n  description: Turn off the kitchen light and lamp every night at 11:30pm.\n  triggers:\n  - trigger: time\n    at: '23:30:00'\n  actions:\n  - action: light.turn_off\n    target:\n      entity_id:\n      - light.kitchen\n      - light.lamp\n    data:\n      transition: 10\n  mode: single\n",
+     "events": [
+      {
+       "kind": "registry",
+       "data": {
+        "action": "create",
+        "entity_id": "automation.kitchen_lights_off_at_11_30pm"
+       }
+      },
+      {
+       "kind": "state",
+       "entity_id": "automation.kitchen_lights_off_at_11_30pm",
+       "old": null,
+       "new": {
+        "state": "off",
+        "attributes": {
+         "id": "kitchen_off",
+         "last_triggered": null,
+         "mode": "single",
+         "current": 0,
+         "friendly_name": "Kitchen lights - off at 11:30pm"
+        }
+       }
+      },
+      {
+       "kind": "reloaded",
+       "data": {},
+       "user": false
+      }
+     ]
+    }
+   ],
+   "registry": [
+    {
+     "entity_id": "automation.hallway_lights_motion_on_when_dark",
+     "unique_id": "hall_motion",
+     "name": null,
+     "original_name": "Hallway lights - motion on when dark",
+     "object_id_base": "Hallway lights - motion on when dark",
+     "capabilities": {
+      "id": "hall_motion"
+     },
+     "options": {}
+    },
+    {
+     "entity_id": "automation.kitchen_lights_off_at_11_30pm",
+     "unique_id": "kitchen_off",
+     "name": null,
+     "original_name": "Kitchen lights - off at 11:30pm",
+     "object_id_base": "Kitchen lights - off at 11:30pm",
+     "capabilities": {
+      "id": "kitchen_off"
+     },
+     "options": {}
+    }
+   ],
+   "final": {
+    "automation.hallway_lights_motion_on_when_dark": {
+     "state": "on",
+     "attributes": {
+      "id": "hall_motion",
+      "last_triggered": null,
+      "mode": "restart",
+      "current": 0,
+      "friendly_name": "Hallway lights - motion on when dark"
+     }
+    },
+    "automation.kitchen_lights_off_at_11_30pm": {
+     "state": "off",
+     "attributes": {
+      "id": "kitchen_off",
+      "last_triggered": null,
+      "mode": "single",
+      "current": 0,
+      "friendly_name": "Kitchen lights - off at 11:30pm"
+     }
+    }
+   }
+  },
+  {
+   "name": "body_id_differs",
+   "doc": "A body whose `id` is not the URL's.",
+   "file": "- id: kitchen_off\n  alias: Kitchen lights - off at 11:30pm\n  description: Turn off the kitchen light and lamp every night at 11:30pm.\n  mode: single\n  triggers:\n  - trigger: time\n    at: \"23:30:00\"\n  actions:\n  - action: light.turn_off\n    target:\n      entity_id:\n      - light.kitchen\n      - light.lamp\n    data:\n      transition: 10\n- id: hall_motion\n  alias: Hallway lights - motion on when dark\n  description: Turn on hallway lights when motion is detected below 30 lux, using dim overnight and gentle morning levels.\n  mode: restart\n  triggers:\n  - trigger: state\n    entity_id: binary_sensor.hall_motion\n    to: \"on\"\n  conditions:\n  - condition: numeric_state\n    entity_id: sensor.hall_illuminance\n    below: 30\n  - condition: time\n    after: \"06:30:00\"\n    before: \"23:00:00\"\n  actions:\n  - action: light.turn_on\n    target:\n      entity_id: light.hall\n    data:\n      brightness_pct: 60\n",
+   "start": [
+    {
+     "kind": "registry",
+     "data": {
+      "action": "create",
+      "entity_id": "automation.kitchen_lights_off_at_11_30pm"
+     }
+    },
+    {
+     "kind": "state",
+     "entity_id": "automation.kitchen_lights_off_at_11_30pm",
+     "old": null,
+     "new": {
+      "state": "on",
+      "attributes": {
+       "id": "kitchen_off",
+       "last_triggered": null,
+       "mode": "single",
+       "current": 0,
+       "friendly_name": "Kitchen lights - off at 11:30pm"
+      }
+     }
+    },
+    {
+     "kind": "registry",
+     "data": {
+      "action": "create",
+      "entity_id": "automation.hallway_lights_motion_on_when_dark"
+     }
+    },
+    {
+     "kind": "state",
+     "entity_id": "automation.hallway_lights_motion_on_when_dark",
+     "old": null,
+     "new": {
+      "state": "on",
+      "attributes": {
+       "id": "hall_motion",
+       "last_triggered": null,
+       "mode": "restart",
+       "current": 0,
+       "friendly_name": "Hallway lights - motion on when dark"
+      }
+     }
+    }
+   ],
+   "steps": [
+    {
+     "request": {
+      "method": "POST",
+      "id": "kitchen_off",
+      "user": "admin",
+      "sent": "{\"id\": \"other_id\", \"alias\": \"Other\", \"description\": \"Turn off the kitchen light and lamp every night at 11:30pm.\", \"mode\": \"single\", \"triggers\": [{\"trigger\": \"time\", \"at\": \"23:30:00\"}], \"actions\": [{\"action\": \"light.turn_off\", \"target\": {\"entity_id\": [\"light.kitchen\", \"light.lamp\"]}, \"data\": {\"transition\": 10}}]}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "body": "{\"result\":\"ok\"}",
+     "file": "- id: other_id\n  alias: Other\n  description: Turn off the kitchen light and lamp every night at 11:30pm.\n  triggers:\n  - trigger: time\n    at: '23:30:00'\n  actions:\n  - action: light.turn_off\n    target:\n      entity_id:\n      - light.kitchen\n      - light.lamp\n    data:\n      transition: 10\n  mode: single\n- id: hall_motion\n  alias: Hallway lights - motion on when dark\n  description: Turn on hallway lights when motion is detected below 30 lux, using\n    dim overnight and gentle morning levels.\n  mode: restart\n  triggers:\n  - trigger: state\n    entity_id: binary_sensor.hall_motion\n    to: 'on'\n  conditions:\n  - condition: numeric_state\n    entity_id: sensor.hall_illuminance\n    below: 30\n  - condition: time\n    after: 06:30:00\n    before: '23:00:00'\n  actions:\n  - action: light.turn_on\n    target:\n      entity_id: light.hall\n    data:\n      brightness_pct: 60\n",
+     "events": [
+      {
+       "kind": "state",
+       "entity_id": "automation.kitchen_lights_off_at_11_30pm",
+       "old": {
+        "state": "on",
+        "attributes": {
+         "id": "kitchen_off",
+         "last_triggered": null,
+         "mode": "single",
+         "current": 0,
+         "friendly_name": "Kitchen lights - off at 11:30pm"
+        }
+       },
+       "new": {
+        "state": "unavailable",
+        "attributes": {
+         "restored": true,
+         "id": "kitchen_off",
+         "friendly_name": "Kitchen lights - off at 11:30pm",
+         "supported_features": 0
+        }
+       }
+      },
+      {
+       "kind": "reloaded",
+       "data": {},
+       "user": false
+      }
+     ]
+    },
+    {
+     "request": {
+      "method": "GET",
+      "id": "kitchen_off",
+      "user": "admin"
+     },
+     "status": 404,
+     "content_type": "application/json",
+     "body": "{\"message\":\"Resource not found\"}",
+     "events": []
+    },
+    {
+     "request": {
+      "method": "GET",
+      "id": "other_id",
+      "user": "admin"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "body": "{\"id\":\"other_id\",\"alias\":\"Other\",\"description\":\"Turn off the kitchen light and lamp every night at 11:30pm.\",\"triggers\":[{\"trigger\":\"time\",\"at\":\"23:30:00\"}],\"actions\":[{\"action\":\"light.turn_off\",\"target\":{\"entity_id\":[\"light.kitchen\",\"light.lamp\"]},\"data\":{\"transition\":10}}],\"mode\":\"single\"}",
+     "events": []
+    }
+   ],
+   "registry": [
+    {
+     "entity_id": "automation.kitchen_lights_off_at_11_30pm",
+     "unique_id": "kitchen_off",
+     "name": null,
+     "original_name": "Kitchen lights - off at 11:30pm",
+     "object_id_base": "Kitchen lights - off at 11:30pm",
+     "capabilities": {
+      "id": "kitchen_off"
+     },
+     "options": {}
+    },
+    {
+     "entity_id": "automation.hallway_lights_motion_on_when_dark",
+     "unique_id": "hall_motion",
+     "name": null,
+     "original_name": "Hallway lights - motion on when dark",
+     "object_id_base": "Hallway lights - motion on when dark",
+     "capabilities": {
+      "id": "hall_motion"
+     },
+     "options": {}
+    }
+   ],
+   "final": {
+    "automation.kitchen_lights_off_at_11_30pm": {
+     "state": "unavailable",
+     "attributes": {
+      "restored": true,
+      "id": "kitchen_off",
+      "friendly_name": "Kitchen lights - off at 11:30pm",
+      "supported_features": 0
+     }
+    },
+    "automation.hallway_lights_motion_on_when_dark": {
+     "state": "on",
+     "attributes": {
+      "id": "hall_motion",
+      "last_triggered": null,
+      "mode": "restart",
+      "current": 0,
+      "friendly_name": "Hallway lights - motion on when dark"
+     }
+    }
+   }
+  },
+  {
+   "name": "legacy_keys",
+   "doc": "`trigger`, `condition`, `action`, `platform` and `service`, as older files have them.",
+   "file": "- id: kitchen_off\n  alias: Kitchen lights - off at 11:30pm\n  description: Turn off the kitchen light and lamp every night at 11:30pm.\n  mode: single\n  triggers:\n  - trigger: time\n    at: \"23:30:00\"\n  actions:\n  - action: light.turn_off\n    target:\n      entity_id:\n      - light.kitchen\n      - light.lamp\n    data:\n      transition: 10\n- id: hall_motion\n  alias: Hallway lights - motion on when dark\n  description: Turn on hallway lights when motion is detected below 30 lux, using dim overnight and gentle morning levels.\n  mode: restart\n  triggers:\n  - trigger: state\n    entity_id: binary_sensor.hall_motion\n    to: \"on\"\n  conditions:\n  - condition: numeric_state\n    entity_id: sensor.hall_illuminance\n    below: 30\n  - condition: time\n    after: \"06:30:00\"\n    before: \"23:00:00\"\n  actions:\n  - action: light.turn_on\n    target:\n      entity_id: light.hall\n    data:\n      brightness_pct: 60\n",
+   "start": [
+    {
+     "kind": "registry",
+     "data": {
+      "action": "create",
+      "entity_id": "automation.kitchen_lights_off_at_11_30pm"
+     }
+    },
+    {
+     "kind": "state",
+     "entity_id": "automation.kitchen_lights_off_at_11_30pm",
+     "old": null,
+     "new": {
+      "state": "on",
+      "attributes": {
+       "id": "kitchen_off",
+       "last_triggered": null,
+       "mode": "single",
+       "current": 0,
+       "friendly_name": "Kitchen lights - off at 11:30pm"
+      }
+     }
+    },
+    {
+     "kind": "registry",
+     "data": {
+      "action": "create",
+      "entity_id": "automation.hallway_lights_motion_on_when_dark"
+     }
+    },
+    {
+     "kind": "state",
+     "entity_id": "automation.hallway_lights_motion_on_when_dark",
+     "old": null,
+     "new": {
+      "state": "on",
+      "attributes": {
+       "id": "hall_motion",
+       "last_triggered": null,
+       "mode": "restart",
+       "current": 0,
+       "friendly_name": "Hallway lights - motion on when dark"
+      }
+     }
+    }
+   ],
+   "steps": [
+    {
+     "request": {
+      "method": "POST",
+      "id": "legacy",
+      "user": "admin",
+      "sent": "{\"alias\": \"Legacy\", \"trigger\": {\"platform\": \"state\", \"entity_id\": \"binary_sensor.hall_motion\", \"to\": \"on\"}, \"condition\": {\"condition\": \"state\", \"entity_id\": \"light.hall\", \"state\": \"off\"}, \"action\": [{\"service\": \"light.turn_on\", \"target\": {\"entity_id\": \"light.hall\"}}, {\"choose\": [{\"conditions\": [{\"condition\": \"state\", \"entity_id\": \"light.hall\", \"state\": \"on\"}], \"sequence\": [{\"service\": \"light.turn_off\", \"target\": {\"entity_id\": \"light.hall\"}}]}]}]}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "body": "{\"result\":\"ok\"}",
+     "file": "- id: kitchen_off\n  alias: Kitchen lights - off at 11:30pm\n  description: Turn off the kitchen light and lamp every night at 11:30pm.\n  mode: single\n  triggers:\n  - trigger: time\n    at: '23:30:00'\n  actions:\n  - action: light.turn_off\n    target:\n      entity_id:\n      - light.kitchen\n      - light.lamp\n    data:\n      transition: 10\n- id: hall_motion\n  alias: Hallway lights - motion on when dark\n  description: Turn on hallway lights when motion is detected below 30 lux, using\n    dim overnight and gentle morning levels.\n  mode: restart\n  triggers:\n  - trigger: state\n    entity_id: binary_sensor.hall_motion\n    to: 'on'\n  conditions:\n  - condition: numeric_state\n    entity_id: sensor.hall_illuminance\n    below: 30\n  - condition: time\n    after: 06:30:00\n    before: '23:00:00'\n  actions:\n  - action: light.turn_on\n    target:\n      entity_id: light.hall\n    data:\n      brightness_pct: 60\n- id: legacy\n  alias: Legacy\n  triggers:\n    platform: state\n    entity_id: binary_sensor.hall_motion\n    to: 'on'\n  conditions:\n    condition: state\n    entity_id: light.hall\n    state: 'off'\n  actions:\n  - target:\n      entity_id: light.hall\n    action: light.turn_on\n  - choose:\n    - conditions:\n      - condition: state\n        entity_id: light.hall\n        state: 'on'\n      sequence:\n      - target:\n          entity_id: light.hall\n        action: light.turn_off\n",
+     "events": [
+      {
+       "kind": "registry",
+       "data": {
+        "action": "create",
+        "entity_id": "automation.legacy"
+       }
+      },
+      {
+       "kind": "state",
+       "entity_id": "automation.legacy",
+       "old": null,
+       "new": {
+        "state": "on",
+        "attributes": {
+         "id": "legacy",
+         "last_triggered": null,
+         "mode": "single",
+         "current": 0,
+         "friendly_name": "Legacy"
+        }
+       }
+      },
+      {
+       "kind": "reloaded",
+       "data": {},
+       "user": false
+      }
+     ]
+    },
+    {
+     "request": {
+      "method": "GET",
+      "id": "legacy",
+      "user": "admin"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "body": "{\"id\":\"legacy\",\"alias\":\"Legacy\",\"triggers\":{\"platform\":\"state\",\"entity_id\":\"binary_sensor.hall_motion\",\"to\":\"on\"},\"conditions\":{\"condition\":\"state\",\"entity_id\":\"light.hall\",\"state\":\"off\"},\"actions\":[{\"target\":{\"entity_id\":\"light.hall\"},\"action\":\"light.turn_on\"},{\"choose\":[{\"conditions\":[{\"condition\":\"state\",\"entity_id\":\"light.hall\",\"state\":\"on\"}],\"sequence\":[{\"target\":{\"entity_id\":\"light.hall\"},\"action\":\"light.turn_off\"}]}]}]}",
+     "events": []
+    }
+   ],
+   "registry": [
+    {
+     "entity_id": "automation.kitchen_lights_off_at_11_30pm",
+     "unique_id": "kitchen_off",
+     "name": null,
+     "original_name": "Kitchen lights - off at 11:30pm",
+     "object_id_base": "Kitchen lights - off at 11:30pm",
+     "capabilities": {
+      "id": "kitchen_off"
+     },
+     "options": {}
+    },
+    {
+     "entity_id": "automation.hallway_lights_motion_on_when_dark",
+     "unique_id": "hall_motion",
+     "name": null,
+     "original_name": "Hallway lights - motion on when dark",
+     "object_id_base": "Hallway lights - motion on when dark",
+     "capabilities": {
+      "id": "hall_motion"
+     },
+     "options": {}
+    },
+    {
+     "entity_id": "automation.legacy",
+     "unique_id": "legacy",
+     "name": null,
+     "original_name": "Legacy",
+     "object_id_base": "Legacy",
+     "capabilities": {
+      "id": "legacy"
+     },
+     "options": {}
+    }
+   ],
+   "final": {
+    "automation.kitchen_lights_off_at_11_30pm": {
+     "state": "on",
+     "attributes": {
+      "id": "kitchen_off",
+      "last_triggered": null,
+      "mode": "single",
+      "current": 0,
+      "friendly_name": "Kitchen lights - off at 11:30pm"
+     }
+    },
+    "automation.hallway_lights_motion_on_when_dark": {
+     "state": "on",
+     "attributes": {
+      "id": "hall_motion",
+      "last_triggered": null,
+      "mode": "restart",
+      "current": 0,
+      "friendly_name": "Hallway lights - motion on when dark"
+     }
+    },
+    "automation.legacy": {
+     "state": "on",
+     "attributes": {
+      "id": "legacy",
+      "last_triggered": null,
+      "mode": "single",
+      "current": 0,
+      "friendly_name": "Legacy"
+     }
+    }
+   }
+  },
+  {
+   "name": "entry_without_id",
+   "doc": "An entry in the file with no id gets one when the file is next written.",
+   "file": "- alias: No id\n  triggers:\n  - trigger: time\n    at: '10:00:00'\n  actions: []\n- id: kitchen_off\n  alias: Kitchen lights - off at 11:30pm\n  description: Turn off the kitchen light and lamp every night at 11:30pm.\n  mode: single\n  triggers:\n  - trigger: time\n    at: \"23:30:00\"\n  actions:\n  - action: light.turn_off\n    target:\n      entity_id:\n      - light.kitchen\n      - light.lamp\n    data:\n      transition: 10\n- id: hall_motion\n  alias: Hallway lights - motion on when dark\n  description: Turn on hallway lights when motion is detected below 30 lux, using dim overnight and gentle morning levels.\n  mode: restart\n  triggers:\n  - trigger: state\n    entity_id: binary_sensor.hall_motion\n    to: \"on\"\n  conditions:\n  - condition: numeric_state\n    entity_id: sensor.hall_illuminance\n    below: 30\n  - condition: time\n    after: \"06:30:00\"\n    before: \"23:00:00\"\n  actions:\n  - action: light.turn_on\n    target:\n      entity_id: light.hall\n    data:\n      brightness_pct: 60\n",
+   "start": [
+    {
+     "kind": "state",
+     "entity_id": "automation.no_id",
+     "old": null,
+     "new": {
+      "state": "on",
+      "attributes": {
+       "last_triggered": null,
+       "mode": "single",
+       "current": 0,
+       "friendly_name": "No id"
+      }
+     }
+    },
+    {
+     "kind": "registry",
+     "data": {
+      "action": "create",
+      "entity_id": "automation.kitchen_lights_off_at_11_30pm"
+     }
+    },
+    {
+     "kind": "state",
+     "entity_id": "automation.kitchen_lights_off_at_11_30pm",
+     "old": null,
+     "new": {
+      "state": "on",
+      "attributes": {
+       "id": "kitchen_off",
+       "last_triggered": null,
+       "mode": "single",
+       "current": 0,
+       "friendly_name": "Kitchen lights - off at 11:30pm"
+      }
+     }
+    },
+    {
+     "kind": "registry",
+     "data": {
+      "action": "create",
+      "entity_id": "automation.hallway_lights_motion_on_when_dark"
+     }
+    },
+    {
+     "kind": "state",
+     "entity_id": "automation.hallway_lights_motion_on_when_dark",
+     "old": null,
+     "new": {
+      "state": "on",
+      "attributes": {
+       "id": "hall_motion",
+       "last_triggered": null,
+       "mode": "restart",
+       "current": 0,
+       "friendly_name": "Hallway lights - motion on when dark"
+      }
+     }
+    }
+   ],
+   "steps": [
+    {
+     "request": {
+      "method": "POST",
+      "id": "kitchen_off",
+      "user": "admin",
+      "sent": "{\"id\": \"kitchen_off\", \"alias\": \"Kitchen lights - off at 11:30pm\", \"description\": \"Turn off the kitchen light and lamp every night at 11:30pm.\", \"mode\": \"restart\", \"triggers\": [{\"trigger\": \"time\", \"at\": \"23:30:00\"}], \"actions\": [{\"action\": \"light.turn_off\", \"target\": {\"entity_id\": [\"light.kitchen\", \"light.lamp\"]}, \"data\": {\"transition\": 10}}]}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "body": "{\"result\":\"ok\"}",
+     "file": "- alias: No id\n  triggers:\n  - trigger: time\n    at: '10:00:00'\n  actions: []\n  id: <hex32>\n- id: kitchen_off\n  alias: Kitchen lights - off at 11:30pm\n  description: Turn off the kitchen light and lamp every night at 11:30pm.\n  triggers:\n  - trigger: time\n    at: '23:30:00'\n  actions:\n  - action: light.turn_off\n    target:\n      entity_id:\n      - light.kitchen\n      - light.lamp\n    data:\n      transition: 10\n  mode: restart\n- id: hall_motion\n  alias: Hallway lights - motion on when dark\n  description: Turn on hallway lights when motion is detected below 30 lux, using\n    dim overnight and gentle morning levels.\n  mode: restart\n  triggers:\n  - trigger: state\n    entity_id: binary_sensor.hall_motion\n    to: 'on'\n  conditions:\n  - condition: numeric_state\n    entity_id: sensor.hall_illuminance\n    below: 30\n  - condition: time\n    after: 06:30:00\n    before: '23:00:00'\n  actions:\n  - action: light.turn_on\n    target:\n      entity_id: light.hall\n    data:\n      brightness_pct: 60\n",
+     "events": [
+      {
+       "kind": "state",
+       "entity_id": "automation.kitchen_lights_off_at_11_30pm",
+       "old": {
+        "state": "on",
+        "attributes": {
+         "id": "kitchen_off",
+         "last_triggered": null,
+         "mode": "single",
+         "current": 0,
+         "friendly_name": "Kitchen lights - off at 11:30pm"
+        }
+       },
+       "new": {
+        "state": "unavailable",
+        "attributes": {
+         "restored": true,
+         "id": "kitchen_off",
+         "friendly_name": "Kitchen lights - off at 11:30pm",
+         "supported_features": 0
+        }
+       }
+      },
+      {
+       "kind": "state",
+       "entity_id": "automation.kitchen_lights_off_at_11_30pm",
+       "old": {
+        "state": "unavailable",
+        "attributes": {
+         "restored": true,
+         "id": "kitchen_off",
+         "friendly_name": "Kitchen lights - off at 11:30pm",
+         "supported_features": 0
+        }
+       },
+       "new": {
+        "state": "on",
+        "attributes": {
+         "id": "kitchen_off",
+         "last_triggered": null,
+         "mode": "restart",
+         "current": 0,
+         "friendly_name": "Kitchen lights - off at 11:30pm"
+        }
+       }
+      },
+      {
+       "kind": "reloaded",
+       "data": {},
+       "user": false
+      }
+     ]
+    }
+   ],
+   "registry": [
+    {
+     "entity_id": "automation.kitchen_lights_off_at_11_30pm",
+     "unique_id": "kitchen_off",
+     "name": null,
+     "original_name": "Kitchen lights - off at 11:30pm",
+     "object_id_base": "Kitchen lights - off at 11:30pm",
+     "capabilities": {
+      "id": "kitchen_off"
+     },
+     "options": {}
+    },
+    {
+     "entity_id": "automation.hallway_lights_motion_on_when_dark",
+     "unique_id": "hall_motion",
+     "name": null,
+     "original_name": "Hallway lights - motion on when dark",
+     "object_id_base": "Hallway lights - motion on when dark",
+     "capabilities": {
+      "id": "hall_motion"
+     },
+     "options": {}
+    }
+   ],
+   "final": {
+    "automation.no_id": {
+     "state": "on",
+     "attributes": {
+      "last_triggered": null,
+      "mode": "single",
+      "current": 0,
+      "friendly_name": "No id"
+     }
+    },
+    "automation.kitchen_lights_off_at_11_30pm": {
+     "state": "on",
+     "attributes": {
+      "id": "kitchen_off",
+      "last_triggered": null,
+      "mode": "restart",
+      "current": 0,
+      "friendly_name": "Kitchen lights - off at 11:30pm"
+     }
+    },
+    "automation.hallway_lights_motion_on_when_dark": {
+     "state": "on",
+     "attributes": {
+      "id": "hall_motion",
+      "last_triggered": null,
+      "mode": "restart",
+      "current": 0,
+      "friendly_name": "Hallway lights - motion on when dark"
+     }
+    }
+   }
+  },
+  {
+   "name": "no_file",
+   "doc": "No `automations.yaml` yet: reading finds nothing, a save makes the file.",
+   "file": null,
+   "start": [],
+   "steps": [
+    {
+     "request": {
+      "method": "GET",
+      "id": "first",
+      "user": "admin"
+     },
+     "status": 404,
+     "content_type": "application/json",
+     "body": "{\"message\":\"Resource not found\"}",
+     "events": []
+    },
+    {
+     "request": {
+      "method": "DELETE",
+      "id": "first",
+      "user": "admin"
+     },
+     "status": 400,
+     "content_type": "application/json",
+     "body": "{\"message\":\"Resource not found\"}",
+     "events": []
+    },
+    {
+     "request": {
+      "method": "POST",
+      "id": "first",
+      "user": "admin",
+      "sent": "{\"description\": \"\", \"mode\": \"single\", \"triggers\": [{\"trigger\": \"state\", \"entity_id\": [\"binary_sensor.hall_motion\"], \"to\": \"on\"}], \"conditions\": [], \"actions\": [{\"action\": \"light.turn_on\", \"metadata\": {}, \"data\": {\"brightness_pct\": 50}, \"target\": {\"entity_id\": \"light.hall\"}}], \"alias\": \"Hallway test: on at 50%\"}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "body": "{\"result\":\"ok\"}",
+     "file": "- id: first\n  alias: 'Hallway test: on at 50%'\n  description: ''\n  triggers:\n  - trigger: state\n    entity_id:\n    - binary_sensor.hall_motion\n    to: 'on'\n  conditions: []\n  actions:\n  - action: light.turn_on\n    metadata: {}\n    data:\n      brightness_pct: 50\n    target:\n      entity_id: light.hall\n  mode: single\n",
+     "events": [
+      {
+       "kind": "registry",
+       "data": {
+        "action": "create",
+        "entity_id": "automation.hallway_test_on_at_50"
+       }
+      },
+      {
+       "kind": "state",
+       "entity_id": "automation.hallway_test_on_at_50",
+       "old": null,
+       "new": {
+        "state": "on",
+        "attributes": {
+         "id": "first",
+         "last_triggered": null,
+         "mode": "single",
+         "current": 0,
+         "friendly_name": "Hallway test: on at 50%"
+        }
+       }
+      },
+      {
+       "kind": "reloaded",
+       "data": {},
+       "user": false
+      }
+     ]
+    },
+    {
+     "request": {
+      "method": "GET",
+      "id": "first",
+      "user": "admin"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "body": "{\"id\":\"first\",\"alias\":\"Hallway test: on at 50%\",\"description\":\"\",\"triggers\":[{\"trigger\":\"state\",\"entity_id\":[\"binary_sensor.hall_motion\"],\"to\":\"on\"}],\"conditions\":[],\"actions\":[{\"action\":\"light.turn_on\",\"metadata\":{},\"data\":{\"brightness_pct\":50},\"target\":{\"entity_id\":\"light.hall\"}}],\"mode\":\"single\"}",
+     "events": []
+    }
+   ],
+   "registry": [
+    {
+     "entity_id": "automation.hallway_test_on_at_50",
+     "unique_id": "first",
+     "name": null,
+     "original_name": "Hallway test: on at 50%",
+     "object_id_base": "Hallway test: on at 50%",
+     "capabilities": {
+      "id": "first"
+     },
+     "options": {}
+    }
+   ],
+   "final": {
+    "automation.hallway_test_on_at_50": {
+     "state": "on",
+     "attributes": {
+      "id": "first",
+      "last_triggered": null,
+      "mode": "single",
+      "current": 0,
+      "friendly_name": "Hallway test: on at 50%"
+     }
+    }
+   }
+  },
+  {
+   "name": "empty_file",
+   "doc": "An empty file, and one holding `[]`.",
+   "file": "",
+   "start": [],
+   "steps": [
+    {
+     "request": {
+      "method": "GET",
+      "id": "first",
+      "user": "admin"
+     },
+     "status": 404,
+     "content_type": "application/json",
+     "body": "{\"message\":\"Resource not found\"}",
+     "events": []
+    },
+    {
+     "request": {
+      "method": "POST",
+      "id": "first",
+      "user": "admin",
+      "sent": "{\"description\": \"\", \"mode\": \"single\", \"triggers\": [{\"trigger\": \"state\", \"entity_id\": [\"binary_sensor.hall_motion\"], \"to\": \"on\"}], \"conditions\": [], \"actions\": [{\"action\": \"light.turn_on\", \"metadata\": {}, \"data\": {\"brightness_pct\": 50}, \"target\": {\"entity_id\": \"light.hall\"}}], \"alias\": \"Hallway test: on at 50%\"}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "body": "{\"result\":\"ok\"}",
+     "file": "- id: first\n  alias: 'Hallway test: on at 50%'\n  description: ''\n  triggers:\n  - trigger: state\n    entity_id:\n    - binary_sensor.hall_motion\n    to: 'on'\n  conditions: []\n  actions:\n  - action: light.turn_on\n    metadata: {}\n    data:\n      brightness_pct: 50\n    target:\n      entity_id: light.hall\n  mode: single\n",
+     "events": [
+      {
+       "kind": "registry",
+       "data": {
+        "action": "create",
+        "entity_id": "automation.hallway_test_on_at_50"
+       }
+      },
+      {
+       "kind": "state",
+       "entity_id": "automation.hallway_test_on_at_50",
+       "old": null,
+       "new": {
+        "state": "on",
+        "attributes": {
+         "id": "first",
+         "last_triggered": null,
+         "mode": "single",
+         "current": 0,
+         "friendly_name": "Hallway test: on at 50%"
+        }
+       }
+      },
+      {
+       "kind": "reloaded",
+       "data": {},
+       "user": false
+      }
+     ]
+    },
+    {
+     "request": {
+      "method": "DELETE",
+      "id": "first",
+      "user": "admin"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "body": "{\"result\":\"ok\"}",
+     "file": "[]\n",
+     "events": [
+      {
+       "kind": "registry",
+       "data": {
+        "action": "remove",
+        "entity_id": "automation.hallway_test_on_at_50"
+       }
+      },
+      {
+       "kind": "state",
+       "entity_id": "automation.hallway_test_on_at_50",
+       "old": {
+        "state": "on",
+        "attributes": {
+         "id": "first",
+         "last_triggered": null,
+         "mode": "single",
+         "current": 0,
+         "friendly_name": "Hallway test: on at 50%"
+        }
+       },
+       "new": null
+      }
+     ]
+    },
+    {
+     "request": {
+      "method": "POST",
+      "id": "second",
+      "user": "admin",
+      "sent": "{\"description\": \"\", \"mode\": \"single\", \"triggers\": [{\"trigger\": \"state\", \"entity_id\": [\"binary_sensor.hall_motion\"], \"to\": \"on\"}], \"conditions\": [], \"actions\": [{\"action\": \"light.turn_on\", \"metadata\": {}, \"data\": {\"brightness_pct\": 50}, \"target\": {\"entity_id\": \"light.hall\"}}], \"alias\": \"Hallway test: on at 50%\"}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "body": "{\"result\":\"ok\"}",
+     "file": "- id: second\n  alias: 'Hallway test: on at 50%'\n  description: ''\n  triggers:\n  - trigger: state\n    entity_id:\n    - binary_sensor.hall_motion\n    to: 'on'\n  conditions: []\n  actions:\n  - action: light.turn_on\n    metadata: {}\n    data:\n      brightness_pct: 50\n    target:\n      entity_id: light.hall\n  mode: single\n",
+     "events": [
+      {
+       "kind": "registry",
+       "data": {
+        "action": "create",
+        "entity_id": "automation.hallway_test_on_at_50"
+       }
+      },
+      {
+       "kind": "state",
+       "entity_id": "automation.hallway_test_on_at_50",
+       "old": null,
+       "new": {
+        "state": "on",
+        "attributes": {
+         "id": "second",
+         "last_triggered": null,
+         "mode": "single",
+         "current": 0,
+         "friendly_name": "Hallway test: on at 50%"
+        }
+       }
+      },
+      {
+       "kind": "reloaded",
+       "data": {},
+       "user": false
+      }
+     ]
+    }
+   ],
+   "registry": [
+    {
+     "entity_id": "automation.hallway_test_on_at_50",
+     "unique_id": "second",
+     "name": null,
+     "original_name": "Hallway test: on at 50%",
+     "object_id_base": "Hallway test: on at 50%",
+     "capabilities": {
+      "id": "second"
+     },
+     "options": {}
+    }
+   ],
+   "final": {
+    "automation.hallway_test_on_at_50": {
+     "state": "on",
+     "attributes": {
+      "id": "second",
+      "last_triggered": null,
+      "mode": "single",
+      "current": 0,
+      "friendly_name": "Hallway test: on at 50%"
+     }
+    }
+   }
+  },
+  {
+   "name": "numeric_id_in_file",
+   "doc": "An entry whose `id` YAML reads as a number.",
+   "file": "- id: 123\n  alias: Numbered\n  triggers:\n  - trigger: time\n    at: '10:00:00'\n  actions: []\n",
+   "start": [],
+   "steps": [
+    {
+     "request": {
+      "method": "GET",
+      "id": "123",
+      "user": "admin"
+     },
+     "status": 404,
+     "content_type": "application/json",
+     "body": "{\"message\":\"Resource not found\"}",
+     "events": []
+    },
+    {
+     "request": {
+      "method": "POST",
+      "id": "123",
+      "user": "admin",
+      "sent": "{\"alias\": \"Numbered again\", \"triggers\": [{\"trigger\": \"time\", \"at\": \"11:00:00\"}], \"actions\": []}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "body": "{\"result\":\"ok\"}",
+     "file": "- id: 123\n  alias: Numbered\n  triggers:\n  - trigger: time\n    at: '10:00:00'\n  actions: []\n- id: '123'\n  alias: Numbered again\n  triggers:\n  - trigger: time\n    at: '11:00:00'\n  actions: []\n",
+     "events": [
+      {
+       "kind": "registry",
+       "data": {
+        "action": "create",
+        "entity_id": "automation.numbered_again"
+       }
+      },
+      {
+       "kind": "state",
+       "entity_id": "automation.numbered_again",
+       "old": null,
+       "new": {
+        "state": "on",
+        "attributes": {
+         "id": "123",
+         "last_triggered": null,
+         "mode": "single",
+         "current": 0,
+         "friendly_name": "Numbered again"
+        }
+       }
+      },
+      {
+       "kind": "reloaded",
+       "data": {},
+       "user": false
+      }
+     ]
+    },
+    {
+     "request": {
+      "method": "DELETE",
+      "id": "123",
+      "user": "admin"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "body": "{\"result\":\"ok\"}",
+     "file": "- id: 123\n  alias: Numbered\n  triggers:\n  - trigger: time\n    at: '10:00:00'\n  actions: []\n",
+     "events": [
+      {
+       "kind": "registry",
+       "data": {
+        "action": "remove",
+        "entity_id": "automation.numbered_again"
+       }
+      },
+      {
+       "kind": "state",
+       "entity_id": "automation.numbered_again",
+       "old": {
+        "state": "on",
+        "attributes": {
+         "id": "123",
+         "last_triggered": null,
+         "mode": "single",
+         "current": 0,
+         "friendly_name": "Numbered again"
+        }
+       },
+       "new": null
+      }
+     ]
+    }
+   ],
+   "registry": [],
+   "final": {}
+  },
+  {
+   "name": "unicode",
+   "doc": "Text that HA's writer quotes or folds: an emoji, a colon, a multi-line description, a template.",
+   "file": "- id: kitchen_off\n  alias: Kitchen lights - off at 11:30pm\n  description: Turn off the kitchen light and lamp every night at 11:30pm.\n  mode: single\n  triggers:\n  - trigger: time\n    at: \"23:30:00\"\n  actions:\n  - action: light.turn_off\n    target:\n      entity_id:\n      - light.kitchen\n      - light.lamp\n    data:\n      transition: 10\n- id: hall_motion\n  alias: Hallway lights - motion on when dark\n  description: Turn on hallway lights when motion is detected below 30 lux, using dim overnight and gentle morning levels.\n  mode: restart\n  triggers:\n  - trigger: state\n    entity_id: binary_sensor.hall_motion\n    to: \"on\"\n  conditions:\n  - condition: numeric_state\n    entity_id: sensor.hall_illuminance\n    below: 30\n  - condition: time\n    after: \"06:30:00\"\n    before: \"23:00:00\"\n  actions:\n  - action: light.turn_on\n    target:\n      entity_id: light.hall\n    data:\n      brightness_pct: 60\n",
+   "start": [
+    {
+     "kind": "registry",
+     "data": {
+      "action": "create",
+      "entity_id": "automation.kitchen_lights_off_at_11_30pm"
+     }
+    },
+    {
+     "kind": "state",
+     "entity_id": "automation.kitchen_lights_off_at_11_30pm",
+     "old": null,
+     "new": {
+      "state": "on",
+      "attributes": {
+       "id": "kitchen_off",
+       "last_triggered": null,
+       "mode": "single",
+       "current": 0,
+       "friendly_name": "Kitchen lights - off at 11:30pm"
+      }
+     }
+    },
+    {
+     "kind": "registry",
+     "data": {
+      "action": "create",
+      "entity_id": "automation.hallway_lights_motion_on_when_dark"
+     }
+    },
+    {
+     "kind": "state",
+     "entity_id": "automation.hallway_lights_motion_on_when_dark",
+     "old": null,
+     "new": {
+      "state": "on",
+      "attributes": {
+       "id": "hall_motion",
+       "last_triggered": null,
+       "mode": "restart",
+       "current": 0,
+       "friendly_name": "Hallway lights - motion on when dark"
+      }
+     }
+    }
+   ],
+   "steps": [
+    {
+     "request": {
+      "method": "POST",
+      "id": "fancy",
+      "user": "admin",
+      "sent": "{\"alias\": \"\\ud83d\\udea8 Alert: door\", \"description\": \"Line one\\nLine two is long enough to need folding when it is written out by the emitter, at eighty columns.\\n\", \"triggers\": [{\"trigger\": \"state\", \"entity_id\": \"binary_sensor.door\", \"to\": \"on\"}], \"actions\": [{\"action\": \"light.turn_on\", \"target\": {\"entity_id\": \"light.hall\"}, \"data\": {\"brightness_pct\": \"{{ 50 if is_state('sun.sun', 'below_horizon') else 100 }}\"}}], \"mode\": \"single\"}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "body": "{\"result\":\"ok\"}",
+     "file": "- id: kitchen_off\n  alias: Kitchen lights - off at 11:30pm\n  description: Turn off the kitchen light and lamp every night at 11:30pm.\n  mode: single\n  triggers:\n  - trigger: time\n    at: '23:30:00'\n  actions:\n  - action: light.turn_off\n    target:\n      entity_id:\n      - light.kitchen\n      - light.lamp\n    data:\n      transition: 10\n- id: hall_motion\n  alias: Hallway lights - motion on when dark\n  description: Turn on hallway lights when motion is detected below 30 lux, using\n    dim overnight and gentle morning levels.\n  mode: restart\n  triggers:\n  - trigger: state\n    entity_id: binary_sensor.hall_motion\n    to: 'on'\n  conditions:\n  - condition: numeric_state\n    entity_id: sensor.hall_illuminance\n    below: 30\n  - condition: time\n    after: 06:30:00\n    before: '23:00:00'\n  actions:\n  - action: light.turn_on\n    target:\n      entity_id: light.hall\n    data:\n      brightness_pct: 60\n- id: fancy\n  alias: \"\\U0001F6A8 Alert: door\"\n  description: 'Line one\n\n    Line two is long enough to need folding when it is written out by the emitter,\n    at eighty columns.\n\n    '\n  triggers:\n  - trigger: state\n    entity_id: binary_sensor.door\n    to: 'on'\n  actions:\n  - action: light.turn_on\n    target:\n      entity_id: light.hall\n    data:\n      brightness_pct: '{{ 50 if is_state(''sun.sun'', ''below_horizon'') else 100\n        }}'\n  mode: single\n",
+     "events": [
+      {
+       "kind": "registry",
+       "data": {
+        "action": "create",
+        "entity_id": "automation.alert_door"
+       }
+      },
+      {
+       "kind": "state",
+       "entity_id": "automation.alert_door",
+       "old": null,
+       "new": {
+        "state": "on",
+        "attributes": {
+         "id": "fancy",
+         "last_triggered": null,
+         "mode": "single",
+         "current": 0,
+         "friendly_name": "🚨 Alert: door"
+        }
+       }
+      },
+      {
+       "kind": "reloaded",
+       "data": {},
+       "user": false
+      }
+     ]
+    },
+    {
+     "request": {
+      "method": "GET",
+      "id": "fancy",
+      "user": "admin"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "body": "{\"id\":\"fancy\",\"alias\":\"🚨 Alert: door\",\"description\":\"Line one\\nLine two is long enough to need folding when it is written out by the emitter, at eighty columns.\\n\",\"triggers\":[{\"trigger\":\"state\",\"entity_id\":\"binary_sensor.door\",\"to\":\"on\"}],\"actions\":[{\"action\":\"light.turn_on\",\"target\":{\"entity_id\":\"light.hall\"},\"data\":{\"brightness_pct\":\"{{ 50 if is_state('sun.sun', 'below_horizon') else 100 }}\"}}],\"mode\":\"single\"}",
+     "events": []
+    }
+   ],
+   "registry": [
+    {
+     "entity_id": "automation.kitchen_lights_off_at_11_30pm",
+     "unique_id": "kitchen_off",
+     "name": null,
+     "original_name": "Kitchen lights - off at 11:30pm",
+     "object_id_base": "Kitchen lights - off at 11:30pm",
+     "capabilities": {
+      "id": "kitchen_off"
+     },
+     "options": {}
+    },
+    {
+     "entity_id": "automation.hallway_lights_motion_on_when_dark",
+     "unique_id": "hall_motion",
+     "name": null,
+     "original_name": "Hallway lights - motion on when dark",
+     "object_id_base": "Hallway lights - motion on when dark",
+     "capabilities": {
+      "id": "hall_motion"
+     },
+     "options": {}
+    },
+    {
+     "entity_id": "automation.alert_door",
+     "unique_id": "fancy",
+     "name": null,
+     "original_name": "🚨 Alert: door",
+     "object_id_base": "🚨 Alert: door",
+     "capabilities": {
+      "id": "fancy"
+     },
+     "options": {}
+    }
+   ],
+   "final": {
+    "automation.kitchen_lights_off_at_11_30pm": {
+     "state": "on",
+     "attributes": {
+      "id": "kitchen_off",
+      "last_triggered": null,
+      "mode": "single",
+      "current": 0,
+      "friendly_name": "Kitchen lights - off at 11:30pm"
+     }
+    },
+    "automation.hallway_lights_motion_on_when_dark": {
+     "state": "on",
+     "attributes": {
+      "id": "hall_motion",
+      "last_triggered": null,
+      "mode": "restart",
+      "current": 0,
+      "friendly_name": "Hallway lights - motion on when dark"
+     }
+    },
+    "automation.alert_door": {
+     "state": "on",
+     "attributes": {
+      "id": "fancy",
+      "last_triggered": null,
+      "mode": "single",
+      "current": 0,
+      "friendly_name": "🚨 Alert: door"
+     }
+    }
+   }
+  },
+  {
+   "name": "invalid_bodies",
+   "doc": "Bodies HA refuses: nothing is written.",
+   "file": "- id: kitchen_off\n  alias: Kitchen lights - off at 11:30pm\n  description: Turn off the kitchen light and lamp every night at 11:30pm.\n  mode: single\n  triggers:\n  - trigger: time\n    at: \"23:30:00\"\n  actions:\n  - action: light.turn_off\n    target:\n      entity_id:\n      - light.kitchen\n      - light.lamp\n    data:\n      transition: 10\n- id: hall_motion\n  alias: Hallway lights - motion on when dark\n  description: Turn on hallway lights when motion is detected below 30 lux, using dim overnight and gentle morning levels.\n  mode: restart\n  triggers:\n  - trigger: state\n    entity_id: binary_sensor.hall_motion\n    to: \"on\"\n  conditions:\n  - condition: numeric_state\n    entity_id: sensor.hall_illuminance\n    below: 30\n  - condition: time\n    after: \"06:30:00\"\n    before: \"23:00:00\"\n  actions:\n  - action: light.turn_on\n    target:\n      entity_id: light.hall\n    data:\n      brightness_pct: 60\n",
+   "start": [
+    {
+     "kind": "registry",
+     "data": {
+      "action": "create",
+      "entity_id": "automation.kitchen_lights_off_at_11_30pm"
+     }
+    },
+    {
+     "kind": "state",
+     "entity_id": "automation.kitchen_lights_off_at_11_30pm",
+     "old": null,
+     "new": {
+      "state": "on",
+      "attributes": {
+       "id": "kitchen_off",
+       "last_triggered": null,
+       "mode": "single",
+       "current": 0,
+       "friendly_name": "Kitchen lights - off at 11:30pm"
+      }
+     }
+    },
+    {
+     "kind": "registry",
+     "data": {
+      "action": "create",
+      "entity_id": "automation.hallway_lights_motion_on_when_dark"
+     }
+    },
+    {
+     "kind": "state",
+     "entity_id": "automation.hallway_lights_motion_on_when_dark",
+     "old": null,
+     "new": {
+      "state": "on",
+      "attributes": {
+       "id": "hall_motion",
+       "last_triggered": null,
+       "mode": "restart",
+       "current": 0,
+       "friendly_name": "Hallway lights - motion on when dark"
+      }
+     }
+    }
+   ],
+   "steps": [
+    {
+     "request": {
+      "method": "POST",
+      "id": "bad",
+      "user": "admin",
+      "sent": "{not json"
+     },
+     "status": 400,
+     "content_type": "application/json",
+     "body": "{\"message\":\"Invalid JSON specified\"}",
+     "events": []
+    },
+    {
+     "request": {
+      "method": "POST",
+      "id": "bad",
+      "user": "admin",
+      "sent": ""
+     },
+     "status": 400,
+     "content_type": "application/json",
+     "body": "{\"message\":\"Invalid JSON specified\"}",
+     "events": []
+    },
+    {
+     "request": {
+      "method": "POST",
+      "id": "bad",
+      "user": "admin",
+      "sent": "[{\"id\": \"kitchen_off\", \"alias\": \"Kitchen lights - off at 11:30pm\", \"description\": \"Turn off the kitchen light and lamp every night at 11:30pm.\", \"mode\": \"single\", \"triggers\": [{\"trigger\": \"time\", \"at\": \"23:30:00\"}], \"actions\": [{\"action\": \"light.turn_off\", \"target\": {\"entity_id\": [\"light.kitchen\", \"light.lamp\"]}, \"data\": {\"transition\": 10}}]}]"
+     },
+     "status": 400,
+     "content_type": "application/json",
+     "body": "{\"message\":\"Message malformed: expected dictionary\"}",
+     "events": []
+    },
+    {
+     "request": {
+      "method": "POST",
+      "id": "bad",
+      "user": "admin",
+      "sent": "5"
+     },
+     "status": 500,
+     "content_type": "text/plain; charset=utf-8",
+     "body": "500 Internal Server Error\n\nServer got itself in trouble",
+     "events": []
+    },
+    {
+     "request": {
+      "method": "POST",
+      "id": "bad",
+      "user": "admin",
+      "sent": "\"text\""
+     },
+     "status": 400,
+     "content_type": "application/json",
+     "body": "{\"message\":\"Message malformed: expected dictionary\"}",
+     "events": []
+    },
+    {
+     "request": {
+      "method": "POST",
+      "id": "bad",
+      "user": "admin",
+      "sent": "null"
+     },
+     "status": 500,
+     "content_type": "text/plain; charset=utf-8",
+     "body": "500 Internal Server Error\n\nServer got itself in trouble",
+     "events": []
+    },
+    {
+     "request": {
+      "method": "POST",
+      "id": "bad",
+      "user": "admin",
+      "sent": "true"
+     },
+     "status": 500,
+     "content_type": "text/plain; charset=utf-8",
+     "body": "500 Internal Server Error\n\nServer got itself in trouble",
+     "events": []
+    },
+    {
+     "request": {
+      "method": "POST",
+      "id": "bad",
+      "user": "admin",
+      "sent": "1.5"
+     },
+     "status": 500,
+     "content_type": "text/plain; charset=utf-8",
+     "body": "500 Internal Server Error\n\nServer got itself in trouble",
+     "events": []
+    },
+    {
+     "request": {
+      "method": "POST",
+      "id": "bad",
+      "user": "admin",
+      "sent": "[]"
+     },
+     "status": 400,
+     "content_type": "application/json",
+     "body": "{\"message\":\"Message malformed: expected dictionary\"}",
+     "events": []
+    },
+    {
+     "request": {
+      "method": "POST",
+      "id": "bad",
+      "user": "admin",
+      "sent": "{\"alias\": \"Both\", \"trigger\": [{\"trigger\": \"time\", \"at\": \"10:00:00\"}], \"triggers\": [{\"trigger\": \"time\", \"at\": \"10:00:00\"}], \"actions\": []}"
+     },
+     "status": 400,
+     "content_type": "application/json",
+     "body": "{\"message\":\"Message malformed: Cannot specify both 'trigger' and 'triggers'. Please use 'triggers' only.\"}",
+     "events": []
+    },
+    {
+     "request": {
+      "method": "POST",
+      "id": "bad",
+      "user": "admin",
+      "sent": "{\"alias\": \"No triggers\", \"actions\": []}"
+     },
+     "status": 400,
+     "content_type": "application/json",
+     "body": "{\"message\":\"Message malformed: required key not provided @ data['triggers']\"}",
+     "events": []
+    },
+    {
+     "request": {
+      "method": "POST",
+      "id": "bad",
+      "user": "admin",
+      "sent": "{\"alias\": \"No actions\", \"triggers\": [{\"trigger\": \"time\", \"at\": \"10:00:00\"}]}"
+     },
+     "status": 400,
+     "content_type": "application/json",
+     "body": "{\"message\":\"Message malformed: required key not provided @ data['actions']\"}",
+     "events": []
+    },
+    {
+     "request": {
+      "method": "POST",
+      "id": "bad",
+      "user": "admin",
+      "sent": "{\"alias\": \"Bad trigger\", \"triggers\": [{\"trigger\": \"state\", \"to\": \"on\"}], \"actions\": []}"
+     },
+     "status": 400,
+     "content_type": "application/json",
+     "body": "{\"message\":\"Message malformed: required key not provided @ data['entity_id']\"}",
+     "events": []
+    },
+    {
+     "request": {
+      "method": "POST",
+      "id": "bad",
+      "user": "admin",
+      "sent": "{\"alias\": \"Unknown trigger\", \"triggers\": [{\"trigger\": \"nope\"}], \"actions\": []}"
+     },
+     "status": 400,
+     "content_type": "application/json",
+     "body": "{\"message\":\"Message malformed: Invalid trigger 'nope' specified\"}",
+     "events": []
+    },
+    {
+     "request": {
+      "method": "POST",
+      "id": "bad",
+      "user": "admin",
+      "sent": "{\"alias\": \"Bad action\", \"triggers\": [{\"trigger\": \"time\", \"at\": \"10:00:00\"}], \"actions\": [{\"action\": \"nodot\"}]}"
+     },
+     "status": 400,
+     "content_type": "application/json",
+     "body": "{\"message\":\"Message malformed: Service nodot does not match format <domain>.<name> for dictionary value @ data['actions'][0]['action']\"}",
+     "events": []
+    },
+    {
+     "request": {
+      "method": "POST",
+      "id": "bad",
+      "user": "admin",
+      "sent": "{\"alias\": \"Extra key\", \"extra\": 1, \"triggers\": [{\"trigger\": \"time\", \"at\": \"10:00:00\"}], \"actions\": []}"
+     },
+     "status": 400,
+     "content_type": "application/json",
+     "body": "{\"message\":\"Message malformed: extra keys not allowed @ data['extra']\"}",
+     "events": []
+    },
+    {
+     "request": {
+      "method": "POST",
+      "id": "bad",
+      "user": "admin",
+      "sent": "{\"alias\": \"Bad mode\", \"mode\": \"sideways\", \"triggers\": [{\"trigger\": \"time\", \"at\": \"10:00:00\"}], \"actions\": []}"
+     },
+     "status": 400,
+     "content_type": "application/json",
+     "body": "{\"message\":\"Message malformed: value must be one of ['parallel', 'queued', 'restart', 'single'] for dictionary value @ data['mode']\"}",
+     "events": []
+    },
+    {
+     "request": {
+      "method": "GET",
+      "id": "bad",
+      "user": "admin"
+     },
+     "status": 404,
+     "content_type": "application/json",
+     "body": "{\"message\":\"Resource not found\"}",
+     "events": []
+    }
+   ],
+   "registry": [
+    {
+     "entity_id": "automation.kitchen_lights_off_at_11_30pm",
+     "unique_id": "kitchen_off",
+     "name": null,
+     "original_name": "Kitchen lights - off at 11:30pm",
+     "object_id_base": "Kitchen lights - off at 11:30pm",
+     "capabilities": {
+      "id": "kitchen_off"
+     },
+     "options": {}
+    },
+    {
+     "entity_id": "automation.hallway_lights_motion_on_when_dark",
+     "unique_id": "hall_motion",
+     "name": null,
+     "original_name": "Hallway lights - motion on when dark",
+     "object_id_base": "Hallway lights - motion on when dark",
+     "capabilities": {
+      "id": "hall_motion"
+     },
+     "options": {}
+    }
+   ],
+   "final": {
+    "automation.kitchen_lights_off_at_11_30pm": {
+     "state": "on",
+     "attributes": {
+      "id": "kitchen_off",
+      "last_triggered": null,
+      "mode": "single",
+      "current": 0,
+      "friendly_name": "Kitchen lights - off at 11:30pm"
+     }
+    },
+    "automation.hallway_lights_motion_on_when_dark": {
+     "state": "on",
+     "attributes": {
+      "id": "hall_motion",
+      "last_triggered": null,
+      "mode": "restart",
+      "current": 0,
+      "friendly_name": "Hallway lights - motion on when dark"
+     }
+    }
+   }
+  },
+  {
+   "name": "who_may",
+   "doc": "Every method needs an admin.",
+   "file": "- id: kitchen_off\n  alias: Kitchen lights - off at 11:30pm\n  description: Turn off the kitchen light and lamp every night at 11:30pm.\n  mode: single\n  triggers:\n  - trigger: time\n    at: \"23:30:00\"\n  actions:\n  - action: light.turn_off\n    target:\n      entity_id:\n      - light.kitchen\n      - light.lamp\n    data:\n      transition: 10\n- id: hall_motion\n  alias: Hallway lights - motion on when dark\n  description: Turn on hallway lights when motion is detected below 30 lux, using dim overnight and gentle morning levels.\n  mode: restart\n  triggers:\n  - trigger: state\n    entity_id: binary_sensor.hall_motion\n    to: \"on\"\n  conditions:\n  - condition: numeric_state\n    entity_id: sensor.hall_illuminance\n    below: 30\n  - condition: time\n    after: \"06:30:00\"\n    before: \"23:00:00\"\n  actions:\n  - action: light.turn_on\n    target:\n      entity_id: light.hall\n    data:\n      brightness_pct: 60\n",
+   "start": [
+    {
+     "kind": "registry",
+     "data": {
+      "action": "create",
+      "entity_id": "automation.kitchen_lights_off_at_11_30pm"
+     }
+    },
+    {
+     "kind": "state",
+     "entity_id": "automation.kitchen_lights_off_at_11_30pm",
+     "old": null,
+     "new": {
+      "state": "on",
+      "attributes": {
+       "id": "kitchen_off",
+       "last_triggered": null,
+       "mode": "single",
+       "current": 0,
+       "friendly_name": "Kitchen lights - off at 11:30pm"
+      }
+     }
+    },
+    {
+     "kind": "registry",
+     "data": {
+      "action": "create",
+      "entity_id": "automation.hallway_lights_motion_on_when_dark"
+     }
+    },
+    {
+     "kind": "state",
+     "entity_id": "automation.hallway_lights_motion_on_when_dark",
+     "old": null,
+     "new": {
+      "state": "on",
+      "attributes": {
+       "id": "hall_motion",
+       "last_triggered": null,
+       "mode": "restart",
+       "current": 0,
+       "friendly_name": "Hallway lights - motion on when dark"
+      }
+     }
+    }
+   ],
+   "steps": [
+    {
+     "request": {
+      "method": "GET",
+      "id": "kitchen_off",
+      "user": "user"
+     },
+     "status": 401,
+     "content_type": "text/plain; charset=utf-8",
+     "body": "401: Unauthorized",
+     "events": []
+    },
+    {
+     "request": {
+      "method": "POST",
+      "id": "kitchen_off",
+      "user": "user",
+      "sent": "{\"id\": \"kitchen_off\", \"alias\": \"Kitchen lights - off at 11:30pm\", \"description\": \"Turn off the kitchen light and lamp every night at 11:30pm.\", \"mode\": \"single\", \"triggers\": [{\"trigger\": \"time\", \"at\": \"23:30:00\"}], \"actions\": [{\"action\": \"light.turn_off\", \"target\": {\"entity_id\": [\"light.kitchen\", \"light.lamp\"]}, \"data\": {\"transition\": 10}}]}"
+     },
+     "status": 401,
+     "content_type": "text/plain; charset=utf-8",
+     "body": "401: Unauthorized",
+     "events": []
+    },
+    {
+     "request": {
+      "method": "DELETE",
+      "id": "kitchen_off",
+      "user": "user"
+     },
+     "status": 401,
+     "content_type": "text/plain; charset=utf-8",
+     "body": "401: Unauthorized",
+     "events": []
+    },
+    {
+     "request": {
+      "method": "GET",
+      "id": "kitchen_off",
+      "user": null
+     },
+     "status": 401,
+     "content_type": "text/plain; charset=utf-8",
+     "body": "401: Unauthorized",
+     "events": []
+    },
+    {
+     "request": {
+      "method": "POST",
+      "id": "kitchen_off",
+      "user": null,
+      "sent": "{\"id\": \"kitchen_off\", \"alias\": \"Kitchen lights - off at 11:30pm\", \"description\": \"Turn off the kitchen light and lamp every night at 11:30pm.\", \"mode\": \"single\", \"triggers\": [{\"trigger\": \"time\", \"at\": \"23:30:00\"}], \"actions\": [{\"action\": \"light.turn_off\", \"target\": {\"entity_id\": [\"light.kitchen\", \"light.lamp\"]}, \"data\": {\"transition\": 10}}]}"
+     },
+     "status": 401,
+     "content_type": "text/plain; charset=utf-8",
+     "body": "401: Unauthorized",
+     "events": []
+    },
+    {
+     "request": {
+      "method": "DELETE",
+      "id": "kitchen_off",
+      "user": null
+     },
+     "status": 401,
+     "content_type": "text/plain; charset=utf-8",
+     "body": "401: Unauthorized",
+     "events": []
+    }
+   ],
+   "registry": [
+    {
+     "entity_id": "automation.kitchen_lights_off_at_11_30pm",
+     "unique_id": "kitchen_off",
+     "name": null,
+     "original_name": "Kitchen lights - off at 11:30pm",
+     "object_id_base": "Kitchen lights - off at 11:30pm",
+     "capabilities": {
+      "id": "kitchen_off"
+     },
+     "options": {}
+    },
+    {
+     "entity_id": "automation.hallway_lights_motion_on_when_dark",
+     "unique_id": "hall_motion",
+     "name": null,
+     "original_name": "Hallway lights - motion on when dark",
+     "object_id_base": "Hallway lights - motion on when dark",
+     "capabilities": {
+      "id": "hall_motion"
+     },
+     "options": {}
+    }
+   ],
+   "final": {
+    "automation.kitchen_lights_off_at_11_30pm": {
+     "state": "on",
+     "attributes": {
+      "id": "kitchen_off",
+      "last_triggered": null,
+      "mode": "single",
+      "current": 0,
+      "friendly_name": "Kitchen lights - off at 11:30pm"
+     }
+    },
+    "automation.hallway_lights_motion_on_when_dark": {
+     "state": "on",
+     "attributes": {
+      "id": "hall_motion",
+      "last_triggered": null,
+      "mode": "restart",
+      "current": 0,
+      "friendly_name": "Hallway lights - motion on when dark"
+     }
+    }
+   }
+  },
+  {
+   "name": "file_not_a_list",
+   "doc": "A file that isn't a list of mappings.",
+   "file": "id: x\nalias: X\n",
+   "start": [
+    {
+     "kind": "registry",
+     "data": {
+      "action": "create",
+      "entity_id": "automation.x"
+     }
+    },
+    {
+     "kind": "state",
+     "entity_id": "automation.x",
+     "old": null,
+     "new": {
+      "state": "unavailable",
+      "attributes": {
+       "id": "x",
+       "friendly_name": "X"
+      }
+     }
+    }
+   ],
+   "steps": [
+    {
+     "request": {
+      "method": "GET",
+      "id": "x",
+      "user": "admin"
+     },
+     "status": 500,
+     "content_type": "text/plain; charset=utf-8",
+     "body": "500 Internal Server Error\n\nServer got itself in trouble",
+     "events": []
+    },
+    {
+     "request": {
+      "method": "POST",
+      "id": "x",
+      "user": "admin",
+      "sent": "{\"description\": \"\", \"mode\": \"single\", \"triggers\": [{\"trigger\": \"state\", \"entity_id\": [\"binary_sensor.hall_motion\"], \"to\": \"on\"}], \"conditions\": [], \"actions\": [{\"action\": \"light.turn_on\", \"metadata\": {}, \"data\": {\"brightness_pct\": 50}, \"target\": {\"entity_id\": \"light.hall\"}}], \"alias\": \"Hallway test: on at 50%\"}"
+     },
+     "status": 500,
+     "content_type": "text/plain; charset=utf-8",
+     "body": "500 Internal Server Error\n\nServer got itself in trouble",
+     "events": []
+    },
+    {
+     "request": {
+      "method": "DELETE",
+      "id": "x",
+      "user": "admin"
+     },
+     "status": 500,
+     "content_type": "text/plain; charset=utf-8",
+     "body": "500 Internal Server Error\n\nServer got itself in trouble",
+     "events": []
+    }
+   ],
+   "registry": [
+    {
+     "entity_id": "automation.x",
+     "unique_id": "x",
+     "name": null,
+     "original_name": "X",
+     "object_id_base": "X",
+     "capabilities": {
+      "id": "x"
+     },
+     "options": {}
+    }
+   ],
+   "final": {
+    "automation.x": {
+     "state": "unavailable",
+     "attributes": {
+      "id": "x",
+      "friendly_name": "X"
+     }
+    }
+   }
+  },
+  {
+   "name": "file_does_not_parse",
+   "doc": "A file that doesn't parse.",
+   "file": "- id: x\n  alias: [unclosed\n",
+   "start": [],
+   "steps": [
+    {
+     "request": {
+      "method": "GET",
+      "id": "x",
+      "user": "admin"
+     },
+     "status": 500,
+     "content_type": "text/plain; charset=utf-8",
+     "body": "500 Internal Server Error\n\nServer got itself in trouble",
+     "events": []
+    },
+    {
+     "request": {
+      "method": "POST",
+      "id": "x",
+      "user": "admin",
+      "sent": "{\"description\": \"\", \"mode\": \"single\", \"triggers\": [{\"trigger\": \"state\", \"entity_id\": [\"binary_sensor.hall_motion\"], \"to\": \"on\"}], \"conditions\": [], \"actions\": [{\"action\": \"light.turn_on\", \"metadata\": {}, \"data\": {\"brightness_pct\": 50}, \"target\": {\"entity_id\": \"light.hall\"}}], \"alias\": \"Hallway test: on at 50%\"}"
+     },
+     "status": 500,
+     "content_type": "text/plain; charset=utf-8",
+     "body": "500 Internal Server Error\n\nServer got itself in trouble",
+     "events": []
+    },
+    {
+     "request": {
+      "method": "DELETE",
+      "id": "x",
+      "user": "admin"
+     },
+     "status": 500,
+     "content_type": "text/plain; charset=utf-8",
+     "body": "500 Internal Server Error\n\nServer got itself in trouble",
+     "events": []
+    }
+   ],
+   "registry": [],
+   "final": {}
+  }
+ ]
+}

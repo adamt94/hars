@@ -216,9 +216,13 @@ pub fn router(hass: Hass, auth: Auth, config: &ApiConfig) -> Router {
     let config_route = Router::new()
         .route("/api/config", axum::routing::get(api_config))
         .with_state(shared.clone());
-    let mut api = rest::router(hass)
+    let mut api = rest::router(hass.clone())
         .merge(config_route)
-        .merge(automation::routes(config.config_dir.clone().into()))
+        .merge(automation::routes(
+            hass,
+            config.config_dir.clone().into(),
+            config.automations.clone(),
+        ))
         .merge(mobile_app::registration_routes(shared.clone()));
     if let Some(views) = &onboarding {
         api = api.merge(views.authed_routes());

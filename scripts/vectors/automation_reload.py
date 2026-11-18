@@ -322,6 +322,16 @@ SCENARIOS = [
         [reload(id=5), reload(entity_id="automation.hall_motion"), reload(id=""), wait(1)],
     ),
     (
+        "numeric_id",
+        "An `id` that isn't a string (YAML reads `id: 5` as a number): HA drops the "
+        "automation altogether, and it has no place in the list.",
+        [auto(5, "Five"), auto(None, None, entity=DOOR, light="light.porch"), HALL],
+        [*pulse(), *pulse(DOOR),
+         write([auto(5, "Five"), auto("5", "Five again"),
+                auto(None, None, entity=DOOR, light="light.porch"), HALL]),
+         reload(), wait(1)],
+    ),
+    (
         "twice",
         "Two reloads called together, the file changed once.",
         [HALL],

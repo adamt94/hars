@@ -154,25 +154,42 @@ impl Store {
     /// Write an already-serialized store file as is (the importer copies
     /// HA's files byte for byte), with the same atomic, durable write.
     pub fn save_raw(&self, json: &[u8]) -> io::Result<()> {
-        let dir = self.path.parent().expect("store path has a parent");
-        fs::create_dir_all(dir)?;
-        let tmp = dir.join(format!(".{}.tmp{}", self.key, std::process::id()));
-        let result = (|| {
-            let mut file = open_new(&tmp, self.private)?;
-            file.write_all(json)?;
-            file.sync_all()?;
-            fs::rename(&tmp, &self.path)?;
-            // Make the rename itself durable: without this, power loss can
-            // bring back the old file (a revoked token, say).
-            #[cfg(unix)]
-            fs::File::open(dir)?.sync_all()?;
-            Ok(())
-        })();
-        if result.is_err() {
-            let _ = fs::remove_file(&tmp);
-        }
-        result
+        write_atomic(&self.path, json, self.private)
     }
+}
+
+/// Write a file atomically and durably (HA's `write_utf8_file_atomic`): a
+/// temporary file beside it, flushed to disk, then renamed over it. A
+/// crash leaves the old or the new file, never a torn one. Its directory
+/// is made if missing. Blocking.
+pub fn write_atomic(path: &Path, data: &[u8], private: bool) -> io::Result<()> {
+    let dir = path
+        .parent()
+        .ok_or_else(|| io::Error::other("the file has no directory"))?;
+    let name = path
+        .file_name()
+        .ok_or_else(|| io::Error::other("the path names no file"))?;
+    fs::create_dir_all(dir)?;
+    let tmp = dir.join(format!(
+        ".{}.tmp{}",
+        name.to_string_lossy(),
+        std::process::id()
+    ));
+    let result = (|| {
+        let mut file = open_new(&tmp, private)?;
+        file.write_all(data)?;
+        file.sync_all()?;
+        fs::rename(&tmp, path)?;
+        // Make the rename itself durable: without this, power loss can
+        // bring back the old file (a revoked token, say).
+        #[cfg(unix)]
+        fs::File::open(dir)?.sync_all()?;
+        Ok(())
+    })();
+    if result.is_err() {
+        let _ = fs::remove_file(&tmp);
+    }
+    result
 }
 
 fn open_new(path: &Path, private: bool) -> io::Result<fs::File> {

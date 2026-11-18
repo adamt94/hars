@@ -335,6 +335,9 @@ struct Shared {
     /// Who may call `automation.reload` (`Automations::set_admin_check`).
     admin: RwLock<Option<AdminCheck>>,
     reloads: Reloads,
+    /// Held while automations are taken away and added (a reload's
+    /// replacing, a delete), so one finishes before the next starts.
+    changing: tokio::sync::Mutex<()>,
 }
 
 /// What `automation.reload` reads: the automations in `configuration.yaml`
@@ -392,29 +395,44 @@ struct New {
     config: Result<Config, String>,
 }
 
-/// The items of an `automation:` list as [`New`]s, their names from
-/// their places in it.
+/// The items of an `automation:` list as [`New`]s, as HA's
+/// `async_validate_config` leaves them, logging each one that can't run
+/// (every time the file is read, as HA does). An item whose `id` isn't a
+/// string is dropped altogether (HA's minimal schema fails too); the
+/// others are named by their place among those kept.
 fn news(items: &[Value], raw: &[Option<String>], parsed: Vec<Result<Config, String>>) -> Vec<New> {
-    items
-        .iter()
-        .zip(raw)
-        .zip(parsed)
-        .enumerate()
-        .map(|(n, ((item, raw), config))| New {
-            name: item
-                .get("alias")
-                .and_then(Value::as_str)
-                .filter(|a| !a.is_empty())
-                .map_or_else(|| format!("automation {n}"), str::to_owned),
-            unique_id: match item.get("id") {
-                Some(Value::String(s)) => Some(s.clone()),
-                Some(Value::Number(num)) => Some(num.to_string()),
-                _ => None,
-            },
+    let mut out: Vec<New> = Vec::with_capacity(items.len());
+    for ((item, raw), config) in items.iter().zip(raw).zip(parsed) {
+        let alias = item
+            .get("alias")
+            .and_then(Value::as_str)
+            .filter(|a| !a.is_empty());
+        let name = alias.map_or_else(|| format!("automation {}", out.len()), str::to_owned);
+        let unique_id = match item.get("id") {
+            None => None,
+            Some(Value::String(s)) => Some(s.clone()),
+            Some(other) => {
+                tracing::error!(
+                    logger = "homeassistant.components.automation",
+                    "Automation with alias '{name}' could not be validated and has been disabled: expected str for dictionary value @ data['id']. Got {other}"
+                );
+                continue;
+            }
+        };
+        if let Err(e) = &config {
+            tracing::error!(
+                logger = "homeassistant.components.automation",
+                "Automation with alias '{name}' could not be validated and has been disabled: {e}"
+            );
+        }
+        out.push(New {
+            name,
+            unique_id,
             raw: raw.clone(),
             config,
-        })
-        .collect()
+        });
+    }
+    out
 }
 
 /// Python's `==` on what JSON holds: mappings whatever their order, and
@@ -1502,6 +1520,18 @@ fn has_template_text(v: &Value) -> bool {
     }
 }
 
+/// Whether hars can run this automation config (HA's
+/// `async_validate_config_item`, for the editor's save): the reason if
+/// not, worded as HA's `vol.Invalid`.
+pub async fn validate(item: &Value) -> Result<(), String> {
+    let mut parsed = parse_all(std::slice::from_ref(item), vec![config::Order::default()]).await;
+    match parsed.pop() {
+        Some(Ok(_)) => Ok(()),
+        Some(Err(e)) => Err(e),
+        None => Err("expected dictionary".into()),
+    }
+}
+
 /// [`config::parse_ordered`] for each item; on a render thread if any has
 /// a template to compile.
 async fn parse_all(items: &[Value], orders: Vec<config::Order>) -> Vec<Result<Config, String>> {
@@ -1531,20 +1561,6 @@ async fn parse_all(items: &[Value], orders: Vec<config::Order>) -> Vec<Result<Co
 async fn stopped(runs: Vec<JoinHandle<()>>) {
     for run in runs {
         let _ = run.await;
-    }
-}
-
-/// HA's validation logs each automation that can't run, every time the
-/// file is read.
-fn log_invalid(news: &[New]) {
-    for n in news {
-        if let Err(e) = &n.config {
-            tracing::error!(
-                logger = "homeassistant.components.automation",
-                "Automation with alias '{}' could not be validated and has been disabled: {e}",
-                n.name
-            );
-        }
     }
 }
 
@@ -1629,6 +1645,7 @@ impl Automations {
             loader: RwLock::default(),
             admin: RwLock::default(),
             reloads: Reloads::default(),
+            changing: tokio::sync::Mutex::new(()),
         });
         // The state feed, to the listeners, one change at a time.
         {
@@ -1651,9 +1668,7 @@ impl Automations {
             });
         }
         let me = Self { shared };
-        let news = news(items, raw, parsed);
-        log_invalid(&news);
-        for new in news {
+        for new in news(items, raw, parsed) {
             me.add(new, registries);
         }
         me.register_services();
@@ -1824,6 +1839,30 @@ impl Automations {
         stopping
     }
 
+    /// The editor's delete (HA's `config/automation.py` hook): the
+    /// registry row of the automation with this id is removed, and with
+    /// it the entity: its triggers and runs stop and its state goes. What
+    /// it was stays in the restore cache, so the same id added again
+    /// comes back as it was. Nothing happens if no row has the id.
+    pub async fn delete(&self, unique_id: &str) {
+        let shared = &self.shared;
+        let _changing = shared.changing.lock().await;
+        let registry = shared.registry.read().clone();
+        let Some(registry) = registry else { return };
+        let Some(row) = registry.entity_by_unique_id(DOMAIN, DOMAIN, unique_id) else {
+            return;
+        };
+        registry.remove_entity(&row.entity_id);
+        // `_async_registry_updated`: the entity removes itself.
+        let entity = self
+            .list()
+            .into_iter()
+            .find(|a| a.entity_id.as_str() == row.entity_id);
+        if let Some(a) = entity {
+            stopped(self.remove(&a)).await;
+        }
+    }
+
     /// What `automation.reload` reads the automations with.
     pub fn set_loader(&self, loader: Loader) {
         *self.shared.loader.write() = Some(loader);
@@ -1916,16 +1955,15 @@ impl Automations {
         })?;
         let (json, raw, orders) = Self::loaded(&items);
         let parsed = parse_all(&json, orders).await;
-        let news = news(&json, &raw, parsed);
         // HA validates the whole file again, whatever is reloaded.
-        log_invalid(&news);
-        Ok(news)
+        Ok(news(&json, &raw, parsed))
     }
 
     /// Replace the automations that differ from `news`, all of them or
     /// the one with `id`, then fire `automation_reloaded`.
     async fn replace(&self, news: Vec<New>, id: Option<&str>, context: &Context) {
         let shared = &self.shared;
+        let _changing = shared.changing.lock().await;
         let automations = self.list();
         let none = Registries::default();
         match id {
