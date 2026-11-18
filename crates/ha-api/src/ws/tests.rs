@@ -294,21 +294,13 @@ async fn startup_commands_have_has_shapes() {
     }
     assert_eq!(panels["lovelace"]["config"], Value::Null);
     assert_eq!(panels["home"]["show_in_sidebar"], false);
-    // The sidebar's History and Logbook entries, as `history` and `logbook`
-    // register them.
-    for (p, icon) in [
-        ("history", "mdi:chart-box"),
-        ("logbook", "mdi:format-list-bulleted-type"),
-    ] {
-        assert_eq!(
-            panels[p],
-            json!({
-                "component_name": p, "icon": icon, "title": p,
-                "default_visible": true, "config": null, "url_path": p,
-                "require_admin": false, "config_panel_domain": null,
-                "show_in_sidebar": true,
-            }),
+    // Nothing records here, so neither the components nor their panels.
+    for p in ["recorder", "history", "logbook"] {
+        assert!(
+            !config["components"].as_array().unwrap().contains(&json!(p)),
+            "{p}"
         );
+        assert_eq!(panels[p], Value::Null, "{p}");
     }
 
     let me = c.call(json!({"id": 4, "type": "auth/current_user"})).await["result"].clone();
@@ -1917,6 +1909,33 @@ async fn recorder_info_and_empty_statistics() {
     let mut c = Client::authed(&s, &token(&s.auth).0).await;
     let ok = |id: u64, result: Value| json!({"id": id, "type": "result", "success": true, "result": result});
     let err = |id: u64, code: &str, message: &str| json!({"id": id, "type": "result", "success": false, "error": {"code": code, "message": message}});
+    // The frontend draws history graphs, the Map's trail and the logbook
+    // only when `get_config` lists these components.
+    let mut c2 = Client::authed(&s, &token(&s.auth).0).await;
+    let config = c2.call(json!({"id": 1, "type": "get_config"})).await["result"].clone();
+    for p in ["recorder", "history", "logbook"] {
+        assert!(
+            config["components"].as_array().unwrap().contains(&json!(p)),
+            "{p}"
+        );
+    }
+    // The sidebar's History and Logbook entries, as `history` and `logbook`
+    // register them.
+    let panels = c2.call(json!({"id": 2, "type": "get_panels"})).await["result"].clone();
+    for (p, icon) in [
+        ("history", "mdi:chart-box"),
+        ("logbook", "mdi:format-list-bulleted-type"),
+    ] {
+        assert_eq!(
+            panels[p],
+            json!({
+                "component_name": p, "icon": icon, "title": p,
+                "default_visible": true, "config": null, "url_path": p,
+                "require_admin": false, "config_panel_domain": null,
+                "show_in_sidebar": true,
+            }),
+        );
+    }
     assert_eq!(
         c.call(json!({"id": 1, "type": "recorder/info"})).await,
         ok(

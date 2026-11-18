@@ -137,6 +137,11 @@ pub(crate) fn components(config: &ApiConfig) -> Vec<&'static str> {
     if config.brands.is_some() {
         c.push("brands");
     }
+    // The frontend draws its history graphs, the Map's trail and the logbook
+    // only when these are listed (`isComponentLoaded`).
+    if config.recorder.is_some() {
+        c.extend(["recorder", "history", "logbook"]);
+    }
     c.extend(&config.integrations);
     if let Some(o) = &config.onboarding {
         c.extend(o.started());

@@ -54,7 +54,11 @@ pub(super) fn dispatch(conn: &mut Conn, id: u64, ty: &str, msg: &Map<String, Val
             let lovelace = conn.shared.config.lovelace.panels();
             conn.out.result(
                 id,
-                panels(conn.principal.permission == Permission::Admin, lovelace),
+                panels(
+                    conn.principal.permission == Permission::Admin,
+                    conn.shared.config.recorder.is_some(),
+                    lovelace,
+                ),
             );
         }),
         "auth/current_user" => only_keys(msg, &[]).map(|()| {
@@ -149,7 +153,7 @@ fn services(conn: &Conn) -> Value {
 /// The panels a default HA 2026.6.1 install registers that `hars` can
 /// serve. `home` is the frontend's default panel; `lovelace` without a
 /// config redirects there. `config` arrives with the settings commands.
-fn panels(is_admin: bool, dashboards: Vec<(String, Value)>) -> Value {
+fn panels(is_admin: bool, recording: bool, dashboards: Vec<(String, Value)>) -> Value {
     let panel = |url: &str, title: Option<&str>, icon: Option<&str>, sidebar: bool, admin: bool| {
         (
             url.to_owned(),
@@ -192,7 +196,11 @@ fn panels(is_admin: bool, dashboards: Vec<(String, Value)>) -> Value {
         ),
         panel("profile", None, None, true, false),
         panel("notfound", None, None, true, false),
-        // `history/__init__.py` and `logbook/__init__.py`.
+        panel("lovelace", None, None, true, false),
+    ];
+    // `history/__init__.py` and `logbook/__init__.py`: there with the
+    // recorder, as the components `get_config` lists.
+    let history = [
         panel(
             "history",
             Some("history"),
@@ -207,11 +215,11 @@ fn panels(is_admin: bool, dashboards: Vec<(String, Value)>) -> Value {
             true,
             false,
         ),
-        panel("lovelace", None, None, true, false),
     ];
     // Each dashboard is a panel; one at `lovelace` replaces the default.
     let visible: Map<String, Value> = all
         .into_iter()
+        .chain(history.into_iter().filter(|_| recording))
         .chain(dashboards)
         .filter(|(_, p)| is_admin || p["require_admin"] == false)
         .collect();
