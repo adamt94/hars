@@ -344,3 +344,45 @@ fn dumps_as_ha() {
         failures.join("\n")
     );
 }
+
+/// A posted JSON body keeps its key order on the way to YAML.
+#[test]
+fn json_text_keeps_key_order() {
+    let y = Yaml::from_json_text(
+        r#"{"z": 1, "a": [true, null, 1.5, -2, "s", {"y": 1, "b": 2}], "z": "last", "e": "\ud83d\udea8"}"#,
+    )
+    .unwrap();
+    assert_eq!(
+        typed(&y),
+        json!([
+            "map",
+            [
+                [["str", "z"], ["str", "last"]],
+                [
+                    ["str", "a"],
+                    [
+                        "seq",
+                        [
+                            ["bool", true],
+                            ["null", null],
+                            ["float", 1.5],
+                            ["int", "-2"],
+                            ["str", "s"],
+                            [
+                                "map",
+                                [[["str", "y"], ["int", "1"]], [["str", "b"], ["int", "2"]]]
+                            ]
+                        ]
+                    ]
+                ],
+                [["str", "e"], ["str", "\u{1f6a8}"]]
+            ]
+        ])
+    );
+    assert_eq!(
+        dump(&y).unwrap(),
+        "z: last\na:\n- true\n- null\n- 1.5\n- -2\n- s\n- y: 1\n  b: 2\ne: \"\\U0001F6A8\"\n"
+    );
+    assert!(Yaml::from_json_text("{not json").is_err());
+    assert!(Yaml::from_json_text("").is_err());
+}

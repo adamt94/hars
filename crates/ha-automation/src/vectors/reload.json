@@ -11305,6 +11305,612 @@
    }
   },
   {
+   "name": "numeric_id",
+   "doc": "An `id` that isn't a string (YAML reads `id: 5` as a number): HA drops the automation altogether, and it has no place in the list.",
+   "states": [
+    {
+     "op": "set",
+     "entity_id": "binary_sensor.hall_motion",
+     "state": "off",
+     "attributes": {
+      "friendly_name": "Hall Motion"
+     }
+    },
+    {
+     "op": "set",
+     "entity_id": "binary_sensor.front_door",
+     "state": "off",
+     "attributes": {
+      "friendly_name": "Front Door"
+     }
+    },
+    {
+     "op": "set",
+     "entity_id": "light.hall",
+     "state": "off",
+     "attributes": {
+      "friendly_name": "Hall"
+     }
+    },
+    {
+     "op": "set",
+     "entity_id": "light.porch",
+     "state": "off",
+     "attributes": {
+      "friendly_name": "Porch"
+     }
+    }
+   ],
+   "automations": [
+    {
+     "id": 5,
+     "alias": "Five",
+     "triggers": [
+      {
+       "trigger": "state",
+       "entity_id": "binary_sensor.hall_motion",
+       "to": "on"
+      }
+     ],
+     "actions": [
+      {
+       "action": "light.turn_on",
+       "target": {
+        "entity_id": "light.hall"
+       }
+      }
+     ]
+    },
+    {
+     "triggers": [
+      {
+       "trigger": "state",
+       "entity_id": "binary_sensor.front_door",
+       "to": "on"
+      }
+     ],
+     "actions": [
+      {
+       "action": "light.turn_on",
+       "target": {
+        "entity_id": "light.porch"
+       }
+      }
+     ]
+    },
+    {
+     "id": "hall",
+     "alias": "Hall motion",
+     "triggers": [
+      {
+       "trigger": "state",
+       "entity_id": "binary_sensor.hall_motion",
+       "to": "on"
+      }
+     ],
+     "actions": [
+      {
+       "action": "light.turn_on",
+       "target": {
+        "entity_id": "light.hall"
+       }
+      }
+     ]
+    }
+   ],
+   "steps": [
+    {
+     "op": "set",
+     "entity_id": "binary_sensor.hall_motion",
+     "state": "on",
+     "attributes": {}
+    },
+    {
+     "op": "wait",
+     "s": 1
+    },
+    {
+     "op": "set",
+     "entity_id": "binary_sensor.hall_motion",
+     "state": "off",
+     "attributes": {}
+    },
+    {
+     "op": "wait",
+     "s": 1
+    },
+    {
+     "op": "set",
+     "entity_id": "binary_sensor.front_door",
+     "state": "on",
+     "attributes": {}
+    },
+    {
+     "op": "wait",
+     "s": 1
+    },
+    {
+     "op": "set",
+     "entity_id": "binary_sensor.front_door",
+     "state": "off",
+     "attributes": {}
+    },
+    {
+     "op": "wait",
+     "s": 1
+    },
+    {
+     "op": "write",
+     "automations": [
+      {
+       "id": 5,
+       "alias": "Five",
+       "triggers": [
+        {
+         "trigger": "state",
+         "entity_id": "binary_sensor.hall_motion",
+         "to": "on"
+        }
+       ],
+       "actions": [
+        {
+         "action": "light.turn_on",
+         "target": {
+          "entity_id": "light.hall"
+         }
+        }
+       ]
+      },
+      {
+       "id": "5",
+       "alias": "Five again",
+       "triggers": [
+        {
+         "trigger": "state",
+         "entity_id": "binary_sensor.hall_motion",
+         "to": "on"
+        }
+       ],
+       "actions": [
+        {
+         "action": "light.turn_on",
+         "target": {
+          "entity_id": "light.hall"
+         }
+        }
+       ]
+      },
+      {
+       "triggers": [
+        {
+         "trigger": "state",
+         "entity_id": "binary_sensor.front_door",
+         "to": "on"
+        }
+       ],
+       "actions": [
+        {
+         "action": "light.turn_on",
+         "target": {
+          "entity_id": "light.porch"
+         }
+        }
+       ]
+      },
+      {
+       "id": "hall",
+       "alias": "Hall motion",
+       "triggers": [
+        {
+         "trigger": "state",
+         "entity_id": "binary_sensor.hall_motion",
+         "to": "on"
+        }
+       ],
+       "actions": [
+        {
+         "action": "light.turn_on",
+         "target": {
+          "entity_id": "light.hall"
+         }
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "op": "service",
+     "domain": "automation",
+     "service": "reload",
+     "data": {}
+    },
+    {
+     "op": "wait",
+     "s": 1
+    }
+   ],
+   "expected": [
+    {
+     "t": "2026-11-10T16:00:00+00:00",
+     "kind": "log",
+     "level": "ERROR",
+     "logger": "homeassistant.components.automation",
+     "msg": "Automation with alias 'Five' could not be validated and has been disabled: expected str for dictionary value @ data['id']. Got 5"
+    },
+    {
+     "t": "2026-11-10T16:00:00+00:00",
+     "kind": "state",
+     "entity_id": "automation.automation_0",
+     "old": null,
+     "new": {
+      "state": "on",
+      "attributes": {
+       "last_triggered": null,
+       "mode": "single",
+       "current": 0,
+       "friendly_name": "automation 0"
+      }
+     },
+     "by_call": false
+    },
+    {
+     "t": "2026-11-10T16:00:00+00:00",
+     "kind": "registry",
+     "data": {
+      "action": "create",
+      "entity_id": "automation.hall_motion"
+     }
+    },
+    {
+     "t": "2026-11-10T16:00:00+00:00",
+     "kind": "state",
+     "entity_id": "automation.hall_motion",
+     "old": null,
+     "new": {
+      "state": "on",
+      "attributes": {
+       "id": "hall",
+       "last_triggered": null,
+       "mode": "single",
+       "current": 0,
+       "friendly_name": "Hall motion"
+      }
+     },
+     "by_call": false
+    },
+    {
+     "t": "2026-11-10T16:00:00+00:00",
+     "kind": "started"
+    },
+    {
+     "t": "2026-11-10T16:00:00+00:00",
+     "kind": "step",
+     "n": 0
+    },
+    {
+     "t": "2026-11-10T16:00:00+00:00",
+     "kind": "triggered",
+     "data": {
+      "name": "Hall motion",
+      "entity_id": "automation.hall_motion",
+      "source": "state of binary_sensor.hall_motion"
+     }
+    },
+    {
+     "t": "2026-11-10T16:00:00+00:00",
+     "kind": "state",
+     "entity_id": "automation.hall_motion",
+     "old": {
+      "state": "on",
+      "attributes": {
+       "id": "hall",
+       "last_triggered": null,
+       "mode": "single",
+       "current": 0,
+       "friendly_name": "Hall motion"
+      }
+     },
+     "new": {
+      "state": "on",
+      "attributes": {
+       "id": "hall",
+       "last_triggered": "2026-11-10T16:00:00+00:00",
+       "mode": "single",
+       "current": 1,
+       "friendly_name": "Hall motion"
+      }
+     },
+     "by_call": false
+    },
+    {
+     "t": "2026-11-10T16:00:00+00:00",
+     "kind": "call",
+     "domain": "light",
+     "service": "turn_on",
+     "data": {
+      "entity_id": [
+       "light.hall"
+      ]
+     }
+    },
+    {
+     "t": "2026-11-10T16:00:00+00:00",
+     "kind": "state",
+     "entity_id": "automation.hall_motion",
+     "old": {
+      "state": "on",
+      "attributes": {
+       "id": "hall",
+       "last_triggered": "2026-11-10T16:00:00+00:00",
+       "mode": "single",
+       "current": 1,
+       "friendly_name": "Hall motion"
+      }
+     },
+     "new": {
+      "state": "on",
+      "attributes": {
+       "id": "hall",
+       "last_triggered": "2026-11-10T16:00:00+00:00",
+       "mode": "single",
+       "current": 0,
+       "friendly_name": "Hall motion"
+      }
+     },
+     "by_call": false
+    },
+    {
+     "t": "2026-11-10T16:00:00+00:00",
+     "kind": "step",
+     "n": 1
+    },
+    {
+     "t": "2026-11-10T16:00:01+00:00",
+     "kind": "step",
+     "n": 2
+    },
+    {
+     "t": "2026-11-10T16:00:01+00:00",
+     "kind": "step",
+     "n": 3
+    },
+    {
+     "t": "2026-11-10T16:00:02+00:00",
+     "kind": "step",
+     "n": 4
+    },
+    {
+     "t": "2026-11-10T16:00:02+00:00",
+     "kind": "triggered",
+     "data": {
+      "name": "automation 0",
+      "entity_id": "automation.automation_0",
+      "source": "state of binary_sensor.front_door"
+     }
+    },
+    {
+     "t": "2026-11-10T16:00:02+00:00",
+     "kind": "state",
+     "entity_id": "automation.automation_0",
+     "old": {
+      "state": "on",
+      "attributes": {
+       "last_triggered": null,
+       "mode": "single",
+       "current": 0,
+       "friendly_name": "automation 0"
+      }
+     },
+     "new": {
+      "state": "on",
+      "attributes": {
+       "last_triggered": "2026-11-10T16:00:02+00:00",
+       "mode": "single",
+       "current": 1,
+       "friendly_name": "automation 0"
+      }
+     },
+     "by_call": false
+    },
+    {
+     "t": "2026-11-10T16:00:02+00:00",
+     "kind": "call",
+     "domain": "light",
+     "service": "turn_on",
+     "data": {
+      "entity_id": [
+       "light.porch"
+      ]
+     }
+    },
+    {
+     "t": "2026-11-10T16:00:02+00:00",
+     "kind": "state",
+     "entity_id": "automation.automation_0",
+     "old": {
+      "state": "on",
+      "attributes": {
+       "last_triggered": "2026-11-10T16:00:02+00:00",
+       "mode": "single",
+       "current": 1,
+       "friendly_name": "automation 0"
+      }
+     },
+     "new": {
+      "state": "on",
+      "attributes": {
+       "last_triggered": "2026-11-10T16:00:02+00:00",
+       "mode": "single",
+       "current": 0,
+       "friendly_name": "automation 0"
+      }
+     },
+     "by_call": false
+    },
+    {
+     "t": "2026-11-10T16:00:02+00:00",
+     "kind": "step",
+     "n": 5
+    },
+    {
+     "t": "2026-11-10T16:00:03+00:00",
+     "kind": "step",
+     "n": 6
+    },
+    {
+     "t": "2026-11-10T16:00:03+00:00",
+     "kind": "step",
+     "n": 7
+    },
+    {
+     "t": "2026-11-10T16:00:04+00:00",
+     "kind": "step",
+     "n": 8
+    },
+    {
+     "t": "2026-11-10T16:00:04+00:00",
+     "kind": "step",
+     "n": 9
+    },
+    {
+     "t": "2026-11-10T16:00:04+00:00",
+     "kind": "log",
+     "level": "ERROR",
+     "logger": "homeassistant.components.automation",
+     "msg": "Automation with alias 'Five' could not be validated and has been disabled: expected str for dictionary value @ data['id']. Got 5"
+    },
+    {
+     "t": "2026-11-10T16:00:04+00:00",
+     "kind": "state",
+     "entity_id": "automation.automation_0",
+     "old": {
+      "state": "on",
+      "attributes": {
+       "last_triggered": "2026-11-10T16:00:02+00:00",
+       "mode": "single",
+       "current": 0,
+       "friendly_name": "automation 0"
+      }
+     },
+     "new": null,
+     "by_call": false
+    },
+    {
+     "t": "2026-11-10T16:00:04+00:00",
+     "kind": "registry",
+     "data": {
+      "action": "create",
+      "entity_id": "automation.five_again"
+     }
+    },
+    {
+     "t": "2026-11-10T16:00:04+00:00",
+     "kind": "state",
+     "entity_id": "automation.five_again",
+     "old": null,
+     "new": {
+      "state": "on",
+      "attributes": {
+       "id": "5",
+       "last_triggered": null,
+       "mode": "single",
+       "current": 0,
+       "friendly_name": "Five again"
+      }
+     },
+     "by_call": false
+    },
+    {
+     "t": "2026-11-10T16:00:04+00:00",
+     "kind": "state",
+     "entity_id": "automation.automation_1",
+     "old": null,
+     "new": {
+      "state": "on",
+      "attributes": {
+       "last_triggered": null,
+       "mode": "single",
+       "current": 0,
+       "friendly_name": "automation 1"
+      }
+     },
+     "by_call": false
+    },
+    {
+     "t": "2026-11-10T16:00:04+00:00",
+     "kind": "reloaded",
+     "data": {},
+     "by_call": true
+    },
+    {
+     "t": "2026-11-10T16:00:04+00:00",
+     "kind": "step",
+     "n": 10
+    }
+   ],
+   "registry": [
+    {
+     "entity_id": "automation.hall_motion",
+     "unique_id": "hall",
+     "name": null,
+     "original_name": "Hall motion",
+     "object_id_base": "Hall motion",
+     "capabilities": {
+      "id": "hall"
+     },
+     "options": {},
+     "disabled_by": null,
+     "has_entity_name": false,
+     "supported_features": 0
+    },
+    {
+     "entity_id": "automation.five_again",
+     "unique_id": "5",
+     "name": null,
+     "original_name": "Five again",
+     "object_id_base": "Five again",
+     "capabilities": {
+      "id": "5"
+     },
+     "options": {},
+     "disabled_by": null,
+     "has_entity_name": false,
+     "supported_features": 0
+    }
+   ],
+   "final": {
+    "automation.hall_motion": {
+     "state": "on",
+     "attributes": {
+      "id": "hall",
+      "last_triggered": "2026-11-10T16:00:00+00:00",
+      "mode": "single",
+      "current": 0,
+      "friendly_name": "Hall motion"
+     }
+    },
+    "automation.five_again": {
+     "state": "on",
+     "attributes": {
+      "id": "5",
+      "last_triggered": null,
+      "mode": "single",
+      "current": 0,
+      "friendly_name": "Five again"
+     }
+    },
+    "automation.automation_1": {
+     "state": "on",
+     "attributes": {
+      "last_triggered": null,
+      "mode": "single",
+      "current": 0,
+      "friendly_name": "automation 1"
+     }
+    }
+   }
+  },
+  {
    "name": "twice",
    "doc": "Two reloads called together, the file changed once.",
    "states": [

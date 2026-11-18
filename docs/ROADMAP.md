@@ -334,8 +334,7 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
       automation as supported or `unavailable` with the reason
 - [x] The editor's read side: `GET /api/config/automation/config/<id>`
       (admin; `automations.yaml` read with HA's loader, the entry in file key
-      order, `Resource not found`) and WS `automation/config` (the raw entry);
-      saving and deleting answer that hars doesn't support it yet
+      order, `Resource not found`) and WS `automation/config` (the raw entry)
 - [x] `automation.reload` (admin only; all automations, or one by `id`):
       `configuration.yaml` is read again and only the automations whose
       name or config changed are replaced, with HA's state and registry
@@ -343,10 +342,18 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
       updated, then the new entity with its on/off and `last_triggered`
       restored), then `automation_reloaded`. An unchanged one keeps its
       triggers and runs and writes nothing. Automations with an `id` get
-      their entity registry row (`capabilities: {id}`) at start too. All 25
+      their entity registry row (`capabilities: {id}`) at start too. All 26
       scenarios of `scripts/vectors/automation_reload.py` match
-- [ ] Editor saves (`POST`/`DELETE /api/config/automation/config/<id>`),
-      traces
+- [x] Editor saves over REST: `POST /api/config/automation/config/<id>`
+      validates the body as the engine does (`Message malformed: …`),
+      writes it into `automations.yaml` with HA's key order and HA's YAML
+      writer (`ha_core::yaml::dump`, byte for byte) and reloads that id;
+      `DELETE` takes the entry out, then the registry row and the entity.
+      All 18 scenarios of `scripts/vectors/automation_editor.py` match. An
+      `id` that isn't a string drops its automation, as in HA
+- [ ] The Settings panel, so the editor's pages can be opened (they need
+      `config/entity_registry/list|get|update` and the category and
+      blueprint lists too); traces
 - [x] Inventory triggers/conditions/actions/modes with HA 2026.6.1 semantics,
       matched against HA's own engine on 36 scenario vectors:
   - [x] `numeric_state` fires on crossing only; covers threshold equality,
