@@ -397,8 +397,9 @@ struct New {
 
 /// The items of an `automation:` list as [`New`]s, as HA's
 /// `async_validate_config` leaves them, logging each one that can't run
-/// (every time the file is read, as HA does). An item whose `id` isn't a
-/// string is dropped altogether (HA's minimal schema fails too); the
+/// (every time the file is read, as HA does). An item that fails HA's
+/// minimal schema ([`config::minimal`]: an `id` that isn't a string, an
+/// alias or description that isn't text) is dropped altogether; the
 /// others are named by their place among those kept.
 fn news(items: &[Value], raw: &[Option<String>], parsed: Vec<Result<Config, String>>) -> Vec<New> {
     let mut out: Vec<New> = Vec::with_capacity(items.len());
@@ -408,17 +409,13 @@ fn news(items: &[Value], raw: &[Option<String>], parsed: Vec<Result<Config, Stri
             .and_then(Value::as_str)
             .filter(|a| !a.is_empty());
         let name = alias.map_or_else(|| format!("automation {}", out.len()), str::to_owned);
-        let unique_id = match item.get("id") {
-            None => None,
-            Some(Value::String(s)) => Some(s.clone()),
-            Some(other) => {
-                tracing::error!(
-                    logger = "homeassistant.components.automation",
-                    "Automation with alias '{name}' could not be validated and has been disabled: expected str for dictionary value @ data['id']. Got {other}"
-                );
-                continue;
-            }
-        };
+        if let Err(e) = config::minimal(item) {
+            tracing::error!(
+                logger = "homeassistant.components.automation",
+                "Automation with alias '{name}' could not be validated and has been disabled: {e}"
+            );
+            continue;
+        }
         if let Err(e) = &config {
             tracing::error!(
                 logger = "homeassistant.components.automation",
@@ -427,7 +424,7 @@ fn news(items: &[Value], raw: &[Option<String>], parsed: Vec<Result<Config, Stri
         }
         out.push(New {
             name,
-            unique_id,
+            unique_id: item.get("id").and_then(Value::as_str).map(str::to_owned),
             raw: raw.clone(),
             config,
         });

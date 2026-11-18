@@ -11306,7 +11306,7 @@
   },
   {
    "name": "numeric_id",
-   "doc": "An `id` that isn't a string (YAML reads `id: 5` as a number): HA drops the automation altogether, and it has no place in the list.",
+   "doc": "An `id` that isn't a string (YAML reads `id: 5` as a number), or an alias or description that isn't text (`description:` with nothing after it): HA drops the automation altogether, and it has no place in the list.",
    "states": [
     {
      "op": "set",
@@ -11360,6 +11360,67 @@
        }
       }
      ]
+    },
+    {
+     "id": "d",
+     "alias": "No description",
+     "triggers": [
+      {
+       "trigger": "state",
+       "entity_id": "binary_sensor.hall_motion",
+       "to": "on"
+      }
+     ],
+     "actions": [
+      {
+       "action": "light.turn_on",
+       "target": {
+        "entity_id": "light.hall"
+       }
+      }
+     ],
+     "description": null
+    },
+    {
+     "id": "a",
+     "triggers": [
+      {
+       "trigger": "state",
+       "entity_id": "binary_sensor.hall_motion",
+       "to": "on"
+      }
+     ],
+     "actions": [
+      {
+       "action": "light.turn_on",
+       "target": {
+        "entity_id": "light.hall"
+       }
+      }
+     ],
+     "alias": [
+      "a",
+      "list"
+     ]
+    },
+    {
+     "alias": "Null id",
+     "triggers": [
+      {
+       "trigger": "state",
+       "entity_id": "binary_sensor.hall_motion",
+       "to": "on"
+      }
+     ],
+     "actions": [
+      {
+       "action": "light.turn_on",
+       "target": {
+        "entity_id": "light.hall"
+       }
+      }
+     ],
+     "id": null
     },
     {
      "triggers": [
@@ -11536,6 +11597,27 @@
      "level": "ERROR",
      "logger": "homeassistant.components.automation",
      "msg": "Automation with alias 'Five' could not be validated and has been disabled: expected str for dictionary value @ data['id']. Got 5"
+    },
+    {
+     "t": "2026-11-10T16:00:00+00:00",
+     "kind": "log",
+     "level": "ERROR",
+     "logger": "homeassistant.components.automation",
+     "msg": "Automation with alias 'No description' could not be validated and has been disabled: string value is None for dictionary value @ data['description']. Got None"
+    },
+    {
+     "t": "2026-11-10T16:00:00+00:00",
+     "kind": "log",
+     "level": "ERROR",
+     "logger": "homeassistant.components.automation",
+     "msg": "Automation with alias '['a', 'list']' could not be validated and has been disabled: value should be a string for dictionary value @ data['alias']. Got ['a', 'list']"
+    },
+    {
+     "t": "2026-11-10T16:00:00+00:00",
+     "kind": "log",
+     "level": "ERROR",
+     "logger": "homeassistant.components.automation",
+     "msg": "Automation with alias 'Null id' could not be validated and has been disabled: expected str for dictionary value @ data['id']. Got None"
     },
     {
      "t": "2026-11-10T16:00:00+00:00",

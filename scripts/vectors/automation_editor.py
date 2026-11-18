@@ -248,11 +248,29 @@ SCENARIOS = [
         }), get("fancy")],
     ),
     (
+        "big_numbers",
+        "HA reads the body with orjson: an integer past 64 bits becomes a float, and "
+        "is written as one.",
+        ORIGINAL,
+        [post("big", '{"alias": "Big", "triggers": [{"trigger": "time", "at": "10:00:00"}], '
+                     '"actions": [{"action": "light.turn_on", "data": {"most": '
+                     '18446744073709551615, "past": 18446744073709551617, "least": '
+                     '-9223372036854775808, "below": -9223372036854775809, "e": 1E2, '
+                     '"f": 0.1}}]}'),
+         get("big"), post("big", '{"alias": "Big", "triggers": [], "actions": [], "x": 1e400}')],
+    ),
+    (
         "invalid_bodies",
         "Bodies HA refuses: nothing is written.",
         ORIGINAL,
         [post("bad", "{not json"), post("bad", ""), post("bad", [KITCHEN]), post("bad", "5"),
          post("bad", '"text"'), post("bad", "null"), post("bad", "true"), post("bad", "1.5"),
+         post("kitchen_off", {"id": None, "triggers": [], "actions": []}),
+         post("kitchen_off", {"id": 5, "triggers": [], "actions": []}),
+         post("bad", {"alias": [], "triggers": [], "actions": []}),
+         post("bad", {"alias": None, "triggers": [], "actions": []}),
+         post("bad", {"alias": 5, "description": None, "triggers": [], "actions": []}),
+         post("bad", {"description": {"a": 1}, "triggers": [], "actions": []}),
          # Not `{}`: which of the two missing keys HA names changes from
          # run to run (voluptuous walks a set).
          post("bad", "[]"),
