@@ -3,6 +3,11 @@
 
 /// Python's `repr(float)`: the shortest round-trip digits, `60.0` not
 /// `60`, and scientific (`1e-07`, `1.5e+16`) outside `1e-4..1e16`.
+///
+/// Where two shortest digit strings round-trip (the value is exactly
+/// half way: `1000000000000000.25`), Python takes the one correctly
+/// rounded from the exact value, half to even (`…000.2`); Rust's shortest
+/// formatting may take the other (`…000.3`).
 pub fn repr_float(x: f64) -> String {
     if !x.is_finite() {
         return if x.is_nan() {
@@ -13,19 +18,42 @@ pub fn repr_float(x: f64) -> String {
             "-inf".into()
         };
     }
+    let sign = if x.is_sign_negative() { "-" } else { "" };
     let a = x.abs();
-    if a != 0.0 && !(1e-4..1e16).contains(&a) {
-        let s = format!("{x:e}");
-        let (mantissa, exp) = s.split_once('e').unwrap_or((&s, "0"));
-        let exp: i32 = exp.parse().unwrap_or(0);
-        let sign = if exp < 0 { '-' } else { '+' };
-        return format!("{mantissa}e{sign}{:02}", exp.abs());
+    if a == 0.0 {
+        return format!("{sign}0.0");
     }
-    if x.fract() == 0.0 {
-        format!("{x:.1}")
+    // The shortest digits, then the same number of digits rounded from
+    // the exact value: Python's, if they still read back as `a`.
+    let split = |s: &str| -> (String, i32) {
+        let (mantissa, exp) = s.split_once('e').unwrap_or((s, "0"));
+        (mantissa.replace('.', ""), exp.parse().unwrap_or(0))
+    };
+    let (mut digits, mut exp) = split(&format!("{a:e}"));
+    let exact = format!("{:.*e}", digits.len() - 1, a);
+    if exact.parse::<f64>() == Ok(a) {
+        (digits, exp) = split(&exact);
+    }
+    let digits = digits.trim_end_matches('0');
+    let digits = if digits.is_empty() { "0" } else { digits };
+    if !(1e-4..1e16).contains(&a) {
+        let mantissa = match digits.len() {
+            1 => digits.to_owned(),
+            _ => format!("{}.{}", &digits[..1], &digits[1..]),
+        };
+        let exp_sign = if exp < 0 { '-' } else { '+' };
+        return format!("{sign}{mantissa}e{exp_sign}{:02}", exp.abs());
+    }
+    let n = digits.len() as i32;
+    let body = if exp < 0 {
+        format!("0.{}{digits}", "0".repeat((-exp - 1) as usize))
+    } else if exp >= n - 1 {
+        format!("{digits}{}.0", "0".repeat((exp - (n - 1)) as usize))
     } else {
-        x.to_string()
-    }
+        let point = (exp + 1) as usize;
+        format!("{}.{}", &digits[..point], &digits[point..])
+    };
+    format!("{sign}{body}")
 }
 
 /// Python's `repr` of a `str`: single quotes unless only `'` is inside,

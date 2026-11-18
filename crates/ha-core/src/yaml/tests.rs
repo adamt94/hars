@@ -294,7 +294,7 @@ fn untyped(v: &Value) -> Yaml {
 }
 
 /// Against `vectors/dump.json`, made by `scripts/vectors/yaml_dump.py`
-/// running HA 2026.6.1's `homeassistant.util.yaml.dump`: 859 values (every
+/// running HA 2026.6.1's `homeassistant.util.yaml.dump`: 930 values (every
 /// kind of string as a value, a list item and a key; numbers, dates,
 /// nesting) written byte for byte as HA writes them, and 18 documents
 /// loaded and written back, as an editor save does to `automations.yaml`.

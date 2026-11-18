@@ -22,7 +22,8 @@
 //! bytes (the emitter's limit for a plain key counts bytes) and are
 //! written in the same ten columns (where a long scalar folds counts
 //! columns). The stand-ins are swapped for the escapes in the text that
-//! comes out.
+//! comes out. A value that already holds every one of the 4000 or so
+//! stand-ins there are can't be written (an error, not a wrong file).
 //!
 //! One difference: HA writes a mapping or sequence that the loaded file
 //! named once and used again (`&a`/`*a`) with an anchor and an alias;
@@ -93,9 +94,11 @@ fn astral(c: char) -> bool {
     c > '\u{ffff}'
 }
 
-/// A stand-in for an astral character: 4 bytes, like its UTF-8, that the
-/// emitter writes in 10 columns, like `\U0001F600` (`\x01\a\x80`).
-/// `None` if every candidate, raw or as written, is in `value` already.
+/// A stand-in for an astral character: three control characters that
+/// take 4 bytes, like its UTF-8, and that the emitter writes as three
+/// escapes in 10 columns, like `\U0001F600` (`\x01\a\x80`). The first
+/// of the 4000 or so there are that `value` holds neither raw nor as
+/// written; `None` if it has them all.
 fn stand_in(value: &Yaml) -> Option<(String, String)> {
     fn any(v: &Yaml, has: &dyn Fn(&str) -> bool) -> bool {
         match v {
@@ -107,16 +110,64 @@ fn stand_in(value: &Yaml) -> Option<(String, String)> {
             _ => false,
         }
     }
-    for a in 1..=6u8 {
-        for c in 0x80..=0x84u8 {
-            let raw: String = [char::from(a), '\x07', char::from(c)].iter().collect();
-            let written = format!("\\x{a:02X}\\a\\x{c:02X}");
-            if !any(value, &|s| s.contains(&raw) || s.contains(&written)) {
-                return Some((raw, written));
+    // One byte, written `\xNN`: control characters with no short escape
+    // that aren't breaks.
+    let first = (0x01..=0x06u8).chain(0x0e..=0x1a).chain(0x1c..=0x1f);
+    // One byte, written with a letter.
+    const SECOND: [(char, char); 6] = [
+        ('\x07', 'a'),
+        ('\0', '0'),
+        ('\x08', 'b'),
+        ('\x0b', 'v'),
+        ('\x0c', 'f'),
+        ('\x1b', 'e'),
+    ];
+    for a in first {
+        for (b, letter) in SECOND {
+            // Two bytes, written `\xNN` (U+0085 is `\N`).
+            for c in (0x80..=0x9fu8).filter(|c| *c != 0x85) {
+                let raw: String = [char::from(a), b, char::from(c)].iter().collect();
+                let written = format!("\\x{a:02X}\\{letter}\\x{c:02X}");
+                if !any(value, &|s| s.contains(&raw) || s.contains(&written)) {
+                    return Some((raw, written));
+                }
             }
         }
     }
     None
+}
+
+/// `text` as the emitter wrote it, with each stand-in (`written`) made
+/// the escape of the character it stood for, in the order written.
+/// Escapes are read one at a time: a backslash the emitter wrote for a
+/// backslash (`\\`) is not the start of the next one, so `\\x01\a\x80`
+/// (the text `\x01`, then two control characters) is left alone.
+fn swap_stand_ins(text: &str, written: &str, stood_for: &[char]) -> Result<String, YamlError> {
+    let mut out = String::with_capacity(text.len() + stood_for.len() * 2);
+    let mut chars = stood_for.iter();
+    let mut rest = text;
+    while let Some(i) = rest.find('\\') {
+        out.push_str(&rest[..i]);
+        rest = &rest[i..];
+        if rest.starts_with("\\\\") {
+            out.push_str("\\\\");
+            rest = &rest[2..];
+        } else if rest.starts_with(written) {
+            let c = chars
+                .next()
+                .ok_or_else(|| YamlError("a stand-in was written twice".into()))?;
+            out.push_str(&format!("\\U{:08X}", u32::from(*c)));
+            rest = &rest[written.len()..];
+        } else {
+            out.push('\\');
+            rest = &rest[1..];
+        }
+    }
+    out.push_str(rest);
+    match chars.next() {
+        Some(_) => err("a stand-in was not written"),
+        None => Ok(out),
+    }
 }
 
 struct Writer<'a, 'w> {
@@ -188,14 +239,23 @@ impl Writer<'_, '_> {
                 plain,
             ),
             // annotatedyaml's representer for a blueprint's `!input`.
-            Yaml::Input(name) => self.emit(Event::scalar(
-                None,
-                Some("!input"),
-                name,
-                false,
-                false,
-                plain,
-            )),
+            Yaml::Input(name) => {
+                let (text, style) = match &self.stand_in {
+                    Some(stand_in) if name.contains(astral) => {
+                        self.astral.extend(name.chars().filter(|c| astral(*c)));
+                        (name.replace(astral, stand_in), ScalarStyle::DoubleQuoted)
+                    }
+                    _ => (name.clone(), plain),
+                };
+                self.emit(Event::scalar(
+                    None,
+                    Some("!input"),
+                    &text,
+                    false,
+                    false,
+                    style,
+                ))
+            }
             Yaml::Seq(items) | Yaml::Tuple(items) => self.sequence(items),
             // `represent_set`: a `!!set` mapping of its members to null.
             Yaml::Set(items) => {
@@ -232,7 +292,7 @@ impl Writer<'_, '_> {
 pub fn dump(value: &Yaml) -> Result<String, YamlError> {
     fn has_astral(v: &Yaml) -> bool {
         match v {
-            Yaml::Str(s) => s.contains(astral),
+            Yaml::Str(s) | Yaml::Input(s) => s.contains(astral),
             Yaml::Seq(items) | Yaml::Set(items) | Yaml::Tuple(items) => {
                 items.iter().any(has_astral)
             }
@@ -267,23 +327,7 @@ pub fn dump(value: &Yaml) -> Result<String, YamlError> {
     }
     let mut text = String::from_utf8(out).map_err(|e| YamlError(e.to_string()))?;
     if let Some((_, written)) = &stand_in {
-        // Each stand-in, in order, becomes its character's escape.
-        let mut swapped = String::with_capacity(text.len() + astral_written.len() * 2);
-        let mut chars = astral_written.iter();
-        let mut rest = text.as_str();
-        while let Some(i) = rest.find(written.as_str()) {
-            let c = chars
-                .next()
-                .ok_or_else(|| YamlError("a stand-in was written twice".into()))?;
-            swapped.push_str(&rest[..i]);
-            swapped.push_str(&format!("\\U{:08X}", u32::from(*c)));
-            rest = &rest[i + written.len()..];
-        }
-        swapped.push_str(rest);
-        if chars.next().is_some() {
-            return err("a stand-in was not written");
-        }
-        text = swapped;
+        text = swap_stand_ins(&text, written, &astral_written)?;
     }
     Ok(text.replace(": null\n", ":\n"))
 }

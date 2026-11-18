@@ -78,6 +78,10 @@ STRINGS = [
     # its 4 bytes.
     "😀 " * 30, "😀" * 30, "😀" + "x" * 124, "😀" + "x" * 125, "x" * 120 + "😀😀", "x" * 121 + "😀😀",
     "\x01\x07\x80 😀", "\\x01\\a\\x80 😀", "𝒳 and 😀 and \U0010ffff", "😀\n😀", " 😀", "😀 ",
+    # A backslash written out, then control characters: escaped, it reads
+    # like the escapes of three control characters, which it isn't.
+    "\\x01\x07\x80😀", "\x01\\a\x80😀", "\x01\x07\\x80😀", "\\\x01\x07\x80 😀 \\",
+    "😀" + "".join(chr(a) + "\x07" + chr(c) for a in range(1, 7) for c in range(0x80, 0x85)),
     LONG + "\n" + LONG, LONG + "\n\n  " + LONG + "\n", "'" + LONG + "'",
     ("x" * 79) + " y", ("x" * 80) + " y", ("x" * 77) + " y z", ("x" * 40) + "  " + ("y" * 60),
 ]
@@ -88,6 +92,11 @@ AWARE = dt.datetime(2026, 11, 14, 17, 42, 5, 123456,
 VALUES = [
     0, 1, -1, 12, 2202, 82800, 10 ** 20, -(10 ** 20), 2 ** 63, 0.1, 1.0, -1.0, 1.5, 100.0, 0.0,
     -0.0, 1e16, 1e17, 1e20, 1e-7, 1.5e-7, 1.5e300, 123456789012345680.0, 0.30000000000000004,
+    # Exactly half way between two shortest digit strings, and the edges.
+    1000000000000000.25, 100000000000000.125, -1000000000000000.25, 5e-324, 2.5e-323,
+    1.7976931348623157e308, 2.2250738585072014e-308, 9007199254740993.0, 1e22, 1e23,
+    9.999999999999999e22, 0.0001, 0.00001, 9999999999999998.0, 1e15, 123456789.12345678,
+    4.35, 2.675, 0.1 + 0.2, 1 / 3, 2 / 3, 1e-5, 1.5e-5, 8.41e-5, 5e-5, 1234.5, 0.5, 2.5,
     float("inf"), float("-inf"), float("nan"), True, False, None,
     dt.date(2026, 11, 14), dt.datetime(2026, 11, 14, 17, 42, 5), dt.datetime(2026, 11, 14),
     dt.datetime(2026, 11, 14, 17, 42, 5, tzinfo=dt.UTC), AWARE,
@@ -141,7 +150,8 @@ DOCUMENTS = {
     # A set of one: Python writes a larger one in hash order.
     "binary_and_sets": "- b: !!binary aGVsbG8=\n  s: !!set {a}\n  o: !!omap [{a: 1}]\n"
                        "  long: !!binary " + "QUJD" * 40 + "\n",
-    "blueprint_input": "- a: !input some_input\n  b: [!input other]\n",
+    "blueprint_input": "- a: !input some_input\n  b: [!input other]\n"
+                       "  c: !input \"\\U0001F600\"\n  d: !input \"on\"\n",
     "unicode": "- alias: \"caf\\xe9 \\U0001F600 \\u2713\"\n  bell: \"a\\ab\"\n",
 }
 
