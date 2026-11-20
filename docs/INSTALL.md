@@ -170,9 +170,29 @@ If hars already has a login, or has run once, the import refuses to replace
 what's there; add `--force` to replace it. Stop Home Assistant before
 starting hars if both use port 8123.
 
-An import that was interrupted leaves `hars/config/.import-staging` behind,
-and the next one stops rather than clear a folder it didn't make. If no
-other import is running, delete that folder and import again.
+An import that fails says so and puts back what it had changed. One that
+was interrupted (the machine lost power, the process was killed) can leave
+two folders in `hars/config`, and the next import stops when it finds
+either, because it clears no folder it didn't make:
+
+- `.import-staging` is the copy the import was working on. Nothing in it
+  is the only copy of anything. If no other import is running, delete it.
+- `.import-backup` holds the files of yours that the import had moved
+  aside when it stopped: stores under `.storage`, and YAML files in the
+  folders they were in, nested ones too. It is the only copy of those
+  files. Keep it until you have done one of these:
+  - To finish the import: move `.import-backup` somewhere else if you may
+    still want the old files, then run the import again with `--force`.
+  - To go back: copy everything in `.import-backup` to the same place in
+    `hars/config` (`cp -a .import-backup/. .` from inside `hars/config`),
+    then delete `.import-backup`. This puts your old files back. A file
+    the import had added where you had none (a store or YAML file new to
+    this folder) is still there, and the backup can't say which those
+    are. If you have your own backup of `hars/config`, restoring that is
+    the sure way.
+
+`.import-backup` is also what is left if an import fails and can't put
+everything back. The error says so and names the folder.
 
 ### Which Home Assistant releases
 

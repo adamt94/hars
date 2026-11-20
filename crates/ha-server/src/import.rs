@@ -1190,6 +1190,9 @@ fn commit(
     let backup = dest.join(BACKUP_DIR);
     // `run` refuses to start while a backup is left over; never delete one.
     std::fs::create_dir(&backup).with_context(|| format!("{} already exists", backup.display()))?;
+    // Made here if it wasn't there, and then taken away again by a
+    // rollback: "nothing changed" means that too.
+    let made_storage = !dest.join(".storage").exists();
     std::fs::create_dir_all(dest.join(".storage"))?;
 
     // What was done, to undo in reverse on failure.
@@ -1252,6 +1255,10 @@ fn commit(
         }
         for d in made.iter().rev().filter(|d| !d.starts_with(&backup)) {
             let _ = std::fs::remove_dir(d);
+        }
+        if made_storage {
+            // Only if empty: `remove_dir` takes nothing with it.
+            let _ = std::fs::remove_dir(dest.join(".storage"));
         }
         if restored {
             let _ = std::fs::remove_dir_all(&backup);

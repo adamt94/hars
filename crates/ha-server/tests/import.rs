@@ -3232,6 +3232,14 @@ fn a_secrets_file_that_cannot_be_replaced_rolls_the_import_back() {
         std::fs::metadata(&secrets).unwrap().permissions().mode() & 0o777,
         0o644
     );
+    // Nothing changed: the destination holds what it held, and no
+    // `.storage` the import made on the way.
+    let mut left: Vec<_> = std::fs::read_dir(&dest)
+        .unwrap()
+        .map(|e| e.unwrap().file_name())
+        .collect();
+    left.sort();
+    assert_eq!(left, ["nested"]);
     for d in [src, dest] {
         let _ = std::fs::remove_dir_all(d);
     }
