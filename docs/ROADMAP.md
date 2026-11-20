@@ -564,8 +564,15 @@ ids, addresses, names and coordinates replaced with fake ones
       A second account that lists the same devices adds none of them
       again, as HA's platform refuses a unique id that already runs.
       Not offered when `core.config_entries` or the entity or device
-      registry can't be written (another version's file), so the three
-      never disagree after a restart. A flow nobody answers is dropped
+      registry can't be written (another version's file): one of the
+      three would then be left behind for certain. After a flow adds an
+      entry and after one is removed, all three are written at once
+      rather than at their timers (1 s, 10 s, or 180 s while starting),
+      the entry first when adding and the rows first when removing, so a
+      crash between two writes leaves what the next start mends. They
+      are still three writes: a crash between them, or a write that
+      fails (logged, not retried until the store next changes), can
+      leave rows without their entry, as in HA. A flow nobody answers is dropped
       when another starts an hour later, and 16 are kept at most (HA
       keeps them until it restarts). A removal waits for an entry's
       first set-up attempt, as HA's does. An account that takes over a
@@ -580,6 +587,11 @@ ids, addresses, names and coordinates replaced with fake ones
       `hars` differs on purpose: only the integrations it has a flow for
       are offered (each on its own, not under HA's brands); no webhook id
       is added to the entry (see above)
+- [ ] Clean the registries at start as HA does
+      (`device_registry.async_cleanup`: a config entry that no longer
+      exists is taken off its devices, a device left with none and no
+      entities is removed, and entities follow their device), so rows
+      left behind by a crash between two store writes don't stay
 - [ ] Config flows: Hue (find the bridge or type its host, press the
       link button) and LIFX (type a host or pick a found bulb); the
       dialog's last step, naming a device and giving it an area (WS

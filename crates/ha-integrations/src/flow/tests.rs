@@ -1623,3 +1623,33 @@ async fn a_removal_waits_for_a_setup_whose_request_went_away() {
     assert!(home.hass.states().all().is_empty());
     assert!(home.registry.snapshot().entities.is_empty());
 }
+
+/// What a flow added and what a removal took away are on disk when the
+/// answer comes, in all three stores: nobody waits for their timers (1 s
+/// for the entries, 10 s for a registry, 180 s while starting), during
+/// which a crash would leave rows pointing at a missing entry.
+#[tokio::test]
+async fn the_stores_are_written_before_the_answer() {
+    let disk = Disk::new("saved-now");
+    let (base, _api) = fake().await;
+    let hass = Hass::new();
+    let (_entries, _registry, flows) = disk.start(&hass, &base);
+    let flows = flows.unwrap();
+    let FlowResult::Form { flow_id, .. } =
+        flows.init("switchbot_cloud", SOURCE_USER).await.unwrap()
+    else {
+        panic!("no form");
+    };
+    let id = entry_id(&flows.configure(&flow_id, credentials(TOKEN)).await.unwrap());
+    let owned = format!("\"config_entry_id\":\"{id}\"");
+    // Read straight from the files, with no flush and no time passing.
+    assert!(disk.file("core.config_entries").contains(&id));
+    assert_eq!(disk.file("core.entity_registry").matches(&owned).count(), 6);
+    assert_eq!(disk.file("core.device_registry").matches(&id).count(), 9);
+
+    assert_eq!(flows.remove_entry(&id).await, Some(false));
+    assert!(!disk.file("core.config_entries").contains(&id));
+    assert!(!disk.file("core.entity_registry").contains(&owned));
+    let devices: Value = serde_json::from_str(&disk.file("core.device_registry")).unwrap();
+    assert_eq!(devices["data"]["devices"], json!([]));
+}

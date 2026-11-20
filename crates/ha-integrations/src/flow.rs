@@ -658,6 +658,7 @@ impl Manager {
                 self.entries.runtime(&entry_id)
             }
         };
+        self.save(true).await;
         Ok(FlowResult::CreateEntry {
             flow_id: flow_id.to_owned(),
             handler: domain,
@@ -821,7 +822,33 @@ impl Manager {
             }
         }
         self.entries.remove(entry_id);
+        self.save(false).await;
         Some(!(unloads || disabled))
+    }
+
+    /// Write the entries and the registries now, not at their timers
+    /// (1 s for the entries; 10 s for a registry, 180 s while starting):
+    /// an entry was added with its rows, or removed with them, and a
+    /// crash before all three are on disk leaves them disagreeing. HA has
+    /// the same three timers and the same window; this makes it as short
+    /// as the writes, which run off the async threads, one store after
+    /// another. It isn't one atomic step: a crash between two writes, or
+    /// a write that fails (logged, and not tried again until the store
+    /// next changes), still leaves the stores apart. So the order is the
+    /// one that mends itself at the next start: the entry first when
+    /// adding (an entry without rows makes them again when it is set up),
+    /// the rows first when removing (rows are gone before their entry
+    /// is).
+    async fn save(&self, added: bool) {
+        if added {
+            self.entries.flush().await;
+        }
+        if let Some(registry) = self.components.registry() {
+            registry.flush().await;
+        }
+        if !added {
+            self.entries.flush().await;
+        }
     }
 
     #[cfg(test)]
