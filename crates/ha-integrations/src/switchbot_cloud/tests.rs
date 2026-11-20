@@ -647,3 +647,83 @@ async fn climate_restores_as_ha() {
         let _ = std::fs::remove_dir_all(&dir);
     }
 }
+
+/// Every message logged at `info` or above (what `hars` prints unless
+/// asked for more) while this is alive, on this thread.
+#[derive(Clone, Default)]
+struct Logged(Arc<parking_lot::Mutex<Vec<String>>>);
+
+impl<S: tracing::Subscriber> tracing_subscriber::Layer<S> for Logged {
+    fn on_event(&self, e: &tracing::Event<'_>, _: tracing_subscriber::layer::Context<'_, S>) {
+        struct Message(String);
+        impl tracing::field::Visit for Message {
+            fn record_debug(&mut self, f: &tracing::field::Field, v: &dyn std::fmt::Debug) {
+                if f.name() == "message" {
+                    self.0 = format!("{v:?}");
+                }
+            }
+        }
+        if *e.metadata().level() > tracing::Level::INFO {
+            return;
+        }
+        let mut m = Message(String::new());
+        e.record(&mut m);
+        self.0.lock().push(m.0);
+    }
+}
+
+/// An API error is logged with its HTTP status and the API's own
+/// `statusCode`, never with the reply's body: a body can echo the request
+/// back, the account's token and signature with it.
+#[tokio::test]
+async fn an_api_error_is_logged_without_its_body() {
+    use tracing_subscriber::layer::SubscriberExt;
+    let logged = Logged::default();
+    let _guard =
+        tracing::subscriber::set_default(tracing_subscriber::registry().with(logged.clone()));
+    let (base, server) = fake().await;
+    let echo = |code: &str| {
+        format!(
+            r#"{{{code}"message":"bad request","request":{{"Authorization":"{TOKEN}","sign":"{SECRET}"}}}}"#
+        )
+    };
+    let json_ct = "application/json";
+    for (status, body, want) in [
+        (500, echo(""), "Error 500"),
+        (
+            400,
+            echo(r#""statusCode":190,"#),
+            "Error 400: statusCode 190",
+        ),
+        (
+            200,
+            echo(r#""statusCode":190,"#),
+            "Error 200: statusCode 190",
+        ),
+        (200, echo(r#""statusCode":"oops","#), "Error 200"),
+    ] {
+        server.set("GET", "/v1.1/devices", (status, json_ct, body));
+        assert_eq!(
+            api(&base).list_devices().await,
+            Err(ApiError::Connection(String::new()))
+        );
+        let lines = std::mem::take(&mut *logged.0.lock());
+        assert_eq!(lines, [want]);
+    }
+    // Whatever else fails, nothing logged or returned names the token.
+    for reply in [
+        (403, json_ct, echo("")),
+        (200, "text/html", format!("<html>{TOKEN}</html>")),
+        (200, json_ct, format!(r#"["{TOKEN}"]"#)),
+        (
+            200,
+            json_ct,
+            format!(r#"{{"statusCode":100,"body":{{"x":"{TOKEN}"}}}}"#),
+        ),
+    ] {
+        server.set("GET", "/v1.1/devices", reply);
+        let error = api(&base).list_devices().await.unwrap_err();
+        let said = format!("{error:?} {error} {:?}", logged.0.lock());
+        assert!(!said.contains(TOKEN) && !said.contains(SECRET), "{said}");
+    }
+}

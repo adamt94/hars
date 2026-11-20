@@ -29,7 +29,7 @@ Ten crates in `crates/`. `ha-server` builds the only binary, `hars`.
 | `ha-core` | `Hass`, the state machine, the event bus and lossless feeds, services and schemas, lifecycle stages, `.storage` files, restore state, the clock, YAML loading and writing, `slugify`, shadow mode's gate, Jinja templates (on `minijinja`) | `core.py`, `helpers/storage.py`, `helpers/restore_state.py`, `util/yaml`, `helpers/template` |
 | `ha-auth` | Users, credentials, login flows, refresh and access tokens, permissions | `auth/` |
 | `ha-registry` | Entity, device, area, floor and label registries; target expansion (device/area/floor/label to entities) | `helpers/*_registry.py` |
-| `ha-http` | The one outbound HTTP(S) client: HTTP/1.1, rustls with compiled-in roots, timeouts, server-sent events | `aiohttp` client session |
+| `ha-http` | The one outbound HTTP(S) client: HTTP/1.1, rustls with compiled-in roots, timeouts, redirects as aiohttp follows them (no `Authorization`, `Cookie` or `Proxy-Authorization` to another origin), server-sent events | `aiohttp` client session |
 | `ha-recorder` | History: an append-only segment log, its intake, retention, and the history and logbook queries | `components/recorder`, `history`, `logbook` |
 | `ha-components` | Built-in `zone` and `person`; new entity ids for them (with `ha_core::slugify`, re-exported here) | `components/zone`, `components/person` |
 | `ha-integrations` | Config entries; the shared entity components (`light`, `switch`, `scene`, `button`, `climate`, `weather`); every integration (`sun`, `met`, `hue`, `lifx`, `switchbot_cloud`, `mobile_app`); the config flows onboarding starts (`met`'s) | `config_entries.py`, `components/<domain>`, `components/onboarding/views.py` |

@@ -509,6 +509,15 @@ ids, addresses, names and coordinates replaced with fake ones
       timeouts. Checked against the real bulb with Get messages only
 - [ ] `lifx`: the `lifx.*` services (effects, `set_state`, themes), the
       RSSI sensor, persisting a rediscovered host
+- [x] Outbound requests keep credentials at home: a redirect to another
+      origin takes no `Authorization`, `Cookie` or `Proxy-Authorization`
+      with it, as aiohttp 3.13.5 (HA 2026.6.1's) does, so SwitchBot's
+      token doesn't follow one; and a SwitchBot API error is logged with
+      its HTTP status and `statusCode` only, not its body (the library
+      logs the body, which can echo the token). As in HA, headers aiohttp
+      doesn't know as credentials still follow a redirect: SwitchBot's
+      `sign`, `t` and `nonce` (of no use without the token) and Hue's
+      `hue-application-key`
 - [x] `switchbot_cloud`: the library's signing, envelope and error classes;
       HA's setup classification and retry ladder; Hub 2 and Bot polled every
       600 s (HA stops polling the Bot once its webhook is set; `hars` never

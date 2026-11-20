@@ -29,4 +29,5 @@ tokio = { version = "1.54.1", features = ["time", "rt", "sync", "net", "macros"]
 tracing = "0.1.44"
 
 [dev-dependencies]
+tracing-subscriber = { version = "0.3.23", default-features = false, features = ["registry"] }
 tokio = { version = "1.54.1", features = ["macros", "rt", "rt-multi-thread", "test-util", "net", "io-util"] }

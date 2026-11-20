@@ -1,6 +1,10 @@
 //! The SwitchBot Cloud API v1.1, as `switchbot-api` 2.11.0 speaks it:
 //! every request signed, one attempt each, the `statusCode` envelope
 //! classified into the library's errors.
+//!
+//! Where `hars` differs on purpose: an error is logged with its HTTP
+//! status and API `statusCode` only. The library logs the whole reply,
+//! which can carry the account's token back.
 
 use base64::Engine;
 use ha_http::{Method, header::HeaderName};
@@ -148,8 +152,7 @@ impl Api {
             )));
         };
         if status >= 400 {
-            let body = Value::Object(envelope);
-            tracing::error!("Error {status}: {body}");
+            log_error(status, &envelope);
             return Err(ApiError::Connection(String::new()));
         }
         match envelope.get("statusCode").and_then(Value::as_i64) {
@@ -160,8 +163,7 @@ impl Api {
                 .ok_or_else(|| ApiError::Other("KeyError: 'body'".into())),
             Some(161 | 171) => Err(ApiError::Offline),
             _ => {
-                let body = Value::Object(envelope);
-                tracing::error!("Error {status}: {body}");
+                log_error(status, &envelope);
                 Err(ApiError::Connection(String::new()))
             }
         }
@@ -229,6 +231,17 @@ impl Api {
         self.request(Method::POST, &path, Some(body))
             .await
             .map(drop)
+    }
+}
+
+/// The library's `_LOGGER.error("Error %d: %s", status, body)`, without
+/// the body: an API's error can echo the request back, the token with it,
+/// and a log is read by more people than a config entry. What is kept is
+/// the HTTP status and the envelope's `statusCode` when it is a number.
+fn log_error(status: u16, envelope: &Map<String, Value>) {
+    match envelope.get("statusCode").and_then(Value::as_i64) {
+        Some(code) => tracing::error!("Error {status}: statusCode {code}"),
+        None => tracing::error!("Error {status}"),
     }
 }
 

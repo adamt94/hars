@@ -56,6 +56,26 @@ pub struct Client {
 /// aiohttp's `max_redirects`: the 10th redirect is an error.
 const MAX_REDIRECTS: usize = 10;
 
+/// What aiohttp 3.13.5 (`ClientSession._request`) takes out of a request
+/// when a redirect leaves its origin.
+const CREDENTIALS: [header::HeaderName; 3] = [
+    header::AUTHORIZATION,
+    header::COOKIE,
+    header::PROXY_AUTHORIZATION,
+];
+
+/// A URL's origin as yarl's `URL.origin()` compares it: scheme, host and
+/// port, a scheme's default port being the same as none.
+fn origin(uri: &Uri) -> (Option<String>, Option<String>, Option<u16>) {
+    let scheme = uri.scheme_str().map(str::to_ascii_lowercase);
+    let port = uri.port_u16().or(match scheme.as_deref() {
+        Some("http") => Some(80),
+        Some("https") => Some(443),
+        _ => None,
+    });
+    (scheme, uri.host().map(str::to_ascii_lowercase), port)
+}
+
 /// How a [`Client`] is made.
 pub struct Builder {
     user_agent: String,
@@ -158,9 +178,10 @@ impl Client {
     }
 
     /// `GET url` with extra headers, following redirects as aiohttp does
-    /// (the 10th is an error) and refusing one from a public host to a
-    /// loopback or unspecified address, as HA's SSRF guard. The body is
-    /// capped in size.
+    /// (the 10th is an error; one to another origin takes no
+    /// `Authorization`, `Cookie` or `Proxy-Authorization` with it) and
+    /// refusing one from a public host to a loopback or unspecified
+    /// address, as HA's SSRF guard. The body is capped in size.
     pub async fn get(
         &self,
         url: &str,
@@ -219,8 +240,9 @@ impl Client {
         let mut method = method;
         let mut body = body;
         let mut redirects = 0;
+        let mut headers = std::borrow::Cow::Borrowed(headers);
         loop {
-            let req = self.build_request(&method, &uri, headers, body.as_ref())?;
+            let req = self.build_request(&method, &uri, &headers, body.as_ref())?;
             let res = tokio::time::timeout_at(headers_by, self.inner.request(req))
                 .await
                 .map_err(|_| Error::Timeout(self.headers_timeout))?
@@ -259,6 +281,16 @@ impl Client {
             {
                 method = Method::GET;
                 body = None;
+            }
+            // aiohttp: a redirect to another origin takes no credentials
+            // with it, on that hop or any after it (a token must not reach
+            // whatever host a compromised or mistaken server names).
+            if origin(&uri) != origin(&next)
+                && headers.iter().any(|(name, _)| CREDENTIALS.contains(name))
+            {
+                headers
+                    .to_mut()
+                    .retain(|(name, _)| !CREDENTIALS.contains(name));
             }
             uri = next;
         }
@@ -899,6 +931,100 @@ mod tests {
             assert_eq!(res.status, StatusCode::OK);
             assert_eq!(server.await.unwrap()[1], want, "{method} after {code}");
         }
+    }
+
+    /// A server answering each request from `replies` in turn (`{to}` in a
+    /// reply is `to`); returns each request's head, lower-cased.
+    async fn serve_heads(replies: Vec<String>) -> (String, tokio::task::JoinHandle<Vec<String>>) {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let base = format!("http://{}", listener.local_addr().unwrap());
+        let task = tokio::spawn(async move {
+            let mut seen = Vec::new();
+            for reply in replies {
+                let (mut s, _) = listener.accept().await.unwrap();
+                let mut buf = vec![0u8; 4096];
+                let n = s.read(&mut buf).await.unwrap();
+                seen.push(String::from_utf8_lossy(&buf[..n]).to_lowercase());
+                s.write_all(reply.as_bytes()).await.unwrap();
+            }
+            seen
+        });
+        (base, task)
+    }
+
+    /// aiohttp 3.13.5: a redirect to another origin (here another port)
+    /// gets no `Authorization`, `Cookie` or `Proxy-Authorization`, and
+    /// they don't come back on a later hop; other headers go on, and a
+    /// redirect within the origin keeps everything.
+    #[tokio::test]
+    async fn a_redirect_to_another_origin_takes_no_credentials() {
+        let moved = |to: &str| {
+            format!(
+                "HTTP/1.1 302 Found\r\nLocation: {to}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+            )
+        };
+        let ok = "HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".to_owned();
+        let name = |n: &'static str| header::HeaderName::from_static(n);
+        let headers = [
+            (header::AUTHORIZATION, "the-token".to_owned()),
+            (header::COOKIE, "session=the-cookie".to_owned()),
+            (header::PROXY_AUTHORIZATION, "Basic the-proxy".to_owned()),
+            (name("sign"), "the-signature".to_owned()),
+        ];
+        let client = Client::new("t").unwrap();
+        let secret = |head: &str| {
+            ["the-token", "the-cookie", "the-proxy"]
+                .iter()
+                .any(|s| head.contains(s))
+        };
+
+        // Within the origin: everything is sent again.
+        let (base, server) = serve_heads(vec![moved("/next"), ok.clone()]).await;
+        client.get(&format!("{base}/a"), &headers).await.unwrap();
+        let seen = server.await.unwrap();
+        assert!(seen[1].starts_with("get /next "));
+        for value in ["the-token", "the-cookie", "the-proxy", "the-signature"] {
+            assert!(
+                seen[1].contains(value),
+                "{value} wasn't sent within the origin"
+            );
+        }
+
+        // To another origin, then back to the first: the credentials stop
+        // at the first hop and stay off.
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let second = format!("http://{}", listener.local_addr().unwrap());
+        let (first, first_server) =
+            serve_heads(vec![moved(&format!("{second}/there")), ok.clone()]).await;
+        let back = moved(&format!("{first}/back"));
+        let second_server = tokio::spawn(async move {
+            let (mut s, _) = listener.accept().await.unwrap();
+            let mut buf = vec![0u8; 4096];
+            let n = s.read(&mut buf).await.unwrap();
+            s.write_all(back.as_bytes()).await.unwrap();
+            String::from_utf8_lossy(&buf[..n]).to_lowercase()
+        });
+        let res = client.get(&format!("{first}/a"), &headers).await.unwrap();
+        assert_eq!(res.status, StatusCode::OK);
+        let there = second_server.await.unwrap();
+        assert!(there.starts_with("get /there "), "{there}");
+        assert!(!secret(&there), "a credential crossed origins:\n{there}");
+        assert!(there.contains("sign: the-signature"), "{there}");
+        let seen = first_server.await.unwrap();
+        assert!(secret(&seen[0]), "the first request carries them");
+        assert!(seen[1].starts_with("get /back "));
+        assert!(!secret(&seen[1]), "a credential came back:\n{}", seen[1]);
+    }
+
+    #[test]
+    fn origins_compare_as_yarl() {
+        let o = |u: &str| origin(&u.parse().unwrap());
+        assert_eq!(o("https://api.test/a"), o("https://API.test:443/b?c"));
+        assert_eq!(o("http://api.test/"), o("http://api.test:80/"));
+        assert_ne!(o("https://api.test/"), o("http://api.test/"));
+        assert_ne!(o("https://api.test/"), o("https://api.test:8443/"));
+        assert_ne!(o("https://api.test/"), o("https://evil.test/"));
+        assert_ne!(o("https://api.test/"), o("https://sub.api.test/"));
     }
 
     #[tokio::test]
