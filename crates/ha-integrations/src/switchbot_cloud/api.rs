@@ -3,8 +3,10 @@
 //! classified into the library's errors.
 //!
 //! Where `hars` differs on purpose: an error is logged with its HTTP
-//! status and API `statusCode` only. The library logs the whole reply,
-//! which can carry the account's token back.
+//! status and API `statusCode` only, and an unexpected content type is
+//! named only when it is a common one. The library logs the whole reply
+//! and aiohttp quotes the header, and either can carry the account's
+//! token back.
 
 use base64::Engine;
 use ha_http::{Method, header::HeaderName};
@@ -66,6 +68,28 @@ pub fn uuid4() -> String {
         &h[16..20],
         &h[20..]
     )
+}
+
+/// The content type as an error names it. aiohttp's `ContentTypeError`
+/// quotes whatever the server sent. `hars` quotes only the types a broken
+/// gateway really answers with, and calls the rest `other`: the message is
+/// logged, and a header is text the far end chooses.
+fn shown_mime(content_type: &str) -> &'static str {
+    const KNOWN: [&str; 5] = [
+        "text/html",
+        "text/plain",
+        "text/xml",
+        "application/xml",
+        "application/octet-stream",
+    ];
+    let mime = content_type.split(';').next().unwrap_or("").trim();
+    if mime.is_empty() {
+        return "none";
+    }
+    KNOWN
+        .into_iter()
+        .find(|known| mime.eq_ignore_ascii_case(known))
+        .unwrap_or("other")
 }
 
 /// aiohttp's JSON content-type check (`application/json` or `*/*+json`).
@@ -137,8 +161,7 @@ impl Api {
             .and_then(|v| v.to_str().ok())
             .unwrap_or("");
         if !is_json(content_type) {
-            let mime = content_type.split(';').next().unwrap_or("").trim();
-            let mime = if mime.is_empty() { "none" } else { mime };
+            let mime = shown_mime(content_type);
             return Err(ApiError::Other(format!(
                 "{status}, message='Attempt to decode JSON with unexpected mimetype: {mime}', url='{url}'"
             )));

@@ -514,7 +514,11 @@ ids, addresses, names and coordinates replaced with fake ones
       with it, as aiohttp 3.13.5 (HA 2026.6.1's) does, so SwitchBot's
       token doesn't follow one; and a SwitchBot API error is logged with
       its HTTP status and `statusCode` only, not its body (the library
-      logs the body, which can echo the token). As in HA, headers aiohttp
+      logs the body, which can echo the token), an unexpected content type
+      is named only when it is a common one, and a redirect `Location`
+      that doesn't parse is reported without its query. As in HA, a
+      redirect is followed from https to http, a 307 or 308 sends the
+      request body again, and headers aiohttp
       doesn't know as credentials still follow a redirect: SwitchBot's
       `sign`, `t` and `nonce` (of no use without the token) and Hue's
       `hue-application-key`

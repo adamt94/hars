@@ -672,6 +672,34 @@ impl<S: tracing::Subscriber> tracing_subscriber::Layer<S> for Logged {
     }
 }
 
+fn leak(s: String) -> &'static str {
+    Box::leak(s.into_boxed_str())
+}
+
+/// An unexpected content type is named in the error only when it is a
+/// common one.
+#[tokio::test]
+async fn an_unknown_content_type_is_not_quoted() {
+    let (base, server) = fake().await;
+    for (sent, shown) in [
+        ("", "none"),
+        ("Text/HTML; charset=utf-8", "text/html"),
+        ("text/plain", "text/plain"),
+        ("application/x-anything", "other"),
+    ] {
+        server.set("GET", "/v1.1/devices", (502, sent, String::new()));
+        match api(&base).list_devices().await {
+            Err(ApiError::Other(m)) => assert!(
+                m.starts_with(&format!(
+                    "502, message='Attempt to decode JSON with unexpected mimetype: {shown}', url='"
+                )),
+                "{m}"
+            ),
+            other => panic!("{other:?}"),
+        }
+    }
+}
+
 /// An API error is logged with its HTTP status and the API's own
 /// `statusCode`, never with the reply's body: a body can echo the request
 /// back, the account's token and signature with it.
@@ -714,6 +742,13 @@ async fn an_api_error_is_logged_without_its_body() {
     for reply in [
         (403, json_ct, echo("")),
         (200, "text/html", format!("<html>{TOKEN}</html>")),
+        // A content type is the far end's text too.
+        (500, leak(format!("application/{TOKEN}")), String::new()),
+        (
+            500,
+            leak(format!("text/html; charset={TOKEN}")),
+            String::new(),
+        ),
         (200, json_ct, format!(r#"["{TOKEN}"]"#)),
         (
             200,

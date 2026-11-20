@@ -64,16 +64,29 @@ const CREDENTIALS: [header::HeaderName; 3] = [
     header::PROXY_AUTHORIZATION,
 ];
 
-/// A URL's origin as yarl's `URL.origin()` compares it: scheme, host and
-/// port, a scheme's default port being the same as none.
+/// A URL's origin as yarl 1.24.2's `URL.origin()` compares it: the scheme,
+/// the host and the port as written. yarl compares the text, so a default
+/// port that is spelled out (`https://a:443`) is another origin than none
+/// (`https://a`); an IPv6 address is the same however it is spelled.
 fn origin(uri: &Uri) -> (Option<String>, Option<String>, Option<u16>) {
-    let scheme = uri.scheme_str().map(str::to_ascii_lowercase);
-    let port = uri.port_u16().or(match scheme.as_deref() {
-        Some("http") => Some(80),
-        Some("https") => Some(443),
-        _ => None,
+    let host = uri.host().map(|host| {
+        host.strip_prefix('[')
+            .and_then(|h| h.strip_suffix(']'))
+            .and_then(|h| h.parse::<std::net::Ipv6Addr>().ok())
+            .map_or_else(|| host.to_ascii_lowercase(), |ip| ip.to_string())
     });
-    (scheme, uri.host().map(str::to_ascii_lowercase), port)
+    (
+        uri.scheme_str().map(str::to_ascii_lowercase),
+        host,
+        uri.port_u16(),
+    )
+}
+
+/// A redirect's `Location` for an error: without its query or fragment,
+/// which can hold a signature or a token and end up in a log.
+fn location_for_error(location: &str) -> String {
+    let end = location.find(['?', '#']).unwrap_or(location.len());
+    location[..end].to_owned()
 }
 
 /// How a [`Client`] is made.
@@ -260,7 +273,8 @@ impl Client {
             if redirects >= MAX_REDIRECTS {
                 return Err(Error::Request(format!("{MAX_REDIRECTS} redirects")));
             }
-            let next = resolve(&uri, location).ok_or_else(|| Error::Url(location.to_owned()))?;
+            let next =
+                resolve(&uri, location).ok_or_else(|| Error::Url(location_for_error(location)))?;
             // HA's guard, per hop: a redirect from a host that isn't
             // blocked may not lead to one that is. Name lookups count
             // against the headers deadline.
@@ -933,6 +947,19 @@ mod tests {
         }
     }
 
+    /// A request's head, lower-cased: everything up to the blank line,
+    /// however many reads it arrives in.
+    async fn read_head(s: &mut tokio::net::TcpStream) -> String {
+        let mut head = Vec::new();
+        let mut buf = [0u8; 1024];
+        while !head.windows(4).any(|w| w == b"\r\n\r\n") {
+            let n = s.read(&mut buf).await.unwrap();
+            assert!(n > 0, "the request ended before its head did");
+            head.extend_from_slice(&buf[..n]);
+        }
+        String::from_utf8_lossy(&head).to_lowercase()
+    }
+
     /// A server answering each request from `replies` in turn (`{to}` in a
     /// reply is `to`); returns each request's head, lower-cased.
     async fn serve_heads(replies: Vec<String>) -> (String, tokio::task::JoinHandle<Vec<String>>) {
@@ -942,9 +969,7 @@ mod tests {
             let mut seen = Vec::new();
             for reply in replies {
                 let (mut s, _) = listener.accept().await.unwrap();
-                let mut buf = vec![0u8; 4096];
-                let n = s.read(&mut buf).await.unwrap();
-                seen.push(String::from_utf8_lossy(&buf[..n]).to_lowercase());
+                seen.push(read_head(&mut s).await);
                 s.write_all(reply.as_bytes()).await.unwrap();
             }
             seen
@@ -999,10 +1024,9 @@ mod tests {
         let back = moved(&format!("{first}/back"));
         let second_server = tokio::spawn(async move {
             let (mut s, _) = listener.accept().await.unwrap();
-            let mut buf = vec![0u8; 4096];
-            let n = s.read(&mut buf).await.unwrap();
+            let head = read_head(&mut s).await;
             s.write_all(back.as_bytes()).await.unwrap();
-            String::from_utf8_lossy(&buf[..n]).to_lowercase()
+            head
         });
         let res = client.get(&format!("{first}/a"), &headers).await.unwrap();
         assert_eq!(res.status, StatusCode::OK);
@@ -1016,15 +1040,37 @@ mod tests {
         assert!(!secret(&seen[1]), "a credential came back:\n{}", seen[1]);
     }
 
+    /// Each pair with what `URL(a).origin() == URL(b).origin()` gives in
+    /// yarl 1.24.2, the one aiohttp 3.13.5 compares origins with.
     #[test]
     fn origins_compare_as_yarl() {
         let o = |u: &str| origin(&u.parse().unwrap());
-        assert_eq!(o("https://api.test/a"), o("https://API.test:443/b?c"));
-        assert_eq!(o("http://api.test/"), o("http://api.test:80/"));
-        assert_ne!(o("https://api.test/"), o("http://api.test/"));
-        assert_ne!(o("https://api.test/"), o("https://api.test:8443/"));
-        assert_ne!(o("https://api.test/"), o("https://evil.test/"));
-        assert_ne!(o("https://api.test/"), o("https://sub.api.test/"));
+        for (a, b, same) in [
+            ("https://api.test/a", "https://API.test/b?c", true),
+            ("HTTPS://api.test/", "https://api.test/", true),
+            ("http://[::1]/", "http://[0:0:0:0:0:0:0:1]/", true),
+            // A default port that is written out is another origin.
+            ("https://api.test/a", "https://API.test:443/b", false),
+            ("http://api.test/", "http://api.test:80/", false),
+            ("http://[::1]:80/", "http://[::1]/", false),
+            ("https://api.test/", "http://api.test/", false),
+            ("https://api.test/", "https://api.test:8443/", false),
+            ("https://api.test/", "https://evil.test/", false),
+            ("https://api.test/", "https://sub.api.test/", false),
+            ("https://api.test./", "https://api.test/", false),
+            ("http://127.0.0.1/", "http://127.1/", false),
+        ] {
+            assert_eq!(o(a) == o(b), same, "{a} and {b}");
+        }
+    }
+
+    #[test]
+    fn a_bad_location_is_reported_without_its_query() {
+        assert_eq!(
+            location_for_error("http://[bad/next?sign=secret#frag"),
+            "http://[bad/next"
+        );
+        assert_eq!(location_for_error("ht tp://x#token"), "ht tp://x");
     }
 
     #[tokio::test]
