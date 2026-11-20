@@ -13,7 +13,6 @@ use crate::switch::select;
 use ha_core::{
     Attributes, EntityId, EntityTarget, Hass, Kind, Range, Schema, ServiceError, SupportsResponse,
 };
-use ha_registry::Registries;
 use parking_lot::RwLock;
 use serde_json::{Map, Number, Value, json};
 use std::sync::Arc;
@@ -364,7 +363,12 @@ impl Climates {
     }
 
     /// Register the ten `climate.*` services, in HA's order.
-    pub fn register_services(self: &Arc<Self>, hass: &Hass, registries: Arc<Registries>) {
+    pub fn register_services(
+        self: &Arc<Self>,
+        hass: &Hass,
+        registries: impl Into<ha_registry::Lookup>,
+    ) {
+        let registries = registries.into();
         use feature::*;
         let entity = Schema::entity_service;
         let services: [(&'static str, Schema, &'static [u32]); 10] = [
@@ -426,7 +430,7 @@ impl Climates {
                     let registries = registries.clone();
                     async move {
                         let target = call.entity_ids()?;
-                        let indirect = registries.target_entities(&call.data);
+                        let indirect = registries.get().target_entities(&call.data);
                         let items = climates.items.read().clone();
                         let chosen = chosen(&items, &target, &indirect, required, name)?;
                         let data = &call.data;

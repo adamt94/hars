@@ -3,7 +3,7 @@ use super::*;
 use serde_json::json;
 
 const SECRET: &str = "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f";
-const WEBHOOK: &str = "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f";
+pub(crate) const WEBHOOK: &str = "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f";
 
 /// The sanitised fake of the user's entry (`spec-mobile-app.md` §1.1).
 pub(crate) fn entry(flag: bool) -> Map<String, Value> {
@@ -287,4 +287,32 @@ async fn store_downgrade_keeps_what_ha_keeps() {
         );
         std::fs::remove_dir_all(dir).unwrap();
     }
+}
+
+/// Removing an entry from the UI (`async_remove_entry`): the webhook id is
+/// kept as deleted whether or not the registration was loaded (a disabled
+/// entry's isn't), so after a restart the app is told it is gone.
+#[tokio::test]
+async fn a_removed_entry_leaves_its_webhook_id_as_deleted() {
+    let hass = ha_core::Hass::new();
+    let mut disabled = entry(true);
+    disabled.insert("disabled_by".into(), json!("user"));
+    let entries = crate::config_entries::ConfigEntries::in_memory(&hass, vec![disabled.clone()]);
+    let app = MobileApp::new(std::slice::from_ref(&disabled), Vec::new());
+    let registry = ha_registry::Registry::in_memory(&hass, Default::default());
+    app.setup(&hass, registry.clone(), entries.clone(), None);
+    assert!(
+        app.is_empty(),
+        "a disabled entry's registration isn't loaded"
+    );
+    app.stop_entry(&disabled).await;
+    assert_eq!(*app.stored_deleted.lock(), [WEBHOOK]);
+
+    // A loaded one stops answering too.
+    let app = MobileApp::new(&[entry(true)], Vec::new());
+    app.setup(&hass, registry, entries, None);
+    assert!(matches!(app.webhook(WEBHOOK), Webhook::Registered(_)));
+    app.stop_entry(&entry(true)).await;
+    assert!(!matches!(app.webhook(WEBHOOK), Webhook::Registered(_)));
+    assert_eq!(*app.stored_deleted.lock(), [WEBHOOK]);
 }

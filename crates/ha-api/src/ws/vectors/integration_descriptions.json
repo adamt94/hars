@@ -1,0 +1,77 @@
+{
+ "keys": {
+  "core": [
+   "helper",
+   "integration",
+   "translated_name"
+  ],
+  "custom": [
+   "helper",
+   "integration"
+  ]
+ },
+ "custom": {
+  "integration": {},
+  "helper": {}
+ },
+ "known": {
+  "hue": {
+   "brand": "philips",
+   "description": {
+    "integration_type": "hub",
+    "config_flow": true,
+    "iot_class": "local_push",
+    "name": "Philips Hue"
+   }
+  },
+  "lifx": {
+   "brand": null,
+   "description": {
+    "name": "LIFX",
+    "integration_type": "device",
+    "config_flow": true,
+    "iot_class": "local_polling"
+   }
+  },
+  "met": {
+   "brand": null,
+   "description": {
+    "name": "Meteorologisk institutt (Met.no)",
+    "integration_type": "service",
+    "config_flow": true,
+    "iot_class": "cloud_polling"
+   }
+  },
+  "mobile_app": {
+   "brand": null,
+   "description": {
+    "integration_type": "device",
+    "config_flow": true,
+    "iot_class": "local_push"
+   }
+  },
+  "sun": {
+   "brand": null,
+   "description": {
+    "integration_type": "service",
+    "config_flow": true,
+    "iot_class": "calculated",
+    "single_config_entry": true
+   }
+  },
+  "switchbot_cloud": {
+   "brand": "switchbot",
+   "description": {
+    "integration_type": "hub",
+    "config_flow": true,
+    "iot_class": "cloud_polling",
+    "name": "SwitchBot Cloud"
+   }
+  }
+ },
+ "helpers_known": [],
+ "translated_name_known": [
+  "mobile_app",
+  "sun"
+ ]
+}

@@ -166,7 +166,14 @@ async fn run(thp_disabled: std::io::Result<bool>) -> anyhow::Result<()> {
         let dir = config_dir.clone();
         tokio::task::spawn_blocking(move || ha_integrations::light::Profiles::load(&dir)).await?
     };
-    let started = ha_integrations::start(&hass, registries.clone(), entries.as_deref(), profiles);
+    let endpoints = endpoints();
+    let started = ha_integrations::start(
+        &hass,
+        registry.clone().into(),
+        entries.as_deref(),
+        profiles,
+        &endpoints,
+    );
     api_config.integrations = started.running;
     // The apps' registrations, before the listener serves their webhooks:
     // an unknown id makes the app register again.
@@ -189,6 +196,19 @@ async fn run(thp_disabled: std::io::Result<bool>) -> anyhow::Result<()> {
         Some(api_config.components.clone()),
     );
     api_config.mobile_app = Some(std::sync::Arc::new(mobile_app));
+    // The config flows a user starts from the UI, and the entries they add.
+    // When the entries or a registry can't be saved, the views say so.
+    match ha_integrations::flow::Manager::new(
+        &hass,
+        config_entries.clone(),
+        started.components,
+        endpoints,
+        started.tasks,
+        api_config.mobile_app.clone(),
+    ) {
+        Ok(flows) => api_config.flows = Some(flows),
+        Err(why) => api_config.flows_unavailable = Some(why.to_string().into()),
+    }
     // `configuration.yaml`'s automations (written now; triggers attach at
     // `homeassistant_started`).
     let automations = match config_yaml.as_ref() {
@@ -320,7 +340,7 @@ async fn run(thp_disabled: std::io::Result<bool>) -> anyhow::Result<()> {
         Some(signal) => tracing::info!("{signal} received during startup, stopping"),
         None => {
             hass.begin_start();
-            registry.snapshot().write_unavailable_states(&hass);
+            registry.write_unavailable_states(&hass);
             api_config.components.start(&hass);
             hass.finish_start();
             if let Some(a) = &automations {
@@ -431,6 +451,20 @@ fn api_config() -> anyhow::Result<ha_api::ApiConfig> {
         frontend: Some(std::sync::Arc::new(frontend)),
         ..Default::default()
     })
+}
+
+/// Where the integrations' services are: the real hosts. A debug build
+/// (never a release) reads `HARS_DEV_SWITCHBOT_HOST`, so a contributor can
+/// drive the UI against a stand-in on 127.0.0.1 instead of SwitchBot's API.
+fn endpoints() -> ha_integrations::Endpoints {
+    #[allow(unused_mut)]
+    let mut endpoints = ha_integrations::Endpoints::default();
+    #[cfg(debug_assertions)]
+    if let Ok(host) = std::env::var("HARS_DEV_SWITCHBOT_HOST") {
+        tracing::warn!("debug build: the SwitchBot API is {host}");
+        endpoints.switchbot = host;
+    }
+    endpoints
 }
 
 /// `HARS_CONFIG`: HA's config directory (`/config` in the Docker image). Its

@@ -183,9 +183,10 @@ async fn start(dir: &Path, whoami_up: bool) -> Install {
     // As `main`: sun runs (its entry was imported), met from onboarding.
     let started = ha_integrations::start(
         &hass,
-        registry.snapshot(),
+        registry.snapshot().into(),
         entries.list().as_deref(),
         ha_integrations::light::Profiles::load(dir),
+        &Default::default(),
     );
     let weather = started.weather.clone();
     let onboarding = ha_integrations::onboarding::Onboarding::new(

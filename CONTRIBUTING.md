@@ -48,6 +48,12 @@ HARS_FRONTEND=./frontend HARS_CONFIG=./config cargo run --release
 too.) The API needs a token, as in Home Assistant:
 `scripts/hars-token.sh http://localhost:8123 me my-password` prints one.
 
+A **debug** build reads `HARS_DEV_SWITCHBOT_HOST` and uses it as the
+SwitchBot API's base URL, so the UI's config flow can be driven against a
+stand-in on 127.0.0.1 (`cargo run`, not `--release`: a release build has no
+such setting and always calls SwitchBot). Never point a test at a real
+account.
+
 CI also has a `docker` job: it builds the image, smoke-tests it, and runs the
 resource budget gate (`PERF_GATE=1 scripts/perf.sh`, see
 [docs/PERF.md](docs/PERF.md#budgets)). To run the same gate locally,
@@ -79,7 +85,7 @@ resource budget gate (`PERF_GATE=1 scripts/perf.sh`, see
   script that made it in `scripts/vectors/` (`onboarding.py`,
   `render_template.py`, `mobile_app_notify.py`, `template_functions.py`,
   `automation_templates.py`, `automation_reload.py`, `yaml_dump.py`,
-  `automation_editor.py`, `entity_registry_ws.py` and
+  `automation_editor.py`, `entity_registry_ws.py`, `config_flow.py` and
   `import_releases.py`, which also runs later releases' code,
   so far); the sets made before that rule have none yet
   and are listed there as a backlog. The rules, a skeleton

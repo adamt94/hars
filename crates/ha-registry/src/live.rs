@@ -13,6 +13,7 @@ use ha_core::{Context, CoreState, Event, EventKind, Hass};
 use parking_lot::{Mutex, RwLock};
 use serde::Serialize;
 use serde_json::{Map, Value, json};
+use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
@@ -32,6 +33,49 @@ pub struct Registry {
     /// Entities, devices, areas.
     saves: Option<[Arc<DelayedSave>; 3]>,
     entries: RwLock<Option<EntryLookup>>,
+    /// The entity or device store that won't be written
+    /// ([`Registries::unwritable`]), as found when the registry was made.
+    read_only: Option<&'static str>,
+}
+
+/// The registries as something long-lived reads them (a service resolving
+/// its targets, an integration set up while `hars` runs): one fixed set
+/// (tests), or whatever the live registry holds when asked, so rows made
+/// after start-up are seen.
+#[derive(Clone)]
+pub enum Lookup {
+    Fixed(Arc<Registries>),
+    Live(Arc<Registry>),
+}
+
+impl Lookup {
+    /// The registries as they are now.
+    pub fn get(&self) -> Arc<Registries> {
+        match self {
+            Self::Fixed(r) => r.clone(),
+            Self::Live(r) => r.snapshot(),
+        }
+    }
+
+    /// The live registry, where rows can be made.
+    pub fn live(&self) -> Option<&Arc<Registry>> {
+        match self {
+            Self::Fixed(_) => None,
+            Self::Live(r) => Some(r),
+        }
+    }
+}
+
+impl From<Arc<Registries>> for Lookup {
+    fn from(r: Arc<Registries>) -> Self {
+        Self::Fixed(r)
+    }
+}
+
+impl From<Arc<Registry>> for Lookup {
+    fn from(r: Arc<Registry>) -> Self {
+        Self::Live(r)
+    }
 }
 
 /// What an integration wants a row to have (HA's keyword arguments to
@@ -137,11 +181,13 @@ impl Registry {
             writer: Mutex::new(()),
             saves: None,
             entries: RwLock::new(None),
+            read_only: None,
         })
     }
 
     /// Saved to `config_dir/.storage` after changes, as HA does.
     pub fn new(hass: &Hass, config_dir: &Path, registries: Registries) -> Arc<Self> {
+        let read_only = registries.unwritable();
         Arc::new_cyclic(|weak: &std::sync::Weak<Self>| {
             let save = |key: &'static str| {
                 let (weak, dir) = (weak.clone(), config_dir.to_owned());
@@ -167,8 +213,56 @@ impl Registry {
                     save(crate::AREA_KEY),
                 ]),
                 entries: RwLock::new(None),
+                read_only,
             }
         })
+    }
+
+    /// The entity or device store whose changes can't be saved, if any
+    /// (see [`Registries::unwritable`]).
+    pub fn read_only(&self) -> Option<&'static str> {
+        self.read_only
+    }
+
+    /// HA's `_write_unavailable_states` at start. No row can be removed
+    /// between being found to exist and its placeholder being written, so
+    /// whoever removes rows afterwards (a config entry's removal) finds
+    /// every placeholder there is. The rows are done a batch at a time
+    /// under the writer's lock, each checked against the registry as it is
+    /// then, so a change to the registry waits for one batch, not for the
+    /// whole pass.
+    pub fn write_unavailable_states(&self, hass: &Hass) {
+        /// Rows per turn of the lock.
+        const BATCH: usize = 64;
+        let rows = self.snapshot();
+        // The registry as it was last found changed, and its rows by id.
+        let mut seen = rows.clone();
+        let mut by_id: HashMap<String, Arc<Entity>> = HashMap::new();
+        for batch in rows.entities.chunks(BATCH) {
+            let turn = self.writer.lock();
+            let now = self.snapshot();
+            if Arc::ptr_eq(&now, &rows) {
+                // Nothing has changed: every row of the batch is there.
+                batch.iter().for_each(|e| e.write_unavailable_state(hass));
+            } else {
+                if !Arc::ptr_eq(&now, &seen) {
+                    by_id = now
+                        .entities
+                        .iter()
+                        .map(|e| (e.entity_id.clone(), e.clone()))
+                        .collect();
+                    seen = now;
+                }
+                // Each row as it is now, if it is still there.
+                batch
+                    .iter()
+                    .filter_map(|e| by_id.get(&e.entity_id))
+                    .for_each(|e| e.write_unavailable_state(hass));
+            }
+            // Whoever waits to change the registry goes next, rather than
+            // this pass taking the lock again for its next batch.
+            parking_lot::MutexGuard::unlock_fair(turn);
+        }
     }
 
     /// How to look up a config entry (a device's primary entry; disables
@@ -313,7 +407,24 @@ impl Registry {
                     .iter()
                     .position(|e| is_unique(e, domain, platform, unique_id))
             {
-                update_row(tx, i, &patch, &now);
+                // `_async_update_entity`, given an entry and no
+                // `disabled_by`: the row's disable follows the entry's. A
+                // row a disabled entry disabled is enabled when an enabled
+                // entry takes it; the user's own disable stays.
+                let disable = match (&patch.disabled_by, &patch.config_entry_id) {
+                    (None, Some(entry)) => {
+                        match (
+                            self.entry_disabled(entry.as_deref()),
+                            tx.r.entities[i].disabled_by.as_deref(),
+                        ) {
+                            (true, None) => Some(Some("config_entry".to_owned())),
+                            (false, Some("config_entry")) => Some(None),
+                            _ => None,
+                        }
+                    }
+                    _ => None,
+                };
+                update_row(tx, i, &patch, &now, disable);
                 return tx.r.entities[i].clone();
             }
             let object_id_base = patch.object_id_base.clone().flatten();
@@ -432,7 +543,7 @@ impl Registry {
                 tx.r.entities
                     .iter()
                     .position(|e| e.entity_id == entity_id)?;
-            update_row(tx, i, &patch, &now)
+            update_row(tx, i, &patch, &now, None)
         })
     }
 
@@ -529,7 +640,7 @@ impl Registry {
                             .iter()
                             .position(|e| e.device_id.as_deref() == Some(device.id.as_str()))
                     {
-                        update_row(tx, e, &unlink, &now_iso);
+                        update_row(tx, e, &unlink, &now_iso, None);
                     }
                 } else {
                     let mut d = (*device).clone();
@@ -692,6 +803,14 @@ impl Registry {
                 d.config_entries.push(entry.clone());
                 d.config_entries_subentries
                     .insert(entry.clone(), json!([null]));
+                // "Enable the device if it was disabled by config entry and
+                // we're adding a non disabled config entry."
+                if d.disabled_by.as_deref() == Some("config_entry")
+                    && !self.entry_disabled(Some(entry))
+                {
+                    changes.insert("disabled_by".into(), json!(d.disabled_by));
+                    d.disabled_by = None;
+                }
             }
             let new_ids: Vec<Value> = info
                 .identifiers
@@ -718,6 +837,7 @@ impl Registry {
             }
             d.modified_at = Some(now.clone());
             let renamed = !is_new && changes.contains_key("name");
+            let enabled = changes.contains_key("disabled_by");
             let device = Arc::new(d);
             match i {
                 Some(i) => r.devices[i] = device.clone(),
@@ -730,6 +850,22 @@ impl Registry {
             });
             if renamed {
                 device_renamed(tx, &device, old_name.as_deref(), &now);
+            }
+            if !is_new && enabled {
+                // `async_device_modified`: entities the device's disable
+                // had disabled come back with it.
+                let enable = EntityPatch {
+                    disabled_by: Some(None),
+                    ..Default::default()
+                };
+                for e in 0..tx.r.entities.len() {
+                    let row = &tx.r.entities[e];
+                    if row.device_id.as_deref() == Some(device.id.as_str())
+                        && row.disabled_by.as_deref() == Some("device")
+                    {
+                        update_row(tx, e, &enable, &now, None);
+                    }
+                }
             }
             device
         })
@@ -766,10 +902,23 @@ fn is_unique(e: &Entity, domain: &str, platform: &str, unique_id: &str) -> bool 
 
 /// Apply `patch` to row `i`: on a change, bump `modified_at` and queue the
 /// `update` event with the old values.
-fn update_row(tx: &mut Tx, i: usize, patch: &EntityPatch, now: &str) -> Option<Map<String, Value>> {
+///
+/// `disable` is a disable that follows the row's config entry: applied
+/// like any change, but HA leaves it out of the event's `changes`.
+fn update_row(
+    tx: &mut Tx,
+    i: usize,
+    patch: &EntityPatch,
+    now: &str,
+    disable: Option<Option<String>>,
+) -> Option<Map<String, Value>> {
     let mut row = (*tx.r.entities[i]).clone();
     let changes = apply(&mut row, patch);
-    if changes.is_empty() {
+    let followed = disable.is_some();
+    if let Some(disabled_by) = disable {
+        row.disabled_by = disabled_by;
+    }
+    if changes.is_empty() && !followed {
         return None;
     }
     row.modified_at = Some(now.to_owned());

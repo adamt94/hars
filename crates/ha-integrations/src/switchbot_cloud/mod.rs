@@ -12,17 +12,24 @@
 //!   battery then only moves at restarts).
 //! - It speaks to the API with its own User-Agent.
 //! - Other device types, and a Bot in switch mode, are logged and skipped.
+//!
+//! Each setup makes the devices' and entities' registry rows as HA's
+//! platforms do (`async_get_or_create` in both registries), so devices
+//! added from the UI show on the integration's page and keep their entity
+//! ids. Rows an import brought are left as they are when HA wrote them.
 
 pub mod api;
+pub mod config_flow;
 
 use crate::button::Button;
 use crate::climate::{self, Climate, Precision, SetTemperature, Temp};
 use crate::components::Components;
+use crate::config_entries::{EntryState, Status};
 use crate::light::BoxFuture;
 use crate::switch::Switch;
 use api::{Api, ApiError, Device};
 use ha_core::{Attributes, EntityId, Hass, ServiceError};
-use ha_registry::Registries;
+use ha_registry::{DeviceInfo, EntityPatch, Registries, Registry};
 use parking_lot::Mutex;
 use serde_json::{Map, Value, json};
 use std::collections::HashMap;
@@ -30,6 +37,15 @@ use std::sync::Arc;
 use std::time::Duration;
 
 pub const DOMAIN: &str = "switchbot_cloud";
+
+/// What running an entry loads, for `get_config`'s `components`.
+pub const COMPONENTS: &[&str] = &["switchbot_cloud", "button", "climate", "sensor", "switch"];
+
+/// Held while an entry's rows, entities and first states are made, and
+/// while a removed entry's are taken away: one entry at a time, so two
+/// accounts that list the same devices can't both take them (HA reserves
+/// an entity id before its setup yields). Never held across an `await`.
+pub(crate) static SETUP: Mutex<()> = parking_lot::const_mutex(());
 
 /// Every coordinator's `update_interval`.
 const INTERVAL: Duration = Duration::from_secs(600);
@@ -50,9 +66,28 @@ pub struct Shared {
     hass: Hass,
     api: Api,
     polled: Mutex<HashMap<String, Polled>>,
+    /// False once the entry is stopped ([`run`] ended).
+    alive: Mutex<bool>,
 }
 
 impl Shared {
+    /// Write an entity's state, unless the entry was stopped: a command
+    /// still in flight when its entry is removed must not bring a state
+    /// back (HA's entity, once removed, writes nothing).
+    fn write(
+        &self,
+        entity_id: EntityId,
+        state: &str,
+        attributes: Attributes,
+        context: Option<ha_core::Context>,
+    ) {
+        let alive = self.alive.lock();
+        if *alive {
+            self.hass
+                .set_state_with_context(entity_id, state, attributes, context);
+        }
+    }
+
     fn ok(&self, device: &str) -> bool {
         self.polled.lock().get(device).is_some_and(|p| p.ok)
     }
@@ -70,6 +105,14 @@ pub struct Entry {
 impl Entry {
     fn ok(&self, device: &str) -> bool {
         self.shared.ok(device)
+    }
+
+    /// No entity: every device belongs to another entry.
+    fn is_empty(&self) -> bool {
+        self.sensors.is_empty()
+            && self.buttons.is_empty()
+            && self.climates.is_empty()
+            && self.switches.is_empty()
     }
 
     /// Write every entity, in HA's (unstable) startup order.
@@ -155,12 +198,19 @@ pub enum SetupError {
 }
 
 /// HA's setup: the device list, then each polled device's first status
-/// (any failure retries the whole entry), then the entities.
+/// (any failure retries the whole entry), then the entities, named from
+/// `registries`.
 pub async fn setup(
     hass: &Hass,
     registries: &Registries,
     api: Api,
 ) -> Result<Arc<Entry>, SetupError> {
+    let (devices, polled) = fetch(&api).await?;
+    Ok(build(hass, registries, api, &devices, polled))
+}
+
+/// The device list and each polled device's first status.
+async fn fetch(api: &Api) -> Result<(Vec<Device>, HashMap<String, Polled>), SetupError> {
     let devices = match api.list_devices().await {
         Ok(d) => d,
         Err(ApiError::Connection(m)) => return Err(SetupError::Retry(m)),
@@ -185,23 +235,215 @@ pub async fn setup(
             Err(e) => return Err(SetupError::Retry(format!("{e:?}"))),
         }
     }
+    Ok((devices, polled))
+}
 
+/// A registry row a platform makes for a device's entity.
+struct Row {
+    domain: &'static str,
+    /// `_attr_unique_id`.
+    unique_id: String,
+    /// The entity description's name (`None`: the device's main entity).
+    name: Option<&'static str>,
+    device_class: Option<&'static str>,
+    unit: Option<&'static str>,
+    capabilities: Option<Value>,
+    supported_features: i64,
+    /// The sensor component's `suggested_display_precision` option.
+    precision: Option<i64>,
+}
+
+/// The entities HA's platforms make for a device `hars` runs: what
+/// [`build`] makes of it, as registry rows.
+fn rows(d: &Device, status: Option<&Polled>) -> Vec<Row> {
+    let row = |domain, unique_id: String| Row {
+        domain,
+        unique_id,
+        name: None,
+        device_class: None,
+        unit: None,
+        capabilities: None,
+        supported_features: 0,
+        precision: None,
+    };
+    let sensor = |key: &str, name, class, unit, precision| Row {
+        name: Some(name),
+        device_class: Some(class),
+        unit: Some(unit),
+        capabilities: Some(json!({"state_class": "measurement"})),
+        precision,
+        ..row("sensor", format!("{}_{key}", d.id))
+    };
+    match (d.remote, d.kind.as_str()) {
+        (true, kind) if kind.ends_with("Air Conditioner") => vec![
+            Row {
+                // `ClimateEntity.capability_attributes`.
+                capabilities: Some(json!({
+                    "hvac_modes": HVAC_MODES,
+                    "min_temp": 7,
+                    "max_temp": 35,
+                    "target_temp_step": 1,
+                    "fan_modes": FAN_MODES,
+                })),
+                supported_features: {
+                    use climate::feature::*;
+                    i64::from(TARGET_TEMPERATURE | FAN_MODE | TURN_OFF | TURN_ON)
+                },
+                ..row("climate", d.id.clone())
+            },
+            Row {
+                device_class: Some("switch"),
+                ..row("switch", d.id.clone())
+            },
+        ],
+        (false, "Bot") => {
+            let press = status
+                .and_then(|p| p.data.get("deviceMode"))
+                .and_then(Value::as_str)
+                == Some("pressMode");
+            let mut rows = Vec::new();
+            if press {
+                rows.push(row("button", d.id.clone()));
+            }
+            rows.push(sensor("battery", "Battery", "battery", "%", None));
+            rows
+        }
+        (false, "Hub 2") => vec![
+            // `UNITS_PRECISION`: a temperature in its default unit shows
+            // one decimal.
+            sensor("temperature", "Temperature", "temperature", "°C", Some(1)),
+            sensor("humidity", "Humidity", "humidity", "%", None),
+        ],
+        _ => Vec::new(),
+    }
+}
+
+/// `_async_add_entity`'s check of a unique id: the entity registered for
+/// it, if that entity is running (it has a state that isn't a restored
+/// placeholder). A second account that lists the same devices meets this:
+/// HA's platform logs "does not generate unique IDs" and leaves the entity
+/// out, with no registry row touched.
+fn taken(hass: &Hass, registries: &Registries, domain: &str, unique_id: &str) -> Option<String> {
+    let row = registries.entities.iter().find(|e| {
+        e.platform == DOMAIN
+            && e.entity_id.split('.').next() == Some(domain)
+            && e.unique_id.as_ref().and_then(Value::as_str) == Some(unique_id)
+    })?;
+    let state = hass.states().get(&EntityId::parse(&row.entity_id).ok()?)?;
+    (!state.attributes.contains_key("restored")).then(|| row.entity_id.clone())
+}
+
+/// The devices' and entities' registry rows, as `SwitchBotCloudEntity`'s
+/// `DeviceInfo` and the entity platform register them on every setup: made
+/// if missing, changed where HA's values differ (a device renamed in the
+/// app), left alone otherwise. An entity another entry runs is skipped,
+/// and its device too if nothing else is made for it. `disable_new` is the
+/// entry's `pref_disable_new_entities`: a row made now starts disabled by
+/// the integration, as the entity registry makes it.
+fn register(
+    hass: &Hass,
+    registry: &Registry,
+    entry_id: &str,
+    disable_new: bool,
+    devices: &[Device],
+    polled: &HashMap<String, Polled>,
+) {
+    let before = registry.snapshot();
+    for d in devices {
+        let status = polled.get(&d.id);
+        let rows: Vec<Row> = rows(d, status)
+            .into_iter()
+            .filter(|r| taken(hass, &before, r.domain, &r.unique_id).is_none())
+            .collect();
+        if rows.is_empty() {
+            continue;
+        }
+        let device = registry.get_or_create_device(DeviceInfo {
+            config_entry_id: entry_id.to_owned(),
+            identifiers: vec![json!([DOMAIN, d.id])],
+            manufacturer: Some("SwitchBot".into()),
+            model: Some(d.kind.clone()),
+            name: Some(d.name.clone()),
+            // `coordinator.data.get("version")`; a remote has no data.
+            sw_version: status
+                .and_then(|p| p.data.get("version"))
+                .and_then(Value::as_str)
+                .map(str::to_owned),
+        });
+        for row in rows {
+            let text = |s: Option<&str>| Some(s.map(str::to_owned));
+            // The sensor's option goes beside the options the row has
+            // (`async_update_entity_options` for the `sensor` domain).
+            let options = row.precision.map(|precision| {
+                let mut options = registry
+                    .entity_by_unique_id(row.domain, DOMAIN, &row.unique_id)
+                    .map(|e| e.options.object())
+                    .unwrap_or_default();
+                let mut sensor = match options.remove("sensor") {
+                    Some(Value::Object(o)) => o,
+                    _ => Map::new(),
+                };
+                sensor.insert("suggested_display_precision".into(), json!(precision));
+                options.insert("sensor".into(), Value::Object(sensor));
+                Value::Object(options)
+            });
+            let patch = EntityPatch {
+                capabilities: Some(row.capabilities),
+                config_entry_id: Some(Some(entry_id.to_owned())),
+                device_id: Some(Some(device.id.clone())),
+                entity_category: Some(None),
+                has_entity_name: Some(true),
+                object_id_base: text(row.name),
+                options,
+                original_device_class: text(row.device_class),
+                original_icon: Some(None),
+                original_name: text(row.name),
+                supported_features: Some(row.supported_features),
+                translation_key: Some(None),
+                unit_of_measurement: text(row.unit),
+                ..Default::default()
+            };
+            let disabled_by = disable_new.then(|| "integration".to_owned());
+            registry.get_or_create_entity(row.domain, DOMAIN, &row.unique_id, disabled_by, patch);
+        }
+    }
+}
+
+/// The entry's entities, with ids and names from `registries`.
+fn build(
+    hass: &Hass,
+    registries: &Registries,
+    api: Api,
+    devices: &[Device],
+    polled: HashMap<String, Polled>,
+) -> Arc<Entry> {
     let shared = Arc::new(Shared {
         hass: hass.clone(),
         api,
         polled: Mutex::new(polled),
+        alive: Mutex::new(true),
     });
     let names = crate::naming::Names::new(hass, registries, DOMAIN);
+    // An entity another entry already runs is left out, as HA's platform
+    // does (see `taken`).
+    let free = |domain: &str, unique_id: &str| match taken(hass, registries, domain, unique_id) {
+        Some(entity_id) => {
+            tracing::error!(
+                "Platform switchbot_cloud does not generate unique IDs. ID {unique_id} already exists - ignoring {entity_id}"
+            );
+            false
+        }
+        None => true,
+    };
     let (mut sensors, mut buttons, mut climates, mut switches) = (vec![], vec![], vec![], vec![]);
-    for d in &devices {
+    for d in devices {
         let sensor = |key: &'static str, name: &str, class: &str, unit: &str| {
-            let (entity_id, friendly) = names.entity(
-                "sensor",
-                &format!("{}_{key}", d.id),
-                &d.id,
-                &d.name,
-                Some(name),
-            )?;
+            let unique_id = format!("{}_{key}", d.id);
+            if !free("sensor", &unique_id) {
+                return None;
+            }
+            let (entity_id, friendly) =
+                names.entity("sensor", &unique_id, &d.id, &d.name, Some(name))?;
             let attrs = json!({"state_class": "measurement", "unit_of_measurement": unit,
                 "device_class": class, "friendly_name": friendly});
             Some(Sensor {
@@ -214,14 +456,16 @@ pub async fn setup(
         };
         match (d.remote, d.kind.as_str()) {
             (true, kind) if kind.ends_with("Air Conditioner") => {
-                if let Some((entity_id, friendly)) =
-                    names.entity("climate", &d.id, &d.id, &d.name, None)
+                if free("climate", &d.id)
+                    && let Some((entity_id, friendly)) =
+                        names.entity("climate", &d.id, &d.id, &d.name, None)
                     && let Some(c) = AcClimate::restored(&shared, &d.id, entity_id, friendly)
                 {
                     climates.push(c);
                 }
-                if let Some((entity_id, friendly)) =
-                    names.entity("switch", &d.id, &d.id, &d.name, None)
+                if free("switch", &d.id)
+                    && let Some((entity_id, friendly)) =
+                        names.entity("switch", &d.id, &d.id, &d.name, None)
                 {
                     switches.push(AcSwitch {
                         shared: shared.clone(),
@@ -244,8 +488,9 @@ pub async fn setup(
                         "SwitchBot Bot {} is in {mode:?}; hars only supports press mode",
                         d.name
                     );
-                } else if let Some((entity_id, friendly)) =
-                    names.entity("button", &d.id, &d.id, &d.name, None)
+                } else if free("button", &d.id)
+                    && let Some((entity_id, friendly)) =
+                        names.entity("button", &d.id, &d.id, &d.name, None)
                 {
                     let last = crate::button::restore(hass, &entity_id);
                     buttons.push(BotButton {
@@ -268,13 +513,19 @@ pub async fn setup(
             ),
         }
     }
-    Ok(Arc::new(Entry {
+    // A device none of whose entities are this entry's isn't polled: HA's
+    // coordinator refreshes only while an entity listens to it.
+    shared.polled.lock().retain(|id, _| {
+        sensors.iter().any(|s: &Sensor| s.device == *id)
+            || buttons.iter().any(|b: &BotButton| b.device == *id)
+    });
+    Arc::new(Entry {
         shared,
         sensors: sensors.into_iter().map(Arc::new).collect(),
         buttons: buttons.into_iter().map(Arc::new).collect(),
         climates: climates.into_iter().map(Arc::new).collect(),
         switches: switches.into_iter().map(Arc::new).collect(),
-    }))
+    })
 }
 
 /// Devices whose status is fetched.
@@ -283,12 +534,14 @@ fn polls(d: &Device) -> bool {
 }
 
 /// Set up an entry (on HA's retry ladder), feed the components and poll.
-/// `ready` is done after the first setup attempt.
+/// `ready` is done after the first setup attempt; `status` hears where the
+/// setup is (`ConfigEntryState`).
 pub async fn run(
     components: Arc<Components>,
     entry: Map<String, Value>,
     host: String,
     ready: ha_core::SetupGuard,
+    status: Status,
 ) {
     let mut ready = Some(ready);
     let data = entry.get("data").and_then(Value::as_object);
@@ -299,29 +552,40 @@ pub async fn run(
     };
     let (Some(token), Some(secret)) = (field("api_token"), field("api_key")) else {
         tracing::error!("switchbot_cloud: the entry has no API token or secret");
+        status.set(EntryState::SetupError, None);
         return;
     };
+    let entry_id = entry.get("entry_id").and_then(Value::as_str);
     let polling = entry.get("pref_disable_polling").and_then(Value::as_bool) != Some(true);
     let client = match ha_http::Client::builder(crate::USER_AGENT).build() {
         Ok(c) => c,
         Err(e) => {
             tracing::error!("switchbot_cloud: {e}");
+            status.set(EntryState::SetupError, None);
             return;
         }
     };
     let hass = components.hass().clone();
     let mut tries = 0u32;
-    let entry = loop {
+    let (api, devices, polled) = loop {
+        if tries > 0 {
+            // `async_setup` again: each attempt starts in progress.
+            status.set(EntryState::SetupInProgress, None);
+        }
         let api = Api::new(client.clone(), host.clone(), token.clone(), secret.clone());
-        match setup(&hass, components.registries(), api).await {
-            Ok(e) => break e,
+        match fetch(&api).await {
+            Ok((devices, polled)) => break (api, devices, polled),
+            // `async_setup_entry` returned `False`.
             Err(SetupError::Fatal(why)) => {
                 tracing::error!(
                     "Error setting up entry SwitchBot Cloud for switchbot_cloud: {why}"
                 );
+                status.set(EntryState::SetupError, None);
                 return;
             }
+            // `ConfigEntryNotReady`: its message is the entry's `reason`.
             Err(SetupError::Retry(why)) => {
+                status.set(EntryState::SetupRetry, Some(why.clone()));
                 if let Some(r) = ready.take() {
                     r.done();
                 }
@@ -335,19 +599,47 @@ pub async fn run(
             }
         }
     };
-    for c in &entry.climates {
-        components.climates().add(c.clone());
+    let entry = {
+        let _one = SETUP.lock();
+        if let (Some(registry), Some(entry_id)) = (components.registry(), entry_id) {
+            let disable_new = entry
+                .get("pref_disable_new_entities")
+                .and_then(Value::as_bool)
+                == Some(true);
+            register(&hass, registry, entry_id, disable_new, &devices, &polled);
+        }
+        let entry = build(&hass, &components.registries(), api, &devices, polled);
+        for c in &entry.climates {
+            components.climates().add(c.clone());
+        }
+        for s in &entry.switches {
+            components.switches().add(s.clone());
+        }
+        for b in &entry.buttons {
+            components.buttons().add(b.clone());
+        }
+        entry.write_all();
+        entry
+    };
+    // When this task ends (its entry was removed), the entities stop
+    // writing: whoever stops it waits for that before removing the states.
+    struct Stopped(Arc<Shared>);
+    impl Drop for Stopped {
+        fn drop(&mut self) {
+            *self.0.alive.lock() = false;
+        }
     }
-    for s in &entry.switches {
-        components.switches().add(s.clone());
-    }
-    for b in &entry.buttons {
-        components.buttons().add(b.clone());
-    }
-    entry.write_all();
+    let _stopped = Stopped(entry.shared.clone());
+    status.set(EntryState::Loaded, None);
     drop(ready);
-    if !polling {
+    if entry.is_empty() {
+        // Every device is another entry's, or disabled: loaded, with
+        // nothing to run and nothing kept.
         return;
+    }
+    if !polling {
+        // Nothing to do, but its entities run until the entry is stopped.
+        return std::future::pending().await;
     }
     let every = INTERVAL + jitter();
     loop {
@@ -423,9 +715,7 @@ impl Sensor {
                 .unwrap_or_else(|| "unknown".into()),
             _ => "unavailable".into(),
         };
-        entry
-            .hass
-            .set_state(self.entity_id.clone(), state, self.attrs.clone());
+        entry.write(self.entity_id.clone(), &state, self.attrs.clone(), None);
     }
 }
 
@@ -451,9 +741,7 @@ impl BotButton {
         };
         let mut a = Map::new();
         a.insert("friendly_name".into(), json!(self.friendly));
-        entry
-            .hass
-            .set_state_with_context(self.entity_id.clone(), state, a, context);
+        entry.write(self.entity_id.clone(), &state, a, context);
     }
 }
 
@@ -560,7 +848,7 @@ impl AcClimate {
             json!(self.supported_features()),
         );
         let mode = self.st.lock().mode.clone();
-        entry.hass.set_state(self.entity_id.clone(), mode, a);
+        entry.write(self.entity_id.clone(), &mode, a, None);
     }
 
     /// `_do_send_command`: always `setAll`, from the call's values or the
@@ -713,7 +1001,7 @@ impl AcSwitch {
         let mut a = Map::new();
         a.insert("device_class".into(), json!("switch"));
         a.insert("friendly_name".into(), json!(self.friendly));
-        entry.hass.set_state(self.entity_id.clone(), state, a);
+        entry.write(self.entity_id.clone(), state, a, None);
     }
 }
 
@@ -747,4 +1035,4 @@ impl Switch for AcSwitch {
 }
 
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;

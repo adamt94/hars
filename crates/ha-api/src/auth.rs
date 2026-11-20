@@ -113,6 +113,15 @@ pub(crate) async fn require_auth(
     mut req: Request,
     next: Next,
 ) -> Response {
+    let path = req
+        .extensions()
+        .get::<MatchedPath>()
+        .map(MatchedPath::as_str);
+    if req.method() == Method::HEAD
+        && let Some(not_allowed) = crate::config_entries::head(path)
+    {
+        return not_allowed;
+    }
     let ip = remote_ip(req.extensions());
     let principal = req
         .headers()
@@ -142,11 +151,24 @@ pub(crate) async fn require_auth(
 /// users have none), and reads need entity read access, which every built-in
 /// group has. Admin-only *services* are checked when such services exist.
 fn required_permission(method: &Method, path: Option<&str>) -> Permission {
+    // A `HEAD` is answered by a route's `GET` handler unless the route
+    // says otherwise, so it needs what the `GET` needs: its status alone
+    // would tell (a flow that exists from one that doesn't).
+    let method = if method == Method::HEAD {
+        &Method::GET
+    } else {
+        method
+    };
     match (method, path) {
         (&Method::POST, Some("/api/states/{entity_id}")) => Permission::Admin,
         (&Method::POST, Some("/api/services/{domain}/{service}")) => Permission::Control,
         // `require_admin` on every method of the config views.
         (_, Some("/api/config/automation/config/{id}")) => Permission::Admin,
+        // Starting, reading and answering a config flow, and removing an
+        // entry. Deleting a flow has no check in HA.
+        (&Method::POST, Some(crate::config_entries::FLOW)) => Permission::Admin,
+        (&Method::GET | &Method::POST, Some(crate::config_entries::FLOW_ID)) => Permission::Admin,
+        (&Method::DELETE, Some(crate::config_entries::ENTRY_ID)) => Permission::Admin,
         _ => Permission::Read,
     }
 }

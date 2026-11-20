@@ -11,13 +11,13 @@ mod analytics;
 mod automation;
 mod commands;
 mod config;
-mod config_entries;
+pub(crate) mod config_entries;
 mod entities;
 mod entity_registry;
 mod frontend;
 mod history;
 mod logbook;
-mod manifest;
+pub(crate) mod manifest;
 mod mobile_app;
 mod recorder;
 mod sensor;
@@ -163,6 +163,9 @@ pub(crate) enum Subscription {
     /// Fed by a listener elsewhere, which checks `live` (held while it
     /// queues an event, as [`TaskSub`]'s) and lets go once it's false.
     Listener(Arc<parking_lot::Mutex<bool>>),
+    /// `config_entries/subscribe`: a [`Subscription::Listener`] whose
+    /// listener the config entries drop as soon as it ends.
+    Entries(Arc<parking_lot::Mutex<bool>>),
     /// Registered so it can be unsubscribed, but nothing ever fires it
     /// (`persistent_notification/subscribe` while there are none).
     Idle,
@@ -593,6 +596,17 @@ impl Conn {
                 *live = false;
                 reply(&self.out);
             }
+            Some(Subscription::Entries(live)) => {
+                {
+                    let mut live = live.lock();
+                    *live = false;
+                    reply(&self.out);
+                }
+                // Released first: the entries take it to see who is gone.
+                if let Some(entries) = &self.shared.config.config_entries {
+                    entries.prune();
+                }
+            }
             Some(Subscription::Idle) => reply(&self.out),
             Some(Subscription::Push(channel)) => {
                 channel.close();
@@ -723,7 +737,7 @@ pub(crate) fn only_keys(msg: &Map<String, Value>, allowed: &[&str]) -> Result<()
 }
 
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;
 
 #[cfg(test)]
 mod humanize_tests {

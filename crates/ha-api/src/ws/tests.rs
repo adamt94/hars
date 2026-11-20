@@ -11,10 +11,10 @@ use tokio_tungstenite::tungstenite::Message;
 type Ws =
     tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>;
 
-struct Server {
-    url: String,
-    hass: Hass,
-    auth: Auth,
+pub(crate) struct Server {
+    pub(crate) url: String,
+    pub(crate) hass: Hass,
+    pub(crate) auth: Auth,
 }
 
 async fn server() -> Server {
@@ -29,7 +29,7 @@ async fn server_with(config: crate::ApiConfig) -> Server {
     server_on(Hass::new(), config).await
 }
 
-async fn server_on(hass: Hass, config: crate::ApiConfig) -> Server {
+pub(crate) async fn server_on(hass: Hass, config: crate::ApiConfig) -> Server {
     hass.start();
     let auth = crate::test_util::auth(true);
     let app = crate::router(hass.clone(), auth.clone(), &config)
@@ -40,7 +40,7 @@ async fn server_on(hass: Hass, config: crate::ApiConfig) -> Server {
     Server { url, hass, auth }
 }
 
-struct Client {
+pub(crate) struct Client {
     ws: Ws,
     /// Messages from coalesced frames not yet returned.
     pending: VecDeque<Value>,
@@ -57,7 +57,7 @@ impl Client {
         }
     }
 
-    async fn send(&mut self, msg: Value) {
+    pub(crate) async fn send(&mut self, msg: Value) {
         self.ws
             .send(Message::Text(msg.to_string().into()))
             .await
@@ -66,7 +66,7 @@ impl Client {
 
     /// The next message, unpacking coalesced arrays. Records whether each
     /// frame was an array.
-    async fn recv(&mut self) -> Value {
+    pub(crate) async fn recv(&mut self) -> Value {
         if let Some(v) = self.pending.pop_front() {
             return v;
         }
@@ -111,7 +111,7 @@ impl Client {
         }
     }
 
-    async fn authed(server: &Server, token: &str) -> Self {
+    pub(crate) async fn authed(server: &Server, token: &str) -> Self {
         let mut c = Self::connect(&server.url).await;
         assert_eq!(
             c.recv().await,
@@ -132,7 +132,7 @@ impl Client {
 }
 
 /// A login for the owner, through the same code paths the HTTP views use.
-fn token(auth: &Auth) -> (String, String) {
+pub(crate) fn token(auth: &Auth) -> (String, String) {
     const CLIENT: &str = "http://127.0.0.1:8123/";
     let flow = auth.start_login_flow(CLIENT, None);
     let user = auth.check_password("alex", "secret").unwrap();

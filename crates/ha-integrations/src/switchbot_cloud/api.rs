@@ -1,6 +1,12 @@
 //! The SwitchBot Cloud API v1.1, as `switchbot-api` 2.11.0 speaks it:
 //! every request signed, one attempt each, the `statusCode` envelope
 //! classified into the library's errors.
+//!
+//! Where `hars` differs on purpose: an error is logged with its HTTP
+//! status and API `statusCode` only, and an unexpected content type is
+//! named only when it is a common one. The library logs the whole reply
+//! and aiohttp quotes the header, and either can carry the account's
+//! token back.
 
 use base64::Engine;
 use ha_http::{Method, header::HeaderName};
@@ -62,6 +68,28 @@ pub fn uuid4() -> String {
         &h[16..20],
         &h[20..]
     )
+}
+
+/// The content type as an error names it. aiohttp's `ContentTypeError`
+/// quotes whatever the server sent. `hars` quotes only the types a broken
+/// gateway really answers with, and calls the rest `other`: the message is
+/// logged, and a header is text the far end chooses.
+fn shown_mime(content_type: &str) -> &'static str {
+    const KNOWN: [&str; 5] = [
+        "text/html",
+        "text/plain",
+        "text/xml",
+        "application/xml",
+        "application/octet-stream",
+    ];
+    let mime = content_type.split(';').next().unwrap_or("").trim();
+    if mime.is_empty() {
+        return "none";
+    }
+    KNOWN
+        .into_iter()
+        .find(|known| mime.eq_ignore_ascii_case(known))
+        .unwrap_or("other")
 }
 
 /// aiohttp's JSON content-type check (`application/json` or `*/*+json`).
@@ -133,8 +161,7 @@ impl Api {
             .and_then(|v| v.to_str().ok())
             .unwrap_or("");
         if !is_json(content_type) {
-            let mime = content_type.split(';').next().unwrap_or("").trim();
-            let mime = if mime.is_empty() { "none" } else { mime };
+            let mime = shown_mime(content_type);
             return Err(ApiError::Other(format!(
                 "{status}, message='Attempt to decode JSON with unexpected mimetype: {mime}', url='{url}'"
             )));
@@ -148,8 +175,7 @@ impl Api {
             )));
         };
         if status >= 400 {
-            let body = Value::Object(envelope);
-            tracing::error!("Error {status}: {body}");
+            log_error(status, &envelope);
             return Err(ApiError::Connection(String::new()));
         }
         match envelope.get("statusCode").and_then(Value::as_i64) {
@@ -160,8 +186,7 @@ impl Api {
                 .ok_or_else(|| ApiError::Other("KeyError: 'body'".into())),
             Some(161 | 171) => Err(ApiError::Offline),
             _ => {
-                let body = Value::Object(envelope);
-                tracing::error!("Error {status}: {body}");
+                log_error(status, &envelope);
                 Err(ApiError::Connection(String::new()))
             }
         }
@@ -229,6 +254,17 @@ impl Api {
         self.request(Method::POST, &path, Some(body))
             .await
             .map(drop)
+    }
+}
+
+/// The library's `_LOGGER.error("Error %d: %s", status, body)`, without
+/// the body: an API's error can echo the request back, the token with it,
+/// and a log is read by more people than a config entry. What is kept is
+/// the HTTP status and the envelope's `statusCode` when it is a number.
+fn log_error(status: u16, envelope: &Map<String, Value>) {
+    match envelope.get("statusCode").and_then(Value::as_i64) {
+        Some(code) => tracing::error!("Error {status}: statusCode {code}"),
+        None => tracing::error!("Error {status}"),
     }
 }
 

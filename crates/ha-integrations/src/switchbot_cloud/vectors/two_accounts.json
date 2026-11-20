@@ -1,0 +1,425 @@
+{
+ "devices": [
+  {
+   "area_id": null,
+   "config_entries": [
+    "<entry:1>"
+   ],
+   "config_entries_subentries": {
+    "<entry:1>": [
+     null
+    ]
+   },
+   "configuration_url": null,
+   "connections": [],
+   "created_at": "<time>",
+   "disabled_by": null,
+   "entry_type": null,
+   "hw_version": null,
+   "id": "<device:01-202301010000-00000001>",
+   "identifiers": [
+    [
+     "switchbot_cloud",
+     "01-202301010000-00000001"
+    ]
+   ],
+   "labels": [],
+   "manufacturer": "SwitchBot",
+   "model": "DIY Air Conditioner",
+   "model_id": null,
+   "modified_at": "<time>",
+   "name_by_user": null,
+   "name": "Air Conditioner",
+   "primary_config_entry": "<entry:1>",
+   "serial_number": null,
+   "sw_version": null,
+   "via_device_id": null
+  },
+  {
+   "area_id": null,
+   "config_entries": [
+    "<entry:1>"
+   ],
+   "config_entries_subentries": {
+    "<entry:1>": [
+     null
+    ]
+   },
+   "configuration_url": null,
+   "connections": [],
+   "created_at": "<time>",
+   "disabled_by": null,
+   "entry_type": null,
+   "hw_version": null,
+   "id": "<device:AABBCC000001>",
+   "identifiers": [
+    [
+     "switchbot_cloud",
+     "AABBCC000001"
+    ]
+   ],
+   "labels": [],
+   "manufacturer": "SwitchBot",
+   "model": "Bot",
+   "model_id": null,
+   "modified_at": "<time>",
+   "name_by_user": null,
+   "name": "Towel switch",
+   "primary_config_entry": "<entry:1>",
+   "serial_number": null,
+   "sw_version": "V6.6",
+   "via_device_id": null
+  },
+  {
+   "area_id": null,
+   "config_entries": [
+    "<entry:1>"
+   ],
+   "config_entries_subentries": {
+    "<entry:1>": [
+     null
+    ]
+   },
+   "configuration_url": null,
+   "connections": [],
+   "created_at": "<time>",
+   "disabled_by": null,
+   "entry_type": null,
+   "hw_version": null,
+   "id": "<device:AABBCC000002>",
+   "identifiers": [
+    [
+     "switchbot_cloud",
+     "AABBCC000002"
+    ]
+   ],
+   "labels": [],
+   "manufacturer": "SwitchBot",
+   "model": "Hub 2",
+   "model_id": null,
+   "modified_at": "<time>",
+   "name_by_user": null,
+   "name": "Hub 2 9D",
+   "primary_config_entry": "<entry:1>",
+   "serial_number": null,
+   "sw_version": "V3.4-2.3",
+   "via_device_id": null
+  }
+ ],
+ "entities": [
+  {
+   "aliases": [],
+   "aliases_v2": [
+    null
+   ],
+   "area_id": null,
+   "categories": {},
+   "capabilities": null,
+   "config_entry_id": "<entry:1>",
+   "config_subentry_id": null,
+   "created_at": "<time>",
+   "device_class": null,
+   "device_id": "<device:AABBCC000001>",
+   "disabled_by": null,
+   "entity_category": null,
+   "entity_id": "button.towel_switch",
+   "hidden_by": null,
+   "icon": null,
+   "id": "<id>",
+   "has_entity_name": true,
+   "labels": [],
+   "modified_at": "<time>",
+   "name": null,
+   "object_id_base": null,
+   "options": {},
+   "original_device_class": null,
+   "original_icon": null,
+   "original_name": null,
+   "platform": "switchbot_cloud",
+   "suggested_object_id": null,
+   "supported_features": 0,
+   "translation_key": null,
+   "unique_id": "AABBCC000001",
+   "previous_unique_id": null,
+   "unit_of_measurement": null
+  },
+  {
+   "aliases": [],
+   "aliases_v2": [
+    null
+   ],
+   "area_id": null,
+   "categories": {},
+   "capabilities": {
+    "hvac_modes": [
+     "heat_cool",
+     "cool",
+     "dry",
+     "fan_only",
+     "heat",
+     "off"
+    ],
+    "min_temp": 7,
+    "max_temp": 35,
+    "target_temp_step": 1,
+    "fan_modes": [
+     "auto",
+     "low",
+     "medium",
+     "high"
+    ]
+   },
+   "config_entry_id": "<entry:1>",
+   "config_subentry_id": null,
+   "created_at": "<time>",
+   "device_class": null,
+   "device_id": "<device:01-202301010000-00000001>",
+   "disabled_by": null,
+   "entity_category": null,
+   "entity_id": "climate.air_conditioner",
+   "hidden_by": null,
+   "icon": null,
+   "id": "<id>",
+   "has_entity_name": true,
+   "labels": [],
+   "modified_at": "<time>",
+   "name": null,
+   "object_id_base": null,
+   "options": {},
+   "original_device_class": null,
+   "original_icon": null,
+   "original_name": null,
+   "platform": "switchbot_cloud",
+   "suggested_object_id": null,
+   "supported_features": 393,
+   "translation_key": null,
+   "unique_id": "01-202301010000-00000001",
+   "previous_unique_id": null,
+   "unit_of_measurement": null
+  },
+  {
+   "aliases": [],
+   "aliases_v2": [
+    null
+   ],
+   "area_id": null,
+   "categories": {},
+   "capabilities": {
+    "state_class": "measurement"
+   },
+   "config_entry_id": "<entry:1>",
+   "config_subentry_id": null,
+   "created_at": "<time>",
+   "device_class": null,
+   "device_id": "<device:AABBCC000002>",
+   "disabled_by": null,
+   "entity_category": null,
+   "entity_id": "sensor.hub_2_9d_humidity",
+   "hidden_by": null,
+   "icon": null,
+   "id": "<id>",
+   "has_entity_name": true,
+   "labels": [],
+   "modified_at": "<time>",
+   "name": null,
+   "object_id_base": "Humidity",
+   "options": {},
+   "original_device_class": "humidity",
+   "original_icon": null,
+   "original_name": "Humidity",
+   "platform": "switchbot_cloud",
+   "suggested_object_id": null,
+   "supported_features": 0,
+   "translation_key": null,
+   "unique_id": "AABBCC000002_humidity",
+   "previous_unique_id": null,
+   "unit_of_measurement": "%"
+  },
+  {
+   "aliases": [],
+   "aliases_v2": [
+    null
+   ],
+   "area_id": null,
+   "categories": {},
+   "capabilities": {
+    "state_class": "measurement"
+   },
+   "config_entry_id": "<entry:1>",
+   "config_subentry_id": null,
+   "created_at": "<time>",
+   "device_class": null,
+   "device_id": "<device:AABBCC000002>",
+   "disabled_by": null,
+   "entity_category": null,
+   "entity_id": "sensor.hub_2_9d_temperature",
+   "hidden_by": null,
+   "icon": null,
+   "id": "<id>",
+   "has_entity_name": true,
+   "labels": [],
+   "modified_at": "<time>",
+   "name": null,
+   "object_id_base": "Temperature",
+   "options": {
+    "sensor": {
+     "suggested_display_precision": 1
+    }
+   },
+   "original_device_class": "temperature",
+   "original_icon": null,
+   "original_name": "Temperature",
+   "platform": "switchbot_cloud",
+   "suggested_object_id": null,
+   "supported_features": 0,
+   "translation_key": null,
+   "unique_id": "AABBCC000002_temperature",
+   "previous_unique_id": null,
+   "unit_of_measurement": "°C"
+  },
+  {
+   "aliases": [],
+   "aliases_v2": [
+    null
+   ],
+   "area_id": null,
+   "categories": {},
+   "capabilities": {
+    "state_class": "measurement"
+   },
+   "config_entry_id": "<entry:1>",
+   "config_subentry_id": null,
+   "created_at": "<time>",
+   "device_class": null,
+   "device_id": "<device:AABBCC000001>",
+   "disabled_by": null,
+   "entity_category": null,
+   "entity_id": "sensor.towel_switch_battery",
+   "hidden_by": null,
+   "icon": null,
+   "id": "<id>",
+   "has_entity_name": true,
+   "labels": [],
+   "modified_at": "<time>",
+   "name": null,
+   "object_id_base": "Battery",
+   "options": {},
+   "original_device_class": "battery",
+   "original_icon": null,
+   "original_name": "Battery",
+   "platform": "switchbot_cloud",
+   "suggested_object_id": null,
+   "supported_features": 0,
+   "translation_key": null,
+   "unique_id": "AABBCC000001_battery",
+   "previous_unique_id": null,
+   "unit_of_measurement": "%"
+  },
+  {
+   "aliases": [],
+   "aliases_v2": [
+    null
+   ],
+   "area_id": null,
+   "categories": {},
+   "capabilities": null,
+   "config_entry_id": "<entry:1>",
+   "config_subentry_id": null,
+   "created_at": "<time>",
+   "device_class": null,
+   "device_id": "<device:01-202301010000-00000001>",
+   "disabled_by": null,
+   "entity_category": null,
+   "entity_id": "switch.air_conditioner",
+   "hidden_by": null,
+   "icon": null,
+   "id": "<id>",
+   "has_entity_name": true,
+   "labels": [],
+   "modified_at": "<time>",
+   "name": null,
+   "object_id_base": null,
+   "options": {},
+   "original_device_class": "switch",
+   "original_icon": null,
+   "original_name": null,
+   "platform": "switchbot_cloud",
+   "suggested_object_id": null,
+   "supported_features": 0,
+   "translation_key": null,
+   "unique_id": "01-202301010000-00000001",
+   "previous_unique_id": null,
+   "unit_of_measurement": null
+  }
+ ],
+ "states": {
+  "button.towel_switch": {
+   "state": "unknown",
+   "attributes": {
+    "friendly_name": "Towel switch"
+   }
+  },
+  "climate.air_conditioner": {
+   "state": "fan_only",
+   "attributes": {
+    "hvac_modes": [
+     "heat_cool",
+     "cool",
+     "dry",
+     "fan_only",
+     "heat",
+     "off"
+    ],
+    "min_temp": 7,
+    "max_temp": 35,
+    "target_temp_step": 1,
+    "fan_modes": [
+     "auto",
+     "low",
+     "medium",
+     "high"
+    ],
+    "current_temperature": null,
+    "temperature": 21,
+    "fan_mode": "auto",
+    "assumed_state": true,
+    "friendly_name": "Air Conditioner",
+    "supported_features": 393
+   }
+  },
+  "sensor.hub_2_9d_humidity": {
+   "state": "49",
+   "attributes": {
+    "state_class": "measurement",
+    "unit_of_measurement": "%",
+    "device_class": "humidity",
+    "friendly_name": "Hub 2 9D Humidity"
+   }
+  },
+  "sensor.hub_2_9d_temperature": {
+   "state": "21.7",
+   "attributes": {
+    "state_class": "measurement",
+    "unit_of_measurement": "°C",
+    "device_class": "temperature",
+    "friendly_name": "Hub 2 9D Temperature"
+   }
+  },
+  "sensor.towel_switch_battery": {
+   "state": "100",
+   "attributes": {
+    "state_class": "measurement",
+    "unit_of_measurement": "%",
+    "device_class": "battery",
+    "friendly_name": "Towel switch Battery"
+   }
+  },
+  "switch.air_conditioner": {
+   "state": "unknown",
+   "attributes": {
+    "device_class": "switch",
+    "friendly_name": "Air Conditioner"
+   }
+  }
+ }
+}

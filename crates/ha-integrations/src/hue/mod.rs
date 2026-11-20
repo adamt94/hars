@@ -709,7 +709,7 @@ impl Platforms {
     pub fn new(components: &crate::components::Components) -> Arc<Self> {
         let p = Arc::new(Self {
             hass: components.hass().clone(),
-            registries: components.registries().clone(),
+            registries: components.registries(),
             lights: components.lights(),
             switches: components.switches(),
             scenes: components.scenes(),
