@@ -569,7 +569,7 @@ ids, addresses, names and coordinates replaced with fake ones
       when another starts an hour later, and 16 are kept at most (HA
       keeps them until it restarts). A removal waits for an entry's
       first set-up attempt, as HA's does. An account that takes over a
-      disabled account's devices enables them, as HA does. All 12 scenarios of
+      disabled account's devices enables them, as HA does. All 13 scenarios of
       `scripts/vectors/config_flow.py` match HA's
       own views (forms, each error, duplicates, bad bodies, unknown
       flows and handlers, who may do what, a setup that retries,

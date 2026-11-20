@@ -50,19 +50,30 @@ pub(crate) fn routes(shared: Shared) -> Router {
         .route(
             FLOW_ID,
             get(show)
-                // HA's view has no `head`, and axum would answer one with
-                // `get`'s handler.
-                .head(|| async { not_allowed("DELETE,GET,OPTIONS,POST") })
                 .post(answer)
                 .delete(abort)
                 .fallback(|| async { not_allowed("DELETE,GET,OPTIONS,POST") }),
         )
-        .route(
-            HANDLERS,
-            get(handlers).head(|| async { not_allowed("GET,OPTIONS") }),
-        )
+        .route(HANDLERS, get(handlers))
         .route(ENTRY_ID, delete(remove_entry))
         .with_state(Views { shared, flows })
+}
+
+/// A `HEAD` to one of these views, answered before anyone is asked who
+/// they are: HA registers no `head` for them, so aiohttp's router says 405
+/// with the methods the URL has, to an admin, a user and a stranger alike
+/// (and axum would otherwise run `get`'s handler for it).
+pub(crate) fn head(path: Option<&str>) -> Option<Response> {
+    let allow = match path? {
+        FLOW => "GET,OPTIONS,POST",
+        FLOW_ID => "DELETE,GET,OPTIONS,POST",
+        HANDLERS => "GET,OPTIONS",
+        ENTRY_ID => "DELETE,OPTIONS",
+        _ => return None,
+    };
+    let mut res = not_allowed(allow);
+    *res.body_mut() = axum::body::Body::empty();
+    Some(res)
 }
 
 /// aiohttp's `HTTPMethodNotAllowed`.

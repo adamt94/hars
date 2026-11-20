@@ -113,6 +113,15 @@ pub(crate) async fn require_auth(
     mut req: Request,
     next: Next,
 ) -> Response {
+    let path = req
+        .extensions()
+        .get::<MatchedPath>()
+        .map(MatchedPath::as_str);
+    if req.method() == Method::HEAD
+        && let Some(not_allowed) = crate::config_entries::head(path)
+    {
+        return not_allowed;
+    }
     let ip = remote_ip(req.extensions());
     let principal = req
         .headers()

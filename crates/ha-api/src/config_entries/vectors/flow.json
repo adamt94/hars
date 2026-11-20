@@ -4398,6 +4398,263 @@
    "deleted_entities": 0
   },
   {
+   "name": "head",
+   "doc": "HEAD on the flow and entry URLs: none of the views has it, whoever asks.",
+   "subscriptions": [],
+   "steps": [
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow",
+      "user": "admin",
+      "sent": "{\"handler\": \"switchbot_cloud\", \"show_advanced_options\": false}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:1>",
+      "handler": "switchbot_cloud",
+      "data_schema": [
+       {
+        "type": "string",
+        "name": "api_token",
+        "required": true
+       },
+       {
+        "type": "string",
+        "name": "api_key",
+        "required": true
+       }
+      ],
+      "errors": {},
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "user"
+     },
+     "events": []
+    },
+    {
+     "http": {
+      "method": "HEAD",
+      "path": "/api/config/config_entries/flow",
+      "user": "admin"
+     },
+     "status": 405,
+     "content_type": "text/plain; charset=utf-8",
+     "allow": "GET,OPTIONS,POST",
+     "text": "",
+     "events": []
+    },
+    {
+     "http": {
+      "method": "HEAD",
+      "path": "/api/config/config_entries/flow",
+      "user": "user"
+     },
+     "status": 405,
+     "content_type": "text/plain; charset=utf-8",
+     "allow": "GET,OPTIONS,POST",
+     "text": "",
+     "events": []
+    },
+    {
+     "http": {
+      "method": "HEAD",
+      "path": "/api/config/config_entries/flow",
+      "user": null
+     },
+     "status": 405,
+     "content_type": "text/plain; charset=utf-8",
+     "allow": "GET,OPTIONS,POST",
+     "text": "",
+     "events": []
+    },
+    {
+     "http": {
+      "method": "HEAD",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin"
+     },
+     "status": 405,
+     "content_type": "text/plain; charset=utf-8",
+     "allow": "DELETE,GET,OPTIONS,POST",
+     "text": "",
+     "events": []
+    },
+    {
+     "http": {
+      "method": "HEAD",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "user"
+     },
+     "status": 405,
+     "content_type": "text/plain; charset=utf-8",
+     "allow": "DELETE,GET,OPTIONS,POST",
+     "text": "",
+     "events": []
+    },
+    {
+     "http": {
+      "method": "HEAD",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": null
+     },
+     "status": 405,
+     "content_type": "text/plain; charset=utf-8",
+     "allow": "DELETE,GET,OPTIONS,POST",
+     "text": "",
+     "events": []
+    },
+    {
+     "http": {
+      "method": "HEAD",
+      "path": "/api/config/config_entries/flow/nope",
+      "user": "admin"
+     },
+     "status": 405,
+     "content_type": "text/plain; charset=utf-8",
+     "allow": "DELETE,GET,OPTIONS,POST",
+     "text": "",
+     "events": []
+    },
+    {
+     "http": {
+      "method": "HEAD",
+      "path": "/api/config/config_entries/flow/nope",
+      "user": "user"
+     },
+     "status": 405,
+     "content_type": "text/plain; charset=utf-8",
+     "allow": "DELETE,GET,OPTIONS,POST",
+     "text": "",
+     "events": []
+    },
+    {
+     "http": {
+      "method": "HEAD",
+      "path": "/api/config/config_entries/flow/nope",
+      "user": null
+     },
+     "status": 405,
+     "content_type": "text/plain; charset=utf-8",
+     "allow": "DELETE,GET,OPTIONS,POST",
+     "text": "",
+     "events": []
+    },
+    {
+     "http": {
+      "method": "HEAD",
+      "path": "/api/config/config_entries/flow_handlers",
+      "user": "admin"
+     },
+     "status": 405,
+     "content_type": "text/plain; charset=utf-8",
+     "allow": "GET,OPTIONS",
+     "text": "",
+     "events": []
+    },
+    {
+     "http": {
+      "method": "HEAD",
+      "path": "/api/config/config_entries/flow_handlers",
+      "user": "user"
+     },
+     "status": 405,
+     "content_type": "text/plain; charset=utf-8",
+     "allow": "GET,OPTIONS",
+     "text": "",
+     "events": []
+    },
+    {
+     "http": {
+      "method": "HEAD",
+      "path": "/api/config/config_entries/flow_handlers",
+      "user": null
+     },
+     "status": 405,
+     "content_type": "text/plain; charset=utf-8",
+     "allow": "GET,OPTIONS",
+     "text": "",
+     "events": []
+    },
+    {
+     "http": {
+      "method": "HEAD",
+      "path": "/api/config/config_entries/entry/nope",
+      "user": "admin"
+     },
+     "status": 405,
+     "content_type": "text/plain; charset=utf-8",
+     "allow": "DELETE,OPTIONS",
+     "text": "",
+     "events": []
+    },
+    {
+     "http": {
+      "method": "HEAD",
+      "path": "/api/config/config_entries/entry/nope",
+      "user": "user"
+     },
+     "status": 405,
+     "content_type": "text/plain; charset=utf-8",
+     "allow": "DELETE,OPTIONS",
+     "text": "",
+     "events": []
+    },
+    {
+     "http": {
+      "method": "HEAD",
+      "path": "/api/config/config_entries/entry/nope",
+      "user": null
+     },
+     "status": 405,
+     "content_type": "text/plain; charset=utf-8",
+     "allow": "DELETE,OPTIONS",
+     "text": "",
+     "events": []
+    },
+    {
+     "http": {
+      "method": "GET",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:1>",
+      "handler": "switchbot_cloud",
+      "data_schema": [
+       {
+        "type": "string",
+        "name": "api_token",
+        "required": true
+       },
+       {
+        "type": "string",
+        "name": "api_key",
+        "required": true
+       }
+      ],
+      "errors": {},
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "user"
+     },
+     "events": []
+    }
+   ],
+   "entries": [],
+   "deleted_devices": 0,
+   "deleted_entities": 0
+  },
+  {
    "name": "remove_while_retrying",
    "doc": "Removing an entry whose setup waits to be tried again: nothing to unload.",
    "subscriptions": [

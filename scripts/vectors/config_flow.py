@@ -255,6 +255,17 @@ SCENARIOS = [
         [START, api("status_down"), http("POST", FLOW + "/<flow:1>", GOOD), ENTRIES],
     ),
     (
+        "head",
+        "HEAD on the flow and entry URLs: none of the views has it, whoever asks.",
+        [],
+        [START]
+        + [http("HEAD", path, user=user)
+           for path in (FLOW, FLOW + "/<flow:1>", FLOW + "/nope", FLOW + "_handlers",
+                        ENTRY + "/nope")
+           for user in ("admin", "user", None)]
+        + [http("GET", FLOW + "/<flow:1>")],
+    ),
+    (
         "remove_while_retrying",
         "Removing an entry whose setup waits to be tried again: nothing to unload.",
         SUBSCRIBE,

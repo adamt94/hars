@@ -473,7 +473,7 @@ fn scenarios() -> Vec<Value> {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn flows_answer_as_home_assistant() {
     let scenarios = scenarios();
-    assert_eq!(scenarios.len(), 12);
+    assert_eq!(scenarios.len(), 13);
     for scenario in &scenarios {
         replay(scenario).await;
     }
@@ -582,12 +582,12 @@ async fn the_dialog_lists_what_can_be_added() {
     }
 }
 
-/// A `HEAD` is checked as the `GET` it would be answered by: a signed-in
-/// user who isn't an admin can't tell a flow in progress from an unknown
-/// id by the status, and nobody gets the form's handler run by a `HEAD`
-/// (HA's view has no `head`: 405).
+/// A `HEAD` to a flow or entry URL is a 405 for everyone, as in HA (the
+/// `head` scenario of the vectors has each reply): nothing about a flow
+/// can be told from it, and nothing runs. Elsewhere a `HEAD` needs what
+/// the `GET` that would answer it needs.
 #[tokio::test]
-async fn a_head_request_needs_what_a_get_needs() {
+async fn a_head_request_learns_nothing() {
     let home = home().await;
     let router = crate::router(
         home.server.hass.clone(),
@@ -620,33 +620,13 @@ async fn a_head_request_needs_what_a_get_needs() {
     assert_eq!(send("GET", unknown.clone(), Some("admin")).await, 404);
     assert_eq!(send("GET", known.clone(), Some("user")).await, 401);
     for path in [&known, &unknown] {
-        assert_eq!(
-            send("HEAD", path.clone(), Some("user")).await,
-            401,
-            "{path}"
-        );
-        assert_eq!(send("HEAD", path.clone(), None).await, 401, "{path}");
-        assert_eq!(
-            send("HEAD", path.clone(), Some("admin")).await,
-            405,
-            "{path}"
-        );
+        for user in [Some("admin"), Some("user"), None] {
+            assert_eq!(send("HEAD", path.clone(), user).await, 405, "{path}");
+        }
     }
-    // The other new views: nothing a `HEAD` gets that a `GET` wouldn't.
-    assert_eq!(send("HEAD", super::FLOW.into(), Some("user")).await, 405);
-    assert_eq!(
-        send("HEAD", format!("{}_handlers", super::FLOW), Some("user")).await,
-        405
-    );
-    assert_eq!(
-        send("HEAD", format!("{}_handlers", super::FLOW), None).await,
-        401
-    );
-    let entry = "/api/config/config_entries/entry/nope".to_owned();
-    assert_eq!(send("HEAD", entry.clone(), Some("user")).await, 405);
-    assert_eq!(send("HEAD", entry, None).await, 401);
-    // An admin-only view from before this change is covered too.
+    assert_eq!(flows.in_progress(), 1, "a HEAD ran nothing");
+    // A view from before this change: its `GET` needs an admin, so its
+    // `HEAD` does.
     let automation = "/api/config/automation/config/nope".to_owned();
     assert_eq!(send("HEAD", automation, Some("user")).await, 401);
-    assert_eq!(flows.in_progress(), 1, "a HEAD ran nothing");
 }
