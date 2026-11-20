@@ -435,10 +435,13 @@ fn api_config() -> anyhow::Result<ha_api::ApiConfig> {
 
 /// `HARS_CONFIG`: HA's config directory (`/config` in the Docker image). Its
 /// `.storage` files are read and written in HA's formats.
+/// Where the config directory is (`HARS_CONFIG`, else `config`).
+fn config_path() -> std::path::PathBuf {
+    std::path::PathBuf::from(std::env::var_os("HARS_CONFIG").unwrap_or_else(|| "config".into()))
+}
+
 fn config_dir() -> anyhow::Result<std::path::PathBuf> {
-    let dir = std::path::PathBuf::from(
-        std::env::var_os("HARS_CONFIG").unwrap_or_else(|| "config".into()),
-    );
+    let dir = config_path();
     std::fs::create_dir_all(&dir)
         .map_err(|e| anyhow::anyhow!("creating the config directory {}: {e}", dir.display()))?;
     Ok(dir)
@@ -482,7 +485,9 @@ fn cli(args: &[String]) -> anyhow::Result<()> {
         {
             let opts = import::Options {
                 source: source.into(),
-                dest: config_dir()?,
+                // Made by the import, once it knows it isn't inside the
+                // directory it reads.
+                dest: config_path(),
                 dry_run: flags.contains(&"--dry-run"),
                 force: flags.contains(&"--force"),
             };

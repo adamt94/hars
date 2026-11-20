@@ -1049,6 +1049,19 @@ fn imports_every_release() {
         } else {
             assert_eq!(report["split_devices"], json!([]));
         }
+        // It loads, and says what it will do differently.
+        let by_id = &report["automations"][2];
+        assert_eq!(
+            (&by_id["alias"], &by_id["status"]),
+            (&json!("Desk off at night"), &json!("ok"))
+        );
+        assert_eq!(by_id["warning"].is_string(), month >= 8, "{by_id}");
+        assert_eq!(
+            stdout.contains("automation Desk off at night loads, but it names a device by the id"),
+            month >= 8,
+            "{stdout}"
+        );
+        assert_eq!(report["parent_devices"], json!([]), "{version}");
         assert_eq!(report["dropped"], json!([]), "{version}");
         // An automation the 2026.7 editor can save and 2026.6 can't run.
         let automations = report["automations"].as_array().unwrap();
@@ -1333,6 +1346,57 @@ fn what_hars_cannot_convert_is_refused() {
             "device-field",
             |src| device(src, "devices", "Hall", |d| d["labels"] = json!("SYNTHETIC_MARKER")),
             "has a field of a type Home Assistant doesn't write. Nothing was imported".into(),
+        ),
+        // A minor version of an entry later than any fixture holds.
+        (
+            "hue-1.3",
+            |src| entry(src, "hue", |e| e["minor_version"] = json!(3)),
+            "the hue integration's config entry \"Hue Bridge\" is version 1.3".into(),
+        ),
+        (
+            "sun-1.2",
+            |src| entry(src, "sun", |e| e["minor_version"] = json!(2)),
+            "the sun integration's config entry \"Sun (2026.11.2)\" is version 1.2".into(),
+        ),
+        // The last states in 2026.11's form, in a file of a later version.
+        (
+            "restore-1.2",
+            |src| edit_store(src, "core.restore_state", |s| s["minor_version"] = json!(2)),
+            "core.restore_state is storage version 1.2, in a config directory of Home \
+             Assistant 2026.11.2; hars reads version 1.1"
+                .into(),
+        ),
+        // Two devices of one integration with one identifier: two phones'
+        // apps that give the same device id, which 2026.8 keeps apart by
+        // config entry. hars would give the second phone the first's
+        // device.
+        (
+            "phone-twins",
+            |src| {
+                edit_store(src, "core.config_entries", |s| {
+                    let entries = s["data"]["entries"].as_array_mut().unwrap();
+                    let mut twin = entries
+                        .iter()
+                        .find(|e| e["domain"] == "mobile_app")
+                        .unwrap()
+                        .clone();
+                    twin["entry_id"] = json!("second-phone");
+                    twin["unique_id"] = json!("io.example.Other-synthetic-phone");
+                    entries.push(twin);
+                });
+                edit_store(src, "core.device_registry", |s| {
+                    let rows = s["data"]["devices"].as_array_mut().unwrap();
+                    let mut twin = rows.iter().find(|d| d["name"] == "Test Phone").unwrap().clone();
+                    twin["id"] = json!("second-phone-device");
+                    twin["config_entry_id"] = json!("second-phone");
+                    twin["primary_config_entry"] = json!("second-phone");
+                    rows.push(twin);
+                });
+            },
+            "and second-phone-device both have an identifier of the mobile_app integration, \
+             and hars, which finds a device by its identifier alone as Home Assistant 2026.6.1 \
+             does, can't tell which one the integration means"
+                .into(),
         ),
         // The same `lifx` entity twice, its serial written each way.
         (
@@ -1838,7 +1902,7 @@ fn a_converted_install_is_the_2026_6_1_install_again() {
         let month: u32 = version.split('.').nth(1).unwrap().parse().unwrap();
         let src = temp(&format!("round-{version}"));
         let dest = temp(&format!("round-{version}-dest"));
-        release(version, &src, &[]);
+        let theirs = release(version, &src, &[]);
         let out = hars(&dest, &["import", src.to_str().unwrap()]);
         assert!(out.status.success(), "{version}: {out:?}");
         let report = read_json(&dest.join("import-report.json"));
@@ -1858,13 +1922,18 @@ fn a_converted_install_is_the_2026_6_1_install_again() {
         );
         let before = rows(&seed_devices, "devices", "id");
         let after = rows(&devices, "devices", "id");
-        let new_ids: Vec<String> = report["split_devices"][0]["new_ids"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|id| id.as_str().unwrap().to_owned())
-            .collect();
+        // The parts' ids and the time of the split are the release's own:
+        // what its file has, not what hars says.
+        let their_devices = store_of(&theirs, "core.device_registry");
+        let their_parts: std::collections::BTreeMap<String, &Value> =
+            rows(&their_devices, "devices", "id")
+                .into_iter()
+                .filter(|(_, d)| d["composite_device_id"] == desk.as_str())
+                .collect();
+        let new_ids: Vec<String> = their_parts.keys().cloned().collect();
+        assert_eq!(new_ids.len(), 2, "{version}");
         assert_eq!(report["split_devices"][0]["old_id"], desk.as_str());
+        assert_eq!(report["split_devices"][0]["new_ids"], json!(new_ids));
         let label = |row: &Value| {
             format!(
                 "devices/{} ({})",
@@ -1880,7 +1949,8 @@ fn a_converted_install_is_the_2026_6_1_install_again() {
             let old = row["composite_device_id"].as_str().unwrap_or(id);
             let skip: &[&str] = if old == id { &[] } else { &["id", "split_at"] };
             if old != id {
-                assert!(new_ids.contains(id) && row["split_at"].is_string(), "{row}");
+                assert_eq!(row["split_at"], their_parts[id]["split_at"], "{row}");
+                assert!(row["split_at"].is_string(), "{row}");
             }
             seen.insert(old.to_owned());
             row_differences(&label(row), before[old], row, skip, &mut found);
@@ -2098,6 +2168,15 @@ fn a_converted_install_is_the_2026_6_1_install_again() {
             }
         }
         if month >= 11 {
+            // 1.24's migration made the old name the first alias of an
+            // entity exposed to Assist, in place of "the entity's name"
+            // (`null`). It stays: an alias the user wrote out looks the
+            // same in the file, and must not start to follow the name.
+            expect(
+                "entities/sensor.hall_temperature/aliases_v2",
+                json!([null]),
+                json!(["Warmth downstairs"]),
+            );
             // Entity registry 1.24 stored "Desk lamp reading light"
             // without the device's name and with a capital
             // (`_async_strip_prefix_from_entity_name`): "Reading light".
@@ -2173,40 +2252,34 @@ fn a_converted_install_is_the_2026_6_1_install_again() {
         // A last state is found by entity id again. 2026.11 keeps it by
         // the registry row, so there the renamed switch's state follows
         // it; before 2026.11 (and in 2026.6.1) it stays under the old id.
+        // Each row is the release's own, whole, but for that.
         let restore = read("core.restore_state");
-        let mut ids: Vec<&str> = restore["data"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|row| {
-                let keys: Vec<&String> = row.as_object().unwrap().keys().collect();
-                assert_eq!(keys, ["extra_data", "last_seen", "state"], "{version}");
-                row["state"]["entity_id"].as_str().unwrap()
-            })
-            .collect();
-        ids.sort_unstable();
-        let person = format!("person.person_{tag}");
+        let mut expected = store_of(&theirs, "core.restore_state");
         let switch = if month >= 11 {
             "switch.towel_warmer"
         } else {
             "switch.towel_rail"
         };
-        let mut expected = vec![
+        let mut ids = Vec::new();
+        for row in expected["data"].as_array_mut().unwrap() {
+            row.as_object_mut().unwrap().remove("entity_registry_id");
+            if row["state"]["entity_id"] == "switch.towel_rail" {
+                row["state"]["entity_id"] = json!(switch);
+            }
+            ids.push(row["state"]["entity_id"].as_str().unwrap().to_owned());
+        }
+        assert_eq!(restore["data"], expected["data"], "{version}");
+        ids.sort_unstable();
+        let person = format!("person.person_{tag}");
+        let mut want = vec![
             "light.desk",
             person.as_str(),
             "person.test_owner",
             "scene.evening",
             switch,
         ];
-        expected.sort_unstable();
-        assert_eq!(ids, expected, "{version}");
-        let on = restore["data"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .find(|row| row["state"]["entity_id"] == switch)
-            .unwrap();
-        assert_eq!(on["state"]["state"], "on");
+        want.sort_unstable();
+        assert_eq!(ids, want, "{version}");
         for d in [src, dest] {
             let _ = std::fs::remove_dir_all(d);
         }
@@ -2702,40 +2775,60 @@ async fn integrations_find_their_rows_in_a_converted_install() {
     }
 }
 
-/// What the fixtures don't hold, each on Home Assistant 2026.11.2's
-/// directory with one thing changed: the rules of 2026.11's own code for
-/// a last state, an entity still on a split device's old id, a name given
-/// after the update, and a setting 2026.6.1 has no place for.
+/// What the fixtures don't hold, on Home Assistant 2026.11.2's directory
+/// with rows added: the rules of 2026.11's own code for a last state, an
+/// entity still on a split device's old id, a name given after the update,
+/// a child device in its parent's area, a removed child device, a setting
+/// 2026.6.1 has no place for, and an action on a parent device.
 #[test]
 fn rows_the_fixtures_do_not_hold_are_converted_by_home_assistants_rules() {
     let src = temp("corners-src");
     let dest = temp("corners-dest");
     let fixture = release("2026.11.2", &src, &[]);
-    let old_device = {
-        let devices = store_of(&fixture, "core.device_registry");
-        let all = devices["data"]["devices"].as_array().unwrap();
-        let part = all
-            .iter()
-            .find(|d| d["composite_device_id"].is_string())
-            .unwrap();
-        part["composite_device_id"].as_str().unwrap().to_owned()
+    let devices = store_of(&fixture, "core.device_registry");
+    let device = |list: &str, name: &str| -> Value {
+        let all = devices["data"][list].as_array().unwrap();
+        all.iter().find(|d| d["name"] == name).unwrap().clone()
     };
-    let row = |entity_id: &str, registry_id: Value| {
-        json!({"state": {"entity_id": entity_id, "state": "on", "attributes": {}},
-               "extra_data": null, "last_seen": "2026-11-15T12:00:00+00:00",
-               "entity_registry_id": registry_id})
+    let old_device = device("devices", "Desk")["composite_device_id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let strip = device("devices", "Power strip");
+    let (strip_id, socket_id) = (
+        strip["id"].as_str().unwrap().to_owned(),
+        device("child_devices", "Socket 1")["id"]
+            .as_str()
+            .unwrap()
+            .to_owned(),
+    );
+
+    let row = |entity_id: &str, state: &str, registry_id: Option<Value>| {
+        let mut row = json!({"state": {"entity_id": entity_id, "state": state, "attributes": {}},
+                             "extra_data": null, "last_seen": "2026-11-15T12:00:00+00:00"});
+        if let Some(id) = registry_id {
+            row["entity_registry_id"] = id;
+        }
+        row
     };
     edit_store(&src, "core.restore_state", |store| {
         let rows = store["data"].as_array_mut().unwrap();
         // Stored for an entity with no registry row, under an id a
         // registered entity has now: 2026.11 never gives it to that one.
-        rows.push(row("light.hall", json!(null)));
-        // Stored for a registry row that is gone, under such an id.
-        rows.push(row("light.hall", json!("gone")));
-        // The same, under an id nothing has: kept, for whoever takes it.
-        rows.push(row("light.attic", json!("gone too")));
-        // A second one for an entity id.
-        rows.push(row("scene.evening", json!(null)));
+        rows.push(row("light.hall", "a", Some(json!(null))));
+        // Stored for a registry row that is gone: 2026.11 gives it to
+        // nobody, whether a registered entity has the id now ...
+        rows.push(row("light.hall", "b", Some(json!("gone"))));
+        // ... or nothing has (2026.6.1 would give it to whatever takes it).
+        rows.push(row("light.attic", "c", Some(json!("gone too"))));
+        // Two under one free id: an unregistered entity of that id gets
+        // the one stored for an unregistered entity.
+        rows.push(row("scene.reused", "d", Some(json!("gone three"))));
+        rows.push(row("scene.reused", "e", Some(json!(null))));
+        // A second one for an id: the later one, as in Home Assistant.
+        rows.push(row("scene.evening", "f", Some(json!(null))));
+        // Stored before 2026.11, for an entity that is registered.
+        rows.push(row("sensor.hall_temperature", "g", None));
     });
     let old = old_device.clone();
     edit_store(&src, "core.entity_registry", move |store| {
@@ -2756,6 +2849,41 @@ fn rows_the_fixtures_do_not_hold_are_converted_by_home_assistants_rules() {
             }
         }
     });
+    let entry = strip["config_entry_id"].clone();
+    edit_store(&src, "core.device_registry", move |store| {
+        // The strip is in an area; its socket has none of its own.
+        for d in store["data"]["devices"].as_array_mut().unwrap() {
+            if d["name"] == "Power strip" {
+                d["area_id"] = json!("hall");
+            }
+        }
+        // A removed child device, disabled through its parent when it
+        // was removed; and an orphan with its integration recorded.
+        let removed = store["data"]["deleted_devices"].as_array_mut().unwrap();
+        let mut child = removed[0].clone();
+        child["id"] = json!("removed-socket");
+        child["config_entry_id"] = entry.clone();
+        child["identifiers"] = json!([["mqtt", "synthetic-strip-socket-2"]]);
+        child["disabled_by"] = json!("device");
+        removed.push(child.clone());
+        child["id"] = json!("orphan");
+        child["config_entry_id"] = json!(null);
+        child["disabled_by"] = json!("user");
+        child["domain"] = json!("mqtt");
+        child["orphaned_timestamp"] = json!(1781524800.0);
+        removed.push(child);
+    });
+    // An action on the strip, its id written with an escape.
+    let mut yaml = std::fs::read_to_string(src.join("automations.yaml")).unwrap();
+    yaml.push_str(&format!(
+        "- id: strip\n  alias: Strip off\n  triggers: [{{trigger: time, at: '01:00:00'}}]\n  \
+         actions:\n  - action: switch.turn_off\n    target:\n      device_id: \"{}\\u003{}\"\n",
+        &strip_id[..31],
+        &strip_id[31..]
+    ));
+    assert!(!yaml.contains(&strip_id));
+    std::fs::write(src.join("automations.yaml"), yaml).unwrap();
+
     let out = hars(&dest, &["import", src.to_str().unwrap()]);
     assert!(out.status.success(), "{out:?}");
     let report = read_json(&dest.join("import-report.json"));
@@ -2776,6 +2904,8 @@ fn rows_the_fixtures_do_not_hold_are_converted_by_home_assistants_rules() {
             ("core.entity_registry", link.as_str()),
             ("core.restore_state", "a last state stored for light.hall"),
             ("core.restore_state", "a last state stored for light.hall"),
+            ("core.restore_state", "a last state stored for light.attic"),
+            ("core.restore_state", "a last state stored for scene.reused"),
             (
                 "core.restore_state",
                 "a last state stored for scene.evening"
@@ -2789,25 +2919,30 @@ fn rows_the_fixtures_do_not_hold_are_converted_by_home_assistants_rules() {
     );
 
     let restore = read_json(&dest.join(".storage/core.restore_state"));
-    let mut ids: Vec<&str> = restore["data"]
+    let mut states: Vec<(&str, &str)> = restore["data"]
         .as_array()
         .unwrap()
         .iter()
         .map(|row| {
             assert!(row.get("entity_registry_id").is_none(), "{row}");
-            row["state"]["entity_id"].as_str().unwrap()
+            let state = &row["state"];
+            (
+                state["entity_id"].as_str().unwrap(),
+                state["state"].as_str().unwrap(),
+            )
         })
         .collect();
-    ids.sort_unstable();
+    states.sort_unstable();
     assert_eq!(
-        ids,
+        states,
         [
-            "light.attic",
-            "light.desk",
-            "person.person_2026_11_2",
-            "person.test_owner",
-            "scene.evening",
-            "switch.towel_warmer"
+            ("light.desk", "off"),
+            ("person.person_2026_11_2", "unknown"),
+            ("person.test_owner", "unknown"),
+            ("scene.evening", "f"),
+            ("scene.reused", "e"),
+            ("sensor.hall_temperature", "g"),
+            ("switch.towel_warmer", "on"),
         ]
     );
 
@@ -2829,7 +2964,98 @@ fn rows_the_fixtures_do_not_hold_are_converted_by_home_assistants_rules() {
         "Test Phone Charge"
     );
     assert_eq!(entity("automation.wait_then_off")["name"], "Later");
+
+    // The socket is in the strip's area, as 2026.9 has it
+    // (`async_get_effective_area_id`), so an action on the area reaches it.
+    let converted = read_json(&dest.join(".storage/core.device_registry"));
+    let socket = converted["data"]["devices"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|d| d["id"] == socket_id.as_str())
+        .unwrap();
+    assert_eq!(socket["area_id"], "hall");
+    let registries = ha_registry::Registries::load_strict(&dest).unwrap();
+    let target = json!({"area_id": "hall"});
+    let reached = registries.target_entities(target.as_object().unwrap());
+    assert!(
+        reached.contains(&"switch.power_strip_socket_1".to_owned()),
+        "{reached:?}"
+    );
+    // The removed child device comes back enabled, as Home Assistant
+    // brings it back (`_calculate_disable_by`); the orphan keeps its
+    // integration's name on the row.
+    let removed = |id: &str| -> &Value {
+        let all = converted["data"]["deleted_devices"].as_array().unwrap();
+        all.iter().find(|d| d["id"] == id).unwrap()
+    };
+    assert_eq!(removed("removed-socket")["disabled_by"], json!(null));
+    assert_eq!(
+        removed("removed-socket")["config_entries"],
+        json!([strip["config_entry_id"]])
+    );
+    assert!(removed("removed-socket").get("domain").is_none());
+    let orphan = removed("orphan");
+    assert_eq!(
+        (
+            &orphan["config_entries"],
+            &orphan["config_entries_subentries"],
+            &orphan["domain"]
+        ),
+        (&json!([]), &json!({}), &json!("mqtt"))
+    );
+    assert_eq!(
+        (&orphan["disabled_by"], &orphan["orphaned_timestamp"]),
+        (&json!("user"), &json!(1781524800.0))
+    );
+
+    // An action on the strip reached the socket in 2026.9 and won't in
+    // hars: said of the automation and of the device, though the file
+    // spells the id another way.
+    assert_eq!(
+        report["parent_devices"],
+        json!([{"id": strip_id, "name": "Power strip", "children": [socket_id],
+                "used_in": ["configuration.yaml or a file it includes"]}])
+    );
+    let strip_off = report["automations"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|a| a["alias"] == "Strip off")
+        .unwrap();
+    assert_eq!(strip_off["status"], "ok");
+    assert!(
+        strip_off["warning"]
+            .as_str()
+            .unwrap()
+            .contains("which has child devices"),
+        "{strip_off}"
+    );
+    assert!(
+        stdout.contains("automation Strip off loads, but it names the device")
+            && stdout.contains("name the child devices too"),
+        "{stdout}"
+    );
     for d in [src, dest] {
         let _ = std::fs::remove_dir_all(d);
     }
+}
+
+/// The import only reads its source: a destination inside it is refused
+/// before anything is made there, a dry run included.
+#[test]
+fn a_destination_inside_the_source_is_refused() {
+    let src = temp("outside-src");
+    release("2026.7.4", &src, &[]);
+    for flag in ["--dry-run", "--force"] {
+        let dest = src.join("hars").join("config");
+        let out = hars(&dest, &["import", src.to_str().unwrap(), flag]);
+        assert!(!out.status.success(), "{flag}");
+        assert!(
+            String::from_utf8_lossy(&out.stderr).contains("the destination is inside the source"),
+            "{out:?}"
+        );
+        assert!(!src.join("hars").exists(), "{flag}");
+    }
+    let _ = std::fs::remove_dir_all(src);
 }

@@ -57,6 +57,7 @@ pub(super) struct Conversion {
     pub entries: Vec<ConvertedEntry>,
     pub dropped: Vec<Dropped>,
     pub split_devices: Vec<SplitDevice>,
+    pub parent_devices: Vec<ParentDevice>,
 }
 
 /// A store rewritten in the form of an older storage version.
@@ -111,6 +112,19 @@ type Version = (u32, u32);
 /// A device two integrations shared, as 2026.8 left it: the id it had,
 /// and the devices it became (id, config entry, subentry).
 type Split = (String, Vec<(String, String, Option<String>)>);
+
+/// A device with child devices (2026.9). Home Assistant 2026.9 and later
+/// take an action on it to mean its children's entities too
+/// (`helpers/target.py`); `hars`, as 2026.6.1, reaches only its own.
+#[derive(Debug, Serialize)]
+pub struct ParentDevice {
+    pub id: String,
+    pub name: Option<String>,
+    /// The devices that were its children.
+    pub children: Vec<String>,
+    /// The YAML files and dashboards that use `id`.
+    pub used_in: Vec<String>,
+}
 
 #[derive(Deserialize)]
 struct Head {
@@ -234,6 +248,7 @@ pub(super) fn run(root: &Path, ha_version: &str) -> anyhow::Result<Conversion> {
     let mut splits: Vec<Split> = Vec::new();
     let mut devices: Vec<Device> = Vec::new();
     let mut deleted = rows.deleted_devices;
+    let mut inherited = 0;
     if from_v3 {
         let children = rows.child_devices.len();
         let parents: HashSet<&str> = rows
@@ -272,7 +287,29 @@ pub(super) fn run(root: &Path, ha_version: &str) -> anyhow::Result<Conversion> {
             devices.push(device_from_v3(row, false)?);
         }
         for row in rows.child_devices {
-            devices.push(device_from_v3(row, true)?);
+            let parent = text(&row, "parent_device_id");
+            let mut child = device_from_v3(row, true)?;
+            // `async_get_effective_area_id`: a child device without an
+            // area of its own is in its parent's. A device has only its
+            // own, so that is where it is written.
+            let area = devices.iter().find(|d| d.id == parent).map(|d| &d.area_id);
+            if child.area_id.is_none() && area.is_some_and(Option::is_some) {
+                child.area_id = area.cloned().flatten();
+                inherited += 1;
+            }
+            match done.parent_devices.iter_mut().find(|p| p.id == parent) {
+                Some(p) => p.children.push(child.id.clone()),
+                None => done.parent_devices.push(ParentDevice {
+                    name: devices
+                        .iter()
+                        .find(|d| d.id == parent)
+                        .and_then(|d| d.display_name().map(str::to_owned)),
+                    id: parent,
+                    children: vec![child.id.clone()],
+                    used_in: Vec::new(),
+                }),
+            }
+            devices.push(child);
         }
         deleted = deleted
             .iter()
@@ -289,6 +326,12 @@ pub(super) fn run(root: &Path, ha_version: &str) -> anyhow::Result<Conversion> {
                 "{} listed with the devices again; the parent's id stays on the row as \
                  `parent_device_id`",
                 count(children, "child device is", "child devices are")
+            ));
+        }
+        if inherited > 0 {
+            device_changes.push(format!(
+                "{} the area of its parent, which Home Assistant 2026.9 takes it to be in",
+                count(inherited, "of them has", "of them have")
             ));
         }
         if !splits.is_empty() {
@@ -353,10 +396,32 @@ pub(super) fn run(root: &Path, ha_version: &str) -> anyhow::Result<Conversion> {
     }
     // Only where version 3 let two devices hold one identifier: a file of
     // 1.12 keeps the order it has.
-    if from_v3 && order_shared_identifiers(&mut devices, &domain_of) {
-        device_changes.push(
-            "a device is listed before another that still holds a copy of its identifier".into(),
-        );
+    if from_v3 {
+        let holders: Vec<Holder> = devices
+            .iter()
+            .map(|d| {
+                (
+                    d.id.clone(),
+                    d.identifiers.clone(),
+                    d.config_entries.clone(),
+                )
+            })
+            .collect();
+        let order = order_shared_identifiers(&holders, &domain_of, true)?;
+        let removed: Vec<Holder> = deleted.iter().map(deleted_holder).collect();
+        let removed_order = order_shared_identifiers(&removed, &domain_of, false)?;
+        if order.is_some() || removed_order.is_some() {
+            device_changes.push(
+                "a device is listed before another that still holds a copy of its identifier"
+                    .into(),
+            );
+        }
+        if let Some(order) = order {
+            devices = order.into_iter().map(|i| devices[i].clone()).collect();
+        }
+        if let Some(order) = removed_order {
+            deleted = order.into_iter().map(|i| deleted[i].clone()).collect();
+        }
     }
     if !device_changes.is_empty() {
         Registries {
@@ -436,7 +501,7 @@ pub(super) fn run(root: &Path, ha_version: &str) -> anyhow::Result<Conversion> {
         });
     }
 
-    convert_restore_state(root, &registry_ids, &mut done)?;
+    convert_restore_state(root, &registry_ids, ha_version, &mut done)?;
 
     if let Some(data) = &mut entries {
         done.entries = convert_entries(data)?;
@@ -561,7 +626,9 @@ struct DeletedDevice {
 /// A removed device's row of storage version 3 as 1.12 has it: the same
 /// three fields as [`device_from_v3`], empty for one whose config entry is
 /// gone (an orphan). `domain`, new in version 3, stays on the row when it
-/// is set.
+/// is set. (2026.8 brings a removed device back for the config entry it
+/// belonged to, or an orphan for an integration of its `domain`; `hars`,
+/// as 2026.6.1, for whoever registers one of its identifiers.)
 fn deleted_device_from_v3(raw: &RawRow) -> anyhow::Result<RawRow> {
     let mut row: Map<String, Value> =
         serde_json::from_str(raw.get()).map_err(|_| bad_row("(removed)"))?;
@@ -578,6 +645,13 @@ fn deleted_device_from_v3(raw: &RawRow) -> anyhow::Result<RawRow> {
     };
     if row.get("domain").is_some_and(Value::is_null) {
         row.remove("domain");
+    }
+    // A removed child device that was disabled through its parent: Home
+    // Assistant clears that when the device comes back
+    // (`DeletedDeviceEntry._calculate_disable_by`), and 2026.6.1 has no
+    // such state.
+    if row.get("disabled_by").and_then(Value::as_str) == Some("device") {
+        row.insert("disabled_by".into(), Value::Null);
     }
     let mut take = |key: &str, missing: Value| row.remove(key).unwrap_or(missing);
     let out = DeletedDevice {
@@ -619,64 +693,111 @@ fn colon_serial(raw: &str) -> Option<String> {
     })
 }
 
+/// A device row for [`order_shared_identifiers`]: its id, identifiers and
+/// config entries.
+type Holder = (String, Vec<Value>, Vec<String>);
+
+fn deleted_holder(raw: &RawRow) -> Holder {
+    #[derive(Deserialize, Default)]
+    struct Row {
+        #[serde(default)]
+        id: String,
+        #[serde(default)]
+        identifiers: Vec<Value>,
+        #[serde(default)]
+        config_entries: Vec<String>,
+    }
+    let row: Row = serde_json::from_str(raw.get()).unwrap_or_default();
+    (row.id, row.identifiers, row.config_entries)
+}
+
 /// Rows that share an identifier of an integration `hars` runs: the one
-/// that integration owns goes first.
+/// that integration owns goes first. The new order, if it differs.
 ///
 /// Until 2026.8 an identifier named one device. Since then two devices of
-/// different config entries may hold the same one, and each part of a
-/// split device starts with a copy of them all until its integration
-/// registers it again. `hars`'s integrations find their device by
-/// identifier, the first row that has it, so the row of the integration's
-/// own config entry is put before the copies. Where none of the rows, or
-/// more than one, is the integration's own (rows a registry bug left
-/// behind: Home Assistant's code says old files hold them), the order
-/// stays as it is, and `hars` finds the first as it does in a 2026.6.1
-/// file. Whether any row moved.
+/// different config entries may hold the same one (Home Assistant finds a
+/// device by identifier and config entry), and each part of a split device
+/// starts with a copy of them all until its integration registers it
+/// again. `hars`'s integrations find their device by identifier alone, the
+/// first row that has it, and bring a removed device back the same way. So
+/// the row of the integration's own config entry is put before the copies.
+///
+/// `strict` (the devices, not the removed ones): where that can't be done
+/// the import stops, because `hars` would find the wrong device. That is
+/// two devices of the same integration with one identifier (two phones'
+/// apps that give one device id, say, which 2026.8 keeps apart by config
+/// entry), and two devices that each hold a copy of the other's.
 fn order_shared_identifiers(
-    devices: &mut Vec<Device>,
+    rows: &[Holder],
     domain_of: &HashMap<String, String>,
-) -> bool {
-    let mut moved = false;
-    // Each pass moves one row up, so the passes end.
-    for _ in 0..=devices.len() * devices.len() {
-        let mut holders: HashMap<String, Vec<usize>> = HashMap::new();
-        for (i, d) in devices.iter().enumerate() {
-            for identifier in &d.identifiers {
-                if identifier[0].as_str().is_some_and(runs) {
-                    holders.entry(identifier.to_string()).or_default().push(i);
+    strict: bool,
+) -> anyhow::Result<Option<Vec<usize>>> {
+    let own = |i: usize, domain: &str| {
+        let owners = &rows[i].2;
+        owners
+            .iter()
+            .any(|e| domain_of.get(e).map(String::as_str) == Some(domain))
+    };
+    // Each identifier `hars` looks up, with the rows that hold it.
+    let mut shared: Vec<(Value, Vec<usize>)> = Vec::new();
+    for (i, (_, identifiers, _)) in rows.iter().enumerate() {
+        for identifier in identifiers {
+            if identifier[0].as_str().is_some_and(runs) {
+                match shared.iter_mut().find(|(id, _)| id == identifier) {
+                    Some((_, at)) => at.push(i),
+                    None => shared.push((identifier.clone(), vec![i])),
                 }
             }
         }
-        // The move that ends highest up first, so the result doesn't
-        // depend on the map's order.
+    }
+    shared.retain(|(_, at)| at.len() > 1);
+    let refuse = |a: usize, b: usize, domain: &str| {
+        anyhow::anyhow!(
+            "{DEVICE_KEY}: the devices {} and {} both have an identifier of the {domain} \
+             integration, and hars, which finds a device by its identifier alone as Home \
+             Assistant 2026.6.1 does, can't tell which one the integration means. Home \
+             Assistant 2026.8 and later tell them apart by config entry. Remove one of the \
+             two devices in Home Assistant, or start Home Assistant once with both of their \
+             integrations loaded, then copy the config directory again. Nothing was imported",
+            rows[a].0,
+            rows[b].0
+        )
+    };
+    let mut order: Vec<usize> = (0..rows.len()).collect();
+    // Each pass moves one row up, so the passes end unless two rows must
+    // each come before the other.
+    for _ in 0..=rows.len() * rows.len() {
+        let place = |i: usize| order.iter().position(|&x| x == i).unwrap_or_default();
         let mut change: Option<(usize, usize)> = None;
-        for (identifier, at) in holders.iter().filter(|(_, at)| at.len() > 1) {
-            let domain: Value = serde_json::from_str(identifier).unwrap_or_default();
-            let domain = domain[0].as_str().unwrap_or_default().to_owned();
-            let own: Vec<usize> = at
-                .iter()
-                .copied()
-                .filter(|&i| {
-                    devices[i]
-                        .config_entries
-                        .iter()
-                        .any(|e| domain_of.get(e) == Some(&domain))
-                })
-                .collect();
-            if let [one] = own[..] {
-                if one != at[0] && change.is_none_or(|(_, to)| at[0] < to) {
-                    change = Some((one, at[0]));
+        for (identifier, at) in &shared {
+            let domain = identifier[0].as_str().unwrap_or_default();
+            let owners: Vec<usize> = at.iter().copied().filter(|&i| own(i, domain)).collect();
+            if strict && owners.len() > 1 {
+                return Err(refuse(owners[0], owners[1], domain));
+            }
+            let first = at.iter().map(|&i| place(i)).min().unwrap_or_default();
+            if let [one] = owners[..] {
+                if place(one) != first && change.is_none_or(|(_, to)| first < to) {
+                    change = Some((place(one), first));
                 }
             }
         }
         let Some((from, to)) = change else {
-            break;
+            let moved = order.iter().enumerate().any(|(at, &i)| at != i);
+            return Ok(moved.then_some(order));
         };
-        let row = devices.remove(from);
-        devices.insert(to, row);
-        moved = true;
+        let row = order.remove(from);
+        order.insert(to, row);
     }
-    moved
+    if strict {
+        let (identifier, at) = &shared[0];
+        return Err(refuse(
+            at[0],
+            at[1],
+            identifier[0].as_str().unwrap_or_default(),
+        ));
+    }
+    Ok(None)
 }
 
 /// What [`convert_entities`] needs from the other stores.
@@ -704,10 +825,11 @@ struct Names<'a> {
 ///   every entity the friendly name it had (`async_get_legacy_friendly_name`:
 ///   `compat_name`, else the device's name and the stored name joined), and
 ///   that is the name stored here: the entity's `friendly_name` is the
-///   same before and after the import. Where the old name was also made
-///   the first alias (for entities exposed to Assist, and by
-///   `async_preserve_compat_name_as_alias`), the alias is the computed
-///   name again, which is that same name.
+///   same before and after the import. Where the migration (for entities
+///   exposed to Assist) or `async_preserve_compat_name_as_alias` also made
+///   the old name the first alias, in place of "the entity's name", it
+///   stays: the file doesn't say whether the user had written that alias
+///   out already.
 /// - An entity still on a shared device's old id goes to the part its
 ///   config entry owns, as 2026.8 does when it loads the file
 ///   (`EntityRegistry._async_load`'s `_split_device_id`); with no such part
@@ -737,7 +859,7 @@ fn convert_entities(
         changes.push("the registry's `settings` are left out".into());
     }
     let device_ids: HashSet<&str> = names.devices.iter().map(|d| d.id.as_str()).collect();
-    let (mut moved, mut renamed, mut aliases, mut serials, mut met) = (0, 0, 0, 0, 0);
+    let (mut moved, mut renamed, mut serials, mut met) = (0, 0, 0, 0);
     for e in &mut rows.entities {
         let split = e
             .device_id
@@ -786,10 +908,6 @@ fn convert_entities(
                 if legacy != name {
                     e.name = Some(legacy);
                     renamed += 1;
-                }
-                if compat.is_some_and(|old| e.aliases_v2.first() == Some(&Value::String(old))) {
-                    e.aliases_v2[0] = Value::Null;
-                    aliases += 1;
                 }
             }
         }
@@ -840,9 +958,8 @@ fn convert_entities(
     if found.1 >= 24 {
         changes.push(format!(
             "`compat_name` is left out; {} stored in full again (friendly names stay the \
-             same), and {} the computed name again",
-            count(renamed, "name the user gave is", "names the user gave are"),
-            count(aliases, "first alias is", "first aliases are")
+             same)",
+            count(renamed, "name the user gave is", "names the user gave are")
         ));
     }
     if serials > 0 {
@@ -863,24 +980,32 @@ fn convert_entities(
 /// `core.restore_state` rows as 2026.6.1 has them: found by entity id.
 ///
 /// 2026.11 (`helpers/restore_state.py`) adds `entity_registry_id` to each
-/// row and, for an entity with a registry row, finds its last state by
-/// that id instead of the entity id in the stored state. So that each
-/// entity gets the state 2026.11 would give it (`async_get_stored_state`),
-/// and no other:
+/// row and keeps two tables: the rows of entities with a registry row, by
+/// that row's id, and the rest by entity id (a later row of the same key
+/// replaces an earlier one). An entity in the registry is given the row of
+/// its registry id, whatever entity id is stored in it; any other entity
+/// the row of its entity id from the second table
+/// (`async_get_stored_state`). 2026.6.1 has one table, by the stored
+/// entity id. So that each entity is given the state 2026.11 would give
+/// it, and no other:
 ///
-/// - a row whose registry id is a registered entity's takes that entity's
-///   current id, which differs when the entity was renamed since;
-/// - a row no registered entity would be given (its registry id is gone,
-///   or it has none) is dropped when a registered entity has its entity
-///   id, because 2026.6.1 would hand it to that entity; otherwise it stays
-///   as it is, for the entity of that id to claim;
-/// - of two rows left with one entity id, the one a registered entity owns
-///   stays, else the first.
+/// - the row of a registered entity takes that entity's current id, which
+///   differs when the entity was renamed since;
+/// - a row for a registry id that is gone is dropped: 2026.11 gives it to
+///   nobody (unless that same registry row comes back), and under its
+///   entity id 2026.6.1 would give it to whatever takes that id;
+/// - a row without a registry id stays, unless a registered entity has its
+///   entity id now: 2026.11 doesn't give it to that entity, and 2026.6.1
+///   would.
 ///
-/// A file with no such field is left alone.
+/// A row with no `entity_registry_id` at all was stored before 2026.11,
+/// which reads it as the registered entity's of that id, if there is one.
+/// A file with no such field is left alone. One of a later minor version
+/// with the field has no rule and stops the import.
 fn convert_restore_state(
     root: &Path,
     registry_ids: &HashMap<String, String>,
+    ha_version: &str,
     done: &mut Conversion,
 ) -> anyhow::Result<()> {
     let store = Store::new(root, RESTORE_KEY, 1, 1, false);
@@ -891,78 +1016,89 @@ fn convert_restore_state(
     if !rows.iter().any(|r| r.get("entity_registry_id").is_some()) {
         return Ok(());
     }
-    let registered: HashSet<&str> = registry_ids.values().map(String::as_str).collect();
-    let mut leave_out = |entity_id: &str, reason: &str| {
+    if let Some(found) = head(root, RESTORE_KEY).filter(|found| *found != (1, 1)) {
+        bail!("{}", too_new(RESTORE_KEY, found, (1, 1), ha_version));
+    }
+    let registered: HashMap<&str, &str> = registry_ids
+        .iter()
+        .map(|(id, entity_id)| (entity_id.as_str(), id.as_str()))
+        .collect();
+    // Which table each row is in, and its key there.
+    #[derive(PartialEq, Eq, Hash, Clone)]
+    enum Key {
+        Registry(String),
+        Entity(String),
+        /// Not an entity's row (Home Assistant skips it); kept as it is.
+        Other(usize),
+    }
+    let mut dropped = Vec::new();
+    let mut renamed = 0;
+    let mut kept: Vec<(Key, Value)> = Vec::new();
+    for (n, mut row) in rows.into_iter().enumerate() {
+        let stored = row["state"]["entity_id"].as_str().map(str::to_owned);
+        let registry_id = row
+            .as_object_mut()
+            .and_then(|o| o.remove("entity_registry_id"));
+        let Some(stored) = stored else {
+            kept.push((Key::Other(n), row));
+            continue;
+        };
+        let key = match registry_id {
+            // "Stored before states were indexed by entity registry id".
+            None => match registered.get(stored.as_str()) {
+                Some(id) => Key::Registry((*id).to_owned()),
+                None => Key::Entity(stored.clone()),
+            },
+            Some(Value::String(id)) => Key::Registry(id),
+            Some(_) => Key::Entity(stored.clone()),
+        };
+        match &key {
+            Key::Registry(id) => match registry_ids.get(id) {
+                Some(current) if *current != stored => {
+                    row["state"]["entity_id"] = Value::String(current.clone());
+                    renamed += 1;
+                }
+                Some(_) => {}
+                None => {
+                    dropped.push((
+                        stored,
+                        "the entity it was stored for is not in the registry any more; Home \
+                         Assistant 2026.11 gives it to no other",
+                    ));
+                    continue;
+                }
+            },
+            Key::Entity(id) if registered.contains_key(id.as_str()) => {
+                dropped.push((
+                    stored,
+                    "it was stored for an entity that was not in the registry; Home Assistant \
+                     2026.11 doesn't give it to the one that has this id now",
+                ));
+                continue;
+            }
+            _ => {}
+        }
+        // A later row of a key replaces an earlier one, as in both tables.
+        if let Some(i) = kept.iter().position(|(k, _)| *k == key) {
+            let (_, old) = kept.remove(i);
+            dropped.push((
+                old["state"]["entity_id"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .to_owned(),
+                "a later one was stored for the same entity, and Home Assistant keeps that",
+            ));
+        }
+        kept.push((key, row));
+    }
+    for (entity_id, reason) in dropped {
         done.dropped.push(Dropped {
             store: RESTORE_KEY.into(),
             what: format!("a last state stored for {entity_id}"),
             reason: reason.into(),
         });
-    };
-    let (mut renamed, mut out, mut owned): (usize, Vec<Value>, Vec<bool>) = (0, vec![], vec![]);
-    for mut row in rows {
-        let Some(object) = row.as_object_mut() else {
-            out.push(row);
-            owned.push(false);
-            continue;
-        };
-        let Some(registry_id) = object.remove("entity_registry_id") else {
-            out.push(row);
-            owned.push(false);
-            continue;
-        };
-        let stored = row["state"]["entity_id"]
-            .as_str()
-            .unwrap_or_default()
-            .to_owned();
-        let owner = registry_id.as_str().and_then(|id| registry_ids.get(id));
-        match owner {
-            Some(current) => {
-                if *current != stored {
-                    row["state"]["entity_id"] = Value::String(current.clone());
-                    renamed += 1;
-                }
-                owned.push(true);
-            }
-            None if registered.contains(stored.as_str()) => {
-                leave_out(
-                    &stored,
-                    "it was stored for another entity (one that is gone, or one not in the \
-                     registry); Home Assistant 2026.11 doesn't give it to this one",
-                );
-                continue;
-            }
-            None => owned.push(false),
-        }
-        out.push(row);
     }
-    let mut kept: Vec<Value> = Vec::new();
-    let mut kept_owned: Vec<bool> = Vec::new();
-    for (row, is_owned) in out.into_iter().zip(owned) {
-        let id = row["state"]["entity_id"].as_str().map(str::to_owned);
-        let twin = id.as_ref().and_then(|id| {
-            kept.iter()
-                .position(|k| k["state"]["entity_id"].as_str() == Some(id))
-        });
-        match twin {
-            Some(i) if is_owned && !kept_owned[i] => {
-                kept[i] = row;
-                kept_owned[i] = true;
-                leave_out(
-                    &id.unwrap_or_default(),
-                    "two were stored and Home Assistant 2026.6.1 keeps one for an entity id",
-                );
-            }
-            Some(_) => leave_out(
-                &id.unwrap_or_default(),
-                "two were stored and Home Assistant 2026.6.1 keeps one for an entity id",
-            ),
-            None => {
-                kept.push(row);
-                kept_owned.push(is_owned);
-            }
-        }
-    }
+    let kept: Vec<Value> = kept.into_iter().map(|(_, row)| row).collect();
     store.save(&kept)?;
     done.stores.push(ConvertedStore {
         key: RESTORE_KEY.into(),
@@ -1103,63 +1239,85 @@ mod tests {
         }
     }
 
-    fn device(id: &str, entry: &str, identifiers: Value) -> Device {
-        Device {
-            id: id.into(),
-            config_entries: vec![entry.into()],
-            identifiers: identifiers.as_array().unwrap().clone(),
-            ..Default::default()
-        }
+    fn holder(id: &str, entry: &str, identifiers: &Value) -> Holder {
+        (
+            id.into(),
+            identifiers.as_array().unwrap().clone(),
+            vec![entry.into()],
+        )
     }
 
     /// The integration's own row goes before the copies of its
-    /// identifier; rows that give no single answer stay where they are.
+    /// identifier; what can't be put right stops the import for devices,
+    /// and is left alone for removed ones.
     #[test]
     fn shared_identifiers() {
-        let domain_of: HashMap<String, String> =
-            [("h", "hue"), ("k", "homekit_controller"), ("l", "lifx")]
-                .into_iter()
-                .map(|(id, domain)| (id.to_owned(), domain.to_owned()))
-                .collect();
-        let order = |devices: &[Device]| -> String {
-            devices
-                .iter()
-                .map(|d| d.id.as_str())
-                .collect::<Vec<_>>()
-                .join(" ")
+        let domain_of: HashMap<String, String> = [
+            ("h", "hue"),
+            ("h2", "hue"),
+            ("k", "homekit_controller"),
+            ("l", "lifx"),
+        ]
+        .into_iter()
+        .map(|(id, domain)| (id.to_owned(), domain.to_owned()))
+        .collect();
+        let order = |rows: &[Holder], strict: bool| {
+            order_shared_identifiers(rows, &domain_of, strict).map(|order| {
+                order.map(|o| {
+                    o.iter()
+                        .map(|&i| rows[i].0.as_str())
+                        .collect::<Vec<_>>()
+                        .join(" ")
+                })
+            })
         };
         let bulb = json!([
             ["lifx", "d0:73:d5:00:00:01"],
             ["homekit_controller:accessory-id", "x"]
         ]);
         let lamp = json!([["hue", "a"]]);
-        let mut rows = vec![
-            device(
+        let rows = [
+            holder(
                 "other",
                 "k",
-                json!([["homekit_controller:accessory-id", "y"]]),
+                &json!([["homekit_controller:accessory-id", "y"]]),
             ),
-            device("copy", "k", bulb.clone()),
-            device("lamp", "h", lamp.clone()),
-            device("own", "l", bulb.clone()),
+            holder("copy", "k", &bulb),
+            holder("lamp", "h", &lamp),
+            holder("own", "l", &bulb),
         ];
-        assert!(order_shared_identifiers(&mut rows, &domain_of));
-        assert_eq!(order(&rows), "other own copy lamp");
-        assert!(!order_shared_identifiers(&mut rows, &domain_of));
-
-        // Two of the integration's own, or none: as they were.
-        let mut rows = vec![
-            device("copy", "k", lamp.clone()),
-            device("one", "h", lamp.clone()),
-            device("two", "h", lamp.clone()),
-        ];
-        assert!(!order_shared_identifiers(&mut rows, &domain_of));
-        let mut rows = vec![device("a", "k", bulb.clone()), device("b", "gone", bulb)];
-        assert!(!order_shared_identifiers(&mut rows, &domain_of));
-        assert_eq!(order(&rows), "a b");
+        assert_eq!(
+            order(&rows, true).unwrap().as_deref(),
+            Some("other own copy lamp")
+        );
+        // Already in order, or nothing of the integration's own: as it is.
+        assert_eq!(
+            order(&[rows[3].clone(), rows[1].clone()], true).unwrap(),
+            None
+        );
+        let unowned = [holder("a", "k", &bulb), holder("b", "gone", &bulb)];
+        assert_eq!(order(&unowned, true).unwrap(), None);
         // An identifier of an integration hars doesn't run is not looked up.
-        let shared = json!([["mqtt", "strip"]]);
-        let mut rows = vec![device("a", "k", shared.clone()), device("b", "m", shared)];
-        assert!(!order_shared_identifiers(&mut rows, &domain_of));
+        let strip = json!([["mqtt", "strip"]]);
+        assert_eq!(
+            order(&[holder("a", "k", &strip), holder("b", "m", &strip)], true).unwrap(),
+            None
+        );
+
+        // Two of one integration's own: 2026.8 tells them apart by config
+        // entry, hars can't.
+        let twins = [holder("one", "h", &lamp), holder("two", "h2", &lamp)];
+        let err = order(&twins, true).unwrap_err().to_string();
+        assert!(
+            err.contains("the devices one and two both have an identifier of the hue"),
+            "{err}"
+        );
+        assert_eq!(order(&twins, false).unwrap(), None);
+        // Each holds a copy of the other's: no order puts both first.
+        let both = json!([["hue", "a"], ["lifx", "d0:73:d5:00:00:01"]]);
+        let crossed = [holder("lamp", "h", &both), holder("bulb", "l", &both)];
+        let err = order(&crossed, true).unwrap_err().to_string();
+        assert!(err.contains("Nothing was imported"), "{err}");
+        assert_eq!(order(&crossed, false).unwrap(), None);
     }
 }

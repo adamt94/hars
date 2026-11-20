@@ -138,6 +138,9 @@ FAR_FUTURE = "4102444800.0"
 RUNS = ["sun", "met", "hue", "switchbot_cloud", "lifx", "mobile_app"]
 # Made-up hardware ids, each with its vendor's prefix.
 LIFX_SERIAL = "d0:73:d5:00:00:01"
+# The bulb's MAC address: for firmware 3.70 and later, 2026.6.1 takes it to
+# be the serial plus one (`components/lifx/util.py::get_real_mac_addr`).
+LIFX_MAC = "d0:73:d5:00:00:02"
 LIFX_LABEL = "Desk"
 SWITCHBOT_BOT = "AABBCC000001"
 HUE_BRIDGE = "00000000-0000-4000-8000-000000000100"
@@ -530,7 +533,8 @@ async def seed(config_dir):
                 "secret": hashlib.sha256(b"synthetic secret").hexdigest(),
                 "webhook_id": WEBHOOK_ID,
             },
-            unique_id="synthetic-phone",
+            # `config_flow.py::async_step_registration`: app id, device id.
+            unique_id="io.robbie.HomeAssistant-synthetic-phone",
             source="registration",
         ),
         # Three integrations hars doesn't run: one that shares a device
@@ -629,7 +633,7 @@ async def seed(config_dir):
     desk = devices.async_get_or_create(
         config_entry_id=lifx.entry_id,
         identifiers={("lifx", LIFX_SERIAL)},
-        connections={("mac", LIFX_SERIAL)},
+        connections={("mac", LIFX_MAC)},
         manufacturer="LIFX",
         model="LIFX A19",
         name=LIFX_LABEL,
@@ -638,7 +642,7 @@ async def seed(config_dir):
     devices.async_get_or_create(
         config_entry_id=homekit.entry_id,
         identifiers={("homekit_controller:accessory-id", "00:00:00:00:00:01:aid:1")},
-        connections={("mac", LIFX_SERIAL)},
+        connections={("mac", LIFX_MAC)},
     )
     devices.async_update_device(desk.id, area_id=study.id, name_by_user="Desk lamp")
     # A device reached through that shared one (2026.8 moves the link to
@@ -1088,9 +1092,13 @@ def register_as_setup_does(hass, month):
       address. From 2026.8 this is the "first re-registration" that
       replaces the identifiers a split device copied from the shared one.
       The other integration's half is not registered again, so it keeps
-      its copies.
+      its copies. From 2026.10 setup first runs the release's own
+      `async_repair_device_registry` with the address the bulb reports
+      (here the one 2026.6.1 derived, so nothing changes).
     - `hue` (`components/hue/v2/device.py`, from 2026.10): a device's
-      Zigbee address as a `zigbee` connection.
+      Zigbee address as a `zigbee` connection. Each device here has its
+      own address: a device of several channels, which share one, is not
+      in the fixture.
     - `met` (`components/met/weather.py`, from 2026.11): the device named
       after the place (the entry's title, or the home's name) and the
       entity without a name of its own.
@@ -1102,10 +1110,17 @@ def register_as_setup_does(hass, month):
     devices, entities = dr.async_get(hass), er.async_get(hass)
     done = []
     (lifx,) = [e for e in hass.config_entries.async_entries("lifx") if e.unique_id != "lifx"]
+    if month >= 10:
+        from types import SimpleNamespace
+
+        from homeassistant.components.lifx.entity import async_repair_device_registry
+
+        bulb = SimpleNamespace(serial=lifx.data["serial"], mac_address=LIFX_MAC)
+        async_repair_device_registry(hass, lifx, bulb)
     devices.async_get_or_create(
         config_entry_id=lifx.entry_id,
         identifiers={("lifx", lifx.unique_id)},
-        connections={("mac", LIFX_SERIAL)},
+        connections={("mac", LIFX_MAC)},
         manufacturer="LIFX",
         model="LIFX A19",
         name=LIFX_LABEL,
@@ -1114,10 +1129,13 @@ def register_as_setup_does(hass, month):
     done.append("lifx")
     if month >= 10:
         (hue,) = hass.config_entries.async_entries("hue")
-        for hue_id, address in ((HUE_BRIDGE, "01"), (HUE_HALL, "02")):
+        for identifiers, address in (
+            ({("hue", HUE_BRIDGE), ("hue", "001788fffe000001")}, "01"),
+            ({("hue", HUE_HALL)}, "02"),
+        ):
             devices.async_get_or_create(
                 config_entry_id=hue.entry_id,
-                identifiers={("hue", hue_id)},
+                identifiers=identifiers,
                 connections={("zigbee", f"00:17:88:01:00:00:00:{address}")},
             )
         done.append("hue")

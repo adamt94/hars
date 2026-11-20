@@ -419,8 +419,19 @@ release started from is listed, with the reason for each, in
 part); a child device has no manufacturer, model or `via_device_id`
 (2026.9 dropped them); Hue devices keep the connections 2026.10 left; the
 `lifx` entry from before one entry per bulb stays removed; a `lifx`
-entity's `previous_unique_id` holds what 2026.10's migration recorded; and
-a name 1.24 stripped keeps the capital it gained.
+entity's `previous_unique_id` holds what 2026.10's migration recorded; a
+name 1.24 stripped keeps the capital it gained; and an alias 1.24 wrote
+out stays written out.
+
+Two things 2026.8 and later do at run time have no 2026.6.1 form, and
+are reported, not converted: an action on a split device's old id reaches
+all its parts there, and an action on a device reaches its child devices'
+entities (`helpers/target.py`). The report names the automations, YAML
+files and dashboards that use such an id (`split_devices`,
+`parent_devices`, an automation's `warning`). And 2026.8 finds a device
+by identifier *and config entry*, where hars finds the first row with the
+identifier: the conversion lists an integration's own row first, and
+refuses a registry where that can't settle it.
 
 Unchanged from 2026.6.1 through 2026.11.2: `auth`,
 `auth_provider.homeassistant`, `onboarding`, `core.config`,

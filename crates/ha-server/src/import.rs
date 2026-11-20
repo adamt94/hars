@@ -30,7 +30,7 @@
 
 mod convert;
 
-pub use convert::{ConvertedEntry, ConvertedStore, Dropped, SplitDevice};
+pub use convert::{ConvertedEntry, ConvertedStore, Dropped, ParentDevice, SplitDevice};
 
 use anyhow::{Context, bail};
 use ha_core::storage::Store;
@@ -163,6 +163,10 @@ pub struct Report {
     /// Devices Home Assistant 2026.8 split by integration, with the files
     /// that still use the old id.
     pub split_devices: Vec<SplitDevice>,
+    /// Devices with child devices (2026.9) that a YAML file or dashboard
+    /// names by id: there Home Assistant reaches the children's entities
+    /// through the parent, and `hars` doesn't.
+    pub parent_devices: Vec<ParentDevice>,
     pub dry_run: bool,
     /// Stores copied (or that would be, in a dry run).
     pub imported: Vec<String>,
@@ -207,6 +211,24 @@ pub struct EntryReport {
 pub fn run(opts: &Options) -> anyhow::Result<Report> {
     let source = std::fs::canonicalize(&opts.source)
         .with_context(|| format!("reading {}", opts.source.display()))?;
+    // Before the destination is made: inside the source it would be
+    // a directory written into the folder the import only reads.
+    let mut inside = std::path::absolute(&opts.dest)?;
+    let mut below = Vec::new();
+    while !inside.exists() {
+        match (inside.file_name().map(|n| n.to_owned()), inside.parent()) {
+            (Some(name), Some(parent)) => {
+                below.push(name);
+                inside = parent.to_path_buf();
+            }
+            _ => break,
+        }
+    }
+    let mut planned = std::fs::canonicalize(&inside).unwrap_or(inside);
+    planned.extend(below.iter().rev());
+    if planned != source && planned.starts_with(&source) {
+        bail!("the destination is inside the source; use a directory outside it");
+    }
     std::fs::create_dir_all(&opts.dest)?;
     let dest = std::fs::canonicalize(&opts.dest)?;
     if dest == source {
@@ -244,6 +266,7 @@ pub fn run(opts: &Options) -> anyhow::Result<Report> {
         converted_entries: Vec::new(),
         dropped: Vec::new(),
         split_devices: Vec::new(),
+        parent_devices: Vec::new(),
         dry_run: opts.dry_run,
         imported: Vec::new(),
         replaced: Vec::new(),
@@ -315,6 +338,7 @@ pub fn run(opts: &Options) -> anyhow::Result<Report> {
     report.converted_entries = converted.entries;
     report.dropped = converted.dropped;
     report.split_devices = converted.split_devices;
+    report.parent_devices = converted.parent_devices;
     report.newer_stores = check_store_versions(&staging, &report.ha_version)?;
     let entries = load_entries(&staging.root)?;
     check_entry_versions(&entries, &report.ha_version)?;
@@ -339,26 +363,6 @@ pub fn run(opts: &Options) -> anyhow::Result<Report> {
         if rel.ends_with("secrets.yaml") {
             use std::os::unix::fs::PermissionsExt;
             std::fs::set_permissions(&to, std::fs::Permissions::from_mode(0o600))?;
-        }
-    }
-
-    // 1c. Where an id that names no device any more is still used.
-    for split in &mut report.split_devices {
-        let mut places: Vec<(String, PathBuf)> = report
-            .yaml
-            .iter()
-            .map(|rel| (rel.clone(), staging.root.join(rel)))
-            .collect();
-        for key in staging.keys()? {
-            if ha_api::Lovelace::is_store(&key) {
-                let path = staging.root.join(".storage").join(&key);
-                places.push((format!(".storage/{key}"), path));
-            }
-        }
-        for (name, path) in places {
-            if std::fs::read_to_string(path).is_ok_and(|text| text.contains(&split.old_id)) {
-                split.used_in.push(name);
-            }
         }
     }
 
@@ -410,6 +414,29 @@ pub fn run(opts: &Options) -> anyhow::Result<Report> {
                         redact(&e.to_string(), &secret_values)
                     )
                 })?;
+        // The device ids that mean something else in hars than in the
+        // Home Assistant the files come from, and what to say of each.
+        let changed_ids: Vec<(&str, String)> = report
+            .split_devices
+            .iter()
+            .map(|s| {
+                let why = format!(
+                    "it names a device by the id {}, which Home Assistant 2026.8 replaced \
+                     with {}: in hars the id reaches no device",
+                    s.old_id,
+                    s.new_ids.join(" and ")
+                );
+                (s.old_id.as_str(), why)
+            })
+            .chain(report.parent_devices.iter().map(|p| {
+                let why = format!(
+                    "it names the device {}, which has child devices: Home Assistant 2026.9 \
+                     and later reach their entities through it, hars only its own",
+                    p.id
+                );
+                (p.id.as_str(), why)
+            }))
+            .collect();
         for item in ha_automation::from_config(&config) {
             // Secret values never reach the report or the terminal.
             let text = |k: &str| {
@@ -418,14 +445,75 @@ pub fn run(opts: &Options) -> anyhow::Result<Report> {
                     .map(|v| redact(v, &secret_values))
             };
             let parsed = ha_automation::config::parse(&item);
+            // As loaded, so however the YAML spells the id.
+            let loaded = item.to_string();
+            let warnings: Vec<&str> = changed_ids
+                .iter()
+                .filter(|(id, _)| loaded.contains(id))
+                .map(|(_, why)| why.as_str())
+                .collect();
             report.automations.push(AutomationReport {
                 id: text("id"),
                 alias: text("alias"),
                 status: if parsed.is_ok() { "ok" } else { "unavailable" },
                 reason: parsed.err().map(|e| redact(&e, &secret_values)),
+                warning: (!warnings.is_empty()).then(|| warnings.join("; ")),
             });
         }
+        // Where else such an id is used: each YAML file by its text, and
+        // the configuration as loaded (which reads an id however it is
+        // spelt) when no file's text shows it.
+        let loaded = config.to_json().to_string();
+        let files: Vec<(String, String)> = report
+            .yaml
+            .iter()
+            .filter(|rel| !rel.ends_with("secrets.yaml"))
+            .filter_map(|rel| {
+                let text = std::fs::read_to_string(staging.root.join(rel)).ok()?;
+                Some((rel.clone(), text))
+            })
+            .collect();
+        let yaml_uses = |id: &str| -> Vec<String> {
+            let mut found: Vec<String> = files
+                .iter()
+                .filter(|(_, text)| text.contains(id))
+                .map(|(rel, _)| rel.clone())
+                .collect();
+            if found.is_empty() && loaded.contains(id) {
+                found.push("configuration.yaml or a file it includes".into());
+            }
+            found
+        };
+        for split in &mut report.split_devices {
+            split.used_in = yaml_uses(&split.old_id);
+        }
+        for parent in &mut report.parent_devices {
+            parent.used_in = yaml_uses(&parent.id);
+        }
     }
+    // And the dashboards, as loaded.
+    for key in staging.keys()? {
+        if !ha_api::Lovelace::is_store(&key) {
+            continue;
+        }
+        let store = Store::new(&staging.root, key.clone(), 1, 1, false);
+        let Ok(Some(dashboard)) = store.load::<Value>() else {
+            continue;
+        };
+        let loaded = dashboard.to_string();
+        for split in &mut report.split_devices {
+            if loaded.contains(&split.old_id) {
+                split.used_in.push(format!(".storage/{key}"));
+            }
+        }
+        for parent in &mut report.parent_devices {
+            if loaded.contains(&parent.id) {
+                parent.used_in.push(format!(".storage/{key}"));
+            }
+        }
+    }
+    // A parent nothing names by id needs no mention.
+    report.parent_devices.retain(|p| !p.used_in.is_empty());
     for key in staging.keys()? {
         if key == "frontend.system_data" || key.starts_with(USER_DATA_PREFIX) {
             let store = Store::new(&staging.root, key.clone(), 1, 1, false);
@@ -685,14 +773,24 @@ fn cannot_import() -> String {
 /// `ConfigEntry.async_migrate`: an entry of an integration `hars` runs,
 /// written by a newer version of its config flow, can't be set up. The
 /// ones with a rule (`lifx` and `met` at 2.1, from 2026.10 and 2026.11)
-/// are back at version 1 by now ([`convert`]); any other is refused. A
+/// are back at version 1 by now ([`convert`]); any other is refused, and so
+/// is a minor version later than the ones the fixtures hold. A
 /// disabled or ignored one is refused as well, which is stricter than HA
 /// (it only migrates an entry it sets up): enabling it later would
 /// otherwise run it.
 fn check_entry_versions(entries: &[Map<String, Value>], ha_version: &str) -> anyhow::Result<()> {
     for e in entries {
         let domain = e.get("domain").and_then(Value::as_str).unwrap_or_default();
-        if runs(domain) && ha_integrations::entry_too_new(e) {
+        // A newer minor version is compatible by Home Assistant's rule, and
+        // hars runs one. The import takes the ones it has seen (`hue` 1.2,
+        // from 2026.10), not ones no fixture holds.
+        let seen = if domain == ha_integrations::hue::DOMAIN {
+            2
+        } else {
+            1
+        };
+        let minor = e.get("minor_version").and_then(Value::as_u64).unwrap_or(1);
+        if runs(domain) && (ha_integrations::entry_too_new(e) || minor > seen) {
             bail!(
                 "the {domain} integration's config entry {:?} is version {}.{}, in a config \
                  directory of Home Assistant {ha_version}; hars runs version {} of it, as \
@@ -974,6 +1072,10 @@ pub struct AutomationReport {
     pub status: &'static str,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reason: Option<String>,
+    /// For one that loads: what it will do differently than in the Home
+    /// Assistant it comes from.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub warning: Option<String>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -1130,6 +1232,17 @@ pub fn summary(report: &Report, dest: &Path) -> String {
             ));
         }
     }
+    for p in &report.parent_devices {
+        out.push_str(&format!(
+            "  {} names the device {} ({}) by id. It has child devices, and Home Assistant \
+             2026.9 and later reach their entities through it; hars reaches only its own: \
+             name the child devices too ({})\n",
+            p.used_in.join(", "),
+            p.id,
+            p.name.as_deref().unwrap_or("unnamed"),
+            p.children.join(", ")
+        ));
+    }
     if !report.replaced.is_empty() {
         out.push_str(&format!("  replaced: {}\n", report.replaced.join(", ")));
     }
@@ -1160,6 +1273,14 @@ pub fn summary(report: &Report, dest: &Path) -> String {
             a.alias.as_deref().or(a.id.as_deref()).unwrap_or("?"),
             a.reason.as_deref().unwrap_or_default()
         ));
+    }
+    for a in report.automations.iter().filter(|a| a.status == "ok") {
+        if let Some(warning) = &a.warning {
+            out.push_str(&format!(
+                "  automation {} loads, but {warning}\n",
+                a.alias.as_deref().or(a.id.as_deref()).unwrap_or("?")
+            ));
+        }
     }
     let ok = report
         .automations

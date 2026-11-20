@@ -192,9 +192,10 @@ tested with it (`ha_version_tested`) and the release hars behaves like
 (`behaves_like`).
 
 The import decides file by file: it checks each file's own storage version,
-not only `.HA_VERSION`. It never writes to the folder you import from. It
-converts and checks a copy first, and it changes your hars folder only when
-every file has passed.
+not only `.HA_VERSION`. It never writes to the folder you import from,
+and refuses to put hars's folder inside it. It converts and checks a copy
+first, and it replaces files in your hars folder only when every file has
+passed.
 
 #### Coming from 2026.7
 
@@ -225,24 +226,31 @@ your folder.
 |---|---|---|
 | 2026.8 | The device list (`core.device_registry`, storage version 3): every device belongs to one integration. A device that two integrations shared became two devices with new ids | Writes the list in the 2026.6 format. The two devices stay two, with the new ids, because your entities already point at them |
 | 2026.8 | The entity list (`core.entity_registry` 1.23) has a setting for how new entity ids are made | Leaves the setting out. If you changed it, the report lists it under `dropped`. hars makes entity ids as 2026.6 does |
-| 2026.9 | Child devices (device list 3.4): a part of a device, such as one socket of a power strip, kept in its own list without a maker or model | Lists each as an ordinary device again. The maker and model are not in your files to bring back. The link to its parent is kept in the file but not shown |
+| 2026.9 | Child devices (device list 3.4): a part of a device, such as one socket of a power strip, kept in its own list without a maker or model | Lists each as an ordinary device again, in its parent's area if it has none of its own. The maker and model are not in your files to bring back. The link to its parent is kept in the file but not shown |
 | 2026.10 | LIFX settings (entry version 2): the bulb's serial is written without colons, in the settings, the device and the entity ids | Writes the serial with colons again, as hars's LIFX code expects it |
 | 2026.10 | Hue settings (entry 1.2): Zigbee addresses moved from one kind of device connection to another | Nothing. hars and Home Assistant 2026.6 both run a 1.2 entry, and hars does not use those connections |
 | 2026.11 | Entity names (`core.entity_registry` 1.24): a name you gave is stored without the device's name, which Home Assistant adds when it shows the name | Stores each name in full again. Every entity keeps the friendly name 2026.11 gave it |
-| 2026.11 | Weather settings (`met`, entry version 2): the place is stored another way, and the forecast's name moved from the entity to the device | Stores the place the 2026.6 way and names the forecast after the entry's title |
-| 2026.11 | Last states (`core.restore_state`) are kept by an entity's registry id | Keeps them by entity id again, under the id each entity has now |
+| 2026.11 | Weather settings (`met`, entry version 2): the place is stored another way, and the forecast's own name is gone. 2026.11 shows the entry's title instead | Stores the place the 2026.6 way and gives the forecast the entry's title as its name |
+| 2026.11 | Last states (`core.restore_state`) are kept by an entity's registry id | Keeps them by entity id again, under the id each entity has now. A last state that 2026.11 would give to no entity is left out and listed under `dropped` |
 
 What you will notice:
 
 - **A device that two integrations shared is two devices.** Home Assistant
   2026.8 did this, and hars keeps it. Home Assistant still accepts the old
   device id in an action and takes it to mean both devices. hars does not:
-  the old id reaches no device. The import names each YAML file and
-  dashboard that still uses an old id, with the two new ids to use
-  instead. hars does not edit your YAML.
-- **A weather forecast is named as in 2026.6.** In 2026.11 the forecast for
-  a place you named "Cabin" shows as "Cabin". In hars it shows as
-  "Forecast Cabin", as it did before 2026.11. Its entity id is unchanged.
+  the old id reaches no device. The import names each automation, YAML
+  file and dashboard that still uses an old id, with the two new ids to use
+  instead. The automation still loads. hars does not edit your YAML.
+- **An action on a device with child devices reaches less.** From 2026.9,
+  Home Assistant takes an action on a device to include its child devices.
+  hars reaches only the device's own entities. The import names each
+  automation, YAML file and dashboard that uses such a device by id, with
+  the child devices to add.
+- **A weather forecast has "Forecast" in front of its name again.** In
+  2026.11 the forecast of an entry titled "Cabin" shows as "Cabin". In hars
+  it shows as "Forecast Cabin", the way 2026.6 names forecasts. The name is
+  the entry's title: if you had given the forecast another name in 2026.6,
+  2026.11 removed it from your files. The entity id is unchanged.
 - **A name can differ in one capital letter.** 2026.11 capitalises what is
   left of a name after it takes the device's name off the front. "Desk lamp
   reading light" on the device "Desk lamp" became "Desk lamp Reading
@@ -266,8 +274,14 @@ What stops an import from these releases, with the reason on the terminal:
 - A child device that is disabled only because its parent device is
   disabled. 2026.6 has no such state. Enable the parent in Home Assistant
   and copy the folder again.
+- Two devices that hars could not tell apart: both hold the same identifier
+  of an integration hars runs, and both or neither can be found first.
+  From 2026.8 Home Assistant tells such devices apart by integration entry.
+  hars finds a device by its identifier alone, as 2026.6 does. The message
+  names the two devices.
 - Settings of the LIFX or weather integration that don't have the shape
-  2026.10 and 2026.11 write.
+  2026.10 and 2026.11 write, or settings of an integration hars runs at a
+  version later than 2026.11 writes.
 
 The conversion follows Home Assistant's own code: each rule is the reverse
 of a migration in the release that made the change, or what that release

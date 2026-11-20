@@ -218,7 +218,8 @@ ids, addresses, names and coordinates replaced with fake ones
         write). `hue` 1.2 entries stay 1.2. A version with no rule, and
         data with no 2026.6.1 meaning, still refuse the import.
         `import-report.json` (version 4) lists `converted`,
-        `converted_entries`, `dropped` and `split_devices`. Tested by a
+        `converted_entries`, `dropped`, `split_devices` and
+        `parent_devices`, and gives an automation a `warning`. Tested by a
         round trip made with Home Assistant's own code: one richer
         synthetic 2026.6.1 install, started on by 2026.8.3, 2026.9.4,
         2026.10.4 and 2026.11.2, must convert back to itself apart from
@@ -227,10 +228,12 @@ ids, addresses, names and coordinates replaced with fake ones
         ([the table](ARCHITECTURE.md#which-home-assistant-releases-can-be-imported))
   - [ ] Import, what remains: a real 2026.8 to 2026.11 install has not
         been imported (the test install is synthetic and small). An
-        automation, script or dashboard that uses a split device's old id
-        is reported, not rewritten, and reaches no device. Integrations
-        find their device by identifier, the first row that has it (the
-        importer orders the rows); 2026.8 looks it up per config entry.
+        automation, script or dashboard that uses a split device's old id,
+        or a device that has child devices, is reported, not rewritten:
+        the old id reaches no device, and the parent not its children.
+        Integrations find their device by identifier, the first row that
+        has it (the importer orders the rows, and refuses what order can't
+        settle); 2026.8 looks it up per config entry.
         Releases after 2026.11 are imported only if every store is in a
         format with a rule
 - [x] `configuration.yaml` loaded as HA loads it: `!include`, the
