@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 416" width="800" height="416" role="img" aria-labelledby="t d" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
   <title id="t">hars and Home Assistant on the same home</title>
-  <desc id="d">Four comparisons from one host with the same devices and automations. Memory: Home Assistant 203 MiB, hars 11.1 MiB. Start-up time: Home Assistant 5.85 seconds, hars 0.59 seconds. CPU at rest: Home Assistant 0.199 percent of one core, hars 0.015 percent. Wakeups per second: Home Assistant 3.4, hars 0.65.</desc>
+  <desc id="d">Four comparisons from one host with the same devices and automations. Memory: Home Assistant 203 MiB, hars 11.1 MiB. Start-up time: Home Assistant 5.85 seconds, hars 0.59 seconds. CPU, as a share of one core: Home Assistant 0.199 percent, hars 0.015 percent. Wakeups per second: Home Assistant 3.4, hars 0.65.</desc>
   <!--
     Numbers: docs/perf/RESULTS.md, "Reference install again, 2026-11-20".
     Each bar is 160 px for the Home Assistant value. The hars bar is
@@ -73,7 +73,7 @@
 
   <!-- CPU at rest. -->
   <g transform="translate(32 250)">
-    <text class="label ink2" y="14">CPU at rest, share of one core</text>
+    <text class="label ink2" y="14">CPU, share of one core</text>
     <text class="hero ink" y="52">13× less</text>
     <text class="name ink2" y="81">Home Assistant</text>
     <path class="ha" d="M108 70h156a4 4 0 0 1 4 4v6a4 4 0 0 1-4 4h-156Z"/>

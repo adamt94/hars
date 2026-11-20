@@ -160,7 +160,10 @@ your contribution is licensed under the same terms (Apache-2.0, section 5).
 When you port code from Home Assistant (Apache-2.0) or a library it uses,
 check the library's licence is compatible (Apache-2.0, MIT, BSD), say what
 you ported in the module's doc comment, and add the library to
-[NOTICE](NOTICE) with its licence and copyright line.
+[NOTICE](NOTICE) with its licence and copyright line. After any change to
+`Cargo.lock`, run `python3 scripts/gen-third-party.py`: it rewrites
+[THIRD-PARTY-LICENSES.txt](THIRD-PARTY-LICENSES.txt), and a script test
+fails until you do.
 
 hars is an independent project. It is not affiliated with or endorsed by the
 Home Assistant project or Nabu Casa. Please don't ask for support with hars

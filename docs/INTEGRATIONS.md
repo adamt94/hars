@@ -19,7 +19,7 @@ memory and wakeup cost is measured before it merges.
 | [LIFX](#lifx) | `lifx` | Local, polled every 10 s | Import |
 | [SwitchBot Cloud](#switchbot-cloud) | `switchbot_cloud` | Cloud, polled every 600 s | Import |
 | [Weather](#weather) | `met` | Cloud, fetched about once an hour | Onboarding |
-| [Sun](#sun) | `sun` | None, calculated | Always on |
+| [Sun](#sun) | `sun` | None, calculated | On by default |
 | [Companion app](#companion-app) | `mobile_app` | The app calls hars | Log in from the app |
 | [People and zones](#people-and-zones) | `person`, `zone` | None | Always on |
 
@@ -35,7 +35,7 @@ one of three ways:
 - **Import.** Set the integration up in Home Assistant 2026.6, then
   [move the install to hars](../README.md#move-from-home-assistant). The
   import brings the integration's settings and credentials, its devices, and
-  its entity ids. `hars/config/import-report.json` says whether hars can run
+  its entity ids. `hars/config/import-report.json` says whether hars has
   each integration.
 - **Onboarding.** The setup screens add the weather forecast for the
   location that you choose.
@@ -49,8 +49,9 @@ bridge pushes each change to hars, so hars does not poll.
 - **Lights:** each light, and each room and zone as a grouped light.
   Brightness, colour, colour temperature, and transitions work as in Home
   Assistant.
-- **Scenes:** scenes and smart scenes, with `scene.turn_on`,
-  `hue.activate_scene`, and `hue.hue_activate_scene`.
+- **Scenes:** scenes and smart scenes, with `scene.turn_on` and
+  `hue.activate_scene`. `hue.hue_activate_scene` works for scenes, but not
+  for smart scenes.
 - **Sensors:** temperature, light level, battery, and Zigbee connectivity.
 - **Binary sensors:** motion, grouped motion, camera motion, contact,
   tamper, and entertainment.
@@ -68,7 +69,8 @@ Not yet:
 ### LIFX
 
 hars talks to each bulb on your network over UDP and asks for its state
-every 10 seconds, as Home Assistant does.
+every 10 seconds, as Home Assistant does. hars supports single-zone colour
+bulbs. Light strips, tiles, and other multi-zone products are not supported.
 
 - **Lights:** power, brightness, colour, colour temperature, and
   transitions.
@@ -79,17 +81,17 @@ Not yet:
 - The `lifx.*` services: effects, `lifx.set_state`, and themes.
 - The signal-strength sensor.
 - Saving a bulb's new IP address. hars finds a bulb that moved, but it
-  searches again after a restart. In Docker Desktop on a Mac or on Windows,
-  hars can't search at all, so give each bulb a fixed address.
+  searches again after a restart. The installer's set-up for Docker Desktop
+  on a Mac or on Windows publishes one port, so hars can't search there.
+  Give each bulb a fixed address.
 
-hars has been checked against one colour bulb. Other LIFX products are
-untested.
+hars has been checked against one colour bulb.
 
 ### SwitchBot Cloud
 
 hars uses SwitchBot's cloud API with the token and secret from your Home
-Assistant install. It asks for each device's state every 600 seconds, as
-Home Assistant does.
+Assistant install. It asks for the state of the Bot and of the Hub 2 every
+600 seconds, which is Home Assistant's interval.
 
 - **Bot:** a button that presses the Bot, and a battery sensor.
 - **Hub 2:** temperature and humidity.
@@ -101,13 +103,15 @@ Not yet:
 - A Bot in switch mode.
 - Every other SwitchBot device type.
 - SwitchBot webhooks. They need a public URL, and hars has no remote access
-  yet.
+  yet. Home Assistant stops its polls of a Bot once a webhook is set. hars
+  keeps the polls.
 
 ### Weather
 
 The `met` integration fetches the forecast for your home from
-[api.met.no](https://api.met.no/) about once an hour. It provides
-`weather.forecast_home`, the hourly and daily forecasts that the weather card
+[api.met.no](https://api.met.no/) about once an hour. It provides one
+weather entity (`weather.forecast_home` on a new install), the hourly and
+daily forecasts that the weather card
 shows, and the `weather.get_forecasts` service.
 
 Not yet: a change of the forecast's settings from the UI.
@@ -115,12 +119,14 @@ Not yet: a change of the forecast's settings from the UI.
 ### Sun
 
 `sun.sun` and the six `sensor.sun_next_*` sensors are calculated from your
-home's location. The times match Home Assistant to the microsecond.
+home's location. The times match Home Assistant's to within a millisecond.
+A new install has the sun integration. An import keeps it off if you had
+turned it off in Home Assistant.
 
 ### Companion app
 
-The Home Assistant iOS app works with hars as it does with Home Assistant.
-The app sends your phone's data to hars over an encrypted channel.
+The Home Assistant iOS app works with hars. The app sends your phone's data
+to hars, encrypted when the app's registration supports encryption.
 
 - **Location:** a `device_tracker`, which moves the matching `person`
   between zones.
@@ -128,10 +134,11 @@ The app sends your phone's data to hars over an encrypted channel.
   battery level.
 - **Notifications:** `notify.mobile_app_<device>`, `notify.notify`, and
   `notify.send_message`. hars sends a notification over the app's local
-  connection when the app is open, and through the app's push service
-  otherwise.
+  push connection while the app holds one open, and through the app's push
+  service otherwise.
 
-Not yet: `notify.persistent_notification` and Assist timer notifications.
+Not yet: `notify.persistent_notification`, Assist timer notifications, and
+templates that the app asks hars to render.
 hars is tested with version 2026.9.0 of the iOS app. The Android app is
 untested.
 

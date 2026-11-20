@@ -61,7 +61,43 @@ switchbot-api 2.11.0
   The request signing, response envelope, and error classes in
   crates/ha-integrations/src/switchbot_cloud are a port.
 
-The MIT License, which applies to PyMetno, aiolifx, and switchbot-api:
+PyYAML 6.0.3 and annotatedyaml 1.0.2
+  https://github.com/yaml/pyyaml
+  https://github.com/home-assistant-libs/annotatedyaml
+  PyYAML: MIT License. Copyright (c) 2017-2021 Ingy döt Net.
+  Copyright (c) 2006-2016 Kirill Simonov.
+  annotatedyaml: Apache License 2.0. Copyright the annotatedyaml authors.
+  The YAML 1.1 scalar resolution, the safe constructors, the writer's
+  style rules, and Home Assistant's tags in crates/ha-core/src/yaml are a
+  port.
+
+CPython 3.14
+  https://github.com/python/cpython
+  Python Software Foundation License Version 2.
+  Copyright (c) 2001 Python Software Foundation. All rights reserved.
+  The number parsing, rounding, summation, and formatting in
+  crates/ha-core/src/template/num.rs, the datetime model in
+  crates/ha-core/src/template/pytime.rs, and the fnmatch and case-folding
+  rules in crates/ha-core follow CPython's algorithms.
+
+ciso8601 2.3.3
+  https://github.com/closeio/ciso8601
+  MIT License. Copyright (c) 2014 Close.io.
+  The ISO 8601 parser in crates/ha-core/src/template/pytime.rs is a port.
+
+aiohttp-cors 0.8.1
+  https://github.com/aio-libs/aiohttp-cors
+  Apache License 2.0. Copyright the aiohttp-cors authors.
+  The preflight handling in crates/ha-api/src/cors.rs is a port.
+
+Jinja 3.1.6
+  https://github.com/pallets/jinja
+  BSD 3-Clause License. Copyright 2007 Pallets.
+  The filters and tests in crates/ha-core/src/template reproduce Jinja's
+  behaviour where minijinja's differs.
+
+The MIT License, which applies to PyMetno, aiolifx, switchbot-api, PyYAML,
+and ciso8601:
 
   Permission is hereby granted, free of charge, to any person obtaining a
   copy of this software and associated documentation files (the "Software"),
@@ -106,9 +142,8 @@ The IANA Time Zone Database
   https://www.iana.org/time-zones
   Public domain.
 
-The Rust crates that hars is built from are listed in Cargo.lock. Each one
-carries its own licence, all of them permissive (MIT, Apache-2.0, BSD, ISC,
-Unicode-3.0, Unlicense, or CDLA-Permissive-2.0 for the Mozilla root
-certificates in webpki-roots). To list them, run:
-
-  cargo metadata --format-version 1 --locked
+The Rust crates that hars is built from are listed, each with its licence
+text, in THIRD-PARTY-LICENSES.txt. All of them are permissive: MIT,
+Apache-2.0, BSD, ISC, Unicode-3.0, Unlicense, or CDLA-Permissive-2.0 for
+the Mozilla root certificates in webpki-roots. The image carries that file,
+this file, and LICENSE in /licenses.

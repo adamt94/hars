@@ -40,9 +40,9 @@ FROM scratch
 COPY --from=build /usr/share/zoneinfo /usr/share/zoneinfo
 COPY --from=frontend /out/hass_frontend /frontend
 COPY --from=build /hars /hars
-# The licences the image must carry: hars's own and its notices, and the
-# frontend's.
-COPY --from=build /src/LICENSE /src/NOTICE /licenses/
+# The licences the image must carry: hars's own, its notices, its crates'
+# (scripts/gen-third-party.py) and the frontend's.
+COPY --from=build /src/LICENSE /src/NOTICE /src/THIRD-PARTY-LICENSES.txt /licenses/
 COPY --from=frontend /out/licence/LICENSE.md /licenses/home-assistant-frontend-LICENSE.md
 ENV HARS_BIND=0.0.0.0:8123 \
     HARS_FRONTEND=/frontend \
