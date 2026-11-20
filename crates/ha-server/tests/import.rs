@@ -811,10 +811,11 @@ fn edit_store(dir: &Path, key: &str, edit: impl FnOnce(&mut Value)) {
     std::fs::write(path, serde_json::to_vec_pretty(&store).unwrap()).unwrap();
 }
 
-/// hars imports a release's directory exactly when Home Assistant 2026.6.1
-/// itself loads it (`downgrade.json`: its
-/// `bootstrap.async_load_base_functionality` on each directory), and names
-/// the store 2026.6.1 names when it doesn't.
+/// For each of the six release fixtures, hars imports the directory when
+/// Home Assistant 2026.6.1's base bootstrap loads it (`downgrade.json`: its
+/// `bootstrap.async_load_base_functionality` on each directory) and refuses
+/// it, naming the store 2026.6.1 names, when it doesn't. (hars is stricter
+/// than that elsewhere: `directories_hars_could_not_keep_are_refused`.)
 #[test]
 fn imports_the_directories_home_assistant_2026_6_1_loads() {
     let cases = vector("downgrade.json");
@@ -1136,7 +1137,7 @@ fn stores_and_entries_from_newer_releases_are_refused() {
 #[test]
 fn directories_hars_could_not_keep_are_refused() {
     type Change = fn(&Path);
-    let cases: [(&str, Change, &str); 9] = [
+    let cases: [(&str, Change, &str); 11] = [
         // hars only writes the config entries at 1.5: at 1.4 a phone's
         // registration would be gone after a restart. Home Assistant
         // migrates the file when it starts.
@@ -1195,6 +1196,29 @@ fn directories_hars_could_not_keep_are_refused() {
                 })
             },
             "core.labs doesn't load",
+        ),
+        // A row the server would drop, and then save without.
+        (
+            "restore-row",
+            |src| {
+                edit_store(src, "core.restore_state", |s| {
+                    s["data"][0]["state"]
+                        .as_object_mut()
+                        .unwrap()
+                        .remove("entity_id");
+                })
+            },
+            "core.restore_state doesn't load",
+        ),
+        // A scope the server would list as empty.
+        (
+            "category-scope",
+            |src| {
+                edit_store(src, "core.category_registry", |s| {
+                    s["data"]["categories"]["automation"] = json!({})
+                })
+            },
+            "core.category_registry doesn't load",
         ),
         // hars only lists the categories, and reads them leniently.
         (
@@ -1381,6 +1405,54 @@ fn a_directory_in_a_yaml_files_place_is_refused() {
         );
         assert!(!dest.join(".storage").exists());
     }
+    for d in [src, dest] {
+        let _ = std::fs::remove_dir_all(d);
+    }
+}
+
+/// A staging directory that is already there is never cleared: it may be
+/// another import's, or hold someone's files. The import says what to do.
+#[test]
+fn an_occupied_staging_directory_is_left_alone() {
+    let src = temp("occupied-src");
+    let dest = temp("occupied-dest");
+    release("2026.7.4", &src, &[]);
+    let marker = dest.join(".import-staging/.storage/auth");
+    std::fs::create_dir_all(marker.parent().unwrap()).unwrap();
+    std::fs::write(&marker, "another import's").unwrap();
+    for flags in [&["--dry-run"][..], &["--force"], &[]] {
+        let mut args = vec!["import", src.to_str().unwrap()];
+        args.extend(flags);
+        let out = hars(&dest, &args);
+        assert!(!out.status.success(), "{flags:?}");
+        assert!(
+            String::from_utf8_lossy(&out.stderr)
+                .contains(".import-staging is already there: another import is running"),
+            "{out:?}"
+        );
+        assert_eq!(
+            std::fs::read_to_string(&marker).unwrap(),
+            "another import's"
+        );
+        assert!(!dest.join(".storage").exists());
+    }
+    // Once it is gone the import runs, and leaves no staging behind; the
+    // report is the only file beside the stores and the YAML.
+    std::fs::remove_dir_all(dest.join(".import-staging")).unwrap();
+    let out = hars(&dest, &["import", src.to_str().unwrap()]);
+    assert!(out.status.success(), "{out:?}");
+    assert!(!dest.join(".import-staging").exists());
+    assert_eq!(
+        read_json(&dest.join("import-report.json"))["ha_version"],
+        "2026.7.4"
+    );
+    let mut left: Vec<String> = std::fs::read_dir(&dest)
+        .unwrap()
+        .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+        .filter(|n| !n.ends_with(".yaml"))
+        .collect();
+    left.sort();
+    assert_eq!(left, [".storage", "import-report.json"]);
     for d in [src, dest] {
         let _ = std::fs::remove_dir_all(d);
     }

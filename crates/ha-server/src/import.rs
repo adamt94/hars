@@ -60,7 +60,9 @@ enum Minor {
     /// Not a newer one: 2026.6.1's own migration fails on it (`person`), or
     /// `hars` only reads the store and would never bring it back to its
     /// own version (the floor, label and category registries). An older
-    /// one is migrated on load, as in HA.
+    /// one is taken: `person` version 1 is migrated by the loader, and the
+    /// read-only registries are read as they are and left at the version
+    /// they have (HA would migrate and save them).
     NotNewer,
     /// Only the one `hars` writes. The entity, device and area registries
     /// (`check_minor`) and the config entries (`writable`) are never
@@ -320,9 +322,16 @@ pub fn run(opts: &Options) -> anyhow::Result<Report> {
         .map_err(|e| anyhow::anyhow!("the zones or people don't load ({})", sanitized(&e)))?;
     ha_api::Lovelace::load_strict(&staging.root)
         .map_err(|e| anyhow::anyhow!("the dashboards don't load ({})", sanitized(&e)))?;
-    // `load_strict` reads the categories leniently (hars only lists them).
+    // `load_strict` reads the categories leniently (hars only lists them,
+    // and a scope that isn't a list of rows lists as empty).
+    #[derive(serde::Deserialize)]
+    struct Categories {
+        #[serde(default)]
+        #[allow(dead_code)]
+        categories: std::collections::BTreeMap<String, Vec<Map<String, Value>>>,
+    }
     Store::new(&staging.root, ha_registry::CATEGORY_KEY, 1, 2, false)
-        .load::<Map<String, Value>>()
+        .load::<Categories>()
         .map_err(|e| anyhow::anyhow!("core.category_registry doesn't load ({})", sanitized(&e)))?;
     ha_integrations::mobile_app::MobileApp::check_store(&staging.root)
         .map_err(|e| anyhow::anyhow!("mobile_app's store doesn't load ({})", sanitized(&e)))?;
@@ -451,14 +460,18 @@ pub fn run(opts: &Options) -> anyhow::Result<Report> {
         std::fs::set_permissions(dest.join(rel), std::fs::Permissions::from_mode(0o600))?;
     }
     let json = serde_json::to_vec_pretty(&report)?;
-    // A new file renamed into place: never a half-written report, and
-    // nothing written through an existing file.
-    ha_core::storage::write_atomic(&dest.join(REPORT_FILE), &json, false).with_context(|| {
-        format!(
-            "everything was imported, but {REPORT_FILE} could not be written in {}",
-            dest.display()
-        )
-    })?;
+    // A new file, made in the staging directory (this run's own) and
+    // renamed into place: never a half-written report, and nothing
+    // written through, or over, a file that was already there.
+    let staged = staging.root.join(REPORT_FILE);
+    std::fs::write(&staged, json)
+        .and_then(|()| std::fs::rename(&staged, dest.join(REPORT_FILE)))
+        .with_context(|| {
+            format!(
+                "everything was imported, but {REPORT_FILE} could not be written in {}",
+                dest.display()
+            )
+        })?;
     Ok(report)
 }
 
@@ -660,6 +673,8 @@ fn sanitized(e: &ha_core::storage::StoreError) -> String {
 }
 
 /// `dest/.import-staging`, laid out like a config dir; removed when dropped.
+/// Only ever one this run made: a directory already there (an import that
+/// was killed, another one running, or someone's files) is never cleared.
 struct Staging {
     root: PathBuf,
 }
@@ -667,9 +682,17 @@ struct Staging {
 impl Staging {
     fn new(dest: &Path) -> anyhow::Result<Self> {
         let root = dest.join(".import-staging");
-        let _ = std::fs::remove_dir_all(&root);
-        std::fs::create_dir_all(root.join(".storage"))?;
-        Ok(Self { root })
+        std::fs::create_dir(&root).map_err(|e| match e.kind() {
+            std::io::ErrorKind::AlreadyExists => anyhow::anyhow!(
+                "{} is already there: another import is running, or one was interrupted. \
+                 If none is running, delete it and import again",
+                root.display()
+            ),
+            _ => anyhow::Error::from(e).context(format!("making {}", root.display())),
+        })?;
+        let staging = Self { root };
+        std::fs::create_dir(staging.root.join(".storage"))?;
+        Ok(staging)
     }
 
     fn keys(&self) -> anyhow::Result<Vec<String>> {

@@ -44,8 +44,22 @@ impl RestoreState {
     /// Whether `.storage/core.restore_state` decodes as
     /// [`RestoreState::load`] decodes it (a missing file does): for
     /// checking a copy before importing it.
+    ///
+    /// Each row must name its entity, as HA's `async_load` needs
+    /// (`item["state"]["entity_id"]`). An id that isn't a valid entity id
+    /// passes: HA skips such a row, and so does [`RestoreState::load`].
     pub fn check(config_dir: &Path) -> Result<(), crate::storage::StoreError> {
-        store(config_dir).load::<Vec<Value>>().map(drop)
+        #[derive(serde::Deserialize)]
+        struct Row {
+            #[allow(dead_code)]
+            state: State,
+        }
+        #[derive(serde::Deserialize)]
+        struct State {
+            #[allow(dead_code)]
+            entity_id: String,
+        }
+        store(config_dir).load::<Vec<Row>>().map(drop)
     }
 
     /// Read `.storage/core.restore_state` (blocking; at start-up). One that

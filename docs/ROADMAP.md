@@ -177,9 +177,10 @@ ids, addresses, names and coordinates replaced with fake ones
         report marks each entry's integration as supported or not. Hue host/key,
         LIFX host, SwitchBot token/secret and mobile_app registration are used
         by the implemented integrations in M4/M5
-  - [x] Releases after the pin: the importer takes any config directory
-        Home Assistant 2026.6.1 would itself load after a downgrade, which
-        is 2026.6.x and 2026.7.x (`TESTED_HA`). A store of a newer major
+  - [x] Releases after the pin: the importer decides store by store,
+        starting from what Home Assistant 2026.6.1 does with a newer file
+        after a downgrade and stricter where `hars` could not keep the
+        data. It takes 2026.6.x and 2026.7.x (`TESTED_HA`). A store of a newer major
         storage version, a registry or `person` store of a newer minor
         version, an entity, device or area registry or
         `core.config_entries` of any minor version but the one `hars`

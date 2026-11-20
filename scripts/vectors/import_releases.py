@@ -39,7 +39,9 @@ It writes crates/ha-server/tests/vectors/import/:
   2026.6.1 itself does with each of those directories. `loads`: whether
   its `bootstrap.async_load_base_functionality` (registries, config
   entries, restore state) accepts it, with the errors it logged when it
-  doesn't; hars imports a directory exactly when this is true. This is
+  doesn't; for these directories hars's import decides the same (elsewhere
+  it is stricter than Home Assistant, for example on an older
+  `core.config_entries`, which Home Assistant migrates). This is
   the base of 2026.6.1's start-up only: it sets no integration up, and it
   stops at the first store it can't read (the device registry, for 2026.8
   and later), so it says nothing about what else in those directories

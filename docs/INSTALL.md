@@ -170,6 +170,10 @@ If hars already has a login, or has run once, the import refuses to replace
 what's there; add `--force` to replace it. Stop Home Assistant before
 starting hars if both use port 8123.
 
+An import that was interrupted leaves `hars/config/.import-staging` behind,
+and the next one stops rather than clear a folder it didn't make. If no
+other import is running, delete that folder and import again.
+
 ### Which Home Assistant releases
 
 The file `.HA_VERSION` in the config folder says which release wrote it.
@@ -223,7 +227,10 @@ serves the 2026.6 frontend (the import says so). Expect:
 tested with it (`ha_version_tested`) and the release hars behaves like
 (`behaves_like`).
 
-The import checks each file's own storage version, not only `.HA_VERSION`.
+hars is tested with 2026.6 and 2026.7. The import decides file by file: it
+checks each file's own storage version, not only `.HA_VERSION`, so what
+stops a 2026.8 or newer folder is the format of its device list, not the
+number.
 It also refuses a folder whose device, entity or area list or integration
 settings are at an *older* storage version than 2026.6 writes: start Home
 Assistant 2026.6 or 2026.7 on the folder once, which brings them up to
