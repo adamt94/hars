@@ -2018,3 +2018,52 @@ async fn a_climate_is_not_added_under_an_id_with_a_bad_last_state() {
     );
     assert_eq!(state(&home.hass, "switch.den")["state"], "unknown");
 }
+
+/// A command still in flight on an air conditioner that then fails to be
+/// added under a new id (its last kept state there isn't a mode) writes
+/// nothing when it finishes: no state comes back under either id, as HA's
+/// entity that did not reach `ADDED` writes none.
+#[tokio::test]
+async fn a_command_in_flight_does_not_bring_back_a_climate_that_failed_to_move() {
+    let home = home().await;
+    add(&home, TOKEN).await;
+    // What an earlier entity left for `climate.den`.
+    let den = EntityId::parse("climate.den").unwrap();
+    home.hass
+        .set_state(den.clone(), "bogus", Default::default());
+    home.hass.restore().register("climate.den", None);
+    home.hass.restore().unregister(&home.hass, "climate.den");
+    home.hass.remove_state(&den);
+
+    home.api.take();
+    let hold = Arc::new(tokio::sync::Notify::new());
+    *home.api.hold.lock() = Some(hold.clone());
+    let in_flight = {
+        let hass = home.hass.clone();
+        tokio::spawn(async move {
+            let data = json!({"entity_id": "climate.air_conditioner", "hvac_mode": "heat"});
+            let data = data.as_object().unwrap().clone();
+            hass.call_service("climate", "set_hvac_mode", data, None, false, None)
+                .await
+        })
+    };
+    // The command has reached the API, which holds its answer.
+    while home.api.count() < 1 {
+        home.api.arrived.notified().await;
+    }
+    rename(
+        &home.registry,
+        &home.flows.components,
+        "climate.air_conditioner",
+        "climate.den",
+    );
+    hold.notify_one();
+    *home.api.hold.lock() = None;
+    in_flight.await.unwrap().unwrap();
+    assert_eq!(state(&home.hass, "climate.air_conditioner"), Value::Null);
+    assert_eq!(
+        state(&home.hass, "climate.den"),
+        Value::Null,
+        "the command wrote a state for an entity that was not added"
+    );
+}

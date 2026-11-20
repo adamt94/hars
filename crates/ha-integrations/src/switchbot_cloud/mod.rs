@@ -32,6 +32,7 @@ use ha_core::{Attributes, EntityId, Hass, ServiceError};
 use ha_registry::{DeviceInfo, EntityPatch, Registries, Registry};
 use parking_lot::Mutex;
 use serde_json::{Map, Value, json};
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
@@ -105,7 +106,17 @@ struct Ident {
     device_name: String,
     /// The entity's own name beside the device's.
     name: Option<&'static str>,
-    now: Mutex<(EntityId, String)>,
+    now: Mutex<Now>,
+}
+
+/// An entity's id and friendly name, and whether it is added under them.
+struct Now {
+    entity_id: EntityId,
+    friendly: String,
+    /// False once the entity failed to be added again under a new id: it
+    /// writes nothing from then on, as HA's entity that did not reach
+    /// `ADDED` (`_async_verify_state_writable`).
+    added: bool,
 }
 
 /// What became of an entity's row.
@@ -114,12 +125,14 @@ enum Followed {
     Named,
     /// Another id: the old one, and the new.
     Moved(EntityId, EntityId),
+    /// Another id, under which it could not be added: the old one.
+    Failed(EntityId),
 }
 
 impl Ident {
     /// The entity's id now.
     fn entity_id(&self) -> EntityId {
-        self.now.lock().0.clone()
+        self.now.lock().entity_id.clone()
     }
 
     /// Write the entity's state where it is now: the state and attributes
@@ -127,25 +140,40 @@ impl Ident {
     /// the lock the id changes under. So the id can't change between
     /// being read and the state being written (a write that began under
     /// the old id is in the state machine before the move takes the old
-    /// state out, never after), and what is written is what the entity
-    /// has at that moment, not a copy taken before a move restored
-    /// something else.
+    /// state out, never after), what is written is what the entity has at
+    /// that moment, not a copy taken before a move restored something
+    /// else, and an entity that could not be added under its new id
+    /// writes nothing, whoever still holds it.
     fn publish(
         &self,
         shared: &Shared,
-        payload: impl FnOnce(&str) -> (String, Attributes),
+        payload: impl FnOnce(&str) -> (Cow<'static, str>, Attributes),
         context: Option<ha_core::Context>,
     ) {
         let now = self.now.lock();
-        let (state, attributes) = payload(&now.1);
-        shared.write(now.0.clone(), &state, attributes, context);
+        if !now.added {
+            return;
+        }
+        let (state, attributes) = payload(&now.friendly);
+        shared.write(now.entity_id.clone(), &state, attributes, context);
     }
 
     /// Take the id and name `names` has for the entity now. A row that is
     /// gone or disabled changes nothing: its entity runs on until its
     /// entry is set up again.
-    fn follow(&self, names: &crate::naming::Names<'_>, device: &str) -> Followed {
-        let Some(new) = names.entity(
+    ///
+    /// For another id, `moved` (given the old id and the new) takes the
+    /// entity out from under the old one and says whether it can be added
+    /// under the new, all before any state write of the entity gets
+    /// another turn: a command that finishes meanwhile writes after the
+    /// decision, or not at all.
+    fn follow(
+        &self,
+        names: &crate::naming::Names<'_>,
+        device: &str,
+        moved: impl FnOnce(&EntityId, &EntityId) -> bool,
+    ) -> Followed {
+        let Some((entity_id, friendly)) = names.entity(
             self.domain,
             &self.unique_id,
             device,
@@ -155,13 +183,19 @@ impl Ident {
             return Followed::Same;
         };
         let mut now = self.now.lock();
-        if *now == new {
+        if !now.added || (now.entity_id == entity_id && now.friendly == friendly) {
             return Followed::Same;
         }
-        let old = std::mem::replace(&mut *now, new);
-        match old.0 == now.0 {
-            true => Followed::Named,
-            false => Followed::Moved(old.0, now.0.clone()),
+        now.friendly = friendly;
+        if now.entity_id == entity_id {
+            return Followed::Named;
+        }
+        let old = std::mem::replace(&mut now.entity_id, entity_id);
+        if moved(&old, &now.entity_id) {
+            Followed::Moved(old, now.entity_id.clone())
+        } else {
+            now.added = false;
+            Followed::Failed(old)
         }
     }
 }
@@ -273,6 +307,8 @@ impl crate::components::Follower for Entry {
         let hass = &self.shared.hass;
         let registries = components.registries();
         let names = crate::naming::Names::new(hass, &registries, DOMAIN);
+        // `async_remove`: its last state is kept for a restore, then its
+        // state goes.
         let gone = |old: &EntityId, restores: bool| {
             if restores {
                 hass.restore().unregister(hass, old.as_str());
@@ -280,25 +316,29 @@ impl crate::components::Follower for Entry {
             hass.remove_state(old);
         };
         for s in &self.sensors {
-            match s.ident.follow(&names, &s.device) {
-                Followed::Same => continue,
-                Followed::Named => {}
-                Followed::Moved(old, _) => gone(&old, false),
+            let moved = |old: &EntityId, _: &EntityId| {
+                gone(old, false);
+                true
+            };
+            if !matches!(s.ident.follow(&names, &s.device, moved), Followed::Same) {
+                s.write();
             }
-            s.write();
         }
         for b in self.buttons.lock().iter_mut() {
-            match b.ident.follow(&names, &b.device) {
-                Followed::Same => continue,
+            let moved = |old: &EntityId, new: &EntityId| {
+                gone(old, true);
+                // `async_internal_added_to_hass` again: a last press kept
+                // under the new id (it was this entity's id before) is
+                // taken; else what it had stays.
+                if let Some(last) = crate::button::restore(hass, new) {
+                    *b.last.lock() = Some(last);
+                }
+                true
+            };
+            match b.ident.follow(&names, &b.device, moved) {
+                Followed::Same | Followed::Failed(_) => continue,
                 Followed::Named => {}
                 Followed::Moved(old, new) => {
-                    gone(&old, true);
-                    // `async_internal_added_to_hass` again: a last press
-                    // kept under the new id (it was this entity's id
-                    // before) is taken; else what it had stays.
-                    if let Some(last) = crate::button::restore(hass, &new) {
-                        *b.last.lock() = Some(last);
-                    }
                     components.buttons().remove(&old);
                     *b = Arc::new(BotButton {
                         entity_id: new,
@@ -310,30 +350,37 @@ impl crate::components::Follower for Entry {
             b.write();
         }
         // A climate whose last state under its new id isn't a mode is not
-        // added there (HA's `async_added_to_hass` raises): it is gone
-        // until its entry is set up again.
+        // added there (HA's `async_added_to_hass` raises): it is gone, and
+        // writes nothing more, until its entry is set up again.
         let mut failed: Vec<EntityId> = Vec::new();
         for c in self.climates.lock().iter_mut() {
-            match c.ident.follow(&names, &c.device) {
+            let moved = |old: &EntityId, new: &EntityId| {
+                gone(old, true);
+                // `async_added_to_hass` again, for the new id.
+                if !c.st.lock().restore(hass, new) {
+                    tracing::error!(
+                        "Error adding entity {new} for domain climate with platform switchbot_cloud: its last state is not a valid HVACMode"
+                    );
+                    return false;
+                }
+                hass.restore().register(new.as_str(), None);
+                true
+            };
+            match c.ident.follow(&names, &c.device, moved) {
                 Followed::Same => continue,
                 Followed::Named => {}
                 Followed::Moved(old, new) => {
-                    gone(&old, true);
                     components.climates().remove(&old);
-                    // `async_added_to_hass` again, for the new id.
-                    if !c.st.lock().restore(hass, &new) {
-                        tracing::error!(
-                            "Error adding entity {new} for domain climate with platform switchbot_cloud: its last state is not a valid HVACMode"
-                        );
-                        failed.push(old);
-                        continue;
-                    }
-                    hass.restore().register(new.as_str(), None);
                     *c = Arc::new(AcClimate {
                         entity_id: new,
                         ..(**c).clone()
                     });
                     components.climates().add(c.clone());
+                }
+                Followed::Failed(old) => {
+                    components.climates().remove(&old);
+                    failed.push(old);
+                    continue;
                 }
             }
             c.write();
@@ -342,11 +389,14 @@ impl crate::components::Follower for Entry {
             .lock()
             .retain(|c| !failed.contains(&c.entity_id));
         for s in self.switches.lock().iter_mut() {
-            match s.ident.follow(&names, &s.device) {
-                Followed::Same => continue,
+            let moved = |old: &EntityId, _: &EntityId| {
+                gone(old, false);
+                true
+            };
+            match s.ident.follow(&names, &s.device, moved) {
+                Followed::Same | Followed::Failed(_) => continue,
                 Followed::Named => {}
                 Followed::Moved(old, new) => {
-                    gone(&old, false);
                     components.switches().remove(&old);
                     *s = Arc::new(AcSwitch {
                         entity_id: new,
@@ -637,13 +687,17 @@ fn build(
     for d in devices {
         // An entity's id and name, unless its row is disabled.
         let ident = |domain: &'static str, unique_id: &str, name: Option<&'static str>| {
-            let now = names.entity(domain, unique_id, &d.id, &d.name, name)?;
+            let (entity_id, friendly) = names.entity(domain, unique_id, &d.id, &d.name, name)?;
             Some(Arc::new(Ident {
                 domain,
                 unique_id: unique_id.to_owned(),
                 device_name: d.name.clone(),
                 name,
-                now: Mutex::new(now),
+                now: Mutex::new(Now {
+                    entity_id,
+                    friendly,
+                    added: true,
+                }),
             }))
         };
         let sensor = |key: &'static str, name: &'static str, class: &str, unit: &str| {
@@ -929,7 +983,7 @@ impl Sensor {
                 };
                 let mut attrs = self.attrs.clone();
                 attrs.insert("friendly_name".into(), json!(friendly));
-                (state, attrs)
+                (Cow::Owned(state), attrs)
             },
             None,
         );
@@ -963,7 +1017,7 @@ impl BotButton {
                 };
                 let mut a = Map::new();
                 a.insert("friendly_name".into(), json!(friendly));
-                (state, a)
+                (Cow::Owned(state), a)
             },
             context,
         );
@@ -1087,7 +1141,7 @@ impl AcClimate {
                     json!(self.supported_features()),
                 );
                 let mode = self.st.lock().mode.clone();
-                (mode, a)
+                (Cow::Owned(mode), a)
             },
             None,
         );
@@ -1248,7 +1302,8 @@ impl AcSwitch {
                 let mut a = Map::new();
                 a.insert("device_class".into(), json!("switch"));
                 a.insert("friendly_name".into(), json!(friendly));
-                (state.to_owned(), a)
+                // Borrowed: an unchanged report allocates nothing for it.
+                (Cow::Borrowed(state), a)
             },
             None,
         );
