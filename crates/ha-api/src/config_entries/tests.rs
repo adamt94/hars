@@ -10,7 +10,7 @@
 //! - which integrations `flow_handlers` lists: `hars` lists its own, which
 //!   must be among HA's.
 
-use crate::ws::tests::{Client, Server, server_on, token};
+use crate::ws::tests::{Client, Kept, Server, server_on, token};
 use axum::body::Body;
 use axum::extract::ConnectInfo;
 use axum::http::Request;
@@ -285,17 +285,22 @@ impl Ids {
     }
 }
 
-/// A WebSocket with the generator's id counter.
+/// A WebSocket with the generator's id counter, kept read between its
+/// uses (a replay opens several and leaves each alone for many steps, far
+/// longer than the server's heartbeat on a slow machine).
 struct Socket {
-    client: Client,
+    client: Kept,
     next: u64,
+    /// Where the test is (a scenario and step), for a failure's message.
+    at: String,
 }
 
 impl Socket {
     async fn open(home: &Home, who: &str) -> Self {
         Self {
-            client: Client::authed(&home.server, &home.tokens[who]).await,
+            client: Client::authed(&home.server, &home.tokens[who]).await.kept(),
             next: 1,
+            at: format!("{who}'s socket"),
         }
     }
 
@@ -304,10 +309,10 @@ impl Socket {
         let mut sent = msg.as_object().unwrap().clone();
         sent.insert("id".into(), json!(self.next));
         self.next += 1;
-        self.client.send(Value::Object(sent)).await;
+        self.client.send(Value::Object(sent), &self.at);
         let mut replies = Vec::new();
         loop {
-            let reply = self.client.recv().await;
+            let reply = self.client.recv(&self.at).await;
             let done = matches!(reply["type"].as_str(), Some("result" | "pong"));
             replies.push(reply);
             if done {
@@ -360,6 +365,12 @@ fn by_row(event: &Value) -> String {
 }
 
 async fn replay(scenario: &Value) {
+    replay_slowly(scenario, std::time::Duration::ZERO).await;
+}
+
+/// [`replay`], on a machine that takes `pause` to get from opening the
+/// sockets to the first step.
+async fn replay_slowly(scenario: &Value, pause: std::time::Duration) {
     let name = scenario["name"].as_str().unwrap();
     // `device_step.py`'s scenarios: events sorted by row within a step,
     // and the registries and states compared at the end.
@@ -381,17 +392,26 @@ async fn replay(scenario: &Value) {
         let mut socket = Socket::open(&home, "admin").await;
         let mut msg = sub["msg"].as_object().unwrap().clone();
         msg.insert("id".into(), json!(1));
-        socket.client.send(Value::Object(msg)).await;
+        socket.at = format!("{name}: subscribing to {}", sub["sub"]);
+        socket.client.send(Value::Object(msg), &socket.at);
         let mut first = Vec::new();
         for _ in sub["first"].as_array().unwrap() {
-            first.push(socket.client.recv().await);
+            first.push(socket.client.recv(&socket.at).await);
         }
         assert_eq!(json!(first), sub["first"], "{name}: {}", sub["sub"]);
         socket.next = 2;
         subs.push((sub["sub"].as_str().unwrap(), socket));
     }
+    tokio::time::sleep(pause).await;
     for (n, step) in scenario["steps"].as_array().unwrap().iter().enumerate() {
         let at = format!("{name}, step {n}: {step:.300}");
+        // A socket that fails says where the replay was.
+        for socket in sockets
+            .values_mut()
+            .chain(subs.iter_mut().map(|s| &mut s.1))
+        {
+            socket.at.clone_from(&at);
+        }
         if let Some(mode) = step["api"].as_str() {
             *home.api.mode.lock() = mode.to_owned();
             continue;
@@ -522,10 +542,10 @@ async fn replay(scenario: &Value) {
             let expected = want.iter().filter(|e| e["sub"] == *sub).count();
             let mut got = Vec::new();
             for _ in 0..expected {
-                let wait = std::time::Duration::from_secs(2);
-                match tokio::time::timeout(wait, socket.client.recv()).await {
-                    Ok(event) => got.push(event),
-                    Err(_) => panic!("{at}\n{sub}: {expected} events expected, got {got:#?}"),
+                let wait = std::time::Duration::from_secs(5);
+                match socket.client.recv_within(wait, &at).await {
+                    Some(event) => got.push(event),
+                    None => panic!("{at}\n{sub}: {expected} events expected, got {got:#?}"),
                 }
             }
             let mut rest = socket.call(&json!({"type": "ping"})).await;
@@ -625,6 +645,19 @@ async fn flows_answer_as_home_assistant() {
     for scenario in &scenarios {
         replay(scenario).await;
     }
+}
+
+/// A replay's sockets wait their turn for longer than the server's
+/// heartbeat allows a silent client (200 ms in test builds, dropped after
+/// two) whenever the machine is slow: CI lost one that way, with a broken
+/// pipe at its next use. They are read all the while, so the replay gets
+/// through however slow.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_replay_outlasts_the_heartbeat() {
+    let pause = std::time::Duration::from_millis(900);
+    replay_slowly(&scenarios()[0], pause).await;
+    let all: Value = serde_json::from_str(include_str!("vectors/device_step.json")).unwrap();
+    replay_slowly(&all["scenarios"][0], pause).await;
 }
 
 /// The dialog's last step and the device page's dialog, as HA 2026.6.1

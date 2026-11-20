@@ -40,6 +40,45 @@ pub(crate) async fn server_on(hass: Hass, config: crate::ApiConfig) -> Server {
     Server { url, hass, auth }
 }
 
+/// A [`Client`] that a task of its own keeps reading, so the server's
+/// heartbeat is answered however long a test leaves the connection alone.
+/// A `Client` answers a ping only while the test reads it: one left idle
+/// for two heartbeats (400 ms in test builds, which a slow machine spends
+/// on a few steps of a replay) is dropped by the server, and its next use
+/// fails with a broken pipe.
+pub(crate) struct Kept {
+    out: tokio::sync::mpsc::UnboundedSender<Value>,
+    inbox: tokio::sync::mpsc::UnboundedReceiver<Result<Value, String>>,
+}
+
+impl Kept {
+    /// Send; `at` says where the test is, should the connection be gone.
+    pub(crate) fn send(&self, msg: Value, at: &str) {
+        if self.out.send(msg).is_err() {
+            panic!("{at}: the WebSocket is closed");
+        }
+    }
+
+    /// The next message, or `None` after `wait` without one. A connection
+    /// that failed panics, saying how and `at`.
+    pub(crate) async fn recv_within(&mut self, wait: Duration, at: &str) -> Option<Value> {
+        match tokio::time::timeout(wait, self.inbox.recv()).await {
+            Ok(Some(Ok(msg))) => Some(msg),
+            Ok(Some(Err(why))) => panic!("{at}: the WebSocket failed: {why}"),
+            Ok(None) => panic!("{at}: the WebSocket is closed"),
+            Err(_) => None,
+        }
+    }
+
+    /// The next message; none within 5 s is a failure.
+    pub(crate) async fn recv(&mut self, at: &str) -> Value {
+        match self.recv_within(Duration::from_secs(5), at).await {
+            Some(msg) => msg,
+            None => panic!("{at}: no message within 5 s"),
+        }
+    }
+}
+
 pub(crate) struct Client {
     ws: Ws,
     /// Messages from coalesced frames not yet returned.
@@ -109,6 +148,46 @@ impl Client {
                 Ok(Some(Ok(_))) => {}
             }
         }
+    }
+
+    /// Hand the connection to a task that reads it all the time: see
+    /// [`Kept`].
+    pub(crate) fn kept(self) -> Kept {
+        assert!(self.pending.is_empty(), "messages not yet read");
+        let (out, mut to_send) = tokio::sync::mpsc::unbounded_channel::<Value>();
+        let (got, inbox) = tokio::sync::mpsc::unbounded_channel();
+        let mut ws = self.ws;
+        tokio::spawn(async move {
+            // What ends the connection is told to whoever reads next.
+            let end = loop {
+                tokio::select! {
+                    msg = to_send.recv() => {
+                        let Some(msg) = msg else { return };
+                        if let Err(e) = ws.send(Message::Text(msg.to_string().into())).await {
+                            break format!("sending failed: {e}");
+                        }
+                    }
+                    frame = ws.next() => match frame {
+                        Some(Ok(Message::Text(text))) => {
+                            let msgs = match serde_json::from_str(&text).unwrap() {
+                                Value::Array(msgs) => msgs,
+                                msg => vec![msg],
+                            };
+                            for msg in msgs {
+                                let _ = got.send(Ok(msg));
+                            }
+                        }
+                        // Reading is what answers a ping.
+                        Some(Ok(Message::Ping(_) | Message::Pong(_))) => {}
+                        Some(Ok(other)) => break format!("unexpected frame {other:?}"),
+                        Some(Err(e)) => break format!("reading failed: {e}"),
+                        None => break "the server closed the connection".to_owned(),
+                    },
+                }
+            };
+            let _ = got.send(Err(end));
+        });
+        Kept { out, inbox }
     }
 
     pub(crate) async fn authed(server: &Server, token: &str) -> Self {
@@ -630,6 +709,24 @@ async fn reqwest_get(url: &str, token: &str) -> Value {
     stream.read_to_string(&mut buf).await.unwrap();
     assert!(buf.starts_with("HTTP/1.1 200"), "{buf}");
     serde_json::from_str(buf.split_once("\r\n\r\n").unwrap().1).unwrap()
+}
+
+/// A connection handed to [`Client::kept`] outlives any number of
+/// heartbeats without the test touching it, where a plain [`Client`] left
+/// alone that long is dropped (the test below): what the replays of HA's
+/// conversations need, which open several sockets and use each only now
+/// and then.
+#[tokio::test]
+async fn a_kept_client_answers_heartbeats_while_the_test_is_elsewhere() {
+    let s = server().await;
+    let (token, _) = token(&s.auth);
+    let mut kept = Client::authed(&s, &token).await.kept();
+    tokio::time::sleep(super::HEARTBEAT * 4).await;
+    kept.send(json!({"id": 1, "type": "ping"}), "after four heartbeats");
+    assert_eq!(
+        kept.recv("after four heartbeats").await,
+        json!({"id": 1, "type": "pong"})
+    );
 }
 
 /// A client that stops answering (no pong for a whole heartbeat) is dropped;
