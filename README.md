@@ -36,21 +36,22 @@ formats, so you can bring an existing install with you.
 
 | Measured on the same home | Home Assistant 2026.6.1 | hars | Difference |
 |---|---|---|---|
-| Memory | 203 MiB | 10.7 MiB | 19× less |
-| Start-up time | 5.85 s | 0.39 s | 15× faster |
-| CPU at rest, share of one core | 0.199 % | 0.023 % | 9× less |
-| CPU wakeups each second | 3.4 | 0.75 | 4.5× fewer |
+| Memory | 203 MiB | 11.1 MiB | 18× less |
+| Start-up time | 5.85 s | 0.59 s | 10× faster |
+| CPU at rest, share of one core | 0.199 % | 0.015 % | 13× less |
+| CPU wakeups each second | 3.4 | 0.65 | 5× fewer |
 
 Both ran in Docker on one machine with the same devices: Hue, LIFX, and
-SwitchBot, a weather forecast, an iPhone, and 4 automations.
-[The performance results](docs/perf/RESULTS.md#reference-install-hars-and-ha-2026-11-16)
+SwitchBot, a weather forecast, an iPhone, and 4 automations. Home Assistant
+was measured on 15 November 2026 and the current hars on 20 November.
+[The performance results](docs/perf/RESULTS.md#reference-install-again-2026-11-20)
 describe how each number was measured.
 
 - **It fits on small hardware.** A new install idles at 10 MiB of memory,
   with no CPU use and no wakeups. A Raspberry Pi keeps almost all of its
   memory for other things.
-- **It restarts in under a second.** An upgrade doesn't leave your
-  automations off for long.
+- **It restarts in under a second** when your devices answer. An upgrade
+  doesn't leave your automations off for long.
 - **It sleeps when your home is quiet.** hars does no background busywork.
   It wakes for a device message or a timer, then sleeps again, so a small
   computer's CPU can stay in its sleep states.
@@ -260,6 +261,7 @@ part follows the [code of conduct](CODE_OF_CONDUCT.md).
 ## License
 
 hars is licensed under [Apache-2.0](LICENSE), as Home Assistant is.
+[NOTICE](NOTICE) lists the projects that hars is ported from and ships with.
 
 hars is an independent project. It is not affiliated with or endorsed by the
 Home Assistant project, the Open Home Foundation, or Nabu Casa. "Home

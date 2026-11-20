@@ -158,8 +158,9 @@ Use the issue templates. Security problems go through
 hars is licensed under [Apache-2.0](LICENSE). By contributing you agree that
 your contribution is licensed under the same terms (Apache-2.0, section 5).
 When you port code from Home Assistant (Apache-2.0) or a library it uses,
-check the library's licence is compatible (Apache-2.0, MIT, BSD) and say what
-you ported in the module's doc comment.
+check the library's licence is compatible (Apache-2.0, MIT, BSD), say what
+you ported in the module's doc comment, and add the library to
+[NOTICE](NOTICE) with its licence and copyright line.
 
 hars is an independent project. It is not affiliated with or endorsed by the
 Home Assistant project or Nabu Casa. Please don't ask for support with hars

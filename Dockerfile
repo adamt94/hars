@@ -18,6 +18,7 @@ RUN apk add --no-cache curl unzip && \
     curl -fsSL "$FRONTEND_URL" -o /frontend.whl && \
     echo "$FRONTEND_SHA256  /frontend.whl" | sha256sum -c - && \
     unzip -q /frontend.whl 'hass_frontend/*' -d /out && \
+    unzip -q -j /frontend.whl '*.dist-info/licenses/LICENSE.md' -d /out/licence && \
     rm -rf /out/hass_frontend/__init__.py /out/hass_frontend/py.typed && \
     find /out/hass_frontend -name '*.map' -o -name '*.map.br' -o -name '*.map.gz' | xargs rm -f
 COPY scripts/patch_frontend_map.py /patch_frontend_map.py
@@ -39,6 +40,10 @@ FROM scratch
 COPY --from=build /usr/share/zoneinfo /usr/share/zoneinfo
 COPY --from=frontend /out/hass_frontend /frontend
 COPY --from=build /hars /hars
+# The licences the image must carry: hars's own and its notices, and the
+# frontend's.
+COPY --from=build /src/LICENSE /src/NOTICE /licenses/
+COPY --from=frontend /out/licence/LICENSE.md /licenses/home-assistant-frontend-LICENSE.md
 ENV HARS_BIND=0.0.0.0:8123 \
     HARS_FRONTEND=/frontend \
     HARS_CONFIG=/config

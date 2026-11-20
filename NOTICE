@@ -1,0 +1,114 @@
+hars (homeassistant-rust)
+Copyright 2026 the hars contributors
+
+hars is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+hars is an independent project. It is not affiliated with or endorsed by the
+Home Assistant project, the Open Home Foundation, or Nabu Casa.
+
+This file lists the work of other people that hars contains, was ported
+from, or ships with. A "port" here means Rust code written to reproduce the
+behaviour of the named work, by reading its source.
+
+
+1. Work that hars is ported from
+--------------------------------
+
+Home Assistant Core 2026.6.1
+  https://github.com/home-assistant/core
+  Apache License 2.0. Copyright Home Assistant Core authors.
+  hars reproduces the behaviour, storage formats, HTTP and WebSocket API,
+  and service schemas of Home Assistant's core and of these components:
+  api, auth, automation, brands, button, climate, config, frontend, history,
+  hue, lifx, light, logbook, lovelace, met, mobile_app, notify, onboarding,
+  person, recorder, scene, sun, switch, switchbot_cloud, system_log,
+  weather, websocket_api, and zone. The translations, icons, manifests, and
+  the country, currency, language, unit, and light-profile tables that hars
+  compiles in are generated from Home Assistant's release files. The test
+  vectors under each crate's `vectors` directory are the output of Home
+  Assistant's own code.
+
+astral 2.2
+  https://github.com/sffjunkie/astral
+  Apache License 2.0. Copyright Simon Kennedy.
+  The sun position and sun event calculations in
+  crates/ha-integrations/src/sun are a port.
+
+aiohue 4.8.1
+  https://github.com/home-assistant-libs/aiohue
+  Apache License 2.0. Copyright Paulus Schoutsen, Marcel van der Veldt, and
+  the aiohue contributors.
+  The Hue bridge client, resource merge rules, and request bodies in
+  crates/ha-integrations/src/hue are a port.
+
+PyMetno 0.13.0
+  https://github.com/Danielhiversen/pyMetno
+  MIT License. Copyright (c) 2018 Daniel Høyer Iversen.
+  The forecast parser in crates/ha-integrations/src/met is a port.
+
+aiolifx 1.2.1
+  https://github.com/aiolifx/aiolifx
+  MIT License.
+  Copyright (c) 2016, 2024 François Wautier.
+  Copyright (c) 2018, 2024 Avi Miller.
+  Copyright (c) 2022 Michael Farrell.
+  The LIFX LAN protocol framing and message matching in
+  crates/ha-integrations/src/lifx are a port.
+
+switchbot-api 2.11.0
+  https://github.com/SeraphicCorp/py-switchbot-api
+  MIT License. Copyright (c) 2023 Seraphic Corp.
+  The request signing, response envelope, and error classes in
+  crates/ha-integrations/src/switchbot_cloud are a port.
+
+The MIT License, which applies to PyMetno, aiolifx, and switchbot-api:
+
+  Permission is hereby granted, free of charge, to any person obtaining a
+  copy of this software and associated documentation files (the "Software"),
+  to deal in the Software without restriction, including without limitation
+  the rights to use, copy, modify, merge, publish, distribute, sublicense,
+  and/or sell copies of the Software, and to permit persons to whom the
+  Software is furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in
+  all copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+  DEALINGS IN THE SOFTWARE.
+
+
+2. Work that is in this repository
+----------------------------------
+
+minijinja 3.1.0, in vendor/minijinja
+  https://github.com/mitsuhiko/minijinja
+  Apache License 2.0 (vendor/minijinja/LICENSE). Copyright Armin Ronacher.
+  Modified by the hars contributors. vendor/minijinja/HARS.md lists each
+  change.
+
+
+3. Work that the Docker image ships with
+----------------------------------------
+
+Home Assistant frontend 20260527.4, unmodified except for the map tile
+source (docs/adr/0010-map-tiles-from-osm.md)
+  https://github.com/home-assistant/frontend
+  Apache License 2.0. Copyright Home Assistant frontend authors.
+  The frontend includes its own third-party software and artwork. The Home
+  Assistant name and logo in the frontend belong to their owner.
+
+The IANA Time Zone Database
+  https://www.iana.org/time-zones
+  Public domain.
+
+The Rust crates that hars is built from are listed in Cargo.lock. Each one
+carries its own licence, all of them permissive (MIT, Apache-2.0, BSD, ISC,
+Unicode-3.0, Unlicense, or CDLA-Permissive-2.0 for the Mozilla root
+certificates in webpki-roots). To list them, run:
+
+  cargo metadata --format-version 1 --locked

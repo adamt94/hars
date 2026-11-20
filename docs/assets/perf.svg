@@ -1,10 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 416" width="800" height="416" role="img" aria-labelledby="t d" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
   <title id="t">hars and Home Assistant on the same home</title>
-  <desc id="d">Four comparisons from one host with the same devices and automations. Memory: Home Assistant 203 MiB, hars 10.7 MiB. Start-up time: Home Assistant 5.85 seconds, hars 0.39 seconds. CPU at rest: Home Assistant 0.199 percent of one core, hars 0.023 percent. Wakeups per second: Home Assistant 3.4, hars 0.75.</desc>
+  <desc id="d">Four comparisons from one host with the same devices and automations. Memory: Home Assistant 203 MiB, hars 11.1 MiB. Start-up time: Home Assistant 5.85 seconds, hars 0.59 seconds. CPU at rest: Home Assistant 0.199 percent of one core, hars 0.015 percent. Wakeups per second: Home Assistant 3.4, hars 0.65.</desc>
   <!--
-    Numbers: docs/perf/RESULTS.md, "Reference install, hars and HA, 2026-11-16".
+    Numbers: docs/perf/RESULTS.md, "Reference install again, 2026-11-20".
     Each bar is 160 px for the Home Assistant value. The hars bar is
-    160 * hars / Home Assistant: 8.4, 10.7, 18.5 and 35.3 px.
+    160 * hars / Home Assistant: 8.7, 16.1, 12.1 and 30.6 px.
   -->
   <style>
     .surface { fill: #fcfcfb; }
@@ -50,49 +50,49 @@
   <!-- Memory. -->
   <g transform="translate(32 104)">
     <text class="label ink2" y="14">Memory</text>
-    <text class="hero ink" y="52">19× less</text>
+    <text class="hero ink" y="52">18× less</text>
     <text class="name ink2" y="81">Home Assistant</text>
     <path class="ha" d="M108 70h156a4 4 0 0 1 4 4v6a4 4 0 0 1-4 4h-156Z"/>
     <text class="value ink" x="276" y="81">203 MiB</text>
     <text class="name ink2" y="103">hars</text>
-    <path class="hars" d="M108 92h4.4a4 4 0 0 1 4 4v6a4 4 0 0 1-4 4h-4.4Z"/>
-    <text class="value ink" x="124.4" y="103">10.7 MiB</text>
+    <path class="hars" d="M108 92h4.7a4 4 0 0 1 4 4v6a4 4 0 0 1-4 4h-4.7Z"/>
+    <text class="value ink" x="124.7" y="103">11.1 MiB</text>
   </g>
 
   <!-- Start-up time. -->
   <g transform="translate(432 104)">
     <text class="label ink2" y="14">Start-up time</text>
-    <text class="hero ink" y="52">15× faster</text>
+    <text class="hero ink" y="52">10× faster</text>
     <text class="name ink2" y="81">Home Assistant</text>
     <path class="ha" d="M108 70h156a4 4 0 0 1 4 4v6a4 4 0 0 1-4 4h-156Z"/>
     <text class="value ink" x="276" y="81">5.85 s</text>
     <text class="name ink2" y="103">hars</text>
-    <path class="hars" d="M108 92h6.7a4 4 0 0 1 4 4v6a4 4 0 0 1-4 4h-6.7Z"/>
-    <text class="value ink" x="126.7" y="103">0.39 s</text>
+    <path class="hars" d="M108 92h12.1a4 4 0 0 1 4 4v6a4 4 0 0 1-4 4h-12.1Z"/>
+    <text class="value ink" x="132.1" y="103">0.59 s</text>
   </g>
 
   <!-- CPU at rest. -->
   <g transform="translate(32 250)">
     <text class="label ink2" y="14">CPU at rest, share of one core</text>
-    <text class="hero ink" y="52">9× less</text>
+    <text class="hero ink" y="52">13× less</text>
     <text class="name ink2" y="81">Home Assistant</text>
     <path class="ha" d="M108 70h156a4 4 0 0 1 4 4v6a4 4 0 0 1-4 4h-156Z"/>
     <text class="value ink" x="276" y="81">0.199 %</text>
     <text class="name ink2" y="103">hars</text>
-    <path class="hars" d="M108 92h14.5a4 4 0 0 1 4 4v6a4 4 0 0 1-4 4h-14.5Z"/>
-    <text class="value ink" x="134.5" y="103">0.023 %</text>
+    <path class="hars" d="M108 92h8.1a4 4 0 0 1 4 4v6a4 4 0 0 1-4 4h-8.1Z"/>
+    <text class="value ink" x="128.1" y="103">0.015 %</text>
   </g>
 
   <!-- Wakeups. -->
   <g transform="translate(432 250)">
     <text class="label ink2" y="14">CPU wakeups each second</text>
-    <text class="hero ink" y="52">4.5× fewer</text>
+    <text class="hero ink" y="52">5× fewer</text>
     <text class="name ink2" y="81">Home Assistant</text>
     <path class="ha" d="M108 70h156a4 4 0 0 1 4 4v6a4 4 0 0 1-4 4h-156Z"/>
     <text class="value ink" x="276" y="81">3.4</text>
     <text class="name ink2" y="103">hars</text>
-    <path class="hars" d="M108 92h31.3a4 4 0 0 1 4 4v6a4 4 0 0 1-4 4h-31.3Z"/>
-    <text class="value ink" x="151.3" y="103">0.75</text>
+    <path class="hars" d="M108 92h26.6a4 4 0 0 1 4 4v6a4 4 0 0 1-4 4h-26.6Z"/>
+    <text class="value ink" x="146.6" y="103">0.65</text>
   </g>
 
   <line class="rule" x1="32" y1="372" x2="768" y2="372"/>

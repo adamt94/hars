@@ -382,3 +382,39 @@ Against HA on the same host and devices: about 1/19th of the memory, 1/9th of
 the CPU, a fifth of the wakeups and 1/15th of the start-up time. The wakeups
 are the device traffic: the Hue event stream and the LIFX and SwitchBot
 polls, which HA does too. Within the [budgets](../PERF.md#budgets).
+
+### Reference install again, 2026-11-20
+
+The same install, now on `hars` alone: the image built from fc6592a
+(static musl, linux/aarch64) under `--memory 150m` on the same host, with
+the same devices and automations plus what has merged since 2026-11-16
+(templates in automations, push notifications, the automation editor and
+the Settings panel). HA's row is the 2026-11-15 measurement above: HA has
+been stopped since the cutover, so it was not run again.
+
+| | start-up | RSS | CPU | wakeups/s | threads |
+|---|---|---|---|---|---|
+| HA (2026-11-15) | 5.85 s | 203 MiB (427 MiB peak) | 0.199 % | 3.4 | 38 |
+| `hars`, fc6592a | 0.59 s | 11.1 MiB (12.5 MiB peak) | 0.015 % | 0.65 | 12 |
+
+- **RSS, CPU, wakeups**: `/proc` of the live process, read from a second
+  container in its pid namespace, 11.5 hours after it started. RSS is the
+  higher of two `smaps_rollup` readings five minutes apart (11.1 and 10.4
+  MiB); the peak is `VmHWM`. CPU and wakeups are the averages over the
+  whole 11.5 hours (`utime`+`stime` 6.02 s; 26,814 voluntary and
+  involuntary context switches over all threads), which include its
+  start-up and a day of normal use. The five quiet minutes alone measured
+  0.010 % and 0.54 wakeups/s, but 3 clock ticks is too few to quote.
+- **Start-up**: container start (`docker inspect` `StartedAt`) to the
+  `listening` log line, on a copy of the live data in shadow mode with the
+  network up, three runs: 0.53, 0.59 and 0.63 s. It was 0.39 s on
+  2026-11-16. `hars` waits for each integration's first answer before it
+  listens, as HA waits for set-up: when the host started before its
+  network on 2026-11-19, the same build took 15.3 s, because the Hue
+  bridge and the LIFX bulb did not answer until their time-outs.
+- **Threads**: 12, up from 4. They are not yet explained; idle CPU and
+  wakeups did not rise with them.
+
+Against HA on the same host and devices: about 1/18th of the memory, 1/13th
+of the CPU, a fifth of the wakeups and a tenth of the start-up time. Within
+the [budgets](../PERF.md#budgets).

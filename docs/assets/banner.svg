@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 280" width="880" height="280" role="img" aria-labelledby="t d" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
   <title id="t">hars: Home Assistant's core, rebuilt in Rust</title>
-  <desc id="d">The hars logo, a house with a gear inside, beside the line "Home Assistant's core, rebuilt in Rust. Your whole smart home in about 11 MiB of memory." Three labels read: 19 times less memory, 15 times faster start-up, same app and dashboards.</desc>
+  <desc id="d">The hars logo, a house with a gear inside, beside the line "Home Assistant's core, rebuilt in Rust. Your whole smart home in about 11 MiB of memory." Three labels read: 18 times less memory, 10 times faster start-up, same app and dashboards.</desc>
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#1b1613"/>
@@ -58,9 +58,9 @@
     <!-- Three facts. Each label has room for wider fonts. -->
     <g font-size="14" font-weight="600" fill="#ffd9c2">
       <rect x="58" y="220" width="178" height="30" rx="15" fill="#f0763a" fill-opacity="0.16" stroke="#f0763a" stroke-opacity="0.45"/>
-      <text x="147" y="240" text-anchor="middle">19× less memory</text>
+      <text x="147" y="240" text-anchor="middle">18× less memory</text>
       <rect x="248" y="220" width="204" height="30" rx="15" fill="#f0763a" fill-opacity="0.16" stroke="#f0763a" stroke-opacity="0.45"/>
-      <text x="350" y="240" text-anchor="middle">15× faster start-up</text>
+      <text x="350" y="240" text-anchor="middle">10× faster start-up</text>
       <rect x="464" y="220" width="236" height="30" rx="15" fill="#f0763a" fill-opacity="0.16" stroke="#f0763a" stroke-opacity="0.45"/>
       <text x="582" y="240" text-anchor="middle">Same app and dashboards</text>
     </g>
