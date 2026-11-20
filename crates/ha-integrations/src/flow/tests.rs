@@ -702,7 +702,6 @@ async fn removing_an_entry_during_its_setup_waits_for_the_setup() {
     assert_eq!(home.entries.list(), Some(Vec::new()));
     assert_eq!(home.entries.runtime(&id), None);
     assert_eq!(home.flows.tasks(), 0);
-    assert_eq!(home.flows.setups.lock().capacity(), 0);
     let snap = home.registry.snapshot();
     assert!(snap.devices.is_empty() && snap.entities.is_empty());
     assert!(home.hass.states().all().is_empty());
@@ -1018,7 +1017,7 @@ async fn a_restart_keeps_the_entity_ids() {
     );
     hass.setups_done().await;
     assert_eq!(started.tasks.len(), 1);
-    assert_eq!(started.tasks[0].0, id);
+    assert_eq!(started.tasks[0].entry_id, id);
     for (entity_id, s) in fresh()["states"].as_object().unwrap() {
         assert_eq!(state(&hass, entity_id), *s, "{entity_id}");
     }
@@ -1499,4 +1498,128 @@ async fn a_flow_at_work_is_not_dropped_to_make_room() {
     assert_eq!(home.flows.in_progress(), 0);
     // With room again, a flow starts.
     assert!(start().await.is_ok());
+}
+
+/// The entry's setup lock is its task's, not the request's that added it:
+/// an entry started at start-up has one too, and a removal waits for its
+/// first attempt as it does for a flow's.
+#[tokio::test]
+async fn removing_a_boot_time_entry_waits_for_its_first_attempt() {
+    let home = home().await;
+    let id = entry_id(&add(&home, TOKEN).await);
+    let stored = home.entries.list().unwrap();
+    let rows = (*home.registry.snapshot()).clone();
+
+    // The same install starting again, the API slow to answer.
+    let hass = Hass::new();
+    let registry = Registry::in_memory(&hass, rows);
+    let entries = ConfigEntries::in_memory(&hass, stored.clone());
+    let endpoints = Endpoints {
+        switchbot: home.base.clone(),
+    };
+    home.api.take();
+    let hold = Arc::new(tokio::sync::Notify::new());
+    *home.api.hold.lock() = Some(hold.clone());
+    let started = crate::start(
+        &hass,
+        registry.clone().into(),
+        Some(&stored),
+        Profiles::default(),
+        &endpoints,
+    );
+    let flows = Manager::new(
+        &hass,
+        entries.clone(),
+        started.components,
+        endpoints,
+        started.tasks,
+        None,
+    )
+    .unwrap();
+    while home.api.count() < 1 {
+        home.api.arrived.notified().await;
+    }
+    let removal = {
+        let (flows, id) = (flows.clone(), id.clone());
+        tokio::spawn(async move { flows.remove_entry(&id).await })
+    };
+    for _ in 0..50 {
+        tokio::task::yield_now().await;
+    }
+    assert!(
+        !removal.is_finished(),
+        "the removal didn't wait for the entry's first attempt"
+    );
+    assert_eq!(entries.list().unwrap().len(), 1);
+    *home.api.hold.lock() = None;
+    hold.notify_one();
+    assert_eq!(removal.await.unwrap(), Some(false));
+    assert_eq!(entries.list(), Some(Vec::new()));
+    assert_eq!(flows.tasks(), 0);
+    assert!(hass.states().all().is_empty());
+    assert!(registry.snapshot().entities.is_empty());
+}
+
+/// The client that added an entry disconnects while its setup still
+/// runs: the setup goes on, and still holds the entry's lock, so a
+/// removal waits for it all the same.
+#[tokio::test]
+async fn a_removal_waits_for_a_setup_whose_request_went_away() {
+    let home = home().await;
+    let FlowResult::Form { flow_id, .. } = home
+        .flows
+        .init("switchbot_cloud", SOURCE_USER)
+        .await
+        .unwrap()
+    else {
+        panic!("no form");
+    };
+    let mut changes = told(&home);
+    let hold = Arc::new(tokio::sync::Notify::new());
+    *home.api.hold.lock() = Some(hold.clone());
+    let answer = {
+        let flows = home.flows.clone();
+        tokio::spawn(async move { flows.configure(&flow_id, credentials(TOKEN)).await })
+    };
+    while home.api.count() < 1 {
+        home.api.arrived.notified().await;
+    }
+    hold.notify_one();
+    loop {
+        let change = changes.recv().await.unwrap();
+        if change.1 == "setup_in_progress" {
+            break;
+        }
+    }
+    while home.api.count() < 2 {
+        home.api.arrived.notified().await;
+    }
+    // The request is dropped, as a disconnect drops it.
+    answer.abort();
+    let _ = answer.await;
+    let id = home.entries.list().unwrap()[0]["entry_id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let removal = {
+        let (flows, id) = (home.flows.clone(), id.clone());
+        tokio::spawn(async move { flows.remove_entry(&id).await })
+    };
+    for _ in 0..50 {
+        tokio::task::yield_now().await;
+    }
+    assert!(
+        !removal.is_finished(),
+        "the removal didn't wait for a setup nobody waits on"
+    );
+    assert_eq!(
+        home.entries.runtime(&id).map(|r| r.state),
+        Some(EntryState::SetupInProgress)
+    );
+    *home.api.hold.lock() = None;
+    hold.notify_one();
+    assert_eq!(removal.await.unwrap(), Some(false));
+    assert_eq!(home.entries.list(), Some(Vec::new()));
+    assert!(home.hass.states().all().is_empty());
+    assert!(home.registry.snapshot().entities.is_empty());
 }

@@ -78,23 +78,85 @@ impl Change {
     }
 }
 
-/// How an entry's setup says where it is. [`Status::none`] says nothing:
-/// the entries started at start-up, whose state the API works out.
-#[derive(Clone)]
-pub struct Status(Option<(Arc<ConfigEntries>, String)>);
+/// An entry's first setup attempt, owned by the task that makes it: HA's
+/// `entry.setup_lock` for that attempt (a removal waits for it), and, for
+/// a config flow, where to say how the attempt ended. It ends when the
+/// task reports the attempt's end ([`Status::set`]), or when the task
+/// itself ends or is stopped; a request that went away changes nothing.
+pub struct FirstAttempt {
+    _lock: Option<tokio::sync::OwnedMutexGuard<()>>,
+    result: Option<tokio::sync::oneshot::Sender<Option<Runtime>>>,
+}
+
+impl FirstAttempt {
+    /// A setup lock, taken: the lock for whoever must wait for the
+    /// attempt, and the attempt for the entry's task.
+    pub fn start() -> (Arc<tokio::sync::Mutex<()>>, Self) {
+        let lock = Arc::new(tokio::sync::Mutex::new(()));
+        let held = lock.clone().try_lock_owned().ok();
+        (
+            lock,
+            Self {
+                _lock: held,
+                result: None,
+            },
+        )
+    }
+
+    /// Also send where the attempt left the entry, before the lock is
+    /// released (so whoever waited on the lock can't have changed it).
+    pub fn tell(mut self, result: tokio::sync::oneshot::Sender<Option<Runtime>>) -> Self {
+        self.result = Some(result);
+        self
+    }
+}
+
+/// How an entry's setup says where it is. [`Status::none`] records
+/// nothing: the entries started at start-up, whose state the API works
+/// out.
+pub struct Status {
+    entry: Option<(Arc<ConfigEntries>, String)>,
+    first: parking_lot::Mutex<Option<FirstAttempt>>,
+}
 
 impl Status {
     pub fn none() -> Self {
-        Self(None)
+        Self {
+            entry: None,
+            first: Default::default(),
+        }
     }
 
     pub fn new(entries: Arc<ConfigEntries>, entry_id: &str) -> Self {
-        Self(Some((entries, entry_id.to_owned())))
+        Self {
+            entry: Some((entries, entry_id.to_owned())),
+            first: Default::default(),
+        }
+    }
+
+    /// With the entry's first setup attempt, which ends at the first
+    /// [`Status::set`] that says so.
+    pub fn with_first(self, first: FirstAttempt) -> Self {
+        *self.first.lock() = Some(first);
+        self
     }
 
     pub fn set(&self, state: EntryState, reason: Option<String>) {
-        if let Some((entries, entry_id)) = &self.0 {
+        if let Some((entries, entry_id)) = &self.entry {
             entries.set_state(entry_id, state, reason);
+        }
+        // The first attempt has ended: its result, then its lock.
+        if matches!(
+            state,
+            EntryState::Loaded | EntryState::SetupError | EntryState::SetupRetry
+        ) && let Some(first) = self.first.lock().take()
+            && let Some(result) = first.result
+        {
+            let runtime = self
+                .entry
+                .as_ref()
+                .and_then(|(entries, entry_id)| entries.runtime(entry_id));
+            let _ = result.send(runtime);
         }
     }
 }
@@ -115,8 +177,6 @@ pub struct ConfigEntries {
     /// By entry id, for entries whose setup reports its state. Empty until
     /// a config flow adds an entry.
     runtime: parking_lot::Mutex<Vec<(String, Runtime)>>,
-    /// Wakes whoever waits for a setup to settle.
-    settled: tokio::sync::Notify,
     /// `config_entries/subscribe`rs. Empty while nobody subscribes.
     listeners: parking_lot::Mutex<Vec<(Live, Listener)>>,
 }
@@ -180,7 +240,6 @@ impl ConfigEntries {
                 save,
                 read_only: !writable,
                 runtime: Default::default(),
-                settled: tokio::sync::Notify::new(),
                 listeners: Default::default(),
             }
         })
@@ -194,7 +253,6 @@ impl ConfigEntries {
             save: None,
             read_only: false,
             runtime: Default::default(),
-            settled: tokio::sync::Notify::new(),
             listeners: Default::default(),
         })
     }
@@ -256,8 +314,7 @@ impl ConfigEntries {
 
     /// `async_remove`'s end: the entry, if it was there, leaves the list
     /// and the file, subscribers hear `removed` with the state it ended
-    /// in, that state is forgotten and whoever waits for its setup is let
-    /// go. Call it once what belonged to the entry is cleaned up
+    /// in, and that state is forgotten. Call it once what belonged to the entry is cleaned up
     /// (`_async_clean_up` tells last).
     pub fn remove(&self, entry_id: &str) -> Option<Map<String, Value>> {
         let mut listeners = self.listeners.lock();
@@ -279,8 +336,6 @@ impl ConfigEntries {
                 *runtime = Vec::new();
             }
         }
-        drop(listeners);
-        self.settled.notify_waiters();
         Some(removed)
     }
 
@@ -315,8 +370,7 @@ impl ConfigEntries {
     }
 
     /// `ConfigEntry._async_set_state`: subscribers hear `updated`, and
-    /// whoever waits for the setup to settle is woken. Nothing for an
-    /// entry that is gone.
+    /// nothing for an entry that is gone.
     pub fn set_state(&self, entry_id: &str, state: EntryState, reason: Option<String>) {
         let mut listeners = self.listeners.lock();
         let Some(entry) = self.get(entry_id) else {
@@ -349,25 +403,6 @@ impl ConfigEntries {
             }
         }
         tell(&mut listeners, Change::Updated, &entry);
-        drop(listeners);
-        self.settled.notify_waiters();
-    }
-
-    /// Wait until the entry's first setup attempt has ended (it is loaded,
-    /// failed, or being retried), as `async_add` awaits `async_setup`; or
-    /// until the entry is removed.
-    pub async fn setup_attempted(&self, entry_id: &str) {
-        loop {
-            let woken = self.settled.notified();
-            tokio::pin!(woken);
-            // Registered before the check, so no change is missed.
-            woken.as_mut().enable();
-            match self.runtime(entry_id) {
-                Some(r) if r.state == EntryState::SetupInProgress => {}
-                _ => return,
-            }
-            woken.await;
-        }
     }
 
     /// The entry of `domain` with this `unique_id`.

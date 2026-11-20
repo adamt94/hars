@@ -82,9 +82,52 @@ pub struct Started {
     pub weather: Arc<weather::Weather>,
     /// The entity components, which entries added later feed too.
     pub components: Arc<components::Components>,
-    /// The tasks of the entries that can be stopped (`switchbot_cloud`'s),
-    /// by entry id, for [`flow::Manager`].
-    pub tasks: Vec<(String, tokio::task::JoinHandle<()>)>,
+    /// The entries that can be stopped (`switchbot_cloud`'s), for
+    /// [`flow::Manager`].
+    pub tasks: Vec<Running>,
+}
+
+/// An entry whose integration can be stopped.
+pub struct Running {
+    pub entry_id: String,
+    pub task: tokio::task::JoinHandle<()>,
+    /// HA's `entry.setup_lock`: the task holds it through its first setup
+    /// attempt ([`config_entries::FirstAttempt`]), whoever started the
+    /// entry and whatever became of them; a removal waits on it.
+    pub setup: Arc<tokio::sync::Mutex<()>>,
+}
+
+impl Running {
+    /// Start `entry`'s integration task with `status`, its first attempt
+    /// under a new setup lock.
+    pub(crate) fn start(
+        entry_id: &str,
+        status: config_entries::Status,
+        spawn: impl FnOnce(config_entries::Status) -> tokio::task::JoinHandle<()>,
+    ) -> Self {
+        let (setup, first) = config_entries::FirstAttempt::start();
+        Self {
+            entry_id: entry_id.to_owned(),
+            task: spawn(status.with_first(first)),
+            setup,
+        }
+    }
+
+    /// [`Running::start`], with `attempted` told where the first attempt
+    /// left the entry.
+    pub(crate) fn start_told(
+        entry_id: &str,
+        status: config_entries::Status,
+        attempted: tokio::sync::oneshot::Sender<Option<config_entries::Runtime>>,
+        spawn: impl FnOnce(config_entries::Status) -> tokio::task::JoinHandle<()>,
+    ) -> Self {
+        let (setup, first) = config_entries::FirstAttempt::start();
+        Self {
+            entry_id: entry_id.to_owned(),
+            task: spawn(status.with_first(first.tell(attempted))),
+            setup,
+        }
+    }
 }
 
 /// Start a `switchbot_cloud` entry: at start-up, or when a config flow
@@ -208,13 +251,11 @@ pub fn start(
     let mut tasks = Vec::new();
     for entry in switchbot {
         let entry_id = field(&entry, "entry_id").unwrap_or_default();
-        let task = spawn_switchbot(
-            &components,
-            entry,
-            endpoints,
+        tasks.push(Running::start(
+            &entry_id,
             config_entries::Status::none(),
-        );
-        tasks.push((entry_id, task));
+            |status| spawn_switchbot(&components, entry, endpoints, status),
+        ));
         running.extend(switchbot_cloud::COMPONENTS);
     }
     let lifx: Vec<Map<String, Value>> = enabled(lifx::DOMAIN).cloned().collect();

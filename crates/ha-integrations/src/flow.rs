@@ -24,8 +24,10 @@
 //!   entry and its registry rows go, and its entities stay until a
 //!   restart (`require_restart`).
 //!
-//! - A removal that comes while the entry's first setup still runs waits
-//!   for that attempt, as HA's does (they share the entry's `setup_lock`).
+//! - A removal that comes while an entry's first setup attempt still runs
+//!   waits for that attempt, as HA's does (they share the entry's
+//!   `setup_lock`). The lock is the entry's task's, whether a flow or
+//!   start-up started it, and whatever became of the request.
 //! - A flow nobody answers doesn't stay for ever. One left alone for
 //!   [`EXPIRES`] is dropped when the next flow starts, and at most
 //!   [`MAX_FLOWS`] are kept (the one longest untouched goes first). HA
@@ -42,7 +44,7 @@
 
 use crate::components::Components;
 use crate::config_entries::{ConfigEntries, EntryState, Status};
-use crate::{Endpoints, switchbot_cloud};
+use crate::{Endpoints, Running, switchbot_cloud};
 use ha_core::Hass;
 use parking_lot::Mutex;
 use serde_json::{Map, Value, json};
@@ -50,7 +52,6 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::task::JoinHandle;
 use tokio::time::Instant;
 
 /// How many flows are kept in progress. Starting one more drops the one
@@ -335,35 +336,13 @@ pub struct Manager {
     flows: Mutex<Vec<Progress>>,
     /// Domains started here, for `get_config`'s `components`.
     started: Mutex<Vec<&'static str>>,
-    /// The tasks of the entries that can be stopped, by entry id.
-    tasks: Mutex<Vec<(String, JoinHandle<()>)>>,
+    /// The entries that can be stopped, with their tasks.
+    tasks: Mutex<Vec<Running>>,
     /// The companion apps' registrations, whose entries can be stopped.
     mobile_app: Option<Arc<crate::mobile_app::MobileApp>>,
     /// An entry is added with its task, or removed, one at a time, so a
     /// removal never misses a task that is about to start.
     lifecycle: tokio::sync::Mutex<()>,
-    /// HA's `entry.setup_lock`, for the entries whose first setup attempt
-    /// is running: a removal waits for it. Empty otherwise.
-    setups: Mutex<Vec<(String, Arc<tokio::sync::Mutex<()>>)>>,
-}
-
-/// A first setup attempt in flight: its lock is held, and leaves the
-/// manager's list when this is dropped (the attempt ended, or the flow's
-/// request went away).
-struct Attempt<'a> {
-    manager: &'a Manager,
-    entry_id: String,
-    _held: tokio::sync::OwnedMutexGuard<()>,
-}
-
-impl Drop for Attempt<'_> {
-    fn drop(&mut self) {
-        let mut setups = self.manager.setups.lock();
-        setups.retain(|(id, _)| *id != self.entry_id);
-        if setups.is_empty() {
-            *setups = Vec::new();
-        }
-    }
 }
 
 /// A request at work on a flow, counted in its [`Progress::busy`] until
@@ -411,7 +390,7 @@ impl Manager {
         entries: Arc<ConfigEntries>,
         components: Arc<Components>,
         endpoints: Endpoints,
-        tasks: Vec<(String, JoinHandle<()>)>,
+        tasks: Vec<Running>,
         mobile_app: Option<Arc<crate::mobile_app::MobileApp>>,
     ) -> Option<Arc<Self>> {
         let unwritable = match components.registry().and_then(|r| r.read_only()) {
@@ -435,7 +414,6 @@ impl Manager {
             tasks: Mutex::new(tasks),
             mobile_app,
             lifecycle: tokio::sync::Mutex::new(()),
-            setups: Mutex::new(Vec::new()),
         }))
     }
 
@@ -593,7 +571,7 @@ impl Manager {
             Step::CreateEntry { .. } => Some(self.lifecycle.lock().await),
             _ => None,
         };
-        let (title, entry, attempt) = {
+        let (title, entry) = {
             let mut flows = self.flows.lock();
             let Some(i) = find(&flows) else {
                 // Deleted while the step ran: `UnknownFlow`, unless the
@@ -649,24 +627,8 @@ impl Manager {
                     .new_entry(domain, SOURCE_USER, &title, unique_id.as_deref(), data);
             entry.insert("version".into(), json!(handler.version));
             entry.insert("minor_version".into(), json!(handler.minor_version));
-            // The entry's setup lock, taken before anyone can know the
-            // entry: a removal waits for the first attempt, as HA's does.
-            let entry_id = entry
-                .get("entry_id")
-                .and_then(Value::as_str)
-                .unwrap_or_default()
-                .to_owned();
-            let lock = Arc::new(tokio::sync::Mutex::new(()));
-            let attempt = lock.clone().try_lock_owned().ok().map(|held| {
-                self.setups.lock().push((entry_id.clone(), lock));
-                Attempt {
-                    manager: self,
-                    entry_id,
-                    _held: held,
-                }
-            });
             self.entries.add_tracked(entry.clone());
-            (title, entry, attempt)
+            (title, entry)
         };
         let entry_id = entry
             .get("entry_id")
@@ -675,50 +637,62 @@ impl Manager {
             .to_owned();
         self.entries
             .set_state(&entry_id, EntryState::SetupInProgress, None);
-        let started = self.setup_entry(&entry);
+        // The entry's task says where its first setup attempt left the
+        // entry before it lets go of the entry's setup lock, on which a
+        // removal waits: the reply is of that moment.
+        let (attempted, attempt) = tokio::sync::oneshot::channel();
+        let started = self.setup_entry(&entry, attempted);
         drop(adding);
         // The flow is over: a request that queued behind this one finds
         // that out now, not when the entry's setup ends.
         drop(flow);
         // `async_add` awaits `async_setup`: the reply waits for the first
         // setup attempt, so the entry's devices are there when it comes.
-        if started {
-            self.entries.setup_attempted(&entry_id).await;
-        } else {
-            self.entries
-                .set_state(&entry_id, EntryState::NotLoaded, None);
-        }
-        // The reply is what the attempt left, read while its lock is still
-        // held: a removal waiting for it changes nothing before this.
-        let result = FlowResult::CreateEntry {
+        let runtime = match (started, attempt.await) {
+            (true, Ok(runtime)) => runtime,
+            // The task ended, or was stopped, without a word.
+            (true, Err(_)) => self.entries.runtime(&entry_id),
+            (false, _) => {
+                self.entries
+                    .set_state(&entry_id, EntryState::NotLoaded, None);
+                self.entries.runtime(&entry_id)
+            }
+        };
+        Ok(FlowResult::CreateEntry {
             flow_id: flow_id.to_owned(),
             handler: domain,
             title,
             version: handler.version,
             minor_version: handler.minor_version,
-            runtime: self.entries.runtime(&entry_id),
+            runtime,
             entry: self.entries.get(&entry_id).unwrap_or(entry),
-        };
-        drop(attempt);
-        Ok(result)
+        })
     }
 
     /// `async_setup` for an entry made while running: start its
     /// integration, which reports the entry's state. `false` for a domain
     /// that can't be started here.
-    fn setup_entry(&self, entry: &Map<String, Value>) -> bool {
+    ///
+    /// `attempted` hears where the first setup attempt left the entry.
+    fn setup_entry(
+        &self,
+        entry: &Map<String, Value>,
+        attempted: tokio::sync::oneshot::Sender<Option<crate::config_entries::Runtime>>,
+    ) -> bool {
         let Some(entry_id) = entry.get("entry_id").and_then(Value::as_str) else {
             return false;
         };
         let status = Status::new(self.entries.clone(), entry_id);
-        let (task, domains) = match entry.get("domain").and_then(Value::as_str) {
+        let (running, domains) = match entry.get("domain").and_then(Value::as_str) {
             Some(switchbot_cloud::DOMAIN) => (
-                crate::spawn_switchbot(&self.components, entry.clone(), &self.endpoints, status),
+                Running::start_told(entry_id, status, attempted, |status| {
+                    crate::spawn_switchbot(&self.components, entry.clone(), &self.endpoints, status)
+                }),
                 switchbot_cloud::COMPONENTS,
             ),
             _ => return false,
         };
-        self.tasks.lock().push((entry_id.to_owned(), task));
+        self.tasks.lock().push(running);
         let mut started = self.started.lock();
         for domain in domains {
             if !started.contains(domain) {
@@ -748,22 +722,30 @@ impl Manager {
         // `_async_remove` takes the entry's setup lock: an entry whose
         // first setup attempt is running is removed once it has ended, and
         // whoever added it has its answer.
-        let setup = {
-            let setups = self.setups.lock();
-            setups
-                .iter()
-                .find(|(id, _)| id == entry_id)
-                .map(|(_, lock)| lock.clone())
+        let _removing = loop {
+            let removing = self.lifecycle.lock().await;
+            let setup = {
+                let tasks = self.tasks.lock();
+                tasks
+                    .iter()
+                    .find(|r| r.entry_id == entry_id)
+                    .map(|r| r.setup.clone())
+            };
+            match setup {
+                // Held by the entry's task: wait for it without holding
+                // up other entries, then look again.
+                Some(setup) if setup.try_lock().is_err() => {
+                    drop(removing);
+                    drop(setup.lock().await);
+                }
+                _ => break removing,
+            }
         };
-        if let Some(setup) = setup {
-            drop(setup.lock().await);
-        }
-        let _removing = self.lifecycle.lock().await;
         let entry = self.entries.get(entry_id)?;
         let task = {
             let mut tasks = self.tasks.lock();
-            let i = tasks.iter().position(|(id, _)| id == entry_id);
-            i.map(|i| tasks.swap_remove(i).1)
+            let i = tasks.iter().position(|r| r.entry_id == entry_id);
+            i.map(|i| tasks.swap_remove(i).task)
         };
         // What can be stopped: an entry with a task here, and a companion
         // app's registration. A disabled entry runs nothing.
