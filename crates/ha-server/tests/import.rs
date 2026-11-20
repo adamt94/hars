@@ -3406,3 +3406,61 @@ fn a_reserved_name_in_a_spelling_the_file_system_folds_is_refused() {
         let _ = std::fs::remove_dir_all(d);
     }
 }
+
+/// A store the destination has under another spelling of its name, where
+/// the file system takes the two for one file: by names alone the import
+/// would not see it as there (and replace it without `--force`), or would
+/// put the new one and remove "the other" in one go. It asks the file
+/// system, and stops.
+#[test]
+fn a_destination_file_under_another_spelling_is_refused() {
+    let probe = temp("spelling-probe");
+    if !folds(&probe, "auth", "AUTH") {
+        return;
+    }
+    let _ = std::fs::remove_dir_all(probe);
+    for (theirs, ours) in [
+        ("frontend.system_data", "FRONTEND.SYSTEM_DATA"),
+        ("frontend.user_data_", "frontend.user_data_"),
+        ("auth", "AUTH"),
+    ] {
+        let src = temp("spelling-src");
+        let dest = temp("spelling-dest");
+        let owner = ha_config(&src);
+        write_store(&src, "frontend.system_data", 1, 1, json!({"theirs": 1}));
+        // The owner's settings, under the same id in capitals.
+        let (theirs, ours) = if theirs.ends_with('_') {
+            (
+                format!("{theirs}{owner}"),
+                format!("{ours}{}", owner.to_uppercase()),
+            )
+        } else {
+            (theirs.to_owned(), ours.to_owned())
+        };
+        std::fs::create_dir_all(dest.join(".storage")).unwrap();
+        std::fs::write(dest.join(".storage").join(&ours), "mine").unwrap();
+        for flags in [&[][..], &["--force"], &["--dry-run"]] {
+            let mut args = vec!["import", src.to_str().unwrap()];
+            args.extend(flags);
+            let out = hars(&dest, &args);
+            assert!(!out.status.success(), "{ours} {flags:?}");
+            let stderr = String::from_utf8_lossy(&out.stderr);
+            assert!(
+                stderr.contains(&format!("{ours} in ")) && stderr.contains("are one file there"),
+                "{stderr}"
+            );
+            let left: Vec<_> = std::fs::read_dir(dest.join(".storage"))
+                .unwrap()
+                .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+                .collect();
+            assert_eq!(left, std::slice::from_ref(&ours), "{theirs} {flags:?}");
+            assert_eq!(
+                std::fs::read_to_string(dest.join(".storage").join(&ours)).unwrap(),
+                "mine"
+            );
+        }
+        for d in [src, dest] {
+            let _ = std::fs::remove_dir_all(d);
+        }
+    }
+}

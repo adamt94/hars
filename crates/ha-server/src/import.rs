@@ -548,6 +548,18 @@ pub fn run(opts: &Options) -> anyhow::Result<Report> {
     //    staged ones. A store the source doesn't have is removed, since a
     //    missing store means defaults (no users, not onboarded).
     let staged = staging.keys()?;
+    // The plan compares names, so first every name it will use must be the
+    // name the destination's file system has for that file: one that is
+    // there under another spelling (`AUTH` for `auth`, where case doesn't
+    // count) would be replaced without being seen as there, or put and
+    // removed in one import.
+    let stores = STORES.iter().map(|(key, ..)| (*key).to_owned());
+    for key in staged.iter().cloned().chain(stores) {
+        exact_name(&dest, &Path::new(".storage").join(key))?;
+    }
+    for rel in &report.yaml {
+        exact_name(&dest, Path::new(rel))?;
+    }
     let mut in_dest: Vec<String> = Vec::new();
     for (key, kind) in storage_keys(&dest)? {
         if supported(&key).is_some() {
@@ -663,6 +675,48 @@ fn excludes(value: &Value) -> bool {
         Value::Array(items) => items.iter().any(excludes),
         _ => false,
     }
+}
+
+/// Whether a name is one the file system has under another spelling: it
+/// finds a file by it, and the directory doesn't list it.
+fn is_alias(listed: &[std::ffi::OsString], name: &std::ffi::OsStr, found: bool) -> bool {
+    found && !listed.iter().any(|l| l == name)
+}
+
+/// Each part of `rel` that exists under `root` must be listed there by
+/// exactly that name. Asked of the file system, which alone knows the
+/// names it folds; the import stops at one it would otherwise take for
+/// another file.
+fn exact_name(root: &Path, rel: &Path) -> anyhow::Result<()> {
+    let mut at = root.to_path_buf();
+    for part in rel.components() {
+        let dir = at.clone();
+        at.push(part);
+        let found = std::fs::symlink_metadata(&at).is_ok();
+        if !found {
+            return Ok(());
+        }
+        let listed: Vec<std::ffi::OsString> = std::fs::read_dir(&dir)
+            .with_context(|| format!("listing {}", dir.display()))?
+            .filter_map(|e| Some(e.ok()?.file_name()))
+            .collect();
+        if is_alias(&listed, part.as_os_str(), found) {
+            let theirs = listed
+                .iter()
+                .find(|l| same_file(&dir.join(l), &at))
+                .map_or("a file of another name".into(), |l| {
+                    l.to_string_lossy().into_owned()
+                });
+            bail!(
+                "{theirs} in {} and {}, which the import brings or hars reads, are one file \
+                 there: its file system takes the two names for the same. Rename or remove \
+                 {theirs}, then import again. Nothing was imported",
+                dir.display(),
+                rel.display()
+            );
+        }
+    }
+    Ok(())
 }
 
 /// Whether two paths are the same file or directory to the file system,
@@ -1599,6 +1653,34 @@ mod tests {
         assert!(!dest.join(".import-backup").exists());
         drop(staging);
         std::fs::remove_dir_all(dest).unwrap();
+    }
+
+    /// A name found though not listed is another file's name.
+    #[test]
+    fn aliases() {
+        let listed = ["AUTH".into(), "core.config".into()];
+        let name = |n: &str| std::ffi::OsString::from(n);
+        assert!(is_alias(&listed, &name("auth"), true));
+        assert!(!is_alias(&listed, &name("core.config"), true));
+        // Not there at all: nothing to take it for.
+        assert!(!is_alias(&listed, &name("auth"), false));
+
+        // On the file system: a name as listed passes, and so does one
+        // that isn't there; where names fold, another spelling doesn't.
+        let dir = std::env::temp_dir().join(format!("hars-import-alias-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("Parts")).unwrap();
+        std::fs::write(dir.join("Parts/a.yaml"), "").unwrap();
+        exact_name(&dir, Path::new("Parts/a.yaml")).unwrap();
+        exact_name(&dir, Path::new("Parts/b.yaml")).unwrap();
+        exact_name(&dir, Path::new("other/a.yaml")).unwrap();
+        if dir.join("parts").exists() {
+            for rel in ["parts/a.yaml", "Parts/A.yaml", "parts/new.yaml"] {
+                let err = exact_name(&dir, Path::new(rel)).unwrap_err().to_string();
+                assert!(err.contains("are one file there"), "{rel}: {err}");
+            }
+        }
+        std::fs::remove_dir_all(dir).unwrap();
     }
 
     /// A file is staged as a new one. A name the file system already has
