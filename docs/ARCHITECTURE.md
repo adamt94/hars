@@ -433,9 +433,18 @@ by identifier *and config entry*, where hars finds the first row with the
 identifier: the conversion lists an integration's own row first. It
 refuses a registry with two rows of the integration's own for one
 identifier, or two rows that each hold a copy of the other's. Other
-leftovers are not refused: a copy whose original is gone is found as the
-integration's device (and said in the report), and a removed device comes
-back for whoever registers its identifier, as in 2026.6.1.
+leftovers: a copy whose original was removed (it is in `deleted_devices`)
+is refused, because 2026.8 would bring the original back and hars would
+attach the integration to the copy; a copy whose original is gone
+altogether is found as the integration's device, and said in the report;
+and a removed device comes back for whoever registers its identifier, as
+in 2026.6.1.
+
+The source is told from the destination by device and inode, not by path
+(one directory can be mounted twice), and a name is told from another by
+asking the destination's file system (staged files are made with
+create-new; the plan checks each name against the directory's own
+listing), because only it knows which names it takes for one file.
 
 Unchanged from 2026.6.1 through 2026.11.2: `auth`,
 `auth_provider.homeassistant`, `onboarding`, `core.config`,

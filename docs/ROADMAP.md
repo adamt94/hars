@@ -233,7 +233,8 @@ ids, addresses, names and coordinates replaced with fake ones
         the old id reaches no device, and the parent not its children.
         Integrations find their device by identifier, the first row that
         has it, and bring a removed device back the same way (the importer
-        orders the rows, and refuses two of one integration's own);
+        orders the rows, and refuses two of one integration's own and a
+        copy beside its removed original);
         2026.8 looks both up per config entry. A last state stored under
         an entity id with a non-ASCII digit is skipped.
         Releases after 2026.11 are imported only if every store is in a

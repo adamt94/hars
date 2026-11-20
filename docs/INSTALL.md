@@ -167,7 +167,17 @@ docker start hars
 ```
 
 If hars already has a login, or has run once, the import refuses to replace
-what's there; add `--force` to replace it. Stop Home Assistant before
+what's there; add `--force` to replace it. `--force` also removes a YAML
+file that hars has in a folder your configuration includes whole
+(`!include_dir_...`) and the import doesn't bring: left there, it would be
+loaded beside the imported ones, and an old automation would run again.
+The import lists each file it would remove first.
+
+The import stops, before it changes anything, when two names are one file
+to the file system `hars/config` is on (on a Mac, `Parts.yaml` and
+`parts.yaml`): two files it brings, or one it brings and one that is
+there. Rename one and import again. It also stops when the folder you
+import from and `hars/config` are the same folder under two paths. Stop Home Assistant before
 starting hars if both use port 8123.
 
 An import that fails says so and puts back what it had changed. One that
@@ -240,8 +250,8 @@ in place, and the import prints its summary and the error.
 Everything above applies, and these releases store some things in a newer
 format. hars reads and writes the 2026.6 formats only, so the import
 converts these files. The terminal and `import-report.json` (`converted`,
-`converted_entries`, `dropped`, `split_devices`) say what was converted in
-your folder.
+`converted_entries`, `dropped`, `not_converted`, `split_devices`,
+`parent_devices`) say what was converted in your folder.
 
 | Since | What changed in Home Assistant | What the import does |
 |---|---|---|
@@ -289,6 +299,13 @@ What you will notice:
   its place.
 - **The LIFX entry from before one entry per bulb is gone.** 2026.10
   removed it from your settings. It ran nothing.
+- **An entity you removed and then add again can come back with a shorter
+  name.** 2026.11 keeps a removed entity's name without its device's name
+  and no note of the device. The import leaves such a name as it is and
+  lists it under `not_converted`.
+- **An entity whose device is gone loses the link to it.** 2026.8 and
+  later do the same when they start. The report lists each under
+  `dropped`.
 
 What stops an import from these releases, with the reason on the terminal:
 
@@ -313,6 +330,11 @@ What stops an import from these releases, with the reason on the terminal:
   From 2026.8 Home Assistant tells such devices apart by integration entry.
   hars finds a device by its identifier alone, as 2026.6 does. The message
   names the two devices.
+- A device of another integration that still holds an identifier of a
+  device you removed, where that device belonged to an integration hars
+  runs. When the integration finds its device again, Home Assistant brings
+  the removed one back. hars would attach it to the other integration's
+  device. The message names both.
 - Settings of the LIFX or weather integration that don't have the shape
   2026.10 and 2026.11 write, or settings of an integration hars runs at a
   version later than 2026.11 writes.
