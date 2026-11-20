@@ -34,15 +34,27 @@ An integration reaches hars in one of four ways:
 - **The UI.** Open **Settings > Devices & services**, choose **Add
   integration**, and pick the integration. Today the list holds SwitchBot
   Cloud only. hars checks what you type before it saves anything, starts the
-  integration at once, and shows the devices that it found. Choose **Skip
-  and finish** in the last step: hars can't yet save a name or an area from
-  that step. To undo it, open the integration and delete its entry.
+  integration at once, and shows the devices that it found. In that last
+  step you can give each device a name and an area, or make a new area
+  there. A device that you name gets entity ids to match, as in Home
+  Assistant: a Bot called "Coffee machine" in the Kitchen has
+  `button.kitchen_coffee_machine`. History that was recorded under the old
+  id stays under it. To undo the integration, open it and delete its entry.
 
-  Adding and deleting are off when hars can't save the change. That
+  The same name, area and labels can be changed later on the device's page.
+  Two limits apply there today. Only a SwitchBot Cloud device can be
+  renamed: hars refuses a new name for a device of another integration,
+  because its entities would keep the old name until the next start. And a
+  device can't be disabled or enabled. Moving a device to another area and
+  labelling it work for every device.
+
+  Adding and deleting are off when hars can't save the change, and so is
+  changing a device, an entity or the areas whose file it can't save. That
   happens when the config folder came from a Home Assistant release older
-  than 2026.6, so the file that lists the integrations, the devices or the
-  entities is in a format that hars reads but doesn't write. hars then says
-  so when you pick the integration, and in its log at start. To fix it,
+  than 2026.6, so the file that lists the integrations, the devices, the
+  entities or the areas is in a format that hars reads but doesn't write.
+  hars then says so when you pick the integration or save the change, and
+  for integrations in its log at start. To fix it,
   start Home Assistant 2026.6 or 2026.7 once on that folder, so that it
   updates its files, and
   [import the folder again](INSTALL.md#which-home-assistant-releases).

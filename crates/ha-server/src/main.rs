@@ -198,6 +198,7 @@ async fn run(thp_disabled: std::io::Result<bool>) -> anyhow::Result<()> {
     api_config.mobile_app = Some(std::sync::Arc::new(mobile_app));
     // The config flows a user starts from the UI, and the entries they add.
     // When the entries or a registry can't be saved, the views say so.
+    api_config.entities = Some(started.components.clone());
     match ha_integrations::flow::Manager::new(
         &hass,
         config_entries.clone(),

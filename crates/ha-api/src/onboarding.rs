@@ -311,7 +311,12 @@ async fn user_step(State(v): State<Views>, body: Bytes) -> Response {
     // Areas an integration already made (by name) are left alone.
     if let Some(registry) = registry {
         for (name, (_, icon)) in area_names(language).into_iter().zip(AREA_KEYS) {
-            registry.create_area(name, Some(icon));
+            // An area of that name is left as it is.
+            let _ = registry.create_area(ha_registry::NewArea {
+                name: (*name).to_owned(),
+                icon: Some((*icon).to_owned()),
+                ..Default::default()
+            });
         }
     }
     if mark_done(s, "user").await.is_err() {

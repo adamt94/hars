@@ -1687,3 +1687,187 @@ async fn the_stores_are_written_before_the_answer() {
     let devices: Value = serde_json::from_str(&disk.file("core.device_registry")).unwrap();
     assert_eq!(devices["data"]["devices"], json!([]));
 }
+
+/// The registry changes the dialog's last step makes for the Bot: a name
+/// and an area for the device, then the ids that follow from them.
+fn name_the_bot(registry: &Registry, components: &Components) {
+    let follows = &crate::components::follows;
+    let area = ha_registry::NewArea {
+        name: "Kitchen".into(),
+        ..Default::default()
+    };
+    registry.create_area(area).unwrap();
+    let snap = registry.snapshot();
+    let bot = snap.devices.iter().find(|d| d.identifiers[0][1] == BOT);
+    let patch = ha_registry::DevicePatch {
+        name_by_user: Some(Some("Coffee machine".into())),
+        area_id: Some(Some("kitchen".into())),
+        ..Default::default()
+    };
+    registry
+        .update_device(&bot.unwrap().id, &patch, follows)
+        .unwrap();
+    components.registry_changed();
+    let old = ["button.towel_switch", "sensor.towel_switch_battery"].map(str::to_owned);
+    for (old, new) in registry.automatic_entity_ids(&old) {
+        registry
+            .rename_entity(&old, &new.unwrap(), &Default::default(), follows)
+            .unwrap();
+        components.registry_changed();
+    }
+}
+
+async fn press(hass: &Hass, entity_id: &str) -> Result<(), ha_core::ServiceError> {
+    let data = json!({"entity_id": entity_id});
+    let data = data.as_object().unwrap().clone();
+    hass.call_service("button", "press", data, None, false, None)
+        .await
+        .map(drop)
+}
+
+/// A device named in the dialog and its entities' new ids are what a
+/// restart finds: the files hold them, the entry sets up under the new
+/// ids with the new names, makes no row and changes none, and the old ids
+/// are gone from the states and the services.
+#[tokio::test]
+async fn a_named_device_and_its_new_ids_survive_a_restart() {
+    let disk = Disk::new("named");
+    let (base, api) = fake().await;
+    let hass = Hass::new();
+    let (entries, registry, flows) = disk.start(&hass, &base);
+    let flows = flows.expect("new stores can be written");
+    let FlowResult::Form { flow_id, .. } =
+        flows.init("switchbot_cloud", SOURCE_USER).await.unwrap()
+    else {
+        panic!("no form");
+    };
+    flows.configure(&flow_id, credentials(TOKEN)).await.unwrap();
+    name_the_bot(&registry, &flows.components);
+    let named = json!({"state": "unknown", "attributes": {"friendly_name": "Coffee machine"}});
+    let check = |hass: &Hass| {
+        assert_eq!(state(hass, "button.kitchen_coffee_machine"), named);
+        assert_eq!(
+            state(hass, "sensor.kitchen_coffee_machine_battery")["attributes"]["friendly_name"],
+            "Coffee machine Battery"
+        );
+        for old in ["button.towel_switch", "sensor.towel_switch_battery"] {
+            assert_eq!(state(hass, old), Value::Null, "{old}");
+        }
+    };
+    check(&hass);
+    // The Bot is pressed under its new id, and not under the old one.
+    api.take();
+    press(&hass, "button.towel_switch").await.unwrap();
+    assert_eq!(api.count(), 0, "the old id still reached the Bot");
+    press(&hass, "button.kitchen_coffee_machine").await.unwrap();
+    assert_eq!(api.take()[0].path, format!("/v1.1/devices/{BOT}/commands"));
+    let pressed = state(&hass, "button.kitchen_coffee_machine");
+    assert_ne!(pressed["state"], "unknown");
+
+    entries.flush().await;
+    registry.flush().await;
+    let rows = |registry: &Registry| {
+        let r = registry.snapshot();
+        json!([r.devices, r.entities, r.areas])
+    };
+    let before = rows(&registry);
+    assert!(
+        disk.file("core.device_registry")
+            .contains(r#""name_by_user":"Coffee machine""#)
+    );
+    assert!(disk.file("core.area_registry").contains(r#""kitchen""#));
+    assert!(
+        disk.file("core.entity_registry")
+            .contains(r#""entity_id":"sensor.kitchen_coffee_machine_battery""#)
+    );
+
+    // A restart on the same directory.
+    let hass = Hass::new();
+    let (_entries, registry, _flows) = disk.start(&hass, &base);
+    hass.setups_done().await;
+    assert_eq!(rows(&registry), before, "a restart changed a row");
+    assert_eq!(
+        state(&hass, "button.kitchen_coffee_machine")["attributes"]["friendly_name"],
+        "Coffee machine"
+    );
+    assert_eq!(state(&hass, "button.towel_switch"), Value::Null);
+    assert_eq!(
+        state(&hass, "sensor.kitchen_coffee_machine_battery")["attributes"]["friendly_name"],
+        "Coffee machine Battery"
+    );
+}
+
+/// A command still in flight when its entity is given another id reports
+/// under the new id, as HA's entity (one object before and after) does,
+/// and nothing comes back under the old one. What the entity had (the air
+/// conditioner's mode, kept in memory) goes with it.
+#[tokio::test]
+async fn a_command_in_flight_reports_under_the_new_id() {
+    let home = home().await;
+    add(&home, TOKEN).await;
+    let call = |service: &'static str, data: Value| {
+        let hass = home.hass.clone();
+        async move {
+            hass.call_service(
+                "climate",
+                service,
+                data.as_object().unwrap().clone(),
+                None,
+                false,
+                None,
+            )
+            .await
+        }
+    };
+    let cool = json!({"entity_id": "climate.air_conditioner", "hvac_mode": "cool"});
+    call("set_hvac_mode", cool).await.unwrap();
+    assert_eq!(
+        state(&home.hass, "climate.air_conditioner")["state"],
+        "cool"
+    );
+
+    home.api.take();
+    let hold = Arc::new(tokio::sync::Notify::new());
+    *home.api.hold.lock() = Some(hold.clone());
+    let heat = json!({"entity_id": "climate.air_conditioner", "hvac_mode": "heat"});
+    let in_flight = tokio::spawn(call("set_hvac_mode", heat));
+    // The command has reached the API, which holds its answer.
+    while home.api.count() < 1 {
+        home.api.arrived.notified().await;
+    }
+    let follows = &crate::components::follows;
+    home.registry
+        .rename_entity(
+            "climate.air_conditioner",
+            "climate.bedroom",
+            &Default::default(),
+            follows,
+        )
+        .unwrap();
+    home.flows.components.registry_changed();
+    // Moved, with the mode it had.
+    assert_eq!(state(&home.hass, "climate.air_conditioner"), Value::Null);
+    assert_eq!(state(&home.hass, "climate.bedroom")["state"], "cool");
+
+    hold.notify_one();
+    *home.api.hold.lock() = None;
+    in_flight.await.unwrap().unwrap();
+    assert_eq!(state(&home.hass, "climate.air_conditioner"), Value::Null);
+    assert_eq!(state(&home.hass, "climate.bedroom")["state"], "heat");
+    // The services find it under the new id only.
+    let off = |id: &str| json!({"entity_id": id, "hvac_mode": "off"});
+    home.api.take();
+    call("set_hvac_mode", off("climate.air_conditioner"))
+        .await
+        .unwrap();
+    assert_eq!(home.api.count(), 0);
+    call("set_hvac_mode", off("climate.bedroom")).await.unwrap();
+    assert_eq!(state(&home.hass, "climate.bedroom")["state"], "off");
+    // Its last state is kept for a restore under the new id.
+    let stored = home
+        .hass
+        .restore()
+        .stored(&home.hass, home.hass.clock().now());
+    let kept = |id: &str| stored.iter().any(|s| s["state"]["entity_id"] == id);
+    assert!(kept("climate.bedroom"), "{stored:?}");
+}

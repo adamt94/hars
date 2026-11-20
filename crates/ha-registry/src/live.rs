@@ -35,7 +35,7 @@ pub struct Registry {
     entries: RwLock<Option<EntryLookup>>,
     /// The entity or device store that won't be written
     /// ([`Registries::unwritable`]), as found when the registry was made.
-    read_only: Option<&'static str>,
+    read_only: Vec<&'static str>,
 }
 
 /// The registries as something long-lived reads them (a service resolving
@@ -106,6 +106,84 @@ pub struct EntityPatch {
     pub supported_features: Option<i64>,
     pub translation_key: Option<Option<String>>,
     pub unit_of_measurement: Option<Option<String>>,
+}
+
+/// What the user changes of a device (`config/device_registry/update`):
+/// `None` leaves a field as it is.
+#[derive(Debug, Clone, Default)]
+pub struct DevicePatch {
+    pub area_id: Option<Option<String>>,
+    /// Only the value the device has is taken: see [`DeviceRefusal`].
+    pub disabled_by: Option<Option<String>>,
+    /// A set (the order given is kept, repeats dropped).
+    pub labels: Option<Vec<String>>,
+    pub name_by_user: Option<Option<String>>,
+}
+
+/// Why a device was not changed.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DeviceRefusal {
+    /// No such device (a `KeyError` in HA).
+    Unknown,
+    /// Disabling or enabling a device: its entities would have to stop
+    /// or start, which `hars`'s don't do while they run.
+    Disable,
+    /// A new name, for a device with an entity that can't take it: one
+    /// of the integration named, whose running entities keep the name
+    /// they started with, or one named the old way (`None`), whose own
+    /// name HA rewrites.
+    Rename(Option<String>),
+}
+
+/// Why an entity did not get another id (`async_update_entity`'s
+/// `ValueError`s, and what `hars` can't do).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RenameRefusal {
+    Unknown,
+    Registered,
+    Invalid,
+    Domain,
+    /// An entity of this integration, whose running entities keep the id
+    /// they started with.
+    Platform(String),
+}
+
+impl RenameRefusal {
+    /// HA's message, where it has one.
+    pub fn message(&self) -> Option<&'static str> {
+        match self {
+            Self::Registered => Some("Entity with this ID is already registered"),
+            Self::Invalid => Some("Invalid entity ID"),
+            Self::Domain => Some("New entity ID should be same domain"),
+            Self::Unknown | Self::Platform(_) => None,
+        }
+    }
+}
+
+/// A new area (`async_create`'s arguments).
+#[derive(Debug, Clone, Default)]
+pub struct NewArea {
+    pub name: String,
+    /// A set (the order given is kept, repeats dropped).
+    pub aliases: Vec<String>,
+    pub floor_id: Option<String>,
+    pub humidity_entity_id: Option<String>,
+    pub icon: Option<String>,
+    /// A set, as the aliases.
+    pub labels: Vec<String>,
+    pub picture: Option<String>,
+    pub temperature_entity_id: Option<String>,
+}
+
+/// A set as HA is given one: each value once, in the order given.
+fn as_set(values: &[String]) -> Vec<String> {
+    let mut set: Vec<String> = Vec::with_capacity(values.len());
+    for v in values {
+        if !set.contains(v) {
+            set.push(v.clone());
+        }
+    }
+    set
 }
 
 /// A device as an integration describes it (`async_get_or_create`'s
@@ -181,13 +259,13 @@ impl Registry {
             writer: Mutex::new(()),
             saves: None,
             entries: RwLock::new(None),
-            read_only: None,
+            read_only: Vec::new(),
         })
     }
 
     /// Saved to `config_dir/.storage` after changes, as HA does.
     pub fn new(hass: &Hass, config_dir: &Path, registries: Registries) -> Arc<Self> {
-        let read_only = registries.unwritable();
+        let read_only: Vec<&'static str> = registries.unwritable_stores().collect();
         Arc::new_cyclic(|weak: &std::sync::Weak<Self>| {
             let save = |key: &'static str| {
                 let (weak, dir) = (weak.clone(), config_dir.to_owned());
@@ -222,6 +300,16 @@ impl Registry {
     /// (see [`Registries::unwritable`]).
     pub fn read_only(&self) -> Option<&'static str> {
         self.read_only
+            .iter()
+            .copied()
+            .find(|key| *key != crate::AREA_KEY)
+    }
+
+    /// Whether `key`'s store (the entities', the devices' or the areas')
+    /// can't be written, so a change to its rows would not outlast a
+    /// restart.
+    pub fn unwritable(&self, key: &str) -> bool {
+        self.read_only.contains(&key)
     }
 
     /// HA's `_write_unavailable_states` at start. No row can be removed
@@ -343,16 +431,37 @@ impl Registry {
         out
     }
 
-    /// `async_create` for an area unless one with the same name (compared
-    /// as `normalize_name` does) exists, as onboarding guards it: the new
-    /// area, or `None`. Its id is the name slugified, with `_2`, `_3`, ...
-    /// when taken (`generate_id_from_name`). Fires `area_registry_updated`
-    /// and schedules the save.
-    pub fn create_area(&self, name: &str, icon: Option<&str>) -> Option<crate::Area> {
+    /// `async_create` for an area: refused, in HA's words, when the name
+    /// (compared as `normalize_name` does) is in use, or a sensor named
+    /// for its humidity or temperature has no state or is another kind.
+    /// Its id is the name slugified, with `_2`, `_3`, ... when taken
+    /// (`generate_id_from_name`). Fires `area_registry_updated` and
+    /// schedules the save.
+    pub fn create_area(&self, new: NewArea) -> Result<crate::Area, String> {
         let now = now_iso(&self.hass);
         self.write(|tx| {
-            if tx.r.area_by_name(name).is_some() {
-                return None;
+            let name = &new.name;
+            if let Some(area) = tx.r.area_by_name(name) {
+                return Err(format!(
+                    "The name {name} ({}) is already in use",
+                    crate::normalize_name(&area.name)
+                ));
+            }
+            // `_validate_humidity_entity`, then `_validate_temperature_entity`.
+            for (entity_id, class) in [
+                (&new.humidity_entity_id, "humidity"),
+                (&new.temperature_entity_id, "temperature"),
+            ] {
+                let Some(entity_id) = entity_id else { continue };
+                let state = ha_core::EntityId::parse(entity_id)
+                    .ok()
+                    .and_then(|id| self.hass.states().get(&id))
+                    .ok_or_else(|| format!("Entity {entity_id} does not exist"))?;
+                if state.entity_id.domain() != "sensor"
+                    || state.attributes.get("device_class").and_then(Value::as_str) != Some(class)
+                {
+                    return Err(format!("Entity {entity_id} is not a {class} sensor"));
+                }
             }
             let base = ha_core::slugify(name);
             let mut id = base.clone();
@@ -363,8 +472,14 @@ impl Registry {
             }
             let area = crate::Area {
                 id: id.clone(),
-                name: name.to_owned(),
-                icon: icon.map(str::to_owned),
+                name: name.clone(),
+                aliases: as_set(&new.aliases),
+                floor_id: new.floor_id.clone(),
+                humidity_entity_id: new.humidity_entity_id.clone(),
+                icon: new.icon.clone(),
+                labels: as_set(&new.labels),
+                picture: new.picture.clone(),
+                temperature_entity_id: new.temperature_entity_id.clone(),
                 created_at: Some(now.clone()),
                 modified_at: Some(now),
                 ..Default::default()
@@ -375,7 +490,159 @@ impl Registry {
                 json!({"action": "create", "area_id": id}),
             ));
             tx.save_areas = true;
-            Some(area)
+            Ok(area)
+        })
+    }
+
+    /// `async_update_device` as `config/device_registry/update` calls it:
+    /// the fields of `patch` that differ are written, `modified_at` is
+    /// bumped and one `update` event carries the old values; nothing
+    /// happens when nothing differs. The device as it is afterwards.
+    ///
+    /// `follows` says whether an integration's running entities take a
+    /// new device name: a name is refused for a device with an entity
+    /// that wouldn't (see [`DeviceRefusal`]). HA's entity registry changes
+    /// nothing of an entity that has its own name beside the device's
+    /// when the device is named or moved.
+    pub fn update_device(
+        &self,
+        device_id: &str,
+        patch: &DevicePatch,
+        follows: &dyn Fn(&str) -> bool,
+    ) -> Result<Arc<Device>, DeviceRefusal> {
+        let now = now_iso(&self.hass);
+        self.write(|tx| {
+            let i =
+                tx.r.devices
+                    .iter()
+                    .position(|d| d.id == device_id)
+                    .ok_or(DeviceRefusal::Unknown)?;
+            let mut d = (*tx.r.devices[i]).clone();
+            // The old values, in the order HA goes through the fields.
+            let mut changes = Map::new();
+            if let Some(area_id) = &patch.area_id
+                && d.area_id != *area_id
+            {
+                changes.insert("area_id".into(), json!(d.area_id));
+                d.area_id.clone_from(area_id);
+            }
+            if patch
+                .disabled_by
+                .as_ref()
+                .is_some_and(|by| *by != d.disabled_by)
+            {
+                return Err(DeviceRefusal::Disable);
+            }
+            if let Some(labels) = &patch.labels {
+                let new = as_set(labels);
+                if new.len() != d.labels.len() || new.iter().any(|l| !d.labels.contains(l)) {
+                    let mut old = std::mem::replace(&mut d.labels, new);
+                    old.sort_unstable();
+                    changes.insert("labels".into(), json!(old));
+                }
+            }
+            if let Some(name) = &patch.name_by_user
+                && d.name_by_user != *name
+            {
+                let cant = tx.r.entities.iter().find_map(|e| {
+                    (e.device_id.as_deref() == Some(device_id)).then_some(())?;
+                    match e.has_entity_name {
+                        false => Some(None),
+                        true => (!follows(&e.platform)).then(|| Some(e.platform.clone())),
+                    }
+                });
+                if let Some(platform) = cant {
+                    return Err(DeviceRefusal::Rename(platform));
+                }
+                changes.insert("name_by_user".into(), json!(d.name_by_user));
+                d.name_by_user.clone_from(name);
+            }
+            if changes.is_empty() {
+                return Ok(tx.r.devices[i].clone());
+            }
+            d.modified_at = Some(now);
+            let device = Arc::new(d);
+            tx.r.devices[i] = device.clone();
+            tx.device_event(
+                json!({"action": "update", "device_id": device.id, "changes": changes}),
+            );
+            Ok(device)
+        })
+    }
+
+    /// `async_regenerate_entity_id` for each id, as
+    /// `config/entity_registry/get_automatic_entity_ids` answers: the id
+    /// that follows from the names as they are now (an entity keeps its
+    /// own id if that is it), or `None` for an id nothing is registered
+    /// under. An id given to one is not given to the next.
+    pub fn automatic_entity_ids(&self, entity_ids: &[String]) -> Vec<(String, Option<String>)> {
+        let r = self.snapshot();
+        let mut reserved: Vec<String> = Vec::new();
+        entity_ids
+            .iter()
+            .map(|entity_id| {
+                let new = r
+                    .entities
+                    .iter()
+                    .find(|e| e.entity_id == *entity_id)
+                    .map(|e| regenerate_entity_id(&r, &self.hass, e, &reserved));
+                reserved.extend(new.clone());
+                (entity_id.clone(), new)
+            })
+            .collect()
+    }
+
+    /// `async_update_entity` with a `new_entity_id` (and whatever else
+    /// `patch` changes, in the same event, which names the old id): the
+    /// old values of what changed, empty if nothing did. `follows` says
+    /// whether an integration's running entities take a new id.
+    pub fn rename_entity(
+        &self,
+        entity_id: &str,
+        new_entity_id: &str,
+        patch: &EntityPatch,
+        follows: &dyn Fn(&str) -> bool,
+    ) -> Result<Map<String, Value>, RenameRefusal> {
+        let now = now_iso(&self.hass);
+        self.write(|tx| {
+            let i =
+                tx.r.entities
+                    .iter()
+                    .position(|e| e.entity_id == entity_id)
+                    .ok_or(RenameRefusal::Unknown)?;
+            let mut row = (*tx.r.entities[i]).clone();
+            let mut changes = apply(&mut row, patch);
+            if new_entity_id != entity_id {
+                // `_entity_id_available`: not registered, and no state.
+                let parsed = ha_core::EntityId::parse(new_entity_id);
+                let state = parsed
+                    .as_ref()
+                    .is_ok_and(|id| self.hass.states().get(id).is_some());
+                if state || tx.r.entities.iter().any(|e| e.entity_id == new_entity_id) {
+                    return Err(RenameRefusal::Registered);
+                }
+                let new = parsed.map_err(|_| RenameRefusal::Invalid)?;
+                if Some(new.domain()) != entity_id.split('.').next() {
+                    return Err(RenameRefusal::Domain);
+                }
+                if !follows(&row.platform) {
+                    return Err(RenameRefusal::Platform(row.platform.clone()));
+                }
+                changes.insert("entity_id".into(), json!(entity_id));
+                row.entity_id = new_entity_id.to_owned();
+            }
+            if changes.is_empty() {
+                return Ok(changes);
+            }
+            row.modified_at = Some(now);
+            tx.r.entities[i] = Arc::new(row);
+            let mut event = json!({"action": "update", "entity_id": new_entity_id,
+                                   "changes": changes});
+            if new_entity_id != entity_id {
+                event["old_entity_id"] = json!(entity_id);
+            }
+            tx.entity_event(event);
+            Ok(changes)
         })
     }
 
@@ -431,17 +698,11 @@ impl Registry {
             let device_id = patch.device_id.clone().flatten();
             // A deleted row for the same unique id comes back: its id,
             // creation time and the user's settings (HA's `deleted_entities`).
-            let key = (domain.to_owned(), platform.to_owned(), json!(unique_id));
-            let deleted =
-                tx.r.entity_file
-                    .deleted
-                    .iter()
-                    .position(|d| DeletedEntity::parse(d).map(|d| d.key()).as_ref() == Some(&key));
+            let key = DeletedKey::new((domain.to_owned(), platform.to_owned(), json!(unique_id)));
+            let deleted = tx.r.entity_file.deleted.iter().position(|d| key.is(d));
             let deleted = deleted.and_then(|i| {
-                let mut rows = (*tx.r.entity_file.deleted).clone();
-                let row = DeletedEntity::parse(&rows.remove(i));
-                tx.r.entity_file.deleted = Arc::new(rows);
-                row
+                let row = Arc::make_mut(&mut tx.r.entity_file.deleted).remove(i);
+                DeletedEntity::parse(&row)
             });
             let available = |id: &str| {
                 !tx.r.entities.iter().any(|e| e.entity_id == id)
@@ -881,17 +1142,45 @@ fn remove_row(tx: &mut Tx, i: usize, now: jiff::Timestamp) {
         .is_none()
         .then(|| now.as_microsecond() as f64 / 1e6);
     let deleted = DeletedEntity::of(&row, ha_core::isoformat(now), orphaned);
-    let key = deleted.key();
-    let mut kept: Vec<RawRow> =
-        tx.r.entity_file
-            .deleted
-            .iter()
-            .filter(|d| DeletedEntity::parse(d).map(|d| d.key()).as_ref() != Some(&key))
-            .cloned()
-            .collect();
-    kept.extend(deleted.raw());
-    tx.r.entity_file.deleted = Arc::new(kept);
+    let key = DeletedKey::new(deleted.key());
+    // Changed in place: the rows are copied once for the write, however
+    // many of them it removes.
+    let rows = Arc::make_mut(&mut tx.r.entity_file.deleted);
+    rows.retain(|d| !key.is(d));
+    rows.extend(deleted.raw());
     tx.entity_event(json!({"action": "remove", "entity_id": row.entity_id}));
+}
+
+/// Which deleted row is the one for an entity (its domain, platform and
+/// unique id). A unique id of plain characters is looked for in a row's
+/// text first, so that only a row that has it is parsed: parsing every
+/// deleted row for each entity removed made removing an entry's entities
+/// quadratic.
+struct DeletedKey {
+    key: (String, String, Value),
+    /// The unique id as it stands in a row's JSON, when no writer could
+    /// spell it another way (no escapes).
+    text: Option<String>,
+}
+
+impl DeletedKey {
+    fn new(key: (String, String, Value)) -> Self {
+        let plain = |c: char| c.is_ascii_alphanumeric() || " _-.:".contains(c);
+        let text = match &key.2 {
+            Value::String(id) if id.chars().all(plain) => Some(format!("\"{id}\"")),
+            _ => None,
+        };
+        Self { key, text }
+    }
+
+    fn is(&self, row: &RawRow) -> bool {
+        if let Some(text) = &self.text
+            && !row.get().contains(text.as_str())
+        {
+            return false;
+        }
+        DeletedEntity::parse(row).map(|d| d.key()).as_ref() == Some(&self.key)
+    }
 }
 
 fn is_unique(e: &Entity, domain: &str, platform: &str, unique_id: &str) -> bool {
@@ -1144,15 +1433,79 @@ fn generate_entity_id(
     available_entity_id(r, hass, domain, &object_id)
 }
 
+/// `async_regenerate_entity_id`: the id `row` would get from the names as
+/// they are now. Its user's name comes first (after the device's, with
+/// that prefix stripped), then `suggested_object_id` on its own, then
+/// what the integration calls it; `reserved` ids are not given.
+fn regenerate_entity_id(r: &Registries, hass: &Hass, row: &Entity, reserved: &[String]) -> String {
+    let domain = row.entity_id.split('.').next().unwrap_or_default();
+    let object_id = match (&row.name, &row.suggested_object_id) {
+        (None, Some(suggested)) if !suggested.is_empty() => suggested.clone(),
+        _ => {
+            let device = row
+                .device_id
+                .as_deref()
+                .and_then(|id| r.devices.iter().find(|d| d.id == id));
+            let device_name = device.and_then(|d| d.display_name());
+            // The entity's own area, else its device's.
+            let area_name = row
+                .area_id
+                .as_deref()
+                .or_else(|| device.and_then(|d| d.area_id.as_deref()))
+                .and_then(|a| r.areas.iter().find(|x| x.id == a))
+                .map(|a| a.name.as_str());
+            let unprefixed = |name: &str| device_name.and_then(|device| strip_prefix(name, device));
+            let entity_name = match (&row.name, &row.object_id_base) {
+                (Some(name), _) => Some(unprefixed(name).unwrap_or_else(|| name.clone())),
+                // Only a name of the old kind carries the device's.
+                (None, Some(base)) if !row.has_entity_name => {
+                    Some(unprefixed(base).unwrap_or_else(|| base.clone()))
+                }
+                (None, base) => base.clone(),
+            };
+            [area_name, device_name, entity_name.as_deref()]
+                .into_iter()
+                .flatten()
+                .filter(|p| !p.is_empty())
+                .collect::<Vec<_>>()
+                .join(" ")
+        }
+    };
+    let unique_id = match &row.unique_id {
+        Some(Value::String(id)) => id.clone(),
+        Some(other) => other.to_string(),
+        None => String::new(),
+    };
+    let object_id = match object_id.is_empty() {
+        true => format!("{}_{unique_id}", row.platform),
+        false => object_id,
+    };
+    available_id(r, hass, domain, &object_id, Some(&row.entity_id), reserved)
+}
+
 /// `async_get_available_entity_id`: `<domain>.<slug>`, cut to 255, with
 /// `_2`, `_3`, … while the registry or the state machine has it.
 pub fn available_entity_id(r: &Registries, hass: &Hass, domain: &str, object_id: &str) -> String {
+    available_id(r, hass, domain, object_id, None, &[])
+}
+
+/// [`available_entity_id`], where `current` (the entity's own id) counts
+/// as free and the `reserved` ids as taken.
+fn available_id(
+    r: &Registries,
+    hass: &Hass,
+    domain: &str,
+    object_id: &str,
+    current: Option<&str>,
+    reserved: &[String],
+) -> String {
     let preferred = format!("{domain}.{}", ha_core::slugify(object_id));
     let taken = |id: &str| {
-        r.entities.iter().any(|e| e.entity_id == id)
+        let used = r.entities.iter().any(|e| e.entity_id == id)
             || ha_core::EntityId::parse(id)
                 .ok()
-                .is_some_and(|id| hass.states().get(&id).is_some())
+                .is_some_and(|id| hass.states().get(&id).is_some());
+        (used && Some(id) != current) || reserved.iter().any(|r| r == id)
     };
     let cut = |s: &str, n: usize| s.chars().take(n).collect::<String>();
     let mut test = cut(&preferred, MAX_ENTITY_ID);

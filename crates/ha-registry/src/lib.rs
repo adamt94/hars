@@ -10,7 +10,8 @@
 
 mod live;
 pub use live::{
-    DeviceInfo, EntityPatch, EntryInfo, EntryLookup, Lookup, Registry, available_entity_id,
+    DeviceInfo, DevicePatch, DeviceRefusal, EntityPatch, EntryInfo, EntryLookup, Lookup, NewArea,
+    Registry, RenameRefusal, available_entity_id,
 };
 
 use ha_core::storage::{Store, StoreError};
@@ -838,12 +839,19 @@ impl Registries {
     /// had no file was loaded as the current version, and registries that
     /// were never read from a file (minor version 0) have none to spare.
     pub fn unwritable(&self) -> Option<&'static str> {
+        self.unwritable_stores().find(|key| *key != AREA_KEY)
+    }
+
+    /// [`Registries::unwritable`] for each store `hars` writes: the
+    /// entities', the devices' and the areas'.
+    pub fn unwritable_stores(&self) -> impl Iterator<Item = &'static str> {
         [
             (ENTITY_KEY, self.entity_file.minor),
             (DEVICE_KEY, self.device_file.minor),
+            (AREA_KEY, self.area_minor),
         ]
         .into_iter()
-        .find(|&(key, minor)| {
+        .filter(|&(key, minor)| {
             STORES
                 .iter()
                 .any(|&(k, _, current)| k == key && minor != 0 && current != minor)

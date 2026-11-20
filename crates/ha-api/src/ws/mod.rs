@@ -12,6 +12,7 @@ mod automation;
 mod commands;
 mod config;
 pub(crate) mod config_entries;
+mod device_registry;
 mod entities;
 mod entity_registry;
 mod frontend;

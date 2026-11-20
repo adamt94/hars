@@ -5,14 +5,20 @@
 //! - `config/entity_registry/list`, `get` and `get_entries`: rows as HA's
 //!   `as_partial_dict` and `extended_dict`.
 //! - `config/entity_registry/update` (admin): the user's area, labels and
-//!   categories. HA's other fields (a name, an icon, a new entity id,
-//!   disabling, hiding, aliases, options) need the entity to follow the
-//!   change, which hars's entities don't do yet: those are refused.
+//!   categories, and a new entity id for an entity of an integration whose
+//!   running entities take it (`ha_integrations::components::follows`).
+//!   HA's other fields (a name, an icon, disabling, hiding, aliases,
+//!   options) need the entity to follow the change, which hars's entities
+//!   don't do yet: those are refused. Nothing is changed when the store
+//!   can't be written.
+//! - `config/entity_registry/get_automatic_entity_ids`: the ids that
+//!   follow from the names as they are now.
 //! - `config/category_registry/list`: the stored categories of a scope.
 //! - `blueprint/list`: hars has no blueprints, so none.
 //!
 //! Checked by `vectors/entity_registry.json`, made by
-//! `scripts/vectors/entity_registry_ws.py`.
+//! `scripts/vectors/entity_registry_ws.py`, and for entity ids by
+//! `config_entries/vectors/device_step.json` (`device_step.py`).
 
 use super::{Conn, Invalid, only_keys};
 use ha_auth::Permission;
@@ -51,10 +57,14 @@ fn get(conn: &Conn, id: u64, msg: &Map<String, Value>) -> Result<(), Invalid> {
     Ok(())
 }
 
-fn get_entries(conn: &Conn, id: u64, msg: &Map<String, Value>) -> Result<(), Invalid> {
+/// `cv.entity_ids`: a list, or one string with commas between ids; each
+/// id trimmed and lower-cased. `None` once the command is answered.
+fn entity_ids(
+    conn: &Conn,
+    id: u64,
+    msg: &Map<String, Value>,
+) -> Result<Option<Vec<String>>, Invalid> {
     only_keys(msg, &["entity_ids"])?;
-    // `cv.entity_ids`: a list, or one string with commas between ids;
-    // each id trimmed and lower-cased.
     let ids: Vec<String> = match msg.get("entity_ids") {
         None => return Err("required key not provided @ data['entity_ids']".into()),
         Some(Value::String(s)) => s.split(',').map(|i| i.trim().to_owned()).collect(),
@@ -68,18 +78,46 @@ fn get_entries(conn: &Conn, id: u64, msg: &Map<String, Value>) -> Result<(), Inv
         // HA iterates whatever it is given: anything else raises.
         Some(_) => {
             conn.out.error(json!(id), "unknown_error", "Unknown error");
-            return Ok(());
+            return Ok(None);
         }
+    };
+    ids.into_iter()
+        .map(|written| {
+            let entity_id = written.to_lowercase();
+            match ha_core::EntityId::parse(&entity_id) {
+                Ok(_) => Ok(entity_id),
+                Err(_) => Err(format!(
+                    "Entity ID {written} is an invalid entity ID for dictionary value @ data['entity_ids']"
+                )),
+            }
+        })
+        .collect::<Result<Vec<String>, Invalid>>()
+        .map(Some)
+}
+
+fn get_automatic_entity_ids(conn: &Conn, id: u64, msg: &Map<String, Value>) -> Result<(), Invalid> {
+    let Some(ids) = entity_ids(conn, id, msg)? else {
+        return Ok(());
+    };
+    let found: Map<String, Value> = match &conn.shared.config.registry {
+        Some(registry) => registry
+            .automatic_entity_ids(&ids)
+            .into_iter()
+            .map(|(old, new)| (old, json!(new)))
+            .collect(),
+        None => ids.into_iter().map(|id| (id, Value::Null)).collect(),
+    };
+    conn.out.result(id, Value::Object(found));
+    Ok(())
+}
+
+fn get_entries(conn: &Conn, id: u64, msg: &Map<String, Value>) -> Result<(), Invalid> {
+    let Some(ids) = entity_ids(conn, id, msg)? else {
+        return Ok(());
     };
     let r = conn.shared.config.registries();
     let mut out = Map::new();
-    for written in ids {
-        let entity_id = written.to_lowercase();
-        if ha_core::EntityId::parse(&entity_id).is_err() {
-            return Err(format!(
-                "Entity ID {written} is an invalid entity ID for dictionary value @ data['entity_ids']"
-            ));
-        }
+    for entity_id in ids {
         let row = r.entities.iter().find(|e| e.entity_id == entity_id);
         out.insert(
             entity_id,
@@ -93,12 +131,11 @@ fn get_entries(conn: &Conn, id: u64, msg: &Map<String, Value>) -> Result<(), Inv
 }
 
 /// What HA's schema takes that hars can't act on yet.
-const UNSUPPORTED: [&str; 9] = [
+const UNSUPPORTED: [&str; 8] = [
     "aliases",
     "device_class",
     "icon",
     "name",
-    "new_entity_id",
     "disabled_by",
     "hidden_by",
     "options_domain",
@@ -106,7 +143,13 @@ const UNSUPPORTED: [&str; 9] = [
 ];
 
 fn update(conn: &Conn, id: u64, msg: &Map<String, Value>) -> Result<(), Invalid> {
-    let mut allowed = vec!["entity_id", "area_id", "categories", "labels"];
+    let mut allowed = vec![
+        "entity_id",
+        "area_id",
+        "categories",
+        "labels",
+        "new_entity_id",
+    ];
     allowed.extend(UNSUPPORTED);
     only_keys(msg, &allowed)?;
     let entity_id = entity_id(msg)?;
@@ -143,20 +186,14 @@ fn update(conn: &Conn, id: u64, msg: &Map<String, Value>) -> Result<(), Invalid>
             return Err("expected dictionary for dictionary value @ data['categories']".into());
         }
     };
-    // `[str]`.
-    let labels = match msg.get("labels") {
+    let labels = super::device_registry::labels(msg)?;
+    // `str`: checked by the registry.
+    let new_entity_id = match msg.get("new_entity_id") {
         None => None,
-        Some(Value::Array(labels)) => Some(
-            labels
-                .iter()
-                .enumerate()
-                .map(|(i, l)| match l {
-                    Value::String(l) => Ok(l.clone()),
-                    _ => Err(format!("expected str @ data['labels'][{i}]")),
-                })
-                .collect::<Result<Vec<String>, Invalid>>()?,
-        ),
-        Some(_) => return Err("expected a list for dictionary value @ data['labels']".into()),
+        Some(Value::String(new)) => Some(new.as_str()),
+        Some(_) => {
+            return Err("expected str for dictionary value @ data['new_entity_id']".into());
+        }
     };
     if conn.principal.permission < Permission::Admin {
         conn.out.error(json!(id), "unauthorized", "Unauthorized");
@@ -183,16 +220,51 @@ fn update(conn: &Conn, id: u64, msg: &Map<String, Value>) -> Result<(), Invalid>
         );
         return Ok(());
     }
-    registry.update_entity(
-        entity_id,
-        ha_registry::EntityPatch {
-            area_id,
-            // Only the scopes named change.
-            categories: categories.cloned(),
-            labels,
-            ..Default::default()
-        },
-    );
+    if registry.unwritable(ha_registry::ENTITY_KEY) {
+        super::device_registry::unwritable(conn, id, ha_registry::ENTITY_KEY);
+        return Ok(());
+    }
+    let patch = ha_registry::EntityPatch {
+        area_id,
+        // Only the scopes named change.
+        categories: categories.cloned(),
+        labels,
+        ..Default::default()
+    };
+    let entity_id = match new_entity_id {
+        None => {
+            registry.update_entity(entity_id, patch);
+            entity_id
+        }
+        Some(new) => {
+            use ha_registry::RenameRefusal;
+            let follows = &ha_integrations::components::follows;
+            match registry.rename_entity(entity_id, new, &patch, follows) {
+                Ok(_) => super::device_registry::registry_changed(conn),
+                Err(RenameRefusal::Unknown) => {
+                    not_found(conn, id);
+                    return Ok(());
+                }
+                Err(RenameRefusal::Platform(platform)) => {
+                    conn.out.error(
+                        json!(id),
+                        "not_supported",
+                        &format!(
+                            "hars can't change the id of an entity of the {platform} integration yet"
+                        ),
+                    );
+                    return Ok(());
+                }
+                // A `ValueError`.
+                Err(refused) => {
+                    let why = refused.message().unwrap_or_default();
+                    conn.out.error(json!(id), "invalid_info", why);
+                    return Ok(());
+                }
+            }
+            new
+        }
+    };
     match extended(entity_id) {
         Some(row) => conn.out.result(id, json!({"entity_entry": row})),
         None => not_found(conn, id),
@@ -247,6 +319,9 @@ pub(super) fn dispatch(
         }),
         "config/entity_registry/get" => get(conn, id, msg),
         "config/entity_registry/get_entries" => get_entries(conn, id, msg),
+        "config/entity_registry/get_automatic_entity_ids" => {
+            get_automatic_entity_ids(conn, id, msg)
+        }
         "config/entity_registry/update" => update(conn, id, msg),
         "config/category_registry/list" => categories(conn, id, msg),
         // `blueprint/list` (admin): every blueprint of a domain, by path.

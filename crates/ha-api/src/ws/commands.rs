@@ -74,6 +74,7 @@ pub(super) fn dispatch(conn: &mut Conn, id: u64, ty: &str, msg: &Map<String, Val
             .or_else(|| super::manifest::dispatch(conn, id, ty, msg))
             .or_else(|| super::automation::dispatch(conn, id, ty, msg))
             .or_else(|| super::entity_registry::dispatch(conn, id, ty, msg))
+            .or_else(|| super::device_registry::dispatch(conn, id, ty, msg))
             .or_else(|| super::mobile_app::dispatch(conn, id, ty, msg))
             .or_else(|| super::recorder::dispatch(conn, id, ty, msg))
             .or_else(|| super::history::dispatch(conn, id, ty, msg))

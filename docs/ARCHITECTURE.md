@@ -197,6 +197,22 @@ area targets against rows made after start-up. What `hars` calls outside
 parameter, so tests and a debug build's browser run point it at
 127.0.0.1.
 
+**Registry changes that reach running entities.** HA's entities each
+listen for their registry row and their device to change. In `hars` an
+entity takes its id and friendly name from the registry when its entry is
+set up, so whoever changes a device's name or an entity's id
+(`ha-api`'s `ws/device_registry.rs` and `ws/entity_registry.rs`) calls
+`Components::registry_changed`, and each running entry that registered as
+a `components::Follower` takes its entities' ids and names again: a new
+name is one more state write, a new id removes the old state and puts the
+entity under the new id in its component, keeping what it had.
+`components::follows` lists the integrations that do this (today
+`switchbot_cloud`); the registry refuses a change the others' entities
+would not follow (`ha_registry::DeviceRefusal`, `RenameRefusal`), and
+the commands refuse one whose store can't be written
+(`Registry::unwritable`). No task or timer is involved: a follower is a
+weak reference in a list that is empty while no such entry runs.
+
 ### Storage and restore
 
 - **`.storage` files** (`ha_core::storage::Store`) use HA's envelope
@@ -307,7 +323,7 @@ All of it is in `ha-api`; `ha_api::router` builds it.
 | REST `/api/…` | `rest.rs`, `automation.rs`, `lib.rs` (`/api/config`), `mobile_app::registration_routes` (`/api/mobile_app/registrations`) | Behind `auth::require_auth`; each route's permission is in `auth::required_permission` |
 | Auth `/auth/…` | `auth.rs` | Login flow, token, revoke; HA's `.storage/auth*` files. `/auth/token` and `/auth/revoke` allow CORS from any origin (`cors.rs`, aiohttp_cors as HA sets it up) |
 | WebSocket `/api/websocket` | `ws/` | Authenticates in the protocol; `ws/commands.rs::dispatch` matches the command type, then asks each domain's module (`ws/weather.rs`, `ws/history.rs`, …) |
-| The frontend's Settings panel | `ws/entity_registry.rs`, `automation.rs`, `ws/automation.rs` | Registered for admins (`ws/commands.rs::panels`). hars answers what the automation pages ask for; the roadmap lists the pages that still have gaps |
+| The frontend's Settings panel | `ws/entity_registry.rs`, `ws/device_registry.rs`, `automation.rs`, `ws/automation.rs` | Registered for admins (`ws/commands.rs::panels`). hars answers what the automation pages ask for; the roadmap lists the pages that still have gaps |
 | Companion app webhook `/api/webhook/{id}` | `mobile_app/` | The webhook id is the credential; encryption is required for registrations with `supports_encryption` enabled |
 | Companion app push channel (WS `mobile_app/push_notification_*`) | `ws/mobile_app.rs` | The commands only; the channels, the confirm timers and cloud push (through `ha-http`) are `ha_integrations::mobile_app::notify`'s, reached through `ApiConfig.mobile_app` |
 | Frontend `/`, `/frontend_latest/…` | `frontend.rs` | Served from `HARS_FRONTEND` on disk with precompressed files ([ADR 0004](adr/0004-frontend-from-disk.md)) |

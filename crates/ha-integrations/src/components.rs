@@ -11,7 +11,22 @@ use crate::switch::Switches;
 use ha_core::Hass;
 use ha_registry::{Lookup, Registries};
 use parking_lot::Mutex;
-use std::sync::{Arc, OnceLock};
+use std::sync::{Arc, OnceLock, Weak};
+
+/// An entry whose running entities take what the registry says of them
+/// when it changes: a device's new name (their friendly names), an
+/// entity's new id. HA's entities each listen for this; here the entry is
+/// told, by whoever made the change.
+pub trait Follower: Send + Sync {
+    fn registry_changed(&self, components: &Components);
+}
+
+/// The integrations whose entries are [`Follower`]s. The entities of
+/// another keep the name and id they started with until it is set up
+/// again, so a change that would reach them is refused.
+pub fn follows(platform: &str) -> bool {
+    platform == crate::switchbot_cloud::DOMAIN
+}
 
 pub struct Components {
     hass: Hass,
@@ -23,6 +38,9 @@ pub struct Components {
     scenes: OnceLock<Arc<Scenes>>,
     buttons: OnceLock<Arc<Buttons>>,
     climates: OnceLock<Arc<Climates>>,
+    /// The entries that run and follow the registry; none while idle
+    /// costs nothing, and one that stopped is dropped at the next change.
+    followers: Mutex<Vec<Weak<dyn Follower>>>,
 }
 
 impl Components {
@@ -36,7 +54,26 @@ impl Components {
             scenes: OnceLock::new(),
             buttons: OnceLock::new(),
             climates: OnceLock::new(),
+            followers: Mutex::default(),
         })
+    }
+
+    /// Tell `follower` of registry changes for as long as it lives.
+    pub fn follow(&self, follower: &Arc<dyn Follower>) {
+        self.followers.lock().push(Arc::downgrade(follower));
+    }
+
+    /// A device was named or an entity given another id: every running
+    /// entry that follows takes its entities' ids and names again.
+    pub fn registry_changed(&self) {
+        let followers: Vec<Arc<dyn Follower>> = {
+            let mut all = self.followers.lock();
+            all.retain(|f| f.strong_count() > 0);
+            all.iter().filter_map(Weak::upgrade).collect()
+        };
+        for follower in followers {
+            follower.registry_changed(self);
+        }
     }
 
     pub fn hass(&self) -> &Hass {

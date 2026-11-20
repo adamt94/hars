@@ -183,15 +183,7 @@ async fn started(hass: &Hass) -> (Arc<Entry>, Arc<Server>, Arc<Components>) {
     let registries = Arc::new(registries());
     let components = Components::new(hass, registries.clone(), Profiles::default());
     let entry = setup(hass, &registries, api(&base)).await.unwrap();
-    for c in &entry.climates {
-        components.climates().add(c.clone());
-    }
-    for s in &entry.switches {
-        components.switches().add(s.clone());
-    }
-    for b in &entry.buttons {
-        components.buttons().add(b.clone());
-    }
+    entry.add_to(&components);
     entry.write_all();
     (entry, server, components)
 }

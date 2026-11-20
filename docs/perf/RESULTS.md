@@ -419,6 +419,40 @@ Against HA on the same host and devices: about 1/18th of the memory, 1/13th
 of the CPU, a fifth of the wakeups and a tenth of the start-up time. Within
 the [budgets](../PERF.md#budgets).
 
+### Device and area edits, 2026-11-20
+
+The Add integration dialog's last step: a device's name, area and labels,
+a new area, the entity ids that follow from a name, and SwitchBot Cloud's
+running entities taking a new name or id. All of it runs when a user
+saves a change and at no other time: no timer, no task, nothing that
+wakes. What stays in memory is one weak reference per running entry that
+follows the registry (an empty, unallocated list on an install with
+none), and per SwitchBot entity the names its id is made from (two short
+strings) behind a lock that only a state write or a rename takes. A state
+write of such an entity now copies its id and friendly name out of that
+lock, where it copied the id and built the name's JSON value before: the
+same number of allocations.
+
+Release binary (macOS arm64, stripped, `cargo build --release -p
+ha-server`): main (49c08fc) 9,469,328 bytes, branch 9,518,944
+(+49,616).
+
+The same change stops the registry from parsing every deleted entity row
+for each entity it removes (the row for the same unique id is now looked
+for in the rows' text first, and the list is changed in place instead of
+copied per removal). Removing an entry's 1,000 entities from a registry of
+8,000 (`Registry::clear_config_entry`, in memory, an Apple-silicon Mac,
+one run each):
+
+| | debug build | release build |
+|---|---|---|
+| before | 8.10 s | 634 ms |
+| after | 0.74 s | 30 ms |
+
+Then 200 single removals (`Registry::remove_entity`, 1,000 deleted rows
+kept): 3.65 s to 0.34 s in a debug build, 280 ms to 28 ms in a release
+build.
+
 ### Config flows, 2026-11-20
 
 Adding an integration from the UI: the flow engine and SwitchBot Cloud's

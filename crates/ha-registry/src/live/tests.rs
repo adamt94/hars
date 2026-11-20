@@ -964,16 +964,21 @@ async fn areas_are_created_once_by_name() {
     hass.start();
     let mut events = hass.bus().subscribe();
     let registry = Registry::new(&hass, &dir, Registries::default());
-    let a = registry
-        .create_area("Living Room", Some("mdi:sofa"))
-        .unwrap();
+    let area = |name: &str, icon: Option<&str>| {
+        registry.create_area(NewArea {
+            name: name.to_owned(),
+            icon: icon.map(str::to_owned),
+            ..Default::default()
+        })
+    };
+    let a = area("Living Room", Some("mdi:sofa")).unwrap();
     assert_eq!(
         (a.id.as_str(), a.icon.as_deref()),
         ("living_room", Some("mdi:sofa"))
     );
-    assert!(registry.create_area("living room", None).is_none());
-    assert!(registry.create_area("LivingRoom", None).is_none());
-    let b = registry.create_area("Living_Room", None).unwrap();
+    assert!(area("living room", None).is_err());
+    assert!(area("LivingRoom", None).is_err());
+    let b = area("Living_Room", None).unwrap();
     assert_eq!(b.id, "living_room_2");
     let e = events.recv().await.unwrap();
     let EventKind::Custom { name, data } = &e.kind else {
@@ -1070,4 +1075,40 @@ fn what_cant_be_written_is_known_without_the_disk() {
     let loaded = Registries::load_strict(&dir).unwrap();
     std::fs::remove_dir_all(&dir).unwrap();
     assert_eq!(loaded.unwritable(), Some(DEVICE_KEY));
+}
+
+/// An older deleted row for the same unique id is replaced, whatever its
+/// unique id looks like in the file (one with an escape is found by
+/// parsing), and a deleted row whose text only contains the id of another
+/// stays.
+#[test]
+fn a_deleted_row_is_replaced_by_its_unique_id() {
+    for unique in ["plain-1", "quoted \"1\"", "caf\u{e9}/1"] {
+        let hass = Hass::new();
+        let reg = Registry::in_memory(&hass, Registries::default());
+        let make = |unique_id: &str| {
+            reg.get_or_create_entity("sensor", "p", unique_id, None, EntityPatch::default())
+        };
+        // Another entity's row, with the first's unique id in its text.
+        let other = make(&format!("x {unique}"));
+        reg.remove_entity(&other.entity_id);
+        for _ in 0..2 {
+            let row = make(unique);
+            reg.remove_entity(&row.entity_id);
+        }
+        let deleted = reg.snapshot().entity_file.deleted.clone();
+        let ids: Vec<Value> = deleted
+            .iter()
+            .map(|d| serde_json::from_str::<Value>(d.get()).unwrap()["unique_id"].clone())
+            .collect();
+        assert_eq!(
+            ids,
+            [json!(format!("x {unique}")), json!(unique)],
+            "{unique}"
+        );
+        // And it comes back, with its id.
+        let back = make(unique);
+        assert_eq!(reg.snapshot().entity_file.deleted.len(), 1);
+        assert_eq!(back.unique_id, Some(json!(unique)));
+    }
 }

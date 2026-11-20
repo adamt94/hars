@@ -37,7 +37,8 @@ sends its steps over real HTTP and a real WebSocket. It writes
 Ids are written as placeholders in order of appearance (`<flow:1>`,
 `<entry:1>`), a device's registry id as `<device:IDENTIFIER>`, other
 registry ids `<id>`, the webhook id HA adds to the entry's data
-`<webhook>`, times `<time>` (ISO text) and `<ts>` (seconds). Registry rows
+`<webhook>`, times `<time>` (ISO text) and `<ts>` (seconds). A step may
+name a device by its placeholder. Registry rows
 are sorted (HA sets the platforms up side by side, in an order that changes
 from run to run), and so are the fields of a refused form's `errors`, the
 handler lists and a device's `config_entries` (sets in HA). Nothing reaches the network. Run it twice: the output
@@ -420,8 +421,8 @@ class Ids:
                 self.learn(v)
 
     def real(self, text):
-        """A step's path with the real ids."""
-        for table in (self.flows, self.entries):
+        """A step's path or message with the real ids."""
+        for table in (self.flows, self.entries, self.devices):
             for real, name in table.items():
                 text = text.replace(name, real)
         return text
@@ -446,11 +447,29 @@ class Ids:
         return value
 
 
+def event_of(message):
+    """A subscription's event: a `subscribe_events` one cut down to its
+    type and data, a state to its text and attributes (the rest is times
+    and context ids)."""
+    event = message["event"]
+    if not isinstance(event, dict) or "event_type" not in event:
+        return event
+    data = event["data"]
+    if event["event_type"] == "state_changed":
+        def state(s):
+            return s and {"state": s["state"], "attributes": s["attributes"]}
+
+        data = {"entity_id": data["entity_id"], "old_state": state(data["old_state"]),
+                "new_state": state(data["new_state"])}
+    return {"event_type": event["event_type"], "data": data}
+
+
 async def run(subscriptions, steps):
     from homeassistant import bootstrap, core, loader
     from homeassistant.auth import auth_manager_from_config
     from homeassistant.config_entries import ConfigEntries
-    from homeassistant.helpers import device_registry as dr, entity_registry as er
+    from homeassistant.helpers import (area_registry as ar, device_registry as dr,
+                                       entity_registry as er)
     from homeassistant.setup import async_setup_component
     import aiohttp
     import switchbot_api
@@ -515,8 +534,10 @@ async def run(subscriptions, steps):
             for name, msg in subscriptions:
                 sock = await connect("admin")
                 await sock.send_json({"id": 1, **msg})
+                # `subscribe_events` answers with its result alone.
+                count = 1 if msg["type"] == "subscribe_events" else 2
                 first = []
-                while len(first) < 2:
+                while len(first) < count:
                     first.append(await asyncio.wait_for(sock.receive_json(), 10))
                 subs.append((name, sock, [2]))
                 opened.append({"sub": name, "msg": msg, "first": first})
@@ -534,7 +555,12 @@ async def run(subscriptions, steps):
                         if m.get("type") == "pong":
                             break
                         ids.learn(m)
-                        got.append({"sub": name, "event": m["event"]})
+                        got.append({"sub": name, "event": event_of(m)})
+                # The devices there are now, for the steps that name one.
+                for device in dr.async_get(hass).devices.values():
+                    for domain, ident in device.identifiers:
+                        if domain == "switchbot_cloud":
+                            ids.devices[device.id] = f"<device:{ident}>"
                 return got
 
             from homeassistant.helpers.json import json_dumps as dumps
@@ -665,6 +691,7 @@ async def run(subscriptions, steps):
                               key=lambda d: json.dumps(d["identifiers"])),
             "entities": sorted(stored(entities)["entities"], key=lambda e: e["entity_id"]),
             "states": json.loads(json_dumps(states)),
+            "areas": stored(ar.async_get(hass))["areas"],
             "deleted_devices": len(stored(devices)["deleted_devices"]),
             "deleted_entities": len(stored(entities)["deleted_entities"]),
         }
@@ -716,6 +743,7 @@ async def main():
     for name, doc, subscriptions, steps in SCENARIOS:
         result = await run(subscriptions, json.loads(json.dumps(steps)))
         rows = {k: result.pop(k) for k in ("devices", "entities", "states")}
+        result.pop("areas")
         if name == "add":
             write(SWITCHBOT / "fresh_setup.json", rows)
         if name == "duplicate":

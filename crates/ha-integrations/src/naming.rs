@@ -38,10 +38,12 @@ impl<'a> Names<'a> {
             .map(|v| &**v)
     }
 
-    /// A device's name: the user's, else the integration's.
+    /// A device's name: the user's unless it is empty (Python's `or`),
+    /// else the integration's.
     pub fn device_name<'d>(&'d self, id: &str, default: &'d str) -> &'d str {
         self.registry_device(id)
             .and_then(|r| r.name_by_user.as_deref())
+            .filter(|name| !name.is_empty())
             .unwrap_or(default)
     }
 

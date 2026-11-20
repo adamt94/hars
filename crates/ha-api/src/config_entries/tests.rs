@@ -125,23 +125,29 @@ struct Home {
 
 async fn home() -> Home {
     let hass = Hass::new();
-    let (base, api) = FakeApi::start().await;
     let registry = ha_registry::Registry::in_memory(&hass, Default::default());
+    home_on(hass, registry).await
+}
+
+/// [`home`], on `registry`.
+async fn home_on(hass: Hass, registry: Arc<ha_registry::Registry>) -> Home {
+    let (base, api) = FakeApi::start().await;
     let entries = ConfigEntries::in_memory(&hass, Vec::new());
     let components = Components::new(&hass, registry.clone(), Default::default());
     let flows = Manager::new(
         &hass,
         entries.clone(),
-        components,
+        components.clone(),
         Endpoints { switchbot: base },
         Vec::new(),
         None,
-    )
-    .unwrap();
+    );
     let config = crate::ApiConfig {
         registry: Some(registry.clone()),
+        entities: Some(components),
         config_entries: Some(entries.clone()),
-        flows: Some(flows),
+        // None when a store can't be written.
+        flows: flows.ok(),
         ..Default::default()
     };
     let server = server_on(hass, config.clone()).await;
@@ -184,6 +190,8 @@ async fn home() -> Home {
 struct Ids {
     flows: Vec<String>,
     entries: Vec<String>,
+    /// A SwitchBot device's registry id, and `<device:IDENTIFIER>`.
+    devices: Vec<(String, String)>,
 }
 
 impl Ids {
@@ -207,13 +215,28 @@ impl Ids {
         }
     }
 
-    /// A step's path with the real ids.
+    /// The devices there are now, for the steps that name one.
+    fn learn_devices(&mut self, registries: &ha_registry::Registries) {
+        for d in &registries.devices {
+            for i in &d.identifiers {
+                let name = format!("<device:{}>", i[1].as_str().unwrap());
+                if i[0] == "switchbot_cloud" && !self.devices.iter().any(|(id, _)| *id == d.id) {
+                    self.devices.push((d.id.clone(), name));
+                }
+            }
+        }
+    }
+
+    /// A step's path or message with the real ids.
     fn real(&self, path: &str) -> String {
         let mut path = path.to_owned();
         for (kind, table) in [("flow", &self.flows), ("entry", &self.entries)] {
             for (i, id) in table.iter().enumerate() {
                 path = path.replace(&format!("<{kind}:{}>", i + 1), id);
             }
+        }
+        for (id, name) in &self.devices {
+            path = path.replace(name, id);
         }
         path
     }
@@ -224,7 +247,14 @@ impl Ids {
         match v {
             Value::Object(m) => Value::Object(
                 m.iter()
-                    .map(|(k, v)| (k.clone(), self.plain(v, Some(k))))
+                    .map(|(k, v)| {
+                        // An id may be a key (a device's entries).
+                        let key = match self.plain(&json!(k), None) {
+                            Value::String(key) => key,
+                            _ => k.clone(),
+                        };
+                        (key, self.plain(v, Some(k)))
+                    })
                     .collect(),
             ),
             Value::Array(a) => Value::Array(a.iter().map(|v| self.plain(v, None)).collect()),
@@ -240,6 +270,13 @@ impl Ids {
                     for (i, id) in table.iter().enumerate() {
                         s = s.replace(id, &format!("<{kind}:{}>", i + 1));
                     }
+                }
+                for (id, name) in &self.devices {
+                    s = s.replace(id, name);
+                }
+                // Any other registry id.
+                if s.len() == 32 && s.bytes().all(|b| b.is_ascii_hexdigit()) {
+                    s = "<id>".into();
                 }
                 Value::String(s)
             }
@@ -292,8 +329,41 @@ fn webhook_update(event: &Value) -> bool {
     })
 }
 
+/// A subscription's event as the generator writes it (`event_of`): a
+/// `subscribe_events` one cut down to its type and data, a state to its
+/// text and attributes.
+fn event_of(event: &Value) -> Value {
+    let Some(kind) = event.get("event_type") else {
+        return event.clone();
+    };
+    let mut data = event["data"].clone();
+    if kind == "state_changed" {
+        let state = |s: &Value| match s {
+            Value::Null => Value::Null,
+            s => json!({"state": s["state"], "attributes": s["attributes"]}),
+        };
+        data = json!({"entity_id": data["entity_id"], "old_state": state(&data["old_state"]),
+                      "new_state": state(&data["new_state"])});
+    }
+    json!({"event_type": kind, "data": data})
+}
+
+/// The registry row or entity a `subscribe_events` event is about
+/// (`by_row` in `device_step.py`).
+fn by_row(event: &Value) -> String {
+    let data = &event["event"]["data"];
+    ["entity_id", "device_id", "area_id"]
+        .iter()
+        .find_map(|k| data.get(k).and_then(Value::as_str))
+        .unwrap_or_default()
+        .to_owned()
+}
+
 async fn replay(scenario: &Value) {
     let name = scenario["name"].as_str().unwrap();
+    // `device_step.py`'s scenarios: events sorted by row within a step,
+    // and the registries and states compared at the end.
+    let rows = scenario.get("devices").is_some();
     let home = home().await;
     let router = crate::router(
         home.server.hass.clone(),
@@ -312,7 +382,10 @@ async fn replay(scenario: &Value) {
         let mut msg = sub["msg"].as_object().unwrap().clone();
         msg.insert("id".into(), json!(1));
         socket.client.send(Value::Object(msg)).await;
-        let first = vec![socket.client.recv().await, socket.client.recv().await];
+        let mut first = Vec::new();
+        for _ in sub["first"].as_array().unwrap() {
+            first.push(socket.client.recv().await);
+        }
         assert_eq!(json!(first), sub["first"], "{name}: {}", sub["sub"]);
         socket.next = 2;
         subs.push((sub["sub"].as_str().unwrap(), socket));
@@ -377,10 +450,22 @@ async fn replay(scenario: &Value) {
         if let Some(sent) = step.get("ws") {
             let who = sent["user"].as_str().unwrap();
             let socket = sockets.get_mut(who).unwrap();
-            let mut replies = socket.call(&sent["msg"]).await;
+            let msg: Value = serde_json::from_str(&ids.real(&sent["msg"].to_string())).unwrap();
+            let mut replies = socket.call(&msg).await;
             ids.learn(&json!(replies));
+            ids.learn_devices(&home.registry.snapshot());
             for reply in &mut replies {
                 reply.as_object_mut().unwrap().remove("id");
+            }
+            // The device and entity lists, sorted as the generator's.
+            let sorted: Option<fn(&Value) -> String> = match msg["type"].as_str().unwrap() {
+                "config/device_registry/list" => Some(|d| d["identifiers"].to_string()),
+                "config/entity_registry/list" => Some(|e| e["entity_id"].to_string()),
+                _ => None,
+            };
+            let list = replies[0].get_mut("result").and_then(Value::as_array_mut);
+            if let (Some(key), Some(list)) = (sorted, list) {
+                list.sort_by_key(key);
             }
             let got = ids.plain(&json!(replies), None);
             assert_eq!(got, step["replies"], "{at}");
@@ -423,22 +508,40 @@ async fn replay(scenario: &Value) {
                 assert_eq!(json!(body), step["text"], "{at}");
             }
         }
-        // What the subscriptions got: everything before a pong.
-        let mut events = Vec::new();
-        for (sub, socket) in &mut subs {
-            let mut got = socket.call(&json!({"type": "ping"})).await;
-            got.pop();
-            for event in got {
-                ids.learn(&event);
-                events.push(json!({"sub": sub, "event": ids.plain(&event["event"], None)}));
-            }
-        }
+        ids.learn_devices(&home.registry.snapshot());
         let want: Vec<&Value> = step["events"]
             .as_array()
             .unwrap()
             .iter()
             .filter(|e| !webhook_update(e))
             .collect();
+        // What the subscriptions got: as many as HA sent (an event of the
+        // bus may still be on its way), then everything before a pong.
+        let mut events = Vec::new();
+        for (sub, socket) in &mut subs {
+            let expected = want.iter().filter(|e| e["sub"] == *sub).count();
+            let mut got = Vec::new();
+            for _ in 0..expected {
+                let wait = std::time::Duration::from_secs(2);
+                match tokio::time::timeout(wait, socket.client.recv()).await {
+                    Ok(event) => got.push(event),
+                    Err(_) => panic!("{at}\n{sub}: {expected} events expected, got {got:#?}"),
+                }
+            }
+            let mut rest = socket.call(&json!({"type": "ping"})).await;
+            rest.pop();
+            got.extend(rest);
+            for event in got {
+                ids.learn(&event);
+                let event = ids.plain(&event_of(&event["event"]), None);
+                events.push(json!({"sub": sub, "event": event}));
+            }
+        }
+        if rows {
+            // Each subscription's events by row, a row's own in order.
+            let order = |e: &Value| subs.iter().position(|(sub, _)| e["sub"] == *sub);
+            events.sort_by_key(|e| (order(e), by_row(e)));
+        }
         assert_eq!(json!(events), json!(want), "{at}");
     }
     // The entries as stored, but for the webhook id `hars` never adds.
@@ -459,6 +562,40 @@ async fn replay(scenario: &Value) {
         scenario["deleted_entities"],
         "{name}"
     );
+    if !rows {
+        return;
+    }
+    // The registries as stored, and the registered entities' states.
+    ids.learn_devices(&registries);
+    let mut devices: Vec<Value> = registries.devices.iter().map(|d| json!(d)).collect();
+    devices.sort_by_key(|d| d["identifiers"].to_string());
+    assert_eq!(
+        ids.plain(&json!(devices), None),
+        scenario["devices"],
+        "{name}: devices"
+    );
+    let mut entities: Vec<Value> = registries.entities.iter().map(|e| json!(e)).collect();
+    entities.sort_by_key(|e| e["entity_id"].to_string());
+    assert_eq!(
+        ids.plain(&json!(entities), None),
+        scenario["entities"],
+        "{name}: entities"
+    );
+    assert_eq!(
+        ids.plain(&json!(registries.areas), None),
+        scenario["areas"],
+        "{name}: areas"
+    );
+    let states: Map<String, Value> = entities
+        .iter()
+        .filter_map(|e| {
+            let id = ha_core::EntityId::parse(e["entity_id"].as_str()?).ok()?;
+            let state = home.server.hass.states().get(&id)?;
+            let state = json!({"state": state.state, "attributes": state.attributes});
+            Some((id.to_string(), state))
+        })
+        .collect();
+    assert_eq!(json!(states), scenario["states"], "{name}: states");
 }
 
 fn scenarios() -> Vec<Value> {
@@ -475,6 +612,21 @@ async fn flows_answer_as_home_assistant() {
     let scenarios = scenarios();
     assert_eq!(scenarios.len(), 13);
     for scenario in &scenarios {
+        replay(scenario).await;
+    }
+}
+
+/// The dialog's last step and the device page's dialog, as HA 2026.6.1
+/// answered them (`vectors/device_step.json`): a new area, a device's
+/// name, area and labels, the entity ids that follow from the names and
+/// an entity given one, with every registry and state event on the way
+/// and the rows and states left.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn devices_and_areas_are_edited_as_home_assistant() {
+    let all: Value = serde_json::from_str(include_str!("vectors/device_step.json")).unwrap();
+    let scenarios = all["scenarios"].as_array().unwrap();
+    assert_eq!(scenarios.len(), 4);
+    for scenario in scenarios {
         replay(scenario).await;
     }
 }
@@ -724,4 +876,203 @@ async fn an_unwritable_store_is_said_where_the_user_tries() {
         .await;
     let reply = ws.recv().await;
     assert!(reply["result"]["core"]["integration"]["switchbot_cloud"].is_object());
+}
+
+/// SwitchBot Cloud added through its flow: the admin's socket.
+async fn with_switchbot(home: &Home) -> Socket {
+    use ha_integrations::flow::{FlowResult, SOURCE_USER};
+    let flows = home.config.flows.clone().unwrap();
+    let FlowResult::Form { flow_id, .. } =
+        flows.init("switchbot_cloud", SOURCE_USER).await.unwrap()
+    else {
+        panic!("no form");
+    };
+    let input = vec![
+        ("api_token".to_owned(), json!("token-one")),
+        ("api_key".to_owned(), json!("secret-one")),
+    ];
+    let added = flows.configure(&flow_id, Some(input)).await.unwrap();
+    assert!(matches!(added, FlowResult::CreateEntry { .. }), "{added:?}");
+    Socket::open(home, "admin").await
+}
+
+/// The registries' rows, for "nothing changed".
+fn rows_of(home: &Home) -> Value {
+    let r = home.registry.snapshot();
+    json!([r.devices, r.entities, r.areas])
+}
+
+/// What `hars`'s running entities can't follow is refused in words, and
+/// changes nothing: disabling a device (HA stops its entities), a name for
+/// a device with an entity of an integration that keeps the name it
+/// started with, or with one whose own name carries the device's (HA
+/// rewrites that name), and another id for such an entity. The same
+/// device can still be moved and labelled. None of this is in HA.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn what_running_entities_cant_follow_is_refused() {
+    let home = home().await;
+    let mut admin = with_switchbot(&home).await;
+    let device = |identifier: &str| {
+        let r = home.registry.snapshot();
+        let found = r.devices.iter().find(|d| d.identifiers[0][1] == identifier);
+        found.unwrap().id.clone()
+    };
+    let refused = |replies: Vec<Value>| {
+        let reply = replies.last().unwrap();
+        assert_eq!(reply["error"]["code"], "not_supported", "{reply}");
+        reply["error"]["message"].as_str().unwrap().to_owned()
+    };
+    // Another integration's device, with an entity named after it, and a
+    // companion app's, whose entity carries the device's name in its own.
+    for (domain, platform, has_entity_name, name) in [
+        ("light", "hue", true, None),
+        ("sensor", "mobile_app", false, Some("Phone Battery")),
+    ] {
+        let made = home.registry.get_or_create_device(ha_registry::DeviceInfo {
+            config_entry_id: "other".into(),
+            identifiers: vec![json!([platform, "1"])],
+            name: Some("Phone".into()),
+            ..Default::default()
+        });
+        let patch = ha_registry::EntityPatch {
+            device_id: Some(Some(made.id.clone())),
+            has_entity_name: Some(has_entity_name),
+            original_name: Some(name.map(str::to_owned)),
+            ..Default::default()
+        };
+        home.registry
+            .get_or_create_entity(domain, platform, "1", None, patch);
+    }
+    let before = rows_of(&home);
+    let update = |id: String, fields: Value| {
+        let mut msg = json!({"type": "config/device_registry/update", "device_id": id});
+        msg.as_object_mut()
+            .unwrap()
+            .extend(fields.as_object().unwrap().clone());
+        msg
+    };
+
+    let bot = device(BOT);
+    let said = refused(
+        admin
+            .call(&update(bot, json!({"disabled_by": "user"})))
+            .await,
+    );
+    assert_eq!(said, "hars can't disable or enable a device yet");
+    let hue = device("1");
+    let said = refused(
+        admin
+            .call(&update(hue.clone(), json!({"name_by_user": "Lamp"})))
+            .await,
+    );
+    assert_eq!(
+        said,
+        "hars can't rename a device of the hue integration yet"
+    );
+    let phone = home.registry.snapshot().devices[4].id.clone();
+    let said = refused(
+        admin
+            .call(&update(
+                phone,
+                json!({"name_by_user": "Mine", "area_id": "hall"}),
+            ))
+            .await,
+    );
+    assert!(said.contains("carry its name"), "{said}");
+    let msg = json!({"type": "config/entity_registry/update", "entity_id": "light.phone",
+                     "new_entity_id": "light.lamp", "area_id": "hall"});
+    let said = refused(admin.call(&msg).await);
+    assert_eq!(
+        said,
+        "hars can't change the id of an entity of the hue integration yet"
+    );
+    assert_eq!(rows_of(&home), before, "a refused change changed something");
+
+    // What needs no entity to follow is taken, for any device.
+    let fields = json!({"name_by_user": null, "disabled_by": null, "area_id": "hall",
+                        "labels": ["lamps"]});
+    let replies = admin.call(&update(hue, fields)).await;
+    assert_eq!(replies[0]["result"]["area_id"], "hall", "{replies:?}");
+    assert_eq!(replies[0]["result"]["labels"], json!(["lamps"]));
+}
+
+/// A registry file `hars` won't write (another minor version's) refuses
+/// what would change its rows, naming the file and the way out, and the
+/// rows in memory stay as they are too: a change that would be gone after
+/// a restart is not shown as made.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_store_that_cant_be_written_is_not_changed_in_memory() {
+    let older = |key: &str| {
+        let current = ha_registry::STORES.iter().find(|s| s.0 == key).unwrap().2;
+        current - 1
+    };
+    let device = ha_registry::Device {
+        id: "dev".into(),
+        identifiers: vec![json!(["switchbot_cloud", BOT])],
+        name: Some("Towel switch".into()),
+        ..Default::default()
+    };
+    let entity = ha_registry::Entity {
+        entity_id: "button.towel_switch".into(),
+        platform: "switchbot_cloud".into(),
+        has_entity_name: true,
+        device_id: Some("dev".into()),
+        ..Default::default()
+    };
+    let rest = |key: &str| ha_registry::FileRest {
+        minor: older(key),
+        ..Default::default()
+    };
+    let registries = ha_registry::Registries {
+        devices: vec![Arc::new(device)],
+        entities: vec![Arc::new(entity)],
+        device_file: rest(ha_registry::DEVICE_KEY),
+        entity_file: rest(ha_registry::ENTITY_KEY),
+        area_minor: older(ha_registry::AREA_KEY),
+        ..Default::default()
+    };
+    let dir = std::env::temp_dir().join(format!("hars-read-only-{}", std::process::id()));
+    let hass = Hass::new();
+    let registry = ha_registry::Registry::new(&hass, &dir, registries);
+    let home = home_on(hass, registry).await;
+    let mut admin = Socket::open(&home, "admin").await;
+    let before = rows_of(&home);
+    for (msg, key) in [
+        (
+            json!({"type": "config/device_registry/update", "device_id": "dev",
+                   "name_by_user": "Rail", "area_id": "bath"}),
+            ha_registry::DEVICE_KEY,
+        ),
+        (
+            json!({"type": "config/area_registry/create", "name": "Bath"}),
+            ha_registry::AREA_KEY,
+        ),
+        (
+            json!({"type": "config/entity_registry/update", "entity_id": "button.towel_switch",
+                   "area_id": "bath"}),
+            ha_registry::ENTITY_KEY,
+        ),
+        (
+            json!({"type": "config/entity_registry/update", "entity_id": "button.towel_switch",
+                   "new_entity_id": "button.rail"}),
+            ha_registry::ENTITY_KEY,
+        ),
+    ] {
+        let replies = admin.call(&msg).await;
+        let error = &replies[0]["error"];
+        assert_eq!(error["code"], "home_assistant_error", "{msg}: {replies:?}");
+        let said = error["message"].as_str().unwrap();
+        assert!(said.contains(&format!(".storage/{key} ")), "{said}");
+        assert!(said.contains("import the folder into hars again"), "{said}");
+        assert_eq!(rows_of(&home), before, "{msg}");
+    }
+    // Reading still works.
+    let ids = json!({"type": "config/entity_registry/get_automatic_entity_ids",
+                     "entity_ids": ["button.towel_switch"]});
+    let replies = admin.call(&ids).await;
+    assert_eq!(
+        replies[0]["result"],
+        json!({"button.towel_switch": "button.towel_switch"})
+    );
+    assert!(!dir.exists(), "something was written");
 }

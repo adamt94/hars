@@ -78,6 +78,9 @@ pub struct ApiConfig {
     pub labs: Arc<Labs>,
     /// Entity, device, area, floor and label registries, as they change.
     pub registry: Option<Arc<ha_registry::Registry>>,
+    /// The entity components, with the running entries that take a
+    /// device's new name or an entity's new id from the registry.
+    pub entities: Option<Arc<ha_integrations::components::Components>>,
     /// Lovelace dashboards.
     pub lovelace: Arc<Lovelace>,
     /// Stored zones and people.

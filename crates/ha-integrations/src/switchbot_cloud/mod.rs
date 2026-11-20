@@ -93,13 +93,68 @@ impl Shared {
     }
 }
 
+/// Where an entity writes: its id and friendly name as the registry has
+/// them. An entity whose id changes is replaced in its component by one
+/// that shares this (and its state), so a command still in flight on the
+/// old one reports under the new id, as HA's one entity object does.
+struct Ident {
+    /// What its registry row is found by.
+    domain: &'static str,
+    unique_id: String,
+    /// The device's name as SwitchBot has it (the user's comes first).
+    device_name: String,
+    /// The entity's own name beside the device's.
+    name: Option<&'static str>,
+    now: Mutex<(EntityId, String)>,
+}
+
+/// What became of an entity's row.
+enum Followed {
+    Same,
+    Named,
+    /// Another id: the old one, and the new.
+    Moved(EntityId, EntityId),
+}
+
+impl Ident {
+    /// The entity's id and friendly name now.
+    fn get(&self) -> (EntityId, String) {
+        self.now.lock().clone()
+    }
+
+    /// Take the id and name `names` has for the entity now. A row that is
+    /// gone or disabled changes nothing: its entity runs on until its
+    /// entry is set up again.
+    fn follow(&self, names: &crate::naming::Names<'_>, device: &str) -> Followed {
+        let Some(new) = names.entity(
+            self.domain,
+            &self.unique_id,
+            device,
+            &self.device_name,
+            self.name,
+        ) else {
+            return Followed::Same;
+        };
+        let mut now = self.now.lock();
+        if *now == new {
+            return Followed::Same;
+        }
+        let old = std::mem::replace(&mut *now, new);
+        match old.0 == now.0 {
+            true => Followed::Named,
+            false => Followed::Moved(old.0, now.0.clone()),
+        }
+    }
+}
+
 /// One config entry: its shared state and entities.
 pub struct Entry {
     shared: Arc<Shared>,
     sensors: Vec<Arc<Sensor>>,
-    buttons: Vec<Arc<BotButton>>,
-    climates: Vec<Arc<AcClimate>>,
-    switches: Vec<Arc<AcSwitch>>,
+    // Those the components know by id: one whose id changes is replaced.
+    buttons: Mutex<Vec<Arc<BotButton>>>,
+    climates: Mutex<Vec<Arc<AcClimate>>>,
+    switches: Mutex<Vec<Arc<AcSwitch>>>,
 }
 
 impl Entry {
@@ -110,22 +165,36 @@ impl Entry {
     /// No entity: every device belongs to another entry.
     fn is_empty(&self) -> bool {
         self.sensors.is_empty()
-            && self.buttons.is_empty()
-            && self.climates.is_empty()
-            && self.switches.is_empty()
+            && self.buttons.lock().is_empty()
+            && self.climates.lock().is_empty()
+            && self.switches.lock().is_empty()
+    }
+
+    /// Hand the entities the services reach to their components.
+    fn add_to(&self, components: &Components) {
+        for c in self.climates.lock().iter() {
+            components.climates().add(c.clone());
+        }
+        for s in self.switches.lock().iter() {
+            components.switches().add(s.clone());
+        }
+        for b in self.buttons.lock().iter() {
+            components.buttons().add(b.clone());
+        }
     }
 
     /// Write every entity, in HA's (unstable) startup order.
     fn write_all(&self) {
-        self.climates.iter().for_each(|c| c.write());
-        self.buttons.iter().for_each(|b| b.write());
-        self.switches.iter().for_each(|s| s.write());
+        self.climates.lock().iter().for_each(|c| c.write());
+        self.buttons.lock().iter().for_each(|b| b.write());
+        self.switches.lock().iter().for_each(|s| s.write());
         self.sensors.iter().for_each(|s| s.write());
     }
 
     /// Write a polled device's entities.
     fn write_device(&self, device: &str) {
         self.buttons
+            .lock()
             .iter()
             .filter(|b| b.device == device)
             .for_each(|b| b.write());
@@ -165,8 +234,91 @@ impl Entry {
                 self.write_device(&id);
             }
         }
-        self.climates.iter().for_each(|c| c.write());
-        self.switches.iter().for_each(|s| s.write());
+        self.climates.lock().iter().for_each(|c| c.write());
+        self.switches.lock().iter().for_each(|s| s.write());
+    }
+}
+
+impl crate::components::Follower for Entry {
+    /// `Entity._async_registry_updated` and
+    /// `_async_device_registry_updated` for every entity of the entry: one
+    /// whose device was named writes its state again, with the new
+    /// friendly name; one whose id changed is removed (its state too, its
+    /// last state kept for a restore) and added under the new id, where it
+    /// writes what it had.
+    fn registry_changed(&self, components: &Components) {
+        // Not while an entry is being set up or removed.
+        let _one = SETUP.lock();
+        if !*self.shared.alive.lock() {
+            return;
+        }
+        let hass = &self.shared.hass;
+        let registries = components.registries();
+        let names = crate::naming::Names::new(hass, &registries, DOMAIN);
+        let gone = |old: &EntityId, restores: bool| {
+            if restores {
+                hass.restore().unregister(hass, old.as_str());
+            }
+            hass.remove_state(old);
+        };
+        for s in &self.sensors {
+            match s.ident.follow(&names, &s.device) {
+                Followed::Same => continue,
+                Followed::Named => {}
+                Followed::Moved(old, _) => gone(&old, false),
+            }
+            s.write();
+        }
+        for b in self.buttons.lock().iter_mut() {
+            match b.ident.follow(&names, &b.device) {
+                Followed::Same => continue,
+                Followed::Named => {}
+                Followed::Moved(old, new) => {
+                    gone(&old, true);
+                    hass.restore().register(new.as_str(), None);
+                    components.buttons().remove(&old);
+                    *b = Arc::new(BotButton {
+                        entity_id: new,
+                        ..(**b).clone()
+                    });
+                    components.buttons().add(b.clone());
+                }
+            }
+            b.write();
+        }
+        for c in self.climates.lock().iter_mut() {
+            match c.ident.follow(&names, &c.device) {
+                Followed::Same => continue,
+                Followed::Named => {}
+                Followed::Moved(old, new) => {
+                    gone(&old, true);
+                    hass.restore().register(new.as_str(), None);
+                    components.climates().remove(&old);
+                    *c = Arc::new(AcClimate {
+                        entity_id: new,
+                        ..(**c).clone()
+                    });
+                    components.climates().add(c.clone());
+                }
+            }
+            c.write();
+        }
+        for s in self.switches.lock().iter_mut() {
+            match s.ident.follow(&names, &s.device) {
+                Followed::Same => continue,
+                Followed::Named => {}
+                Followed::Moved(old, new) => {
+                    gone(&old, false);
+                    components.switches().remove(&old);
+                    *s = Arc::new(AcSwitch {
+                        entity_id: new,
+                        ..(**s).clone()
+                    });
+                    components.switches().add(s.clone());
+                }
+            }
+            s.write();
+        }
     }
 }
 
@@ -394,7 +546,6 @@ fn register(
                 entity_category: Some(None),
                 has_entity_name: Some(true),
                 object_id_base: text(row.name),
-                options,
                 original_device_class: text(row.device_class),
                 original_icon: Some(None),
                 original_name: text(row.name),
@@ -404,7 +555,21 @@ fn register(
                 ..Default::default()
             };
             let disabled_by = disable_new.then(|| "integration".to_owned());
-            registry.get_or_create_entity(row.domain, DOMAIN, &row.unique_id, disabled_by, patch);
+            let made = registry.get_or_create_entity(
+                row.domain,
+                DOMAIN,
+                &row.unique_id,
+                disabled_by,
+                patch,
+            );
+            // A change of its own, after the row is made.
+            if options.is_some() {
+                let options = EntityPatch {
+                    options,
+                    ..Default::default()
+                };
+                registry.update_entity(&made.entity_id, options);
+            }
         }
     }
 }
@@ -437,42 +602,50 @@ fn build(
     };
     let (mut sensors, mut buttons, mut climates, mut switches) = (vec![], vec![], vec![], vec![]);
     for d in devices {
-        let sensor = |key: &'static str, name: &str, class: &str, unit: &str| {
+        // An entity's id and name, unless its row is disabled.
+        let ident = |domain: &'static str, unique_id: &str, name: Option<&'static str>| {
+            let now = names.entity(domain, unique_id, &d.id, &d.name, name)?;
+            Some(Arc::new(Ident {
+                domain,
+                unique_id: unique_id.to_owned(),
+                device_name: d.name.clone(),
+                name,
+                now: Mutex::new(now),
+            }))
+        };
+        let sensor = |key: &'static str, name: &'static str, class: &str, unit: &str| {
             let unique_id = format!("{}_{key}", d.id);
             if !free("sensor", &unique_id) {
                 return None;
             }
-            let (entity_id, friendly) =
-                names.entity("sensor", &unique_id, &d.id, &d.name, Some(name))?;
+            let ident = ident("sensor", &unique_id, Some(name))?;
             let attrs = json!({"state_class": "measurement", "unit_of_measurement": unit,
-                "device_class": class, "friendly_name": friendly});
+                "device_class": class});
             Some(Sensor {
                 shared: shared.clone(),
                 device: d.id.clone(),
                 key,
-                entity_id,
+                ident,
                 attrs: attrs.as_object().cloned().unwrap_or_default(),
             })
         };
         match (d.remote, d.kind.as_str()) {
             (true, kind) if kind.ends_with("Air Conditioner") => {
                 if free("climate", &d.id)
-                    && let Some((entity_id, friendly)) =
-                        names.entity("climate", &d.id, &d.id, &d.name, None)
-                    && let Some(c) = AcClimate::restored(&shared, &d.id, entity_id, friendly)
+                    && let Some(ident) = ident("climate", &d.id, None)
+                    && let Some(c) = AcClimate::restored(&shared, &d.id, ident)
                 {
                     climates.push(c);
                 }
                 if free("switch", &d.id)
-                    && let Some((entity_id, friendly)) =
-                        names.entity("switch", &d.id, &d.id, &d.name, None)
+                    && let Some(ident) = ident("switch", &d.id, None)
                 {
                     switches.push(AcSwitch {
                         shared: shared.clone(),
                         device: d.id.clone(),
-                        entity_id,
-                        friendly,
-                        on: Mutex::new(None),
+                        entity_id: ident.get().0,
+                        ident,
+                        on: Arc::default(),
                     });
                 }
             }
@@ -489,16 +662,16 @@ fn build(
                         d.name
                     );
                 } else if free("button", &d.id)
-                    && let Some((entity_id, friendly)) =
-                        names.entity("button", &d.id, &d.id, &d.name, None)
+                    && let Some(ident) = ident("button", &d.id, None)
                 {
+                    let entity_id = ident.get().0;
                     let last = crate::button::restore(hass, &entity_id);
                     buttons.push(BotButton {
                         shared: shared.clone(),
                         device: d.id.clone(),
                         entity_id,
-                        friendly,
-                        last: Mutex::new(last),
+                        ident,
+                        last: Arc::new(Mutex::new(last)),
                     });
                 }
             }
@@ -522,9 +695,9 @@ fn build(
     Arc::new(Entry {
         shared,
         sensors: sensors.into_iter().map(Arc::new).collect(),
-        buttons: buttons.into_iter().map(Arc::new).collect(),
-        climates: climates.into_iter().map(Arc::new).collect(),
-        switches: switches.into_iter().map(Arc::new).collect(),
+        buttons: Mutex::new(buttons.into_iter().map(Arc::new).collect()),
+        climates: Mutex::new(climates.into_iter().map(Arc::new).collect()),
+        switches: Mutex::new(switches.into_iter().map(Arc::new).collect()),
     })
 }
 
@@ -609,18 +782,15 @@ pub async fn run(
             register(&hass, registry, entry_id, disable_new, &devices, &polled);
         }
         let entry = build(&hass, &components.registries(), api, &devices, polled);
-        for c in &entry.climates {
-            components.climates().add(c.clone());
-        }
-        for s in &entry.switches {
-            components.switches().add(s.clone());
-        }
-        for b in &entry.buttons {
-            components.buttons().add(b.clone());
-        }
+        entry.add_to(&components);
         entry.write_all();
         entry
     };
+    // From here on a device's new name or an entity's new id reaches the
+    // entities; one given while they were being built is taken now.
+    let follower: Arc<dyn crate::components::Follower> = entry.clone();
+    components.follow(&follower);
+    follower.registry_changed(&components);
     // When this task ends (its entry was removed), the entities stop
     // writing: whoever stops it waits for that before removing the states.
     struct Stopped(Arc<Shared>);
@@ -700,7 +870,8 @@ struct Sensor {
     shared: Arc<Shared>,
     device: String,
     key: &'static str,
-    entity_id: EntityId,
+    ident: Arc<Ident>,
+    /// All but the friendly name.
     attrs: Attributes,
 }
 
@@ -715,17 +886,22 @@ impl Sensor {
                 .unwrap_or_else(|| "unknown".into()),
             _ => "unavailable".into(),
         };
-        entry.write(self.entity_id.clone(), &state, self.attrs.clone(), None);
+        let (entity_id, friendly) = self.ident.get();
+        let mut attrs = self.attrs.clone();
+        attrs.insert("friendly_name".into(), Value::String(friendly));
+        entry.write(entity_id, &state, attrs, None);
     }
 }
 
 /// A Bot in press mode: its state is HA's time of the last press.
+#[derive(Clone)]
 struct BotButton {
     shared: Arc<Shared>,
     device: String,
+    /// What the component knows it by; it writes where `ident` says.
     entity_id: EntityId,
-    friendly: String,
-    last: Mutex<Option<String>>,
+    ident: Arc<Ident>,
+    last: Arc<Mutex<Option<String>>>,
 }
 
 impl BotButton {
@@ -739,9 +915,10 @@ impl BotButton {
             true => self.last.lock().clone().unwrap_or_else(|| "unknown".into()),
             false => "unavailable".into(),
         };
+        let (entity_id, friendly) = self.ident.get();
         let mut a = Map::new();
-        a.insert("friendly_name".into(), json!(self.friendly));
-        entry.write(self.entity_id.clone(), &state, a, context);
+        a.insert("friendly_name".into(), Value::String(friendly));
+        entry.write(entity_id, &state, a, context);
     }
 }
 
@@ -774,12 +951,14 @@ impl Button for BotButton {
 
 /// The DIY IR air conditioner's climate entity: its state is what was
 /// last sent, or restored.
+#[derive(Clone)]
 pub struct AcClimate {
     shared: Arc<Shared>,
     device: String,
+    /// What the component knows it by; it writes where `ident` says.
     entity_id: EntityId,
-    friendly: String,
-    st: Mutex<AcState>,
+    ident: Arc<Ident>,
+    st: Arc<Mutex<AcState>>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -793,12 +972,8 @@ impl AcClimate {
     /// `async_added_to_hass`: the last state if it was a mode, its
     /// `fan_mode` and `temperature` if present. A state that isn't an
     /// `HVACMode` fails the entity (HA doesn't add it).
-    fn restored(
-        shared: &Arc<Shared>,
-        device: &str,
-        entity_id: EntityId,
-        friendly: String,
-    ) -> Option<Self> {
+    fn restored(shared: &Arc<Shared>, device: &str, ident: Arc<Ident>) -> Option<Self> {
+        let entity_id = ident.get().0;
         let mut st = AcState {
             mode: "fan_only".into(),
             fan: Some("auto".into()),
@@ -833,22 +1008,23 @@ impl AcClimate {
             shared: shared.clone(),
             device: device.to_owned(),
             entity_id,
-            friendly,
-            st: Mutex::new(st),
+            ident,
+            st: Arc::new(Mutex::new(st)),
         })
     }
 
     fn write(&self) {
         let entry = &self.shared;
         let mut a = climate::attributes(self);
+        let (entity_id, friendly) = self.ident.get();
         a.insert("assumed_state".into(), json!(true));
-        a.insert("friendly_name".into(), json!(self.friendly));
+        a.insert("friendly_name".into(), Value::String(friendly));
         a.insert(
             "supported_features".into(),
             json!(self.supported_features()),
         );
         let mode = self.st.lock().mode.clone();
-        entry.write(self.entity_id.clone(), &mode, a, None);
+        entry.write(entity_id, &mode, a, None);
     }
 
     /// `_do_send_command`: always `setAll`, from the call's values or the
@@ -982,12 +1158,14 @@ impl Climate for AcClimate {
 }
 
 /// The IR remote's power switch: `unknown` until commanded.
+#[derive(Clone)]
 struct AcSwitch {
     shared: Arc<Shared>,
     device: String,
+    /// What the component knows it by; it writes where `ident` says.
     entity_id: EntityId,
-    friendly: String,
-    on: Mutex<Option<bool>>,
+    ident: Arc<Ident>,
+    on: Arc<Mutex<Option<bool>>>,
 }
 
 impl AcSwitch {
@@ -999,9 +1177,10 @@ impl AcSwitch {
             None => "unknown",
         };
         let mut a = Map::new();
+        let (entity_id, friendly) = self.ident.get();
         a.insert("device_class".into(), json!("switch"));
-        a.insert("friendly_name".into(), json!(self.friendly));
-        entry.write(self.entity_id.clone(), state, a, None);
+        a.insert("friendly_name".into(), Value::String(friendly));
+        entry.write(entity_id, state, a, None);
     }
 }
 
