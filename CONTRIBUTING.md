@@ -79,7 +79,8 @@ resource budget gate (`PERF_GATE=1 scripts/perf.sh`, see
   script that made it in `scripts/vectors/` (`onboarding.py`,
   `render_template.py`, `mobile_app_notify.py`, `template_functions.py`,
   `automation_templates.py`, `automation_reload.py`, `yaml_dump.py`,
-  `automation_editor.py` and `entity_registry_ws.py`
+  `automation_editor.py`, `entity_registry_ws.py` and
+  `import_releases.py`, which also runs later releases' code,
   so far); the sets made before that rule have none yet
   and are listed there as a backlog. The rules, a skeleton
   and the backlog are in [scripts/vectors/README.md](scripts/vectors/README.md).

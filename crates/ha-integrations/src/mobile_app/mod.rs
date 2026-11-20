@@ -285,6 +285,7 @@ impl MobileApp {
             .iter()
             .filter(|e| e.get("domain").and_then(Value::as_str) == Some(DOMAIN))
             .filter(|e| e.get("disabled_by").is_none_or(Value::is_null))
+            .filter(|e| !crate::entry_too_new(e))
             .filter_map(Registration::from_entry)
             .map(|r| (r.webhook_id.clone(), Arc::new(r)))
             .collect();

@@ -33,6 +33,23 @@ pub const SUPPORTED: &[&str] = &[
     lifx::DOMAIN,
 ];
 
+/// The config flow `VERSION` of every integration `hars` runs (and of
+/// `mobile_app`), at the pinned Home Assistant: 1.
+pub const ENTRY_VERSION: u64 = 1;
+
+/// Whether a config entry was written by a newer version of its config
+/// flow than `hars` runs. Later Home Assistant releases migrate entries
+/// (2026.10 `lifx` and 2026.11 `met` to version 2, with other `data`);
+/// `ConfigEntry.async_migrate` doesn't set such an entry up
+/// (`migration_error`), and neither does `hars`. A newer `minor_version`
+/// is compatible by Home Assistant's rule, and runs.
+pub fn entry_too_new(entry: &Map<String, Value>) -> bool {
+    entry
+        .get("version")
+        .and_then(Value::as_u64)
+        .is_some_and(|v| v > ENTRY_VERSION)
+}
+
 /// Who `hars` says it is to the services it calls.
 pub const USER_AGENT: &str = concat!(
     "hars/",
@@ -76,7 +93,22 @@ pub fn start(
             .iter()
             .filter(move |e| field(e, "domain").as_deref() == Some(domain))
             .filter(|e| e.get("disabled_by").is_none_or(Value::is_null))
+            .filter(|e| !entry_too_new(e))
     };
+    // `ConfigEntry.async_migrate`'s error for an entry no migration reaches.
+    for e in entries
+        .unwrap_or_default()
+        .iter()
+        .filter(|e| entry_too_new(e))
+    {
+        let domain = field(e, "domain").unwrap_or_default();
+        if SUPPORTED.contains(&domain.as_str()) {
+            tracing::error!(
+                "Migration handler not found for entry {} for {domain}",
+                field(e, "title").unwrap_or_default()
+            );
+        }
+    }
     let sun_entry = match entries {
         None => Some("hars-sun".to_owned()),
         Some(_) => enabled(sun::DOMAIN)
@@ -155,4 +187,46 @@ pub fn start(
     running.sort_unstable();
     running.dedup();
     Started { running, weather }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    fn entry(domain: &str, version: u64, minor: u64) -> Map<String, Value> {
+        json!({"entry_id": format!("{domain}-{version}"), "domain": domain, "title": "T",
+               "disabled_by": null, "version": version, "minor_version": minor, "data": {}})
+        .as_object()
+        .unwrap()
+        .clone()
+    }
+
+    /// `ConfigEntry.async_migrate` (2026.6.1): an entry from a newer major
+    /// version than the flow's is not set up; a newer minor version is.
+    /// The entries are what `scripts/vectors/import_releases.py` shows
+    /// Home Assistant 2026.11.2 stores: `met` and `lifx` at 2.1, `hue` at
+    /// 1.2.
+    #[tokio::test]
+    async fn entries_from_a_newer_version_are_not_started() {
+        assert!(entry_too_new(&entry("met", 2, 1)));
+        assert!(entry_too_new(&entry("lifx", 2, 1)));
+        assert!(!entry_too_new(&entry("hue", 1, 2)));
+        assert!(!entry_too_new(&entry("sun", 1, 1)));
+        // Written before entries had versions.
+        let mut old = entry("sun", 1, 1);
+        old.remove("version");
+        assert!(!entry_too_new(&old));
+
+        let hass = Hass::new();
+        let registries = Arc::new(Registries::default());
+        let entries = [entry("met", 2, 1), entry("lifx", 2, 1)];
+        let started = start(
+            &hass,
+            registries,
+            Some(&entries),
+            light::Profiles::default(),
+        );
+        assert!(started.running.is_empty(), "{:?}", started.running);
+    }
 }

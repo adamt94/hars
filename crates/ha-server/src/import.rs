@@ -1,10 +1,24 @@
-//! `hars import <HA config dir>`: take over a Home Assistant 2026.6 install.
+//! `hars import <HA config dir>`: take over a Home Assistant install.
 //!
 //! `hars` keeps HA's own `.storage` formats, so a store `hars` understands is
 //! validated with the loader `hars` itself uses and then copied byte for
 //! byte: users, password hashes and refresh tokens (ids, client ids,
 //! `jwt_key`s) arrive unchanged, and the browser and phone sessions logged in
 //! to HA keep working. Everything else is listed in `import-report.json`.
+//!
+//! Which releases: the rule is Home Assistant's own for a downgrade. `hars`
+//! behaves like one pinned release ([`PINNED_HA`]) and imports a directory
+//! that release would itself load: 2026.6 and later, as long as no store
+//! `hars` reads has a newer major storage version (`helpers/storage.py`
+//! raises `UnsupportedStorageVersionError`, and HA starts in recovery mode)
+//! and no integration `hars` runs has a config entry of a newer version
+//! (`ConfigEntry.async_migrate`: `migration_error`). Such a directory is
+//! refused whole, with the store and versions named. A newer *minor*
+//! version is compatible by HA's rule and is read; the registries and the
+//! config entries are the exception, because `hars` never writes those at
+//! another minor version. `tests/vectors/import/downgrade.json` is what
+//! 2026.6.1 itself did with each fixture; [`TESTED_HA`] lists the releases
+//! with one.
 //!
 //! The source directory is only read. Give it a consistent copy, taken with
 //! HA stopped (or a backup), not a live directory HA is writing to.
@@ -16,38 +30,78 @@ use serde_json::{Map, Value};
 use std::path::{Path, PathBuf};
 
 /// Bumped whenever what the importer does changes.
-pub const IMPORTER_VERSION: u32 = 2;
-/// The HA release whose formats `hars` reads.
-const SUPPORTED_HA: &str = "2026.6.";
+pub const IMPORTER_VERSION: u32 = 3;
+/// The Home Assistant release `hars` behaves like, whichever release the
+/// files come from (docs/ARCHITECTURE.md, "Home Assistant compatibility").
+pub const PINNED_HA: &str = "2026.6.1";
+/// The oldest release line `hars` imports (year, month): older ones have
+/// formats its loaders don't migrate.
+const OLDEST_HA: (u32, u32) = (2026, 6);
+/// The release lines `hars import` is tested against, oldest first: for
+/// each, `tests/vectors/import/` holds a config directory made by that
+/// release's own code (`scripts/vectors/import_releases.py`). This is the
+/// one place the list lives; the messages and the report read it.
+pub const TESTED_HA: &[(u32, u32)] = &[(2026, 6), (2026, 7)];
 const REPORT_FILE: &str = "import-report.json";
 /// Where a commit keeps the destination's previous files until it's done.
 const BACKUP_DIR: &str = ".import-backup";
 const USER_DATA_PREFIX: &str = "frontend.user_data_";
 
-/// The stores `hars` reads, with whether HA writes them owner-only.
-const STORES: &[(&str, bool)] = &[
-    ("auth", true),
-    ("auth_provider.homeassistant", true),
-    ("onboarding", true),
-    ("core.config", true),
-    ("frontend.system_data", false),
+/// What `hars` does with a store of a newer minor storage version.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum NewerMinor {
+    /// Reads it, as HA's `Store` does after a downgrade, and writes its own
+    /// minor version next time, without what 2026.6.1 doesn't know.
+    Reads,
+    /// Never writes the store at another minor version (the registries'
+    /// `check_minor`, the config entries' `writable`), so every later
+    /// change would be lost: refused.
+    Refuses,
+}
+
+/// A store `hars` reads: whether it is written owner-only, the storage
+/// version (major, minor) `hars` reads and writes (2026.6.1's), and what a
+/// newer minor version means.
+type StoreSpec = (&'static str, bool, (u32, u32), NewerMinor);
+
+const STORES: &[StoreSpec] = &[
+    ("auth", true, (1, 1), NewerMinor::Reads),
+    (
+        "auth_provider.homeassistant",
+        true,
+        (1, 1),
+        NewerMinor::Reads,
+    ),
+    ("onboarding", true, (4, 1), NewerMinor::Reads),
+    ("core.config", true, (1, 4), NewerMinor::Reads),
+    ("frontend.system_data", false, (1, 1), NewerMinor::Reads),
     // Integrations' settings (hosts, keys, tokens): owner-only, as in HA.
-    ("core.config_entries", true),
-    ("core.labs", true),
+    ("core.config_entries", true, (1, 5), NewerMinor::Refuses),
+    ("core.labs", true, (1, 1), NewerMinor::Reads),
     // Last states of entities that restore themselves (scenes, ...).
-    ("core.restore_state", false),
-    (ha_registry::ENTITY_KEY, false),
-    (ha_registry::DEVICE_KEY, false),
-    (ha_registry::AREA_KEY, false),
-    (ha_registry::FLOOR_KEY, false),
-    (ha_registry::LABEL_KEY, false),
-    // The names of the categories the automation list groups by.
-    (ha_registry::CATEGORY_KEY, false),
+    ("core.restore_state", false, (1, 1), NewerMinor::Reads),
+    (ha_registry::ENTITY_KEY, false, (1, 22), NewerMinor::Refuses),
+    (ha_registry::DEVICE_KEY, false, (1, 12), NewerMinor::Refuses),
+    (ha_registry::AREA_KEY, false, (1, 9), NewerMinor::Refuses),
+    (ha_registry::FLOOR_KEY, false, (1, 3), NewerMinor::Refuses),
+    (ha_registry::LABEL_KEY, false, (1, 2), NewerMinor::Refuses),
+    // The names of the categories the automation list groups by (read
+    // only).
+    (ha_registry::CATEGORY_KEY, false, (1, 2), NewerMinor::Reads),
+    // The webhook ids of removed app registrations, which answer 410.
+    (
+        ha_integrations::mobile_app::DOMAIN,
+        false,
+        (1, 1),
+        NewerMinor::Reads,
+    ),
 ];
 
-/// Integrations `hars` implements, by domain; their config entries are
-/// imported once their integration exists.
-const SUPPORTED_DOMAINS: &[&str] = ha_integrations::SUPPORTED;
+/// The integrations `hars` runs, by domain: `SUPPORTED`'s and the
+/// companion app's registrations.
+fn runs(domain: &str) -> bool {
+    ha_integrations::SUPPORTED.contains(&domain) || domain == ha_integrations::mobile_app::DOMAIN
+}
 
 pub struct Options {
     pub source: PathBuf,
@@ -60,7 +114,18 @@ pub struct Options {
 #[derive(Debug, Serialize)]
 pub struct Report {
     pub importer_version: u32,
+    /// The release the files come from (`.HA_VERSION`).
     pub ha_version: String,
+    /// Whether `hars`'s tests cover imports from that release
+    /// ([`TESTED_HA`]). If not, its stores still passed every check here.
+    pub ha_version_tested: bool,
+    /// The release `hars` behaves like after the import ([`PINNED_HA`]),
+    /// whatever `ha_version` is.
+    pub behaves_like: &'static str,
+    /// Stores of a newer minor storage version than `hars` writes: read as
+    /// 2026.6.1 would read them, and written back at `hars_writes`,
+    /// without what 2026.6.1 doesn't know, the next time they change.
+    pub newer_stores: Vec<NewerStore>,
     pub dry_run: bool,
     /// Stores copied (or that would be, in a dry run).
     pub imported: Vec<String>,
@@ -77,6 +142,14 @@ pub struct Report {
     pub yaml: Vec<String>,
     /// Each automation in the YAML, and whether hars can run it.
     pub automations: Vec<AutomationReport>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct NewerStore {
+    pub key: String,
+    /// The file's storage version, `major.minor`.
+    pub version: String,
+    pub hars_writes: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -107,22 +180,31 @@ pub fn run(opts: &Options) -> anyhow::Result<Report> {
         .context("no .HA_VERSION: is this a Home Assistant config directory?")?
         .trim()
         .to_owned();
-    if !ha_version.starts_with(SUPPORTED_HA) {
+    let Some(line) = release_line(&ha_version) else {
+        bail!(".HA_VERSION says {ha_version:?}, which is not a Home Assistant version");
+    };
+    if line < OLDEST_HA {
         bail!(
-            "this is Home Assistant {ha_version}; hars imports {SUPPORTED_HA}x. \
-             Update HA to 2026.6 first, then copy its config again"
+            "this is Home Assistant {ha_version}; hars imports {}. \
+             Update Home Assistant to {} first (not to a later release), \
+             then copy its config again",
+            importable(),
+            line_name(newest_tested())
         );
     }
 
     let mut report = Report {
         importer_version: IMPORTER_VERSION,
+        ha_version_tested: TESTED_HA.contains(&line),
         ha_version,
+        behaves_like: PINNED_HA,
+        newer_stores: Vec::new(),
         dry_run: opts.dry_run,
         imported: Vec::new(),
         replaced: Vec::new(),
         removed: Vec::new(),
         skipped: Vec::new(),
-        config_entries: config_entries(&source)?,
+        config_entries: Vec::new(),
         yaml: Vec::new(),
         automations: Vec::new(),
     };
@@ -159,6 +241,13 @@ pub fn run(opts: &Options) -> anyhow::Result<Report> {
         let bytes = std::fs::read(source.join(".storage").join(&key))?;
         Store::new(&staging.root, key.clone(), 1, 1, private).save_raw(&bytes)?;
     }
+
+    // 1a. Before anything is loaded: a store, or a config entry, from a
+    //     newer Home Assistant than hars can read refuses the whole import.
+    report.newer_stores = check_store_versions(&staging, &report.ha_version)?;
+    let entries = load_entries(&staging.root)?;
+    check_entry_versions(&entries, &report.ha_version)?;
+    report.config_entries = entry_reports(&entries);
 
     // 1b. The YAML configuration, staged byte for byte with its mode bits
     //     (`secrets.yaml` owner-only).
@@ -198,6 +287,15 @@ pub fn run(opts: &Options) -> anyhow::Result<Report> {
         .map_err(|e| anyhow::anyhow!("the zones or people don't load ({})", sanitized(&e)))?;
     ha_api::Lovelace::load_strict(&staging.root)
         .map_err(|e| anyhow::anyhow!("the dashboards don't load ({})", sanitized(&e)))?;
+    Store::new(
+        &staging.root,
+        ha_integrations::mobile_app::DOMAIN,
+        1,
+        1,
+        false,
+    )
+    .load::<Map<String, Value>>()
+    .map_err(|e| anyhow::anyhow!("mobile_app's store doesn't load ({})", sanitized(&e)))?;
     if !report.yaml.is_empty() {
         let secrets = ha_core::yaml::Secrets {
             config_dir: staging.root.clone(),
@@ -232,6 +330,7 @@ pub fn run(opts: &Options) -> anyhow::Result<Report> {
             let store = Store::new(&staging.root, key.clone(), 1, 1, false);
             if let Err(e) = store.load::<Map<String, Value>>() {
                 std::fs::remove_file(store.path())?;
+                report.newer_stores.retain(|s| s.key != key);
                 report.skipped.push(Skipped {
                     key,
                     reason: format!("doesn't load ({})", sanitized(&e)),
@@ -317,15 +416,141 @@ pub fn run(opts: &Options) -> anyhow::Result<Report> {
     Ok(report)
 }
 
-/// Whether `hars` reads a store, and whether HA writes it owner-only.
+/// Whether `hars` reads a store, and whether it is written owner-only.
 fn supported(key: &str) -> Option<bool> {
-    STORES
-        .iter()
-        .find(|(k, _)| *k == key)
-        .map(|&(_, private)| private)
-        .or_else(|| key.starts_with(USER_DATA_PREFIX).then_some(false))
-        .or_else(|| ha_api::Lovelace::is_store(key).then_some(false))
-        .or_else(|| ha_components::Components::is_store(key).then_some(false))
+    spec(key).map(|(_, private, ..)| private)
+}
+
+/// The store's row in [`STORES`], or the one its family has.
+fn spec(key: &str) -> Option<StoreSpec> {
+    if let Some(spec) = STORES.iter().find(|(k, ..)| *k == key) {
+        return Some(*spec);
+    }
+    let version = if key == ha_components::PERSON_KEY {
+        (2, 1)
+    } else if key.starts_with(USER_DATA_PREFIX)
+        || ha_api::Lovelace::is_store(key)
+        || ha_components::Components::is_store(key)
+    {
+        (1, 1)
+    } else {
+        return None;
+    };
+    Some(("", false, version, NewerMinor::Reads))
+}
+
+/// `2026.7.4` (or `2026.7.0b3`) as `(2026, 7)`.
+fn release_line(version: &str) -> Option<(u32, u32)> {
+    let mut parts = version.split('.');
+    let year = parts.next()?.parse().ok()?;
+    let month = parts.next()?.parse().ok()?;
+    parts.next()?;
+    Some((year, month))
+}
+
+fn line_name((year, month): (u32, u32)) -> String {
+    format!("{year}.{month}")
+}
+
+fn newest_tested() -> (u32, u32) {
+    *TESTED_HA.last().expect("a tested release")
+}
+
+/// `2026.6 and 2026.7`.
+fn importable() -> String {
+    let names: Vec<String> = TESTED_HA.iter().map(|&l| line_name(l)).collect();
+    names.join(" and ")
+}
+
+/// Every staged store's storage version against the one `hars` reads. A
+/// newer major version, or a newer minor version of a store `hars` won't
+/// write, is an error naming both; the other newer minor versions are
+/// returned for the report. A file that isn't a store envelope is left to
+/// its loader, which says so.
+fn check_store_versions(staging: &Staging, ha_version: &str) -> anyhow::Result<Vec<NewerStore>> {
+    #[derive(serde::Deserialize)]
+    struct Head {
+        version: u32,
+        minor_version: Option<u32>,
+    }
+    let mut newer = Vec::new();
+    for key in staging.keys()? {
+        let Some((_, _, reads, newer_minor)) = spec(&key) else {
+            continue;
+        };
+        // Frontend settings that don't load are left out, not fatal.
+        let frontend = key == "frontend.system_data" || key.starts_with(USER_DATA_PREFIX);
+        let bytes = std::fs::read(staging.root.join(".storage").join(&key))?;
+        let Ok(head) = serde_json::from_slice::<Head>(&bytes) else {
+            continue;
+        };
+        // `Store.async_load`: no minor version means 1.
+        let found = (head.version, head.minor_version.unwrap_or(1));
+        if found.0 != reads.0 || found.1 <= reads.1 {
+            if found.0 > reads.0 && !frontend {
+                bail!("{}", too_new(&key, found, reads, ha_version));
+            }
+            // An older major version is the loader's to migrate or refuse.
+            continue;
+        }
+        if newer_minor == NewerMinor::Refuses {
+            bail!("{}", too_new(&key, found, reads, ha_version));
+        }
+        newer.push(NewerStore {
+            key,
+            version: format!("{}.{}", found.0, found.1),
+            hars_writes: format!("{}.{}", reads.0, reads.1),
+        });
+    }
+    Ok(newer)
+}
+
+/// Why a store from a newer Home Assistant stops the import.
+fn too_new(key: &str, found: (u32, u32), reads: (u32, u32), ha_version: &str) -> String {
+    let mut text = format!(
+        "{key} is storage version {}.{}, written by Home Assistant {ha_version}; \
+         hars reads version {}.{}, as Home Assistant {PINNED_HA} does. ",
+        found.0, found.1, reads.0, reads.1
+    );
+    if key == ha_registry::DEVICE_KEY && found.0 >= 3 {
+        text.push_str(
+            "Home Assistant 2026.8 and later keep each device under one config entry \
+             (storage version 3), which hars can't read yet. ",
+        );
+    }
+    text.push_str(&cannot_import());
+    text
+}
+
+/// What to do about a directory from too new a release.
+fn cannot_import() -> String {
+    format!(
+        "hars imports Home Assistant {}: import a copy or backup of this config directory \
+         made before it was updated past {}. Nothing was imported",
+        importable(),
+        line_name(newest_tested())
+    )
+}
+
+/// `ConfigEntry.async_migrate`: an entry of an integration `hars` runs,
+/// written by a newer version of its config flow (2026.10 migrates `lifx`
+/// and 2026.11 `met` to version 2), can't be set up.
+fn check_entry_versions(entries: &[Map<String, Value>], ha_version: &str) -> anyhow::Result<()> {
+    for e in entries {
+        let domain = e.get("domain").and_then(Value::as_str).unwrap_or_default();
+        if runs(domain) && ha_integrations::entry_too_new(e) {
+            bail!(
+                "the {domain} integration's config entry {:?} is version {}, migrated by \
+                 Home Assistant {ha_version}; hars runs version {} of it, as Home Assistant \
+                 {PINNED_HA} does. {}",
+                e.get("title").and_then(Value::as_str).unwrap_or_default(),
+                e.get("version").cloned().unwrap_or_default(),
+                ha_integrations::ENTRY_VERSION,
+                cannot_import()
+            );
+        }
+    }
+    Ok(())
 }
 
 fn unsupported_reason(key: &str) -> &'static str {
@@ -618,40 +843,42 @@ fn storage_keys(config_dir: &Path) -> anyhow::Result<Vec<(String, Kind)>> {
     Ok(keys)
 }
 
-/// `core.config_entries`: which integrations the install uses.
-fn config_entries(config_dir: &Path) -> anyhow::Result<Vec<EntryReport>> {
+/// `core.config_entries`' entries.
+fn load_entries(config_dir: &Path) -> anyhow::Result<Vec<Map<String, Value>>> {
     #[derive(serde::Deserialize)]
     struct Entries {
         #[serde(default)]
         entries: Vec<Map<String, Value>>,
     }
     let store = Store::new(config_dir, "core.config_entries", 1, 5, true);
-    let Some(data) = store
+    Ok(store
         .load::<Entries>()
         .map_err(|e| anyhow::anyhow!("core.config_entries doesn't load ({})", sanitized(&e)))?
-    else {
-        return Ok(Vec::new());
-    };
+        .map(|data| data.entries)
+        .unwrap_or_default())
+}
+
+/// Which integrations the install uses.
+fn entry_reports(entries: &[Map<String, Value>]) -> Vec<EntryReport> {
     let text = |e: &Map<String, Value>, k: &str| {
         e.get(k)
             .and_then(Value::as_str)
             .unwrap_or_default()
             .to_owned()
     };
-    Ok(data
-        .entries
+    entries
         .iter()
         .map(|e| {
             let domain = text(e, "domain");
             EntryReport {
                 entry_id: text(e, "entry_id"),
-                supported: SUPPORTED_DOMAINS.contains(&domain.as_str()),
+                supported: runs(&domain),
                 domain,
                 title: text(e, "title"),
                 disabled: e.get("disabled_by").is_some_and(|v| !v.is_null()),
             }
         })
-        .collect())
+        .collect()
 }
 
 /// One line per item, for the terminal.
@@ -667,6 +894,28 @@ pub fn summary(report: &Report, dest: &Path) -> String {
         report.imported.len(),
         report.imported.join(", ")
     );
+    // What someone coming from a newer release should expect.
+    if release_line(&report.ha_version).is_some_and(|l| Some(l) != release_line(PINNED_HA)) {
+        out.push_str(&format!(
+            "  hars behaves like Home Assistant {PINNED_HA} and serves its frontend: \
+             what Home Assistant added after it is not there\n"
+        ));
+    }
+    if !report.ha_version_tested {
+        out.push_str(&format!(
+            "  hars is not tested with Home Assistant {} (it is with {}): \
+             every store passed its checks, but look the result over\n",
+            report.ha_version,
+            importable()
+        ));
+    }
+    for s in &report.newer_stores {
+        out.push_str(&format!(
+            "  {} is storage version {}: hars writes {} and, like Home Assistant \
+             {PINNED_HA}, drops what that version doesn't have when it next changes the store\n",
+            s.key, s.version, s.hars_writes
+        ));
+    }
     if !report.replaced.is_empty() {
         out.push_str(&format!("  replaced: {}\n", report.replaced.join(", ")));
     }

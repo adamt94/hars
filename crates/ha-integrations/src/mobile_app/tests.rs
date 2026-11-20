@@ -236,3 +236,55 @@ fn concurrent_persists_save_the_newest_data() {
     let saved = entries.list().unwrap()[0]["data"].clone();
     assert_eq!(Value::Object(reg.data()), saved);
 }
+
+/// A store written by a newer Home Assistant (1.2, from 2026.7, with
+/// Live Activity tokens) is read, and the next change writes what Home
+/// Assistant 2026.6.1 writes after loading the same file: version 1.1,
+/// the deleted ids, and none of what 2026.6.1 doesn't know. The vectors
+/// are 2026.6.1's `mobile_app` on stores made by 2026.7.0 and 2026.7.4
+/// (`scripts/vectors/import_releases.py downgrade`).
+#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
+async fn store_downgrade_keeps_what_ha_keeps() {
+    let vectors: Value =
+        serde_json::from_str(include_str!("vectors/store_downgrade.json")).unwrap();
+    let cases = vectors["cases"].as_array().unwrap();
+    assert!(!cases.is_empty());
+    for case in cases {
+        let from = case["from"].as_str().unwrap();
+        let dir = std::env::temp_dir().join(format!(
+            "hars-mobile-app-downgrade-{from}-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join(".storage")).unwrap();
+        let file = dir.join(".storage/mobile_app");
+        let input = case["input"].as_str().unwrap();
+        std::fs::write(&file, input).unwrap();
+        let read = |text: &str| serde_json::from_str::<Value>(text).unwrap();
+        assert_eq!(read(input)["minor_version"], 2, "{from}");
+        assert!(read(input)["data"]["live_activity_tokens"].is_object());
+
+        let app = MobileApp::load(&dir, &[]);
+        let deleted = read(input)["data"]["deleted_ids"][0]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        assert!(matches!(app.webhook(&deleted), Webhook::Deleted), "{from}");
+        // Home Assistant writes the file back at once (`after_load`: the
+        // same data at 1.1); hars leaves it until something changes.
+        assert_eq!(std::fs::read_to_string(&file).unwrap(), input, "{from}");
+        assert_eq!(
+            read(case["after_load"].as_str().unwrap())["data"],
+            read(input)["data"]
+        );
+
+        app.save_deleted(case["removed_webhook_id"].as_str().unwrap())
+            .await;
+        assert_eq!(
+            read(&std::fs::read_to_string(&file).unwrap()),
+            read(case["after_change"].as_str().unwrap()),
+            "{from}"
+        );
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+}

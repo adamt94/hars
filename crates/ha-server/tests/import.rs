@@ -1,4 +1,9 @@
-//! `hars import`: an HA 2026.6 config directory taken over, sessions intact.
+//! `hars import`: a Home Assistant config directory taken over, sessions
+//! intact.
+//!
+//! The tests from `release` on use config directories made by each Home
+//! Assistant release's own code, and what 2026.6.1 itself does with them
+//! (`tests/vectors/import/`, made by `scripts/vectors/import_releases.py`).
 
 use serde_json::{Value, json};
 use std::io::{Read, Write};
@@ -226,8 +231,13 @@ fn imports_an_ha_install_and_keeps_its_sessions() {
         assert_eq!(mode(&user_data), 0o644);
     }
     let report = read_json(&dest.join("import-report.json"));
-    assert_eq!(report["importer_version"], 2);
+    assert_eq!(report["importer_version"], 3);
     assert_eq!(report["ha_version"], "2026.6.1");
+    assert_eq!(report["ha_version_tested"], true);
+    assert_eq!(report["behaves_like"], "2026.6.1");
+    assert_eq!(report["newer_stores"], json!([]));
+    // The pinned release itself: nothing to expect differently.
+    assert!(!stdout.contains("behaves like"), "{stdout}");
     let mut imported = vec![
         "auth",
         "auth_provider.homeassistant",
@@ -378,11 +388,29 @@ fn refuses_other_ha_versions_and_its_own_directory() {
     let dest = temp("old-dest");
     let out = hars(&dest, &["import", src.to_str().unwrap()]);
     assert!(!out.status.success());
+    let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(
-        String::from_utf8_lossy(&out.stderr).contains("Home Assistant 2025.12.4"),
-        "{out:?}"
+        stderr.contains(
+            "this is Home Assistant 2025.12.4; hars imports 2026.6 and 2026.7. \
+             Update Home Assistant to 2026.7 first (not to a later release)"
+        ),
+        "{stderr}"
     );
     assert!(!dest.join(".storage").exists());
+    for (version, says) in [
+        ("2026.5.4", "this is Home Assistant 2026.5.4"),
+        ("garbage", "not a Home Assistant version"),
+        ("2026", "not a Home Assistant version"),
+    ] {
+        std::fs::write(src.join(".HA_VERSION"), version).unwrap();
+        let out = hars(&dest, &["import", src.to_str().unwrap()]);
+        assert!(!out.status.success(), "{version}");
+        assert!(
+            String::from_utf8_lossy(&out.stderr).contains(says),
+            "{out:?}"
+        );
+        assert!(!dest.join(".storage").exists(), "{version}");
+    }
 
     std::fs::write(src.join(".HA_VERSION"), "2026.6.1").unwrap();
     let out = hars(&src, &["import", src.to_str().unwrap()]);
@@ -703,4 +731,354 @@ fn yaml_paths_are_checked() {
         String::from_utf8_lossy(&out.stderr).contains("keeps for itself"),
         "{out:?}"
     );
+}
+
+// ----- Config directories made by Home Assistant releases -----
+
+const VECTORS: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/vectors/import");
+
+fn vector(name: &str) -> Value {
+    read_json(&Path::new(VECTORS).join(name))
+}
+
+/// The config directory Home Assistant `version` left, written to `dir`.
+/// `swap` takes these files from another release's directory instead.
+fn release(version: &str, dir: &Path, swap: &[(&str, &str)]) -> Value {
+    let mut fixture = vector(&format!("{version}.json"));
+    assert_eq!(fixture["ha_version"], version);
+    for (file, from) in swap {
+        fixture["files"][file] = vector(&format!("{from}.json"))["files"][file].clone();
+    }
+    for (rel, text) in fixture["files"].as_object().unwrap() {
+        let path = dir.join(rel);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, text.as_str().unwrap()).unwrap();
+    }
+    fixture
+}
+
+fn stores(fixture: &Value) -> Vec<String> {
+    fixture["files"]
+        .as_object()
+        .unwrap()
+        .keys()
+        .filter_map(|k| k.strip_prefix(".storage/"))
+        .map(str::to_owned)
+        .collect()
+}
+
+/// A refused import changed nothing: no stores, no report, no staging.
+fn nothing_imported(dest: &Path) {
+    let left: Vec<_> = std::fs::read_dir(dest)
+        .map(|d| d.map(|e| e.unwrap().file_name()).collect())
+        .unwrap_or_default();
+    assert!(left.is_empty(), "{left:?}");
+}
+
+/// hars imports a release's directory exactly when Home Assistant 2026.6.1
+/// itself loads it (`downgrade.json`: its
+/// `bootstrap.async_load_base_functionality` on each directory), and names
+/// the store 2026.6.1 names when it doesn't.
+#[test]
+fn imports_the_directories_home_assistant_2026_6_1_loads() {
+    let cases = vector("downgrade.json");
+    assert_eq!(cases["ha_version"], "2026.6.1");
+    let cases = cases["cases"].as_array().unwrap();
+    let versions: Vec<&str> = cases.iter().map(|c| c["from"].as_str().unwrap()).collect();
+    assert_eq!(
+        versions,
+        [
+            "2026.6.1",
+            "2026.6.4",
+            "2026.7.0",
+            "2026.7.4",
+            "2026.8.3",
+            "2026.11.2"
+        ]
+    );
+    for case in cases {
+        let version = case["from"].as_str().unwrap();
+        let src = temp(&format!("release-{version}"));
+        let dest = temp(&format!("release-{version}-dest"));
+        let fixture = release(version, &src, &[]);
+        let out = hars(&dest, &["import", src.to_str().unwrap()]);
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        assert_eq!(
+            out.status.success(),
+            case["loads"].as_bool().unwrap(),
+            "{version}: {stderr}"
+        );
+        if !out.status.success() {
+            // "Storage file core.device_registry was created by a newer
+            // version of Home Assistant (storage version 3 > 1)".
+            assert!(
+                case["errors"][0]
+                    .as_str()
+                    .unwrap()
+                    .contains("core.device_registry was created by a newer version"),
+                "{case}"
+            );
+            let minor = if version == "2026.8.3" { 2 } else { 4 };
+            assert!(
+                stderr.contains(&format!(
+                    "core.device_registry is storage version 3.{minor}, written by Home \
+                     Assistant {version}; hars reads version 1.12, as Home Assistant 2026.6.1 \
+                     does. Home Assistant 2026.8 and later keep each device under one config \
+                     entry (storage version 3), which hars can't read yet. hars imports Home \
+                     Assistant 2026.6 and 2026.7: import a copy or backup of this config \
+                     directory made before it was updated past 2026.7. Nothing was imported"
+                )),
+                "{stderr}"
+            );
+            nothing_imported(&dest);
+            // Nor does a dry run or --force get past it.
+            for flag in ["--dry-run", "--force"] {
+                let out = hars(&dest, &["import", src.to_str().unwrap(), flag]);
+                assert!(!out.status.success(), "{version} {flag}");
+                nothing_imported(&dest);
+            }
+            continue;
+        }
+
+        let report = read_json(&dest.join("import-report.json"));
+        assert_eq!(report["ha_version"], version);
+        assert_eq!(report["ha_version_tested"], true, "{version}");
+        assert_eq!(report["behaves_like"], "2026.6.1");
+        // Every store but `http.auth` (the user media is served as) is one
+        // hars reads: copied byte for byte.
+        let mut imported = stores(&fixture);
+        imported.retain(|k| k != "http.auth");
+        assert_eq!(report["imported"], json!(imported), "{version}");
+        assert_eq!(report["skipped"][0]["key"], "http.auth");
+        assert_eq!(report["skipped"].as_array().unwrap().len(), 1, "{report}");
+        for key in &imported {
+            assert_eq!(
+                std::fs::read_to_string(dest.join(".storage").join(key)).unwrap(),
+                fixture["files"][format!(".storage/{key}")]
+                    .as_str()
+                    .unwrap(),
+                "{version} {key}"
+            );
+        }
+        // 2026.7 writes `mobile_app`'s store at 1.2.
+        let newer = if version.starts_with("2026.7.") {
+            json!([{"key": "mobile_app", "version": "1.2", "hars_writes": "1.1"}])
+        } else {
+            json!([])
+        };
+        assert_eq!(report["newer_stores"], newer, "{version}");
+        // The integrations hars runs, the companion app's among them.
+        let unsupported: Vec<&str> = report["config_entries"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|e| e["supported"] == false)
+            .map(|e| e["domain"].as_str().unwrap())
+            .collect();
+        assert_eq!(unsupported, ["radio_browser", "homekit_controller"]);
+        assert_eq!(report["config_entries"].as_array().unwrap().len(), 9);
+
+        let stdout = String::from_utf8_lossy(&out.stdout);
+        assert_eq!(
+            stdout.contains(
+                "hars behaves like Home Assistant 2026.6.1 and serves its frontend: \
+                 what Home Assistant added after it is not there"
+            ),
+            version.starts_with("2026.7."),
+            "{stdout}"
+        );
+        assert!(!stdout.contains("not tested"), "{stdout}");
+        // An automation the 2026.7 editor can save and 2026.6 can't run.
+        let automations = report["automations"].as_array().unwrap();
+        if version.starts_with("2026.7.") {
+            assert_eq!(automations.len(), 3);
+            assert_eq!(automations[2]["alias"], "When the hall light turns on");
+            assert_eq!(automations[2]["status"], "unavailable");
+            assert!(
+                stdout.contains("automation When the hall light turns on will be unavailable"),
+                "{stdout}"
+            );
+        } else {
+            assert_eq!(automations.len(), 2);
+        }
+        assert_eq!(automations[0]["status"], "ok");
+        for d in [src, dest] {
+            let _ = std::fs::remove_dir_all(d);
+        }
+    }
+}
+
+/// A directory from Home Assistant 2026.7.4 runs: the session it issued
+/// logs in, and what its stores hold is served.
+#[test]
+fn a_2026_7_install_runs() {
+    let src = temp("runs-src");
+    let dest = temp("runs-dest");
+    let fixture = release("2026.7.4", &src, &[]);
+    let out = hars(&dest, &["import", src.to_str().unwrap()]);
+    assert!(out.status.success(), "{out:?}");
+
+    let auth: Value =
+        serde_json::from_str(fixture["files"][".storage/auth"].as_str().unwrap()).unwrap();
+    // The session Home Assistant 2026.7.4 itself created.
+    let session = auth["data"]["refresh_tokens"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|t| t["client_id"] == "http://127.0.0.1:8123/2026.7.4")
+        .unwrap();
+    assert_eq!(session["version"], "2026.7.4");
+
+    let port = free_port();
+    let mut server = Command::new(env!("CARGO_BIN_EXE_hars"))
+        .env("HARS_CONFIG", &dest)
+        .env("HARS_BIND", format!("127.0.0.1:{port}"))
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .unwrap();
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while TcpStream::connect(("127.0.0.1", port)).is_err() {
+        assert!(Instant::now() < deadline, "hars did not start");
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    let form = format!(
+        "grant_type=refresh_token&client_id={}&refresh_token={}",
+        "http%3A%2F%2F127.0.0.1%3A8123%2F2026.7.4",
+        session["token"].as_str().unwrap()
+    );
+    let (status, body) = http(
+        port,
+        "POST",
+        "/auth/token",
+        &[("Content-Type", "application/x-www-form-urlencoded")],
+        &form,
+    );
+    assert_eq!(status, 200, "{body}");
+    let access = serde_json::from_str::<Value>(&body).unwrap()["access_token"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let bearer = format!("Bearer {access}");
+    let get = |path: &str| {
+        let (status, body) = http(port, "GET", path, &[("Authorization", &bearer)], "");
+        assert_eq!(status, 200, "{path}: {body}");
+        serde_json::from_str::<Value>(&body).unwrap()
+    };
+    // `core.config`, as 2026.7.4 wrote it.
+    let config = get("/api/config");
+    assert_eq!(config["time_zone"], "Europe/Amsterdam");
+    assert_eq!(config["elevation"], 7);
+    // The zone and the person 2026.7.4 added, and the ones from 2026.6.1.
+    for (entity, name) in [
+        ("zone.office", "Office"),
+        ("zone.zone_2026_7_4", "Zone 2026.7.4"),
+        ("person.test_owner", "Test Owner"),
+        ("person.person_2026_7_4", "Person 2026.7.4"),
+        ("automation.hall_light_at_dusk", "Hall light at dusk"),
+    ] {
+        let state = get(&format!("/api/states/{entity}"));
+        assert_eq!(state["attributes"]["friendly_name"], name, "{state}");
+    }
+    // 2026.6 can't run what the 2026.7 editor saved here.
+    let new = get("/api/states/automation.when_the_hall_light_turns_on");
+    assert_eq!(new["state"], "unavailable");
+    let _ = Command::new("kill")
+        .args(["-TERM", &server.id().to_string()])
+        .status();
+    server.wait().unwrap();
+    for d in [src, dest] {
+        let _ = std::fs::remove_dir_all(d);
+    }
+}
+
+/// A release hars has no fixture for imports when every store passes, and
+/// the report and the terminal say it is untested.
+#[test]
+fn an_untested_release_is_imported_and_flagged() {
+    let src = temp("untested-src");
+    let dest = temp("untested-dest");
+    release("2026.7.4", &src, &[]);
+    std::fs::write(src.join(".HA_VERSION"), "2026.12.0").unwrap();
+    let out = hars(&dest, &["import", src.to_str().unwrap(), "--dry-run"]);
+    assert!(out.status.success(), "{out:?}");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        stdout.contains(
+            "hars is not tested with Home Assistant 2026.12.0 (it is with 2026.6 and 2026.7)"
+        ),
+        "{stdout}"
+    );
+    let out = hars(&dest, &["import", src.to_str().unwrap()]);
+    assert!(out.status.success(), "{out:?}");
+    let report = read_json(&dest.join("import-report.json"));
+    assert_eq!(report["ha_version"], "2026.12.0");
+    assert_eq!(report["ha_version_tested"], false);
+    assert_eq!(report["behaves_like"], "2026.6.1");
+    for d in [src, dest] {
+        let _ = std::fs::remove_dir_all(d);
+    }
+}
+
+/// What later releases changed, one at a time, each on a real file of
+/// Home Assistant 2026.11.2: every one refuses the whole import.
+#[test]
+fn stores_and_entries_from_newer_releases_are_refused() {
+    let device = ".storage/core.device_registry";
+    let entity = ".storage/core.entity_registry";
+    let entries = ".storage/core.config_entries";
+    let cases: [(&[(&str, &str)], &str); 3] = [
+        // The entity registry at 1.24 (2026.11 stores names another way):
+        // a newer minor version of a store hars would never write back.
+        (
+            &[(device, "2026.7.4")],
+            "core.entity_registry is storage version 1.24, written by Home Assistant \
+             2026.11.2; hars reads version 1.22, as Home Assistant 2026.6.1 does. hars imports",
+        ),
+        // `met` at config entry version 2 (2026.11 nests its location).
+        (
+            &[(device, "2026.7.4"), (entity, "2026.7.4")],
+            "the met integration's config entry \"Home\" is version 2, migrated by Home \
+             Assistant 2026.11.2; hars runs version 1 of it, as Home Assistant 2026.6.1 does. \
+             hars imports Home Assistant 2026.6 and 2026.7",
+        ),
+        // Everything from 2026.11.2 at once: the device registry is named.
+        (&[], "core.device_registry is storage version 3.4"),
+    ];
+    for (swap, says) in cases {
+        let src = temp("newer-src");
+        let dest = temp("newer-dest");
+        release("2026.11.2", &src, swap);
+        let out = hars(&dest, &["import", src.to_str().unwrap(), "--force"]);
+        assert!(!out.status.success(), "{says}");
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        assert!(stderr.contains(says), "{stderr}");
+        assert!(stderr.contains("Nothing was imported"), "{stderr}");
+        nothing_imported(&dest);
+        let _ = std::fs::remove_dir_all(src);
+    }
+
+    // The other way round: a 2026.7.4 directory whose config entries are
+    // 2026.11.2's (`lifx` and `met` at version 2, `hue` at 1.2).
+    let src = temp("newer-entries-src");
+    let dest = temp("newer-entries-dest");
+    release("2026.7.4", &src, &[(entries, "2026.11.2")]);
+    let out = hars(&dest, &["import", src.to_str().unwrap()]);
+    assert!(!out.status.success());
+    assert!(
+        String::from_utf8_lossy(&out.stderr).contains("the met integration's config entry"),
+        "{out:?}"
+    );
+    nothing_imported(&dest);
+    // An existing install is left exactly as it was.
+    let dest = temp("newer-entries-dest2");
+    assert!(hars(&dest, &["auth", "add", "bob", "pw"]).status.success());
+    let before = std::fs::read(dest.join(".storage/auth")).unwrap();
+    let out = hars(&dest, &["import", src.to_str().unwrap(), "--force"]);
+    assert!(!out.status.success());
+    assert_eq!(std::fs::read(dest.join(".storage/auth")).unwrap(), before);
+    assert!(!dest.join(".import-staging").exists());
+    for d in [src, dest] {
+        let _ = std::fs::remove_dir_all(d);
+    }
 }

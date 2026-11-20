@@ -1,0 +1,19 @@
+{
+ "ha_version": "2026.6.1",
+ "cases": [
+  {
+   "from": "2026.7.0",
+   "input": "{\n  \"version\": 1,\n  \"minor_version\": 2,\n  \"key\": \"mobile_app\",\n  \"data\": {\n    \"deleted_ids\": [\n      \"0000000000000000000000000000000000000000000000000000060100000036\"\n    ],\n    \"live_activity_tokens\": {\n      \"0000000000000000000000000000000000000000000000000000060100000018\": {\n        \"synthetic-activity\": {\n          \"token\": \"synthetic-push-token\",\n          \"expires_at\": 4102444800.0\n        }\n      }\n    }\n  }\n}",
+   "after_load": "{\n  \"version\": 1,\n  \"minor_version\": 1,\n  \"key\": \"mobile_app\",\n  \"data\": {\n    \"deleted_ids\": [\n      \"0000000000000000000000000000000000000000000000000000060100000036\"\n    ],\n    \"live_activity_tokens\": {\n      \"0000000000000000000000000000000000000000000000000000060100000018\": {\n        \"synthetic-activity\": {\n          \"token\": \"synthetic-push-token\",\n          \"expires_at\": 4102444800.0\n        }\n      }\n    }\n  }\n}",
+   "removed_webhook_id": "0000000000000000000000000000000000000000000000000000060100000018",
+   "after_change": "{\n  \"version\": 1,\n  \"minor_version\": 1,\n  \"key\": \"mobile_app\",\n  \"data\": {\n    \"deleted_ids\": [\n      \"0000000000000000000000000000000000000000000000000000060100000036\",\n      \"0000000000000000000000000000000000000000000000000000060100000018\"\n    ]\n  }\n}"
+  },
+  {
+   "from": "2026.7.4",
+   "input": "{\n  \"version\": 1,\n  \"minor_version\": 2,\n  \"key\": \"mobile_app\",\n  \"data\": {\n    \"deleted_ids\": [\n      \"0000000000000000000000000000000000000000000000000000060100000036\"\n    ],\n    \"live_activity_tokens\": {\n      \"0000000000000000000000000000000000000000000000000000060100000018\": {\n        \"synthetic-activity\": {\n          \"token\": \"synthetic-push-token\",\n          \"expires_at\": 4102444800.0\n        }\n      }\n    }\n  }\n}",
+   "after_load": "{\n  \"version\": 1,\n  \"minor_version\": 1,\n  \"key\": \"mobile_app\",\n  \"data\": {\n    \"deleted_ids\": [\n      \"0000000000000000000000000000000000000000000000000000060100000036\"\n    ],\n    \"live_activity_tokens\": {\n      \"0000000000000000000000000000000000000000000000000000060100000018\": {\n        \"synthetic-activity\": {\n          \"token\": \"synthetic-push-token\",\n          \"expires_at\": 4102444800.0\n        }\n      }\n    }\n  }\n}",
+   "removed_webhook_id": "0000000000000000000000000000000000000000000000000000060100000018",
+   "after_change": "{\n  \"version\": 1,\n  \"minor_version\": 1,\n  \"key\": \"mobile_app\",\n  \"data\": {\n    \"deleted_ids\": [\n      \"0000000000000000000000000000000000000000000000000000060100000036\",\n      \"0000000000000000000000000000000000000000000000000000060100000018\"\n    ]\n  }\n}"
+  }
+ ]
+}

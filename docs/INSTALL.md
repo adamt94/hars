@@ -42,7 +42,7 @@ macOS, `$env:HARS_PORT = '8124'; irm … | iex` in PowerShell.
 |---|---|
 | `HARS_DIR` | where hars keeps its folder (default: `hars` in your home folder) |
 | `HARS_PORT` | the web port (default: 8123, or the next free one up to 8133) |
-| `HARS_IMPORT` | a copy of a Home Assistant 2026.6 config folder to bring over before hars first starts (a new install only; otherwise [import by hand](#importing-by-hand)) |
+| `HARS_IMPORT` | a copy of a Home Assistant 2026.6 or 2026.7 config folder ([which releases](#which-home-assistant-releases)) to bring over before hars first starts (a new install only; otherwise [import by hand](#importing-by-hand)) |
 | `HARS_YES=1` | answer yes to the questions (installing Docker), for unattended installs |
 | `HARS_IMAGE` | another image, such as one you built (`docker build -t hars .`) |
 
@@ -169,6 +169,59 @@ docker start hars
 If hars already has a login, or has run once, the import refuses to replace
 what's there; add `--force` to replace it. Stop Home Assistant before
 starting hars if both use port 8123.
+
+### Which Home Assistant releases
+
+The file `.HA_VERSION` in the config folder says which release wrote it.
+
+| Your Home Assistant | The import |
+|---|---|
+| 2026.6.x or 2026.7.x | works |
+| older than 2026.6 | refused. Update Home Assistant to 2026.7 (not later: `ha core update --version 2026.7.4`, or the `2026.7.4` image tag), let it start once, then copy the folder again |
+| 2026.8 or newer | refused, with the reason. Nothing is changed |
+
+**From 2026.8 on, hars can't import yet.** Home Assistant 2026.8 rewrote
+its device list (`core.device_registry`, storage version 3) so that every
+device belongs to one integration, and split the devices that two
+integrations shared. 2026.10 and 2026.11 then changed how the Hue, LIFX and
+weather (`met`) integrations and entity names are stored. hars reads the
+2026.6 formats, as Home Assistant 2026.6 does, and Home Assistant itself
+can't go back either: it refuses to start on these files. The import says
+which file stopped it, for example:
+
+```text
+Error: core.device_registry is storage version 3.4, written by Home Assistant 2026.11.2; hars reads version 1.12, as Home Assistant 2026.6.1 does. ...
+```
+
+What you can do today: import a copy of the config folder, or a backup,
+made while Home Assistant was on 2026.7 or older. Everything set up since
+then is not in it. Reading the newer formats is on the
+[roadmap](ROADMAP.md).
+
+**Coming from 2026.7,** hars still behaves like Home Assistant 2026.6.1 and
+serves the 2026.6 frontend (the import says so). Expect:
+
+- The UI is 2026.6's: pages and cards the frontend gained in 2026.7 aren't
+  there, and a dashboard that uses a card added in 2026.7 shows an error in
+  that card's place.
+- An automation that uses a trigger or condition 2026.7 made generally
+  available (`light.turned_on`, `climate.started_heating`, ...; a Labs
+  preview in 2026.6) is `unavailable`. `import-report.json` lists each one
+  with the reason, and the automation stays in your YAML untouched.
+- Behaviour follows 2026.6. Two rules 2026.7 changed: which zone wins when
+  zones overlap (2026.6: the nearest centre; 2026.7: the smallest zone) and
+  how a person's state follows a router or Bluetooth tracker.
+- The companion app's Live Activity push tokens (`mobile_app`, new in
+  2026.7) are kept in the imported file until hars next changes it, then
+  dropped, as Home Assistant 2026.6 would drop them. `newer_stores` in the
+  report names such files.
+- Going back to Home Assistant works: hars keeps Home Assistant's file
+  formats, at the 2026.6 versions, and a newer Home Assistant migrates them
+  again when it starts.
+
+`import-report.json` records the release (`ha_version`), whether hars is
+tested with it (`ha_version_tested`) and the release hars behaves like
+(`behaves_like`).
 
 ## Troubleshooting
 

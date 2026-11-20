@@ -1,0 +1,39 @@
+{
+ "ha_version": "2026.6.1",
+ "cases": [
+  {
+   "from": "2026.6.1",
+   "loads": true,
+   "errors": []
+  },
+  {
+   "from": "2026.6.4",
+   "loads": true,
+   "errors": []
+  },
+  {
+   "from": "2026.7.0",
+   "loads": true,
+   "errors": []
+  },
+  {
+   "from": "2026.7.4",
+   "loads": true,
+   "errors": []
+  },
+  {
+   "from": "2026.8.3",
+   "loads": false,
+   "errors": [
+    "Storage file core.device_registry was created by a newer version of Home Assistant (storage version 3 > 1); activating recovery mode; on-disk data is preserved; upgrade Home Assistant or restore from a backup"
+   ]
+  },
+  {
+   "from": "2026.11.2",
+   "loads": false,
+   "errors": [
+    "Storage file core.device_registry was created by a newer version of Home Assistant (storage version 3 > 1); activating recovery mode; on-disk data is preserved; upgrade Home Assistant or restore from a backup"
+   ]
+  }
+ ]
+}
