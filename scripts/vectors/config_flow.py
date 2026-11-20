@@ -39,8 +39,8 @@ Ids are written as placeholders in order of appearance (`<flow:1>`,
 registry ids `<id>`, the webhook id HA adds to the entry's data
 `<webhook>`, times `<time>` (ISO text) and `<ts>` (seconds). Registry rows
 are sorted (HA sets the platforms up side by side, in an order that changes
-from run to run), and so are the fields of a refused form's `errors` and
-the handler lists (sets in HA). Nothing reaches the network. Run it twice: the output
+from run to run), and so are the fields of a refused form's `errors`, the
+handler lists and a device's `config_entries` (sets in HA). Nothing reaches the network. Run it twice: the output
 must not change.
 """
 
@@ -418,7 +418,9 @@ class Ids:
         if isinstance(value, dict):
             return {self.text(k): self.plain(v, k) for k, v in value.items()}
         if isinstance(value, (list, tuple)):
-            return [self.plain(v) for v in value]
+            items = [self.plain(v) for v in value]
+            # A device's entries are a set in HA.
+            return sorted(items) if key == "config_entries" else items
         if isinstance(value, float) and key in ("created_at", "modified_at"):
             return "<ts>"
         if isinstance(value, str):
