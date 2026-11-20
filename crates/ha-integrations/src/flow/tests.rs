@@ -1424,3 +1424,79 @@ async fn abandoned_flows_are_capped_and_expire() {
     home.flows.abort(&fresh).unwrap();
     assert_eq!(home.flows.flows.lock().capacity(), 0);
 }
+
+/// A flow whose answer is being checked is never the one dropped to make
+/// room, however many forms are opened meanwhile: its answer comes back
+/// and its entry is made. When every flow is at work, a new one is
+/// refused rather than started outside the limit.
+#[tokio::test]
+async fn a_flow_at_work_is_not_dropped_to_make_room() {
+    let home = home().await;
+    let start = || async {
+        match home.flows.init("switchbot_cloud", SOURCE_USER).await {
+            Ok(FlowResult::Form { flow_id, .. }) => Ok(flow_id),
+            Ok(other) => panic!("{other:?}"),
+            Err(e) => Err(e),
+        }
+    };
+    let hold = Arc::new(tokio::sync::Notify::new());
+    *home.api.hold.lock() = Some(hold.clone());
+    // The first flow's credentials are with the API, which holds its
+    // answer.
+    let first = start().await.unwrap();
+    let answer = {
+        let (flows, first) = (home.flows.clone(), first.clone());
+        tokio::spawn(async move { flows.configure(&first, credentials(TOKEN)).await })
+    };
+    while home.api.count() < 1 {
+        home.api.arrived.notified().await;
+    }
+    // Sixteen more forms: the oldest idle ones go, never the one at work.
+    let mut others = Vec::new();
+    for _ in 0..MAX_FLOWS {
+        others.push(start().await.unwrap());
+    }
+    assert_eq!(home.flows.in_progress(), MAX_FLOWS);
+    assert_eq!(
+        home.flows.configure(&others[0], None).await,
+        Err(Error::UnknownFlow),
+        "an idle flow made room"
+    );
+    // Every remaining flow put to work too: no room can be made.
+    let mut answers = Vec::new();
+    for (n, id) in others[1..].iter().enumerate() {
+        let (flows, id) = (home.flows.clone(), id.clone());
+        answers.push(tokio::spawn(async move {
+            flows
+                .configure(&id, credentials(&format!("token-{n}")))
+                .await
+        }));
+    }
+    while home.api.count() < MAX_FLOWS {
+        home.api.arrived.notified().await;
+    }
+    assert_eq!(start().await, Err(Error::Busy));
+    assert_eq!(home.flows.in_progress(), MAX_FLOWS);
+
+    // The API answers: every submission ends as it should.
+    *home.api.hold.lock() = None;
+    hold.notify_waiters();
+    for _ in 0..MAX_FLOWS {
+        hold.notify_one();
+    }
+    let result = answer.await.unwrap();
+    assert!(
+        matches!(result, Ok(FlowResult::CreateEntry { .. })),
+        "the first submission was lost: {result:?}"
+    );
+    for answer in answers {
+        assert!(matches!(
+            answer.await.unwrap(),
+            Ok(FlowResult::CreateEntry { .. })
+        ));
+    }
+    assert_eq!(home.entries.list().unwrap().len(), MAX_FLOWS);
+    assert_eq!(home.flows.in_progress(), 0);
+    // With room again, a flow starts.
+    assert!(start().await.is_ok());
+}

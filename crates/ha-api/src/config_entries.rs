@@ -89,6 +89,19 @@ fn not_allowed(allow: &'static str) -> Response {
         .into_response()
 }
 
+/// A refusal in words, as `ConfigManagerFlowIndexView` answers a failed
+/// dependency (`web.Response(text=…)`): the frontend's dialog shows a
+/// text body as it is ("Config flow could not be loaded: …"), and a JSON
+/// one as JSON.
+fn plain(status: StatusCode, text: String) -> Response {
+    (
+        status,
+        [(header::CONTENT_TYPE, "text/plain; charset=utf-8")],
+        text,
+    )
+        .into_response()
+}
+
 /// `RequestDataValidator`'s refusal.
 fn incorrect(why: &str) -> Response {
     json_message(
@@ -166,12 +179,23 @@ fn result_json(views: &Views, result: FlowResult) -> Value {
 fn reply(views: &Views, result: Result<FlowResult, Error>) -> Response {
     match result {
         Ok(result) => Json(result_json(views, result)).into_response(),
-        Err(Error::UnknownHandler) => {
-            json_message(StatusCode::NOT_FOUND, "Invalid handler specified")
-        }
-        Err(Error::UnknownFlow) => json_message(StatusCode::NOT_FOUND, "Invalid flow specified"),
-        Err(Error::UnknownStep(message)) => json_message(StatusCode::BAD_REQUEST, &message),
-        Err(Error::InvalidData(errors)) => {
+        Err(error) => refusal(error),
+    }
+}
+
+/// The views' answer to each of the manager's refusals.
+fn refusal(error: Error) -> Response {
+    match error {
+        Error::UnknownHandler => json_message(StatusCode::NOT_FOUND, "Invalid handler specified"),
+        Error::UnknownFlow => json_message(StatusCode::NOT_FOUND, "Invalid flow specified"),
+        Error::UnknownStep(message) => json_message(StatusCode::BAD_REQUEST, &message),
+        // Not HA's (it keeps every flow): "not now", said as its view
+        // says a failed dependency.
+        Error::Busy => plain(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "Too many integrations are being set up at once. Try again in a moment.".into(),
+        ),
+        Error::InvalidData(errors) => {
             (StatusCode::BAD_REQUEST, Json(json!({ "errors": errors }))).into_response()
         }
     }

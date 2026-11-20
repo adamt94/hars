@@ -289,6 +289,10 @@ pub enum Error {
     UnknownStep(String),
     /// `InvalidData`: its `schema_errors`.
     InvalidData(Map<String, Value>),
+    /// Every one of the [`MAX_FLOWS`] flows is in the middle of a step, so
+    /// none can make room for a new one. HA has no such case: it keeps
+    /// every flow.
+    Busy,
 }
 
 /// A flow in progress, as `async_progress` lists it.
@@ -313,6 +317,9 @@ struct Progress {
     source: &'static str,
     /// When a request last reached it.
     touched: Instant,
+    /// Requests at work on it or waiting their turn. While there are any
+    /// it is neither expired nor dropped to make room.
+    busy: u32,
     /// Held while one of its steps runs.
     flow: Arc<tokio::sync::Mutex<Box<dyn Flow>>>,
 }
@@ -355,6 +362,22 @@ impl Drop for Attempt<'_> {
         setups.retain(|(id, _)| *id != self.entry_id);
         if setups.is_empty() {
             *setups = Vec::new();
+        }
+    }
+}
+
+/// A request at work on a flow, counted in its [`Progress::busy`] until
+/// this is dropped (the request ended, or went away).
+struct Working<'a> {
+    manager: &'a Manager,
+    flow_id: &'a str,
+}
+
+impl Drop for Working<'_> {
+    fn drop(&mut self) {
+        let mut flows = self.manager.flows.lock();
+        if let Some(p) = flows.iter_mut().find(|p| p.flow_id == self.flow_id) {
+            p.busy = p.busy.saturating_sub(1);
         }
     }
 }
@@ -464,10 +487,18 @@ impl Manager {
             // there are still too many: checked here, when a flow starts,
             // so nothing has to wake for it.
             let now = Instant::now();
-            flows.retain(|p| now.duration_since(p.touched) < EXPIRES);
+            flows.retain(|p| p.busy > 0 || now.duration_since(p.touched) < EXPIRES);
             while flows.len() >= MAX_FLOWS {
-                let oldest = (0..flows.len()).min_by_key(|&i| flows[i].touched);
-                flows.remove(oldest.unwrap_or(0));
+                // Never one a request is at work on: its answer would be
+                // lost, and what it asked its device or service would run
+                // on outside the limit.
+                let oldest = (0..flows.len())
+                    .filter(|&i| flows[i].busy == 0)
+                    .min_by_key(|&i| flows[i].touched);
+                match oldest {
+                    Some(i) => flows.remove(i),
+                    None => return Err(Error::Busy),
+                };
             }
             flows.push(Progress {
                 flow_id: flow_id.clone(),
@@ -477,6 +508,7 @@ impl Manager {
                 schema: None,
                 source,
                 touched: now,
+                busy: 0,
                 flow: Arc::new(tokio::sync::Mutex::new((handler.new)())),
             });
         }
@@ -510,9 +542,15 @@ impl Manager {
     async fn step(&self, flow_id: &str, input: Input) -> Result<FlowResult, Error> {
         let find = |flows: &[Progress]| flows.iter().position(|p| p.flow_id == flow_id);
         let flow = {
-            let flows = self.flows.lock();
+            let mut flows = self.flows.lock();
             let i = find(&flows).ok_or(Error::UnknownFlow)?;
+            flows[i].busy += 1;
             flows[i].flow.clone()
+        };
+        // Counted from here until the request is done with the flow.
+        let _working = Working {
+            manager: self,
+            flow_id,
         };
         // One request at a time for a flow, each seeing the flow as the
         // one before left it: a request that waited here for another that

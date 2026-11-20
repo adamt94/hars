@@ -630,3 +630,20 @@ async fn a_head_request_learns_nothing() {
     let automation = "/api/config/automation/config/nope".to_owned();
     assert_eq!(send("HEAD", automation, Some("user")).await, 401);
 }
+
+/// The one refusal HA doesn't have (every flow is at work, so none can
+/// make room): "not now", in words the frontend's dialog shows as they
+/// are.
+#[tokio::test]
+async fn a_full_house_is_refused_in_words() {
+    let res = super::refusal(ha_integrations::flow::Error::Busy);
+    assert_eq!(res.status(), 503);
+    assert_eq!(res.headers()["content-type"], "text/plain; charset=utf-8");
+    let body = axum::body::to_bytes(res.into_body(), 1 << 20)
+        .await
+        .unwrap();
+    assert_eq!(
+        body,
+        "Too many integrations are being set up at once. Try again in a moment."
+    );
+}
