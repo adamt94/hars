@@ -316,7 +316,8 @@ pub fn run(opts: &Options) -> anyhow::Result<Report> {
             bail!("{key} in the source is not a regular file (a symlink?); copy the real file");
         }
         let bytes = std::fs::read(source.join(".storage").join(&key))?;
-        Store::new(&staging.root, key.clone(), 1, 1, private).save_raw(&bytes)?;
+        let mode = if private { 0o600 } else { 0o644 };
+        staging.put(&Path::new(".storage").join(&key), &bytes, mode)?;
     }
 
     // 1a. Before anything is loaded: what Home Assistant 2026.8 to 2026.11
@@ -352,16 +353,20 @@ pub fn run(opts: &Options) -> anyhow::Result<Report> {
         }
     }
     for rel in &report.yaml {
-        let to = staging.root.join(rel);
-        if let Some(d) = to.parent() {
-            std::fs::create_dir_all(d)?;
-        }
-        std::fs::copy(source.join(rel), &to)?;
+        let from = source.join(rel);
         #[cfg(unix)]
-        if rel.ends_with("secrets.yaml") {
+        let mode = {
             use std::os::unix::fs::PermissionsExt;
-            std::fs::set_permissions(&to, std::fs::Permissions::from_mode(0o600))?;
-        }
+            std::fs::metadata(&from)?.permissions().mode() & 0o777
+        };
+        #[cfg(not(unix))]
+        let mode = 0o644;
+        let mode = if rel.ends_with("secrets.yaml") {
+            0o600
+        } else {
+            mode
+        };
+        staging.put(Path::new(rel), &std::fs::read(&from)?, mode)?;
     }
 
     // 2. Validate the staged copy with the loaders the server uses. Auth and
@@ -660,6 +665,26 @@ fn excludes(value: &Value) -> bool {
     }
 }
 
+/// Whether two paths are the same file or directory to the file system,
+/// whatever they are called: the same device and inode. (Elsewhere than
+/// Unix, the same resolved path.)
+fn same_file(a: &Path, b: &Path) -> bool {
+    file_id(a).is_some_and(|id| Some(id) == file_id(b))
+}
+
+/// What a file is to its file system, links followed: device and inode.
+#[cfg(unix)]
+fn file_id(path: &Path) -> Option<(u64, u64)> {
+    use std::os::unix::fs::MetadataExt;
+    let meta = std::fs::metadata(path).ok()?;
+    Some((meta.dev(), meta.ino()))
+}
+
+#[cfg(not(unix))]
+fn file_id(path: &Path) -> Option<PathBuf> {
+    std::fs::canonicalize(path).ok()
+}
+
 /// Where a path that may not exist yet will be: absolute, each part that
 /// exists resolved (symlinks), and a `..` taken off what is before it, as
 /// the system takes it once the directories are made.
@@ -907,9 +932,18 @@ fn sanitized(e: &ha_core::storage::StoreError) -> String {
 /// was killed, another one running, or someone's files) is never cleared.
 struct Staging {
     root: PathBuf,
+    /// Every directory and file staged, by the relative path asked for.
+    staged: std::cell::RefCell<std::collections::HashSet<PathBuf>>,
 }
 
+/// The names in a config directory the importer keeps for itself.
+const RESERVED: [&str; 4] = [".storage", ".import-staging", BACKUP_DIR, REPORT_FILE];
+
 impl Staging {
+    /// The staging directory, with every reserved name taken in it: the
+    /// staging directory is on the destination's file system, so what that
+    /// file system takes for one of those names (in another case, or in
+    /// some other spelling it folds) can't be staged beside it.
     fn new(dest: &Path) -> anyhow::Result<Self> {
         let root = dest.join(".import-staging");
         std::fs::create_dir(&root).map_err(|e| match e.kind() {
@@ -920,9 +954,89 @@ impl Staging {
             ),
             _ => anyhow::Error::from(e).context(format!("making {}", root.display())),
         })?;
-        let staging = Self { root };
-        std::fs::create_dir(staging.root.join(".storage"))?;
+        let staging = Self {
+            root,
+            staged: Default::default(),
+        };
+        for name in RESERVED {
+            if name == REPORT_FILE {
+                std::fs::write(staging.root.join(name), "")?;
+            } else {
+                std::fs::create_dir(staging.root.join(name))?;
+            }
+        }
+        // Stores are staged in it.
+        staging.staged.borrow_mut().insert(".storage".into());
         Ok(staging)
+    }
+
+    /// Stage a file as a new one, each directory on the way as a new one
+    /// too unless it was staged under that same name.
+    ///
+    /// Two names the destination's file system takes for one file (`a.yaml`
+    /// and `A.yaml` where case doesn't count) would otherwise be staged one
+    /// over the other and committed as two changes to one file. They are
+    /// found by making, not by comparing names: only the file system knows
+    /// which names it folds.
+    fn put(&self, rel: &Path, bytes: &[u8], mode: u32) -> anyhow::Result<()> {
+        use std::io::Write;
+        let taken = |at: &Path| {
+            let reserved = RESERVED.iter().any(|name| {
+                at.parent() == Some(Path::new(""))
+                    && same_file(&self.root.join(name), &self.root.join(at))
+            });
+            if reserved {
+                return anyhow::anyhow!("{} is a path hars keeps for itself", rel.display());
+            }
+            let staged = self.staged.borrow();
+            let other = staged
+                .iter()
+                .find(|other| same_file(&self.root.join(other), &self.root.join(at)));
+            anyhow::anyhow!(
+                "{} and {} are one file in the destination, whose file system takes the two \
+                 names for the same: the import can't bring both. Nothing was imported",
+                at.display(),
+                other.map_or("another file the import brings".into(), |o| o
+                    .display()
+                    .to_string())
+            )
+        };
+        let mut dirs: Vec<&Path> = rel.ancestors().skip(1).collect();
+        dirs.reverse();
+        for dir in dirs.into_iter().filter(|d| !d.as_os_str().is_empty()) {
+            if self.staged.borrow().contains(dir) {
+                continue;
+            }
+            match std::fs::create_dir(self.root.join(dir)) {
+                Ok(()) => self.staged.borrow_mut().insert(dir.to_path_buf()),
+                Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => return Err(taken(dir)),
+                Err(e) => return Err(e.into()),
+            };
+        }
+        let mut options = std::fs::OpenOptions::new();
+        options.write(true).create_new(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            options.mode(mode);
+        }
+        let mut file = match options.open(self.root.join(rel)) {
+            Ok(file) => file,
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => return Err(taken(rel)),
+            Err(e) => return Err(e.into()),
+        };
+        file.write_all(bytes)?;
+        // The mode asked for, whatever the umask.
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            file.set_permissions(std::fs::Permissions::from_mode(mode))?;
+        }
+        #[cfg(not(unix))]
+        let _ = mode;
+        file.sync_all()?;
+        self.staged.borrow_mut().insert(rel.to_path_buf());
+        Ok(())
     }
 
     fn keys(&self) -> anyhow::Result<Vec<String>> {
@@ -987,6 +1101,13 @@ fn commit(
             if current.exists() {
                 let saved = backup.join(rel);
                 parent(&saved)?;
+                // The backup is the only copy of what was there: nothing
+                // is moved over a file already in it.
+                if std::fs::symlink_metadata(&saved).is_ok() {
+                    return Err(std::io::Error::other(format!(
+                        "{rel} was already moved aside: two of the files to replace are one file"
+                    )));
+                }
                 rename(&current, &saved)?;
                 moved_out.push(rel.clone());
             }
@@ -1447,6 +1568,119 @@ mod tests {
             "new auth"
         );
         assert!(!storage.join("onboarding").exists());
+        drop(staging);
+        std::fs::remove_dir_all(dest).unwrap();
+    }
+
+    /// What was moved aside is never written over: a second change to a
+    /// file fails and is rolled back to the first's old file, not to the
+    /// new one moved over it.
+    #[test]
+    fn a_backup_is_never_written_over() {
+        let dest = std::env::temp_dir().join(format!("hars-import-backup-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dest);
+        std::fs::create_dir_all(dest.join(".storage")).unwrap();
+        std::fs::write(dest.join(".storage/auth"), "old auth").unwrap();
+        let staging = Staging::new(&dest).unwrap();
+        staging
+            .put(Path::new(".storage/auth"), b"new auth", 0o600)
+            .unwrap();
+        let changes = [
+            Change::Put(".storage/auth".into()),
+            Change::Put(".storage/auth".into()),
+        ];
+        let err = commit(&staging, &dest, &changes, |f, t| std::fs::rename(f, t)).unwrap_err();
+        assert!(err.to_string().contains("rolled back"), "{err}");
+        assert!(err.to_string().contains("already moved aside"), "{err}");
+        assert_eq!(
+            std::fs::read_to_string(dest.join(".storage/auth")).unwrap(),
+            "old auth"
+        );
+        assert!(!dest.join(".import-backup").exists());
+        drop(staging);
+        std::fs::remove_dir_all(dest).unwrap();
+    }
+
+    /// A file is staged as a new one. A name the file system already has
+    /// in the staging directory, under whatever spelling, is refused: a
+    /// reserved one, or one staged before. (Here the second name is made
+    /// behind the importer's back, as a file system that folds names
+    /// would make it.)
+    #[test]
+    fn staging_never_writes_over_a_name_already_there() {
+        let dest = std::env::temp_dir().join(format!("hars-import-put-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dest);
+        std::fs::create_dir_all(&dest).unwrap();
+        let staging = Staging::new(&dest).unwrap();
+        staging.put(Path::new("parts/a.yaml"), b"1", 0o644).unwrap();
+        staging.put(Path::new("parts/b.yaml"), b"2", 0o644).unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mode = |rel: &str| {
+                std::fs::metadata(staging.root.join(rel))
+                    .unwrap()
+                    .permissions()
+                    .mode()
+                    & 0o777
+            };
+            staging.put(Path::new("secrets.yaml"), b"3", 0o600).unwrap();
+            assert_eq!((mode("parts/a.yaml"), mode("secrets.yaml")), (0o644, 0o600));
+        }
+        // The same name again.
+        let err = staging
+            .put(Path::new("parts/a.yaml"), b"x", 0o644)
+            .unwrap_err();
+        assert!(
+            err.to_string().contains("are one file in the destination"),
+            "{err}"
+        );
+        assert_eq!(
+            std::fs::read(staging.root.join("parts/a.yaml")).unwrap(),
+            b"1"
+        );
+        // A file and a directory the file system has, though not staged
+        // under those names.
+        std::fs::write(staging.root.join("parts/C.yaml"), "kept").unwrap();
+        std::fs::create_dir(staging.root.join("Other")).unwrap();
+        for rel in ["parts/C.yaml", "Other/d.yaml"] {
+            let err = staging.put(Path::new(rel), b"x", 0o644).unwrap_err();
+            assert!(
+                err.to_string().contains("Nothing was imported"),
+                "{rel}: {err}"
+            );
+        }
+        assert_eq!(
+            std::fs::read(staging.root.join("parts/C.yaml")).unwrap(),
+            b"kept"
+        );
+        // The names the importer keeps for itself.
+        for rel in [
+            REPORT_FILE,
+            ".import-backup/a.yaml",
+            ".import-staging/a.yaml",
+        ] {
+            let err = staging.put(Path::new(rel), b"x", 0o644).unwrap_err();
+            assert!(
+                err.to_string().contains("is a path hars keeps for itself"),
+                "{rel}: {err}"
+            );
+        }
+        // And, where the file system folds them, their other spellings.
+        if staging.root.join("IMPORT-REPORT.JSON").exists() {
+            for rel in ["IMPORT-REPORT.JSON", ".Storage/x", "Parts/a.yaml"] {
+                assert!(staging.put(Path::new(rel), b"x", 0o644).is_err(), "{rel}");
+            }
+        }
+        if staging.root.join("import-report.j\u{17f}on").exists() {
+            let err = staging
+                .put(Path::new("import-report.j\u{17f}on"), b"x", 0o644)
+                .unwrap_err();
+            assert!(
+                err.to_string().contains("is a path hars keeps for itself"),
+                "{err}"
+            );
+        }
         drop(staging);
         std::fs::remove_dir_all(dest).unwrap();
     }

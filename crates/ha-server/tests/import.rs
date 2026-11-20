@@ -3319,3 +3319,90 @@ fn a_copy_of_an_identifier_without_its_original_is_said() {
         let _ = std::fs::remove_dir_all(d);
     }
 }
+
+/// Whether the file system `dir` is on takes two spellings of a name for
+/// one file (macOS's does by default; CI's Linux doesn't, and there the
+/// decision is covered by `import::tests` on its own).
+fn folds(dir: &Path, name: &str, other: &str) -> bool {
+    std::fs::create_dir_all(dir).unwrap();
+    std::fs::write(dir.join(name), "").unwrap();
+    let folded = dir.join(other).exists();
+    std::fs::remove_file(dir.join(name)).unwrap();
+    folded
+}
+
+/// One file the configuration includes under two names, where the file
+/// system takes them for one: staged and committed as two files, the
+/// second would go over the first and over the copy of what was there
+/// before. It is refused before anything is replaced, `--force` or not.
+#[test]
+fn one_file_under_two_names_is_refused() {
+    let src = temp("two-names-src");
+    let dest = temp("two-names-dest");
+    if !folds(&src, "parts.yaml", "Parts.yaml") {
+        return;
+    }
+    ha_config(&src);
+    std::fs::write(src.join("parts.yaml"), "new: 1\n").unwrap();
+    std::fs::write(
+        src.join("configuration.yaml"),
+        "a: !include parts.yaml\nb: !include Parts.yaml\n",
+    )
+    .unwrap();
+    std::fs::create_dir_all(&dest).unwrap();
+    std::fs::write(dest.join("parts.yaml"), "old: 1\n").unwrap();
+    for flags in [&["--force"][..], &["--dry-run"], &[]] {
+        let mut args = vec!["import", src.to_str().unwrap()];
+        args.extend(flags);
+        let out = hars(&dest, &args);
+        assert!(!out.status.success(), "{flags:?}");
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        assert!(
+            stderr.contains("are one file in the destination") && stderr.contains("arts.yaml"),
+            "{stderr}"
+        );
+        assert_eq!(
+            std::fs::read_to_string(dest.join("parts.yaml")).unwrap(),
+            "old: 1\n"
+        );
+        let mut left: Vec<_> = std::fs::read_dir(&dest)
+            .unwrap()
+            .map(|e| e.unwrap().file_name())
+            .collect();
+        left.sort();
+        assert_eq!(left, ["parts.yaml"], "{flags:?}");
+    }
+    for d in [src, dest] {
+        let _ = std::fs::remove_dir_all(d);
+    }
+}
+
+/// A name the file system takes for one the importer keeps for itself,
+/// though no rule about letters says so: APFS reads the long s in
+/// `import-report.jſon` as an `s`, and the report would replace the file.
+#[test]
+fn a_reserved_name_in_a_spelling_the_file_system_folds_is_refused() {
+    let src = temp("fold-src");
+    let dest = temp("fold-dest");
+    let long_s = "import-report.j\u{17f}on";
+    if !folds(&src, "import-report.json", long_s) {
+        return;
+    }
+    ha_config(&src);
+    std::fs::write(src.join(long_s), "mine: 1\n").unwrap();
+    std::fs::write(
+        src.join("configuration.yaml"),
+        format!("x: !include {long_s}\n"),
+    )
+    .unwrap();
+    let out = hars(&dest, &["import", src.to_str().unwrap()]);
+    assert!(!out.status.success());
+    assert!(
+        String::from_utf8_lossy(&out.stderr).contains("is a path hars keeps for itself"),
+        "{out:?}"
+    );
+    nothing_imported(&dest);
+    for d in [src, dest] {
+        let _ = std::fs::remove_dir_all(d);
+    }
+}
