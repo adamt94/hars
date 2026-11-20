@@ -2852,6 +2852,9 @@ fn rows_the_fixtures_do_not_hold_are_converted_by_home_assistants_rules() {
     let old = old_device.clone();
     edit_store(&src, "core.entity_registry", move |store| {
         store["data"]["settings"]["entity_id_parts"] = json!(["area", "device", "entity"]);
+        // A removed entity with a name given in 2026.11: stored without
+        // its device's name, and the row doesn't say which device.
+        store["data"]["deleted_entities"][0]["name"] = json!("Temperature");
         for entity in store["data"]["entities"].as_array_mut().unwrap() {
             match entity["entity_id"].as_str().unwrap() {
                 // Not moved to its part yet (Home Assistant moves it when
@@ -2966,6 +2969,28 @@ fn rows_the_fixtures_do_not_hold_are_converted_by_home_assistants_rules() {
     assert!(
         stdout.contains("left out of core.restore_state: a last state stored for light.hall"),
         "{stdout}"
+    );
+    // The removed entity's name is not guessed at: the row is as it was,
+    // and the report says so.
+    assert_eq!(report["not_converted"].as_array().unwrap().len(), 1);
+    assert_eq!(
+        (
+            &report["not_converted"][0]["store"],
+            &report["not_converted"][0]["what"]
+        ),
+        (
+            &json!("core.entity_registry"),
+            &json!("the name \"Temperature\" of the removed entity sensor.hall_old_sensor")
+        )
+    );
+    assert!(
+        stdout.contains("not converted in core.entity_registry: the name \"Temperature\""),
+        "{stdout}"
+    );
+    let removed_entities = read_json(&dest.join(".storage/core.entity_registry"));
+    assert_eq!(
+        removed_entities["data"]["deleted_entities"][0]["name"],
+        "Temperature"
     );
 
     let restore = read_json(&dest.join(".storage/core.restore_state"));
@@ -3571,6 +3596,173 @@ fn yaml_left_in_an_included_directory_is_not_left_active() {
     let out = hars(&dest, &["import", src.to_str().unwrap()]);
     assert!(out.status.success(), "{out:?}");
     for d in [src, dest] {
+        let _ = std::fs::remove_dir_all(d);
+    }
+}
+
+/// A copy of an integration's identifier on another integration's live
+/// device, with the integration's own device removed (not lost): Home
+/// Assistant 2026.8 brings the removed one back when the integration
+/// registers again, and hars would find the other integration's device by
+/// the identifier and attach the phone to it. The import stops, and names
+/// the two.
+#[test]
+fn a_copy_beside_a_removed_original_is_refused() {
+    let src = temp("removed-original-src");
+    let dest = temp("removed-original-dest");
+    let fixture = release("2026.11.2", &src, &[]);
+    let devices = store_of(&fixture, "core.device_registry");
+    let id_of = |name: &str, copy: bool| -> String {
+        let all = devices["data"]["devices"].as_array().unwrap();
+        let found = all
+            .iter()
+            .find(|d| d["name"] == name && d["has_composite_identifiers"] == copy);
+        found.unwrap()["id"].as_str().unwrap().to_owned()
+    };
+    let (phone, other) = (id_of("Test Phone", false), id_of("Desk", true));
+    edit_store(&src, "core.device_registry", |store| {
+        let rows = store["data"]["devices"].as_array_mut().unwrap();
+        let at = rows.iter().position(|d| d["name"] == "Test Phone").unwrap();
+        let row = rows.remove(at);
+        // The part of the split device that still holds copies gets one
+        // of the phone's identifier.
+        let copy = rows
+            .iter_mut()
+            .find(|d| d["has_composite_identifiers"] == true)
+            .unwrap();
+        copy["identifiers"]
+            .as_array_mut()
+            .unwrap()
+            .push(json!(["mobile_app", "synthetic-phone"]));
+        // The phone's own device, removed (`DeletedDeviceEntry`'s row).
+        let mut removed = json!({"disabled_by_undefined": false, "orphaned_timestamp": null,
+                                 "domain": null});
+        for key in [
+            "area_id",
+            "config_entry_id",
+            "config_subentry_id",
+            "connections",
+            "created_at",
+            "disabled_by",
+            "identifiers",
+            "id",
+            "labels",
+            "modified_at",
+            "name_by_user",
+        ] {
+            removed[key] = row[key].clone();
+        }
+        store["data"]["deleted_devices"]
+            .as_array_mut()
+            .unwrap()
+            .push(removed);
+    });
+    for flags in [&["--dry-run"][..], &["--force"], &[]] {
+        let mut args = vec!["import", src.to_str().unwrap()];
+        args.extend(flags);
+        let out = hars(&dest, &args);
+        assert!(!out.status.success(), "{flags:?}");
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        assert!(
+            stderr.contains(&format!(
+                "core.device_registry: the device {other} (Desk lamp) belongs to another \
+                 integration and still holds an identifier of the mobile_app integration's \
+                 removed device {phone}"
+            )),
+            "{stderr}"
+        );
+        assert!(stderr.contains("Nothing was imported"), "{stderr}");
+        nothing_imported(&dest);
+    }
+    for d in [src, dest] {
+        let _ = std::fs::remove_dir_all(d);
+    }
+}
+
+/// A device registry of version 3 beside an entity registry already at
+/// 1.22, with nothing to change in it but two device links: an entity on
+/// a split device's old id that has no part of its own, and one on an id
+/// no device has. Both are detached, as Home Assistant 2026.8 detaches
+/// them when it loads the file, and the store is written with that: what
+/// the report says was done is what is on disk.
+#[test]
+fn a_detached_entity_is_written_detached() {
+    let src = temp("detached-src");
+    let dest = temp("detached-dest");
+    let fixture = release("2026.8.3", &src, &[]);
+    let devices = store_of(&fixture, "core.device_registry");
+    let old = devices["data"]["devices"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find_map(|d| d["composite_device_id"].as_str())
+        .unwrap()
+        .to_owned();
+    let old_id = old.clone();
+    edit_store(&src, "core.entity_registry", move |store| {
+        // As 2026.6.1 writes the file: 1.22, no `settings`.
+        store["minor_version"] = json!(22);
+        store["data"].as_object_mut().unwrap().remove("settings");
+        for entity in store["data"]["entities"].as_array_mut().unwrap() {
+            match entity["entity_id"].as_str().unwrap() {
+                "sensor.towel_rail_battery" => entity["device_id"] = json!(old_id),
+                "sensor.hall_illuminance" => entity["device_id"] = json!("no-such-device"),
+                _ => {}
+            }
+        }
+    });
+    let out = hars(&dest, &["import", src.to_str().unwrap()]);
+    assert!(out.status.success(), "{out:?}");
+    let report = read_json(&dest.join("import-report.json"));
+    let dropped: Vec<&str> = report["dropped"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|d| d["what"].as_str().unwrap())
+        .collect();
+    assert_eq!(
+        dropped,
+        [
+            "sensor.hall_illuminance's link to the device no-such-device".to_owned(),
+            format!("sensor.towel_rail_battery's link to the device {old}"),
+        ]
+    );
+    let converted: Vec<(&str, &str)> = report["converted"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|c| (c["key"].as_str().unwrap(), c["from"].as_str().unwrap()))
+        .collect();
+    assert_eq!(
+        converted,
+        [
+            ("core.device_registry", "3.2"),
+            ("core.entity_registry", "1.22")
+        ]
+    );
+    let entities = read_json(&dest.join(".storage/core.entity_registry"));
+    for entity in entities["data"]["entities"].as_array().unwrap() {
+        let id = entity["entity_id"].as_str().unwrap();
+        if id == "sensor.towel_rail_battery" || id == "sensor.hall_illuminance" {
+            assert_eq!(entity["device_id"], json!(null), "{id}");
+        }
+    }
+
+    // Beside a device registry 2026.6.1 wrote, an id no device has is left
+    // as it is, as 2026.6.1 leaves it.
+    let src = temp("dangling-src");
+    let dest = temp("dangling-dest");
+    release("2026.7.4", &src, &[]);
+    edit_store(&src, "core.entity_registry", |store| {
+        store["data"]["entities"][0]["device_id"] = json!("no-such-device");
+    });
+    let out = hars(&dest, &["import", src.to_str().unwrap()]);
+    assert!(out.status.success(), "{out:?}");
+    assert_eq!(
+        std::fs::read(dest.join(".storage/core.entity_registry")).unwrap(),
+        std::fs::read(src.join(".storage/core.entity_registry")).unwrap()
+    );
+    for d in [temp("detached-src"), temp("detached-dest"), src, dest] {
         let _ = std::fs::remove_dir_all(d);
     }
 }

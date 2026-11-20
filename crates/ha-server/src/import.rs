@@ -167,6 +167,9 @@ pub struct Report {
     /// names by id: there Home Assistant reaches the children's entities
     /// through the parent, and `hars` doesn't.
     pub parent_devices: Vec<ParentDevice>,
+    /// What is still in a newer release's form, there being no way to
+    /// tell what the older form would hold.
+    pub not_converted: Vec<Dropped>,
     pub dry_run: bool,
     /// Stores copied (or that would be, in a dry run).
     pub imported: Vec<String>,
@@ -264,6 +267,7 @@ pub fn run(opts: &Options) -> anyhow::Result<Report> {
         dropped: Vec::new(),
         split_devices: Vec::new(),
         parent_devices: Vec::new(),
+        not_converted: Vec::new(),
         dry_run: opts.dry_run,
         imported: Vec::new(),
         replaced: Vec::new(),
@@ -337,6 +341,7 @@ pub fn run(opts: &Options) -> anyhow::Result<Report> {
     report.dropped = converted.dropped;
     report.split_devices = converted.split_devices;
     report.parent_devices = converted.parent_devices;
+    report.not_converted = converted.not_converted;
     // An action on a label reaches a labelled device's children from
     // 2026.10 (`helpers/target.py`; 2026.9 keeps a label to the devices
     // that have it), so before that there is nothing to say of labels.
@@ -1527,6 +1532,12 @@ pub fn summary(report: &Report, dest: &Path) -> String {
         out.push_str(&format!(
             "  left out of {}: {} ({})\n",
             d.store, d.what, d.reason
+        ));
+    }
+    for n in &report.not_converted {
+        out.push_str(&format!(
+            "  not converted in {}: {} ({})\n",
+            n.store, n.what, n.reason
         ));
     }
     for s in &report.split_devices {

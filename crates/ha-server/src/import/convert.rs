@@ -58,6 +58,8 @@ pub(super) struct Conversion {
     pub dropped: Vec<Dropped>,
     pub split_devices: Vec<SplitDevice>,
     pub parent_devices: Vec<ParentDevice>,
+    /// What is in a newer form and was left in it, there being no rule.
+    pub not_converted: Vec<Dropped>,
 }
 
 /// A store rewritten in the form of an older storage version.
@@ -469,6 +471,46 @@ pub(super) fn run(root: &Path, ha_version: &str) -> anyhow::Result<Conversion> {
             ));
         }
         let removed: Vec<Holder> = deleted.iter().map(deleted_holder).collect();
+        // And a copy whose original was removed, not lost: when the
+        // integration registers its device again, Home Assistant 2026.8
+        // brings the removed row back for that config entry
+        // (`_async_get_or_create_from_info`), while hars finds the other
+        // integration's live device by the identifier first and attaches
+        // the config entry to it. That would be the wrong device.
+        for d in &devices {
+            for identifier in &d.identifiers {
+                let domain = identifier[0].as_str().unwrap_or_default();
+                if !runs(domain)
+                    || owned(d, domain)
+                    || devices
+                        .iter()
+                        .any(|o| owned(o, domain) && o.identifiers.contains(identifier))
+                {
+                    continue;
+                }
+                let original = removed.iter().find(|(_, identifiers, entries)| {
+                    identifiers.contains(identifier)
+                        && entries
+                            .iter()
+                            .any(|e| domain_of.get(e).map(String::as_str) == Some(domain))
+                });
+                if let Some((removed_id, ..)) = original {
+                    bail!(
+                        "{DEVICE_KEY}: the device {} ({}) belongs to another integration and \
+                         still holds an identifier of the {domain} integration's removed device \
+                         {removed_id}. When {domain} registers its device again, Home Assistant \
+                         2026.8 and later bring the removed one back; hars, which finds a device \
+                         by its identifier alone as Home Assistant 2026.6.1 does, would attach \
+                         it to {} instead. Start Home Assistant once with both integrations \
+                         loaded, or delete one of the two devices there, then copy the config \
+                         directory again. Nothing was imported",
+                        d.id,
+                        d.display_name().unwrap_or("unnamed"),
+                        d.id
+                    );
+                }
+            }
+        }
         let removed_order = order_shared_identifiers(&removed, &domain_of, false)?;
         if order.is_some() || removed_order.is_some() {
             device_changes.push(
@@ -508,6 +550,7 @@ pub(super) fn run(root: &Path, ha_version: &str) -> anyhow::Result<Conversion> {
         .map_err(|e| anyhow::anyhow!("{ENTITY_KEY} doesn't load ({})", sanitized(&e)))?
         .unwrap_or_default();
     let core_config = ha_core::config::CoreConfig::load(root).ok();
+    let mut not_converted = Vec::new();
     let (entities, entity_changes) = convert_entities(
         entity_rows,
         entity_head.unwrap_or((1, 22)),
@@ -515,6 +558,7 @@ pub(super) fn run(root: &Path, ha_version: &str) -> anyhow::Result<Conversion> {
             devices: &devices,
             device_names: &device_names,
             splits: &splits,
+            from_v3,
             lifx: &lifx,
             met: &met,
             met_names: before
@@ -536,7 +580,9 @@ pub(super) fn run(root: &Path, ha_version: &str) -> anyhow::Result<Conversion> {
                 .collect(),
         },
         &mut done.dropped,
+        &mut not_converted,
     )?;
+    done.not_converted = not_converted;
     let registry_ids: HashMap<String, String> = entities
         .entities
         .iter()
@@ -886,6 +932,8 @@ struct Names<'a> {
     /// Each device's `name_by_user or name`, as the file had it.
     device_names: &'a HashMap<String, String>,
     splits: &'a [Split],
+    /// Whether the device registry was of storage version 3.
+    from_v3: bool,
     /// The `lifx` and `met` entries going back to version 1.
     lifx: &'a HashSet<String>,
     met: &'a HashSet<String>,
@@ -910,10 +958,14 @@ struct Names<'a> {
 ///   the old name the first alias, in place of "the entity's name", it
 ///   stays: the file doesn't say whether the user had written that alias
 ///   out already.
-/// - An entity still on a shared device's old id goes to the part its
-///   config entry owns, as 2026.8 does when it loads the file
-///   (`EntityRegistry._async_load`'s `_split_device_id`); with no such part
-///   it is detached, as there.
+/// - Beside a device registry of version 3, an entity still on a shared
+///   device's old id goes to the part its config entry owns, as 2026.8
+///   does when it loads the file (`EntityRegistry._async_load`'s
+///   `_split_device_id`); with no such part it is detached, as there, and
+///   so is one whose device id names no device at all (the same function:
+///   "the device is gone ... detach the entity rather than leave it
+///   pointing at a device id that no longer exists"). 2026.6.1 leaves such
+///   an id alone, so beside a 1.12 registry it is left alone too.
 /// - `lifx` 2 to 1 (`migration.py::_raw_unique_id` reversed): the serial at
 ///   the front of a unique id is written as a MAC address again.
 /// - `met` 2 to 1: the entity gets back the name 2026.6.1 gives it
@@ -923,6 +975,7 @@ fn convert_entities(
     found: (u32, u32),
     names: &Names,
     dropped: &mut Vec<Dropped>,
+    not_converted: &mut Vec<Dropped>,
 ) -> anyhow::Result<(EntityRows, Vec<String>)> {
     let mut changes = Vec::new();
     if found.1 >= 23 {
@@ -939,32 +992,47 @@ fn convert_entities(
         changes.push("the registry's `settings` are left out".into());
     }
     let device_ids: HashSet<&str> = names.devices.iter().map(|d| d.id.as_str()).collect();
-    let (mut moved, mut renamed, mut serials, mut met) = (0, 0, 0, 0);
+    let (mut moved, mut detached, mut renamed, mut serials, mut met) = (0, 0, 0, 0, 0);
     for e in &mut rows.entities {
-        let split = e
+        // `EntityRegistry._async_load`'s `_split_device_id` (2026.8): a
+        // device id that names no device goes to the part of the split
+        // device its config entry owns, and is taken off the entity when
+        // there is no such part, or no such device at all.
+        let gone = e
             .device_id
             .clone()
-            .filter(|d| !device_ids.contains(d.as_str()))
-            .and_then(|old| {
-                let (_, parts) = names.splits.iter().find(|(id, _)| *id == old)?;
-                Some((old, parts))
-            });
-        if let Some((old, parts)) = split {
+            .filter(|d| names.from_v3 && !device_ids.contains(d.as_str()));
+        if let Some(old) = gone {
+            let parts = names.splits.iter().find(|(id, _)| *id == old).map(|s| &s.1);
             let entry = e.config_entry_id.as_deref();
-            let part = parts
-                .iter()
-                .find(|p| Some(p.1.as_str()) == entry && p.2 == e.config_subentry_id)
-                .or_else(|| parts.iter().find(|p| Some(p.1.as_str()) == entry));
+            let part = parts.and_then(|parts| {
+                parts
+                    .iter()
+                    .find(|p| Some(p.1.as_str()) == entry && p.2 == e.config_subentry_id)
+                    .or_else(|| parts.iter().find(|p| Some(p.1.as_str()) == entry))
+            });
             e.device_id = part.map(|p| p.0.clone());
-            match part {
-                Some(_) => moved += 1,
-                None => dropped.push(Dropped {
-                    store: ENTITY_KEY.into(),
-                    what: format!("{}'s link to the device {old}", e.entity_id),
-                    reason: "Home Assistant 2026.8 split that device and no part belongs to \
-                             the entity's integration; Home Assistant detaches it too"
+            match (part, parts) {
+                (Some(_), _) => moved += 1,
+                (None, split) => {
+                    detached += 1;
+                    dropped.push(Dropped {
+                        store: ENTITY_KEY.into(),
+                        what: format!("{}'s link to the device {old}", e.entity_id),
+                        reason: match split {
+                            Some(_) => {
+                                "Home Assistant 2026.8 split that device and no part \
+                                        belongs to the entity's integration; Home Assistant \
+                                        detaches it too"
+                            }
+                            None => {
+                                "no device has that id; Home Assistant 2026.8 and later \
+                                     detach such an entity when they load the file"
+                            }
+                        }
                         .into(),
-                }),
+                    });
+                }
             }
         }
         if found.1 >= 24 {
@@ -1014,6 +1082,38 @@ fn convert_entities(
             met += 1;
         }
     }
+    // A removed entity's name, as 1.24 stores one: without the device's
+    // name. The row has no device id (`DeletedRegistryEntry`), so the full
+    // name can't be made, and the migration to 1.24 itself had to clear
+    // such names ("we don't know what the device name was"). The row is
+    // left as it is and said, not guessed at.
+    if found.1 >= 24 {
+        #[derive(Deserialize)]
+        struct Removed {
+            entity_id: String,
+            name: Option<String>,
+        }
+        for row in &rows.deleted_entities {
+            let Ok(Removed {
+                entity_id,
+                name: Some(name),
+            }) = serde_json::from_str(row.get())
+            else {
+                continue;
+            };
+            if !name.is_empty() {
+                not_converted.push(Dropped {
+                    store: ENTITY_KEY.into(),
+                    what: format!("the name {name:?} of the removed entity {entity_id}"),
+                    reason: "Home Assistant 2026.11 stores a name without its device's name \
+                             and puts that in front when it shows it. A removed entity's row \
+                             doesn't say which device it had, so if the entity comes back hars \
+                             shows the name as stored, without a device's name"
+                        .into(),
+                });
+            }
+        }
+    }
     // A unique id written back must not be one another row already has:
     // the two rows would be one entity.
     let mut seen = HashSet::new();
@@ -1033,6 +1133,14 @@ fn convert_entities(
         changes.push(format!(
             "{} from a split device's old id to the part its integration owns",
             count(moved, "entity is moved", "entities are moved")
+        ));
+    }
+    // Any change to a link is a change to the store: it is written again
+    // though its version was 1.22 already.
+    if detached > 0 {
+        changes.push(format!(
+            "{} from a device id that names no device any more",
+            count(detached, "entity is detached", "entities are detached")
         ));
     }
     if found.1 >= 24 {
