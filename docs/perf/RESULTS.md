@@ -449,8 +449,14 @@ an Apple-silicon Mac, criterion 0.7, the same bench file run on main):
 | main (49c08fc) | 2.038 µs [2.031, 2.044] |
 | branch, `--baseline main` | 2.005 µs [2.002, 2.009], change −0.43 %: "within noise threshold" |
 
-A polled sensor's and a Bot's writes are not in the bench (each needs an
-API answer first); by reading, they make the same allocations as on main.
+The bench does not resolve one small allocation: the switch's state as an
+owned string again, run the same way, measured 1.947 µs [1.945, 1.948],
+so runs on this machine differ by a few percent whatever the code. What
+the numbers show is that the lock and the closure cost nothing that can
+be measured here; the borrowed literal is back because rule 2 says so,
+not because a run was faster. A polled sensor's and a Bot's writes are
+not in the bench (each needs an API answer first); by reading, they make
+the same allocations as on main.
 
 Release binary (macOS arm64, stripped, `cargo build --release -p
 ha-server`): main (49c08fc) 9,469,328 bytes, branch 9,535,472
