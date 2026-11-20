@@ -152,9 +152,10 @@ ids, addresses, names and coordinates replaced with fake ones
 
 ### M1: Import, registries, config & restore
 - [x] Versioned, idempotent **importer** (`hars import`) that reads a consistent copy of an HA
-      2026.6 or 2026.7 config dir and writes a machine-readable report of anything
+      2026.6 to 2026.11 config dir and writes a machine-readable report of anything
       unsupported or unresolved (`import-report.json`). Stores `hars` reads
-      are validated with its own loaders and copied byte for byte; a re-run
+      are validated with its own loaders and copied byte for byte (after
+      the ones 2026.8 to 2026.11 write in a newer form are converted); a re-run
       that would replace state `hars` changed needs `--force`. It imports:
   - [x] Entity/device/area/floor/label registries (HA's files as they are:
         unique ids, disabled/hidden flags, names), read by `ha-registry`
@@ -180,7 +181,7 @@ ids, addresses, names and coordinates replaced with fake ones
   - [x] Releases after the pin: the importer decides store by store,
         starting from what Home Assistant 2026.6.1 does with a newer file
         after a downgrade and stricter where `hars` could not keep the
-        data. It takes 2026.6.x and 2026.7.x (`TESTED_HA`). A store of a newer major
+        data. It takes 2026.6.x and 2026.7.x as they are. A store of a newer major
         storage version, a registry or `person` store of a newer minor
         version, an entity, device or area registry or
         `core.config_entries` of any minor version but the one `hars`
@@ -202,16 +203,36 @@ ids, addresses, names and coordinates replaced with fake ones
         (`scripts/vectors/import_releases.py`;
         [the table](ARCHITECTURE.md#which-home-assistant-releases-can-be-imported)).
         Entries of a newer config flow version are not started either
-  - [ ] Import from Home Assistant 2026.8 and later. Needs, in order:
-        `core.device_registry` version 3 (2026.8: one config entry per
-        device; devices two integrations shared are split, entities and
-        `via_device_id` links moved to the split devices; 3.4 adds
-        `child_devices`) and `core.entity_registry` 1.23 (`settings`);
-        `hue` entries 1.2 and `lifx` entries version 2 (2026.10); the
-        entity registry's 1.24 names and `met` entries version 2
-        (2026.11). `hars` serves 2026.6's frontend, which expects the
-        version 1 device shape, so this is either a conversion back at
-        import (lossy for split devices) or part of moving the pin
+  - [x] Import from Home Assistant 2026.8 to 2026.11, by conversion at
+        import: `hars` at run time still reads and writes 2026.6.1's
+        formats. In the staged copy, `core.device_registry` 3.2 and 3.4
+        become 1.12 (one row per device with its one config entry in the
+        three old fields, as 2026.8's own compatibility properties answer;
+        child devices become rows; a device 2026.8 split stays split, with
+        its new ids), `core.entity_registry` 1.23 and 1.24 become 1.22
+        (`settings` out; each name the user gave stored in full, as
+        2026.11's `async_get_legacy_friendly_name` gives it), restore-state
+        rows lose `entity_registry_id`, and `lifx` and `met` entries 2.1
+        become 1.1 (with the `lifx` identifiers and unique ids, and the
+        `met` device and entity names, that 2026.6.1's integrations
+        write). `hue` 1.2 entries stay 1.2. A version with no rule, and
+        data with no 2026.6.1 meaning, still refuse the import.
+        `import-report.json` (version 4) lists `converted`,
+        `converted_entries`, `dropped` and `split_devices`. Tested by a
+        round trip made with Home Assistant's own code: one richer
+        synthetic 2026.6.1 install, started on by 2026.8.3, 2026.9.4,
+        2026.10.4 and 2026.11.2, must convert back to itself apart from
+        the differences the test lists; and 2026.6.1 itself loads each
+        converted directory
+        ([the table](ARCHITECTURE.md#which-home-assistant-releases-can-be-imported))
+  - [ ] Import, what remains: a real 2026.8 to 2026.11 install has not
+        been imported (the test install is synthetic and small). An
+        automation, script or dashboard that uses a split device's old id
+        is reported, not rewritten, and reaches no device. Integrations
+        find their device by identifier, the first row that has it (the
+        importer orders the rows); 2026.8 looks it up per config entry.
+        Releases after 2026.11 are imported only if every store is in a
+        format with a rule
 - [x] `configuration.yaml` loaded as HA loads it: `!include`, the
       `!include_dir_*` tags, `!secret`, `!env_var`; unsupported
       **automation** syntax makes that automation `unavailable`

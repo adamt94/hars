@@ -231,11 +231,14 @@ fn imports_an_ha_install_and_keeps_its_sessions() {
         assert_eq!(mode(&user_data), 0o644);
     }
     let report = read_json(&dest.join("import-report.json"));
-    assert_eq!(report["importer_version"], 3);
+    assert_eq!(report["importer_version"], 4);
     assert_eq!(report["ha_version"], "2026.6.1");
     assert_eq!(report["ha_version_tested"], true);
     assert_eq!(report["behaves_like"], "2026.6.1");
     assert_eq!(report["newer_stores"], json!([]));
+    for nothing in ["converted", "converted_entries", "dropped", "split_devices"] {
+        assert_eq!(report[nothing], json!([]), "{nothing}");
+    }
     // The pinned release itself: nothing to expect differently.
     assert!(!stdout.contains("behaves like"), "{stdout}");
     let mut imported = vec![
@@ -391,8 +394,8 @@ fn refuses_other_ha_versions_and_its_own_directory() {
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(
         stderr.contains(
-            "this is Home Assistant 2025.12.4; hars imports 2026.6 and 2026.7. \
-             Update Home Assistant to 2026.7 first (not to a later release)"
+            "this is Home Assistant 2025.12.4; hars imports 2026.6 to 2026.11. \
+             Update Home Assistant to 2026.11 first (not to a later release)"
         ),
         "{stderr}"
     );
@@ -811,13 +814,35 @@ fn edit_store(dir: &Path, key: &str, edit: impl FnOnce(&mut Value)) {
     std::fs::write(path, serde_json::to_vec_pretty(&store).unwrap()).unwrap();
 }
 
-/// For each of the six release fixtures, hars imports the directory when
-/// Home Assistant 2026.6.1's base bootstrap loads it (`downgrade.json`: its
-/// `bootstrap.async_load_base_functionality` on each directory) and refuses
-/// it, naming the store 2026.6.1 names, when it doesn't. (hars is stricter
-/// than that elsewhere: `directories_hars_could_not_keep_are_refused`.)
+/// What `hars import` converts in each release's directory: the stores, with
+/// the storage version each had, and the config entries.
+fn converted_in(version: &str) -> (Vec<(&'static str, &'static str)>, Vec<&'static str>) {
+    let device = "core.device_registry";
+    let entity = "core.entity_registry";
+    match version {
+        "2026.8.3" => (vec![(device, "3.2"), (entity, "1.23")], vec![]),
+        "2026.9.4" => (vec![(device, "3.4"), (entity, "1.23")], vec![]),
+        "2026.10.4" => (vec![(device, "3.4"), (entity, "1.23")], vec!["lifx Desk"]),
+        "2026.11.2" => (
+            vec![
+                (device, "3.4"),
+                (entity, "1.24"),
+                ("core.restore_state", "1.1"),
+            ],
+            vec!["met Home", "met Cabin", "lifx Desk"],
+        ),
+        _ => (vec![], vec![]),
+    }
+}
+
+/// Every release fixture imports. What Home Assistant 2026.6.1's own base
+/// bootstrap loads (`downgrade.json`: its
+/// `bootstrap.async_load_base_functionality` on each directory) is copied
+/// byte for byte. The directories it refuses, 2026.8's and later, are the
+/// ones with a store hars converts first: those stores arrive in 2026.6.1's
+/// form, every other one byte for byte, and the source is left as it was.
 #[test]
-fn imports_the_directories_home_assistant_2026_6_1_loads() {
+fn imports_every_release() {
     let cases = vector("downgrade.json");
     assert_eq!(cases["ha_version"], "2026.6.1");
     let cases = cases["cases"].as_array().unwrap();
@@ -830,24 +855,27 @@ fn imports_the_directories_home_assistant_2026_6_1_loads() {
             "2026.7.0",
             "2026.7.4",
             "2026.8.3",
+            "2026.9.4",
+            "2026.10.4",
             "2026.11.2"
         ]
     );
     for case in cases {
         let version = case["from"].as_str().unwrap();
+        let month: u32 = version.split('.').nth(1).unwrap().parse().unwrap();
         let src = temp(&format!("release-{version}"));
         let dest = temp(&format!("release-{version}-dest"));
         let fixture = release(version, &src, &[]);
-        let out = hars(&dest, &["import", src.to_str().unwrap()]);
-        let stderr = String::from_utf8_lossy(&out.stderr);
+        let (converted, converted_entries) = converted_in(version);
+        // 2026.6.1 itself refuses exactly the directories with a store to
+        // convert: "Storage file core.device_registry was created by a
+        // newer version of Home Assistant (storage version 3 > 1)".
         assert_eq!(
-            out.status.success(),
             case["loads"].as_bool().unwrap(),
-            "{version}: {stderr}"
+            converted.is_empty(),
+            "{version}"
         );
-        if !out.status.success() {
-            // "Storage file core.device_registry was created by a newer
-            // version of Home Assistant (storage version 3 > 1)".
+        if !converted.is_empty() {
             assert!(
                 case["errors"][0]
                     .as_str()
@@ -855,50 +883,118 @@ fn imports_the_directories_home_assistant_2026_6_1_loads() {
                     .contains("core.device_registry was created by a newer version"),
                 "{case}"
             );
-            let minor = if version == "2026.8.3" { 2 } else { 4 };
-            assert!(
-                stderr.contains(&format!(
-                    "core.device_registry is storage version 3.{minor}, in a config directory \
-                     of Home Assistant {version}; hars reads version 1.12, as Home Assistant \
-                     2026.6.1 does. Home Assistant 2026.8 and later keep each device under one \
-                     config entry (storage version 3), which hars can't read yet. hars imports \
-                     Home Assistant 2026.6 and 2026.7: import a copy or backup of this config \
-                     directory made before it was updated past 2026.7. Nothing was imported"
-                )),
-                "{stderr}"
-            );
-            nothing_imported(&dest);
-            // Nor does a dry run or --force get past it.
-            for flag in ["--dry-run", "--force"] {
-                let out = hars(&dest, &["import", src.to_str().unwrap(), flag]);
-                assert!(!out.status.success(), "{version} {flag}");
-                nothing_imported(&dest);
-            }
-            continue;
         }
 
+        // A dry run says the same and writes nothing.
+        let out = hars(&dest, &["import", src.to_str().unwrap(), "--dry-run"]);
+        assert!(out.status.success(), "{version}: {out:?}");
+        let dry = String::from_utf8_lossy(&out.stdout).replace("would import", "imported");
+        nothing_imported(&dest);
+
+        let out = hars(&dest, &["import", src.to_str().unwrap()]);
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        assert!(out.status.success(), "{version}: {stderr}");
+        let stdout = String::from_utf8_lossy(&out.stdout);
+        assert_eq!(
+            stdout
+                .lines()
+                .filter(|l| !l.starts_with("Report:"))
+                .collect::<Vec<_>>(),
+            dry.lines().collect::<Vec<_>>(),
+            "{version}"
+        );
+
         let report = read_json(&dest.join("import-report.json"));
+        assert_eq!(report["importer_version"], 4);
         assert_eq!(report["ha_version"], version);
         assert_eq!(report["ha_version_tested"], true, "{version}");
         assert_eq!(report["behaves_like"], "2026.6.1");
-        // Every store but `http.auth` (the user media is served as) is one
-        // hars reads: copied byte for byte.
+        let was: Vec<(&str, &str)> = report["converted"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|c| (c["key"].as_str().unwrap(), c["from"].as_str().unwrap()))
+            .collect();
+        assert_eq!(was, converted, "{version}");
+        let entries: Vec<String> = report["converted_entries"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|e| {
+                assert_eq!((&e["from"], &e["to"]), (&json!("2.1"), &json!("1.1")));
+                format!(
+                    "{} {}",
+                    e["domain"].as_str().unwrap(),
+                    e["title"].as_str().unwrap()
+                )
+            })
+            .collect();
+        assert_eq!(entries, converted_entries, "{version}");
+
+        // Every store but `http.auth` (the user media is served as) and
+        // the repairs registry is one hars reads.
         let mut imported = stores(&fixture);
-        imported.retain(|k| k != "http.auth");
+        imported.retain(|k| k != "http.auth" && k != "repairs.issue_registry");
         assert_eq!(report["imported"], json!(imported), "{version}");
-        assert_eq!(report["skipped"][0]["key"], "http.auth");
-        assert_eq!(report["skipped"].as_array().unwrap().len(), 1, "{report}");
+        let skipped: Vec<&str> = report["skipped"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|s| s["key"].as_str().unwrap())
+            .collect();
+        let expected: &[&str] = if month >= 8 {
+            &["http.auth", "repairs.issue_registry"]
+        } else {
+            &["http.auth"]
+        };
+        assert_eq!(skipped, expected, "{version}");
         for key in &imported {
+            let written = std::fs::read_to_string(dest.join(".storage").join(key)).unwrap();
+            let theirs = fixture["files"][format!(".storage/{key}")]
+                .as_str()
+                .unwrap();
+            let is_converted = converted.iter().any(|(k, _)| k == key)
+                || (key == "core.config_entries" && !converted_entries.is_empty());
+            if is_converted {
+                // In the versions hars reads and writes.
+                assert_ne!(written, theirs, "{version} {key}");
+                let head: Value = serde_json::from_str(&written).unwrap();
+                let reads = match key.as_str() {
+                    "core.device_registry" => (1, 12),
+                    "core.entity_registry" => (1, 22),
+                    "core.config_entries" => (1, 5),
+                    _ => (1, 1),
+                };
+                assert_eq!(
+                    (&head["version"], &head["minor_version"]),
+                    (&json!(reads.0), &json!(reads.1)),
+                    "{version} {key}"
+                );
+            } else {
+                // Byte for byte.
+                assert_eq!(written, theirs, "{version} {key}");
+            }
+        }
+        // Converted or not, the entries (hosts, keys, tokens) are owner-only.
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let entries = dest.join(".storage/core.config_entries");
+            let mode = std::fs::metadata(entries).unwrap().permissions().mode();
+            assert_eq!(mode & 0o777, 0o600, "{version}");
+        }
+        // The source is only read.
+        for (rel, text) in fixture["files"].as_object().unwrap() {
             assert_eq!(
-                std::fs::read_to_string(dest.join(".storage").join(key)).unwrap(),
-                fixture["files"][format!(".storage/{key}")]
-                    .as_str()
-                    .unwrap(),
-                "{version} {key}"
+                std::fs::read_to_string(src.join(rel)).unwrap(),
+                text.as_str().unwrap(),
+                "{version} {rel}"
             );
         }
+        assert!(!src.join(".import-staging").exists());
+
         // 2026.7 writes `mobile_app`'s store at 1.2.
-        let newer = if version.starts_with("2026.7.") {
+        let newer = if month >= 7 {
             json!([{"key": "mobile_app", "version": "1.2", "hars_writes": "1.1"}])
         } else {
             json!([])
@@ -912,33 +1008,69 @@ fn imports_the_directories_home_assistant_2026_6_1_loads() {
             .filter(|e| e["supported"] == false)
             .map(|e| e["domain"].as_str().unwrap())
             .collect();
-        assert_eq!(unsupported, ["radio_browser", "homekit_controller"]);
-        assert_eq!(report["config_entries"].as_array().unwrap().len(), 9);
+        assert_eq!(unsupported, ["radio_browser", "homekit_controller", "mqtt"]);
+        // 2026.10 removes the `lifx` entry from before one entry per bulb.
+        let entries = if month >= 10 { 10 } else { 11 };
+        assert_eq!(report["config_entries"].as_array().unwrap().len(), entries);
 
-        let stdout = String::from_utf8_lossy(&out.stdout);
         assert_eq!(
             stdout.contains(
-                "hars behaves like Home Assistant 2026.6.1 and serves its frontend: \
-                 what Home Assistant added after it is not there"
+                "hars behaves like Home Assistant 2026.6.1 and shows the 2026.6 app: what \
+                 Home Assistant added after that is not there"
             ),
-            version.starts_with("2026.7."),
+            month >= 7,
             "{stdout}"
         );
         assert!(!stdout.contains("not tested"), "{stdout}");
+        assert_eq!(stdout.contains("converted "), month >= 8, "{stdout}");
+        // The device two integrations shared: 2026.8 made it two, and the
+        // automation that names it by the old id reaches neither.
+        if month >= 8 {
+            let split = &report["split_devices"];
+            assert_eq!(split.as_array().unwrap().len(), 1, "{split}");
+            assert_eq!(split[0]["name"], "Desk lamp");
+            assert_eq!(split[0]["new_ids"].as_array().unwrap().len(), 2);
+            assert_eq!(split[0]["used_in"], json!(["automations.yaml"]));
+            let old = split[0]["old_id"].as_str().unwrap();
+            assert!(
+                fixture["files"]["automations.yaml"]
+                    .as_str()
+                    .unwrap()
+                    .contains(old),
+                "{old}"
+            );
+            assert!(
+                stdout.contains(&format!(
+                    "automations.yaml still uses the id {old} of a device that Home Assistant \
+                     2026.8 replaced with two"
+                )),
+                "{stdout}"
+            );
+        } else {
+            assert_eq!(report["split_devices"], json!([]));
+        }
+        assert_eq!(report["dropped"], json!([]), "{version}");
         // An automation the 2026.7 editor can save and 2026.6 can't run.
         let automations = report["automations"].as_array().unwrap();
-        if version.starts_with("2026.7.") {
-            assert_eq!(automations.len(), 3);
-            assert_eq!(automations[2]["alias"], "When the hall light turns on");
-            assert_eq!(automations[2]["status"], "unavailable");
+        if month >= 7 {
+            assert_eq!(automations.len(), 4);
+            assert_eq!(automations[3]["alias"], "When the hall light turns on");
+            assert_eq!(automations[3]["status"], "unavailable");
             assert!(
                 stdout.contains("automation When the hall light turns on will be unavailable"),
                 "{stdout}"
             );
         } else {
-            assert_eq!(automations.len(), 2);
+            assert_eq!(automations.len(), 3);
         }
         assert_eq!(automations[0]["status"], "ok");
+
+        // The same import again changes nothing.
+        let out = hars(&dest, &["import", src.to_str().unwrap()]);
+        assert!(out.status.success(), "{version}: {out:?}");
+        let again = read_json(&dest.join("import-report.json"));
+        assert_eq!(again["replaced"], json!([]), "{version}");
+        assert_eq!(again["converted"], report["converted"], "{version}");
         for d in [src, dest] {
             let _ = std::fs::remove_dir_all(d);
         }
@@ -1053,7 +1185,7 @@ fn an_untested_release_is_imported_and_flagged() {
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(
         stdout.contains(
-            "hars is not tested with Home Assistant 2026.12.0 (it is with 2026.6 and 2026.7)"
+            "hars is not tested with Home Assistant 2026.12.0 (it is with 2026.6 to 2026.11)"
         ),
         "{stdout}"
     );
@@ -1068,65 +1200,209 @@ fn an_untested_release_is_imported_and_flagged() {
     }
 }
 
-/// What later releases changed, one at a time, each on a real file of
-/// Home Assistant 2026.11.2: every one refuses the whole import.
+/// What hars has no rule for is refused whole, each on Home Assistant
+/// 2026.11.2's directory with one thing changed: a storage version or a
+/// config entry version past the ones converted, and data in a convertible
+/// store that has no 2026.6.1 meaning. Nothing is written, with `--dry-run`
+/// and `--force` too.
 #[test]
-fn stores_and_entries_from_newer_releases_are_refused() {
-    let device = ".storage/core.device_registry";
-    let entity = ".storage/core.entity_registry";
-    let entries = ".storage/core.config_entries";
-    let cases: [(&[(&str, &str)], &str); 3] = [
-        // The entity registry at 1.24 (2026.11 stores names another way):
-        // a newer minor version of a store hars would never write back.
+fn what_hars_cannot_convert_is_refused() {
+    type Change = fn(&Path);
+    fn entry(src: &Path, domain: &str, edit: impl Fn(&mut Value)) {
+        edit_store(src, "core.config_entries", |s| {
+            let entries = s["data"]["entries"].as_array_mut().unwrap();
+            edit(entries.iter_mut().rfind(|e| e["domain"] == domain).unwrap());
+        });
+    }
+    fn device(src: &Path, list: &str, name: &str, edit: impl Fn(&mut Value)) {
+        edit_store(src, "core.device_registry", |s| {
+            let rows = s["data"][list].as_array_mut().unwrap();
+            edit(rows.iter_mut().find(|d| d["name"] == name).unwrap());
+        });
+    }
+    let past = "hars imports Home Assistant 2026.6 to 2026.11: import a copy or backup of this \
+                config directory made before it was updated past 2026.11. Nothing was imported";
+    let cases: Vec<(&str, Change, String)> =
+        vec![
+        // A minor version after 2026.11's: a later release's format.
         (
-            &[(device, "2026.7.4")],
-            "core.entity_registry is storage version 1.24, in a config directory of Home \
-             Assistant 2026.11.2; hars reads version 1.22, as Home Assistant 2026.6.1 does. \
-             hars imports",
+            "device-3.5",
+            |src| edit_store(src, "core.device_registry", |s| s["minor_version"] = json!(5)),
+            format!(
+                "core.device_registry is storage version 3.5, in a config directory of Home \
+                 Assistant 2026.11.2; hars reads version 1.12, as Home Assistant 2026.6.1 does, \
+                 and converts versions 3.2 and 3.4 to it (Home Assistant 2026.8 to 2026.11). \
+                 {past}"
+            ),
         ),
-        // `met` at config entry version 2 (2026.11 nests its location).
+        // 3.3 was in no release, so there is no fixture for it.
         (
-            &[(device, "2026.7.4"), (entity, "2026.7.4")],
-            "the met integration's config entry \"Home\" is version 2, in a config directory \
-             of Home Assistant 2026.11.2; hars runs version 1 of it, as Home Assistant 2026.6.1 \
-             does. hars imports Home Assistant 2026.6 and 2026.7",
+            "device-3.3",
+            |src| edit_store(src, "core.device_registry", |s| s["minor_version"] = json!(3)),
+            "core.device_registry is storage version 3.3".into(),
         ),
-        // Everything from 2026.11.2 at once: the device registry is named.
-        (&[], "core.device_registry is storage version 3.4"),
+        (
+            "device-4",
+            |src| edit_store(src, "core.device_registry", |s| s["version"] = json!(4)),
+            "core.device_registry is storage version 4.4".into(),
+        ),
+        (
+            "entity-1.25",
+            |src| edit_store(src, "core.entity_registry", |s| s["minor_version"] = json!(25)),
+            format!(
+                "core.entity_registry is storage version 1.25, in a config directory of Home \
+                 Assistant 2026.11.2; hars reads version 1.22, as Home Assistant 2026.6.1 does, \
+                 and converts versions 1.23 and 1.24 to it (Home Assistant 2026.8 to 2026.11). \
+                 {past}"
+            ),
+        ),
+        (
+            "entity-2",
+            |src| edit_store(src, "core.entity_registry", |s| s["version"] = json!(2)),
+            "core.entity_registry is storage version 2.24".into(),
+        ),
+        // Config entries past the versions with a rule.
+        (
+            "met-2.2",
+            |src| entry(src, "met", |e| e["minor_version"] = json!(2)),
+            format!(
+                "the met integration's config entry \"Cabin\" is version 2.2, in a config \
+                 directory of Home Assistant 2026.11.2; hars runs version 1 of it, as Home \
+                 Assistant 2026.6.1 does, and has no rule to bring this one back to it. {past}"
+            ),
+        ),
+        (
+            "met-3",
+            |src| entry(src, "met", |e| e["version"] = json!(3)),
+            "the met integration's config entry \"Cabin\" is version 3.1".into(),
+        ),
+        (
+            "lifx-2.2",
+            |src| entry(src, "lifx", |e| e["minor_version"] = json!(2)),
+            "the lifx integration's config entry \"Desk\" is version 2.2".into(),
+        ),
+        (
+            "hue-2",
+            |src| entry(src, "hue", |e| e["version"] = json!(2)),
+            "the hue integration's config entry \"Hue Bridge\" is version 2.2".into(),
+        ),
+        // Entries at a version with a rule, holding what the rule can't
+        // take back.
+        (
+            "lifx-unique-id",
+            |src| entry(src, "lifx", |e| e["unique_id"] = json!("not-a-serial")),
+            "the lifx integration's config entry \"Desk\" is version 2.1 and its unique id is \
+             not a LIFX serial, so hars can't bring it back to version 1. Nothing was imported"
+                .into(),
+        ),
+        (
+            "lifx-serial",
+            |src| entry(src, "lifx", |e| e["data"]["serial"] = json!("d073d5000002")),
+            "the lifx integration's config entry \"Desk\" is version 2.1 and its serial is not \
+             its unique id"
+                .into(),
+        ),
+        (
+            "met-location",
+            |src| entry(src, "met", |e| e["data"]["location"]["radius"] = json!(5)),
+            "the met integration's config entry \"Cabin\" is version 2.1 and its location is \
+             not a latitude and a longitude"
+                .into(),
+        ),
+        // A child device disabled through its parent: 2026.6.1 has no
+        // such state for a device.
+        (
+            "child-disabled",
+            |src| device(src, "child_devices", "Socket 1", |d| d["disabled_by"] = json!("device")),
+            "is disabled because its parent device is (`disabled_by: device`), which Home \
+             Assistant 2026.6.1 has no way to say. Enable the parent device in Home Assistant, \
+             then copy the config directory again. Nothing was imported"
+                .into(),
+        ),
+        (
+            "child-orphan",
+            |src| device(src, "child_devices", "Socket 1", |d| d["parent_device_id"] = json!("x")),
+            "has no parent device in the file. Nothing was imported".into(),
+        ),
+        (
+            "device-no-entry",
+            |src| device(src, "devices", "Hall", |d| d["config_entry_id"] = json!(null)),
+            "has no config entry, which storage version 3 doesn't allow".into(),
+        ),
+        (
+            "device-field",
+            |src| device(src, "devices", "Hall", |d| d["labels"] = json!("SYNTHETIC_MARKER")),
+            "has a field of a type Home Assistant doesn't write. Nothing was imported".into(),
+        ),
+        // The same `lifx` entity twice, its serial written each way.
+        (
+            "lifx-twins",
+            |src| {
+                edit_store(src, "core.entity_registry", |s| {
+                    let rows = s["data"]["entities"].as_array_mut().unwrap();
+                    let mut twin = rows
+                        .iter()
+                        .find(|e| e["entity_id"] == "light.desk")
+                        .unwrap()
+                        .clone();
+                    twin["entity_id"] = json!("light.desk_2");
+                    twin["unique_id"] = json!("d0:73:d5:00:00:01");
+                    rows.push(twin);
+                })
+            },
+            "two `lifx` entities of the same kind have the unique id of".into(),
+        ),
     ];
-    for (swap, says) in cases {
-        let src = temp("newer-src");
-        let dest = temp("newer-dest");
-        release("2026.11.2", &src, swap);
+    for (name, change, says) in cases {
+        let src = temp(&format!("unconverted-{name}"));
+        let dest = temp(&format!("unconverted-{name}-dest"));
+        release("2026.11.2", &src, &[]);
+        change(&src);
+        for flags in [&["--dry-run"][..], &["--force"], &[]] {
+            let mut args = vec!["import", src.to_str().unwrap()];
+            args.extend(flags);
+            let out = hars(&dest, &args);
+            assert!(!out.status.success(), "{name} {flags:?}");
+            let stderr = String::from_utf8_lossy(&out.stderr);
+            assert!(stderr.contains(&says), "{name}: {stderr}");
+            assert!(stderr.contains("Nothing was imported"), "{name}: {stderr}");
+            assert!(!stderr.contains("SYNTHETIC"), "{name}: {stderr}");
+            nothing_imported(&dest);
+        }
+        // An existing install is left exactly as it was.
+        let dest = temp(&format!("unconverted-{name}-dest2"));
+        assert!(hars(&dest, &["auth", "add", "bob", "pw"]).status.success());
+        let before = std::fs::read(dest.join(".storage/auth")).unwrap();
         let out = hars(&dest, &["import", src.to_str().unwrap(), "--force"]);
-        assert!(!out.status.success(), "{says}");
-        let stderr = String::from_utf8_lossy(&out.stderr);
-        assert!(stderr.contains(says), "{stderr}");
-        assert!(stderr.contains("Nothing was imported"), "{stderr}");
-        nothing_imported(&dest);
-        let _ = std::fs::remove_dir_all(src);
+        assert!(!out.status.success(), "{name}");
+        assert_eq!(std::fs::read(dest.join(".storage/auth")).unwrap(), before);
+        assert!(!dest.join(".import-staging").exists() && !dest.join(".import-backup").exists());
+        for d in [src, dest] {
+            let _ = std::fs::remove_dir_all(d);
+        }
     }
 
-    // The other way round: a 2026.7.4 directory whose config entries are
-    // 2026.11.2's (`lifx` and `met` at version 2, `hue` at 1.2).
-    let src = temp("newer-entries-src");
-    let dest = temp("newer-entries-dest");
-    release("2026.7.4", &src, &[(entries, "2026.11.2")]);
-    let out = hars(&dest, &["import", src.to_str().unwrap()]);
-    assert!(!out.status.success());
-    assert!(
-        String::from_utf8_lossy(&out.stderr).contains("the met integration's config entry"),
-        "{out:?}"
+    // One store converts only with the others: 2026.7.4's directory with
+    // 2026.11.2's config entries (`lifx` and `met` at version 2) imports,
+    // its entries converted, its registries as they were.
+    let src = temp("mixed-src");
+    let dest = temp("mixed-dest");
+    let fixture = release(
+        "2026.7.4",
+        &src,
+        &[(".storage/core.config_entries", "2026.11.2")],
     );
-    nothing_imported(&dest);
-    // An existing install is left exactly as it was.
-    let dest = temp("newer-entries-dest2");
-    assert!(hars(&dest, &["auth", "add", "bob", "pw"]).status.success());
-    let before = std::fs::read(dest.join(".storage/auth")).unwrap();
-    let out = hars(&dest, &["import", src.to_str().unwrap(), "--force"]);
-    assert!(!out.status.success());
-    assert_eq!(std::fs::read(dest.join(".storage/auth")).unwrap(), before);
-    assert!(!dest.join(".import-staging").exists());
+    let out = hars(&dest, &["import", src.to_str().unwrap()]);
+    assert!(out.status.success(), "{out:?}");
+    let report = read_json(&dest.join("import-report.json"));
+    assert_eq!(report["converted_entries"].as_array().unwrap().len(), 3);
+    assert_eq!(report["converted"], json!([]));
+    assert_eq!(
+        std::fs::read_to_string(dest.join(".storage/core.entity_registry")).unwrap(),
+        fixture["files"][".storage/core.entity_registry"]
+            .as_str()
+            .unwrap()
+    );
     for d in [src, dest] {
         let _ = std::fs::remove_dir_all(d);
     }
@@ -1150,7 +1426,7 @@ fn directories_hars_could_not_keep_are_refused() {
             },
             "core.config_entries is storage version 1.4, older than the 1.5 hars reads and \
              writes: Home Assistant brings it up to date when it starts. Start Home Assistant \
-             2026.6 or 2026.7 on this config directory once",
+             2026.6 to 2026.11 on this config directory once",
         ),
         (
             "older-entities",
@@ -1453,6 +1729,1106 @@ fn an_occupied_staging_directory_is_left_alone() {
         .collect();
     left.sort();
     assert_eq!(left, [".storage", "import-report.json"]);
+    for d in [src, dest] {
+        let _ = std::fs::remove_dir_all(d);
+    }
+}
+
+// ----- Directories of Home Assistant 2026.8 to 2026.11, converted -----
+
+const CONVERTED: [&str; 4] = ["2026.8.3", "2026.9.4", "2026.10.4", "2026.11.2"];
+
+/// The rows of a store's list, by a field of each.
+fn rows<'a>(
+    store: &'a Value,
+    list: &str,
+    key: &str,
+) -> std::collections::BTreeMap<String, &'a Value> {
+    store["data"][list]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|row| (row[key].as_str().unwrap().to_owned(), row))
+        .collect()
+}
+
+fn store_of(fixture: &Value, key: &str) -> Value {
+    serde_json::from_str(
+        fixture["files"][format!(".storage/{key}")]
+            .as_str()
+            .unwrap(),
+    )
+    .unwrap()
+}
+
+/// One difference between a row of the 2026.6.1 install and the row it is
+/// after another release ran on it and hars converted it back.
+type Difference = (String, Value, Value);
+
+/// The fields that differ between two rows. `modified_at` is left out: a
+/// row a release changed has that release's time, and that is the only
+/// reason it differs.
+fn row_differences(
+    path: &str,
+    before: &Value,
+    after: &Value,
+    skip: &[&str],
+    out: &mut Vec<Difference>,
+) {
+    let absent = json!("(absent)");
+    let (before, after) = (before.as_object().unwrap(), after.as_object().unwrap());
+    let keys: std::collections::BTreeSet<&String> = before.keys().chain(after.keys()).collect();
+    for key in keys {
+        if key == "modified_at" || skip.contains(&key.as_str()) {
+            continue;
+        }
+        let (a, b) = (
+            before.get(key).unwrap_or(&absent),
+            after.get(key).unwrap_or(&absent),
+        );
+        if a != b {
+            out.push((format!("{path}/{key}"), a.clone(), b.clone()));
+        }
+    }
+}
+
+/// The round trip. Home Assistant has no code that takes a config
+/// directory back a version, so the check is made with its own code going
+/// forward: `scripts/vectors/import_releases.py` makes one install with
+/// 2026.6.1 and starts each later release on it. What hars makes of each
+/// result must be that 2026.6.1 install again, field for field, except
+/// for the differences listed here, each with its reason. They are of
+/// three kinds: what the generator itself changed through the newer
+/// release (so that every store is written by it), what the newer release
+/// did that 2026.6.1 has a place for and hars keeps, and the two things a
+/// way back doesn't exist for.
+#[test]
+fn a_converted_install_is_the_2026_6_1_install_again() {
+    let seed = vector("2026.6.1.json");
+    let seed_entries = store_of(&seed, "core.config_entries");
+    let seed_entries = rows(&seed_entries, "entries", "entry_id");
+    let entry_id = |domain: &str, title: &str| -> String {
+        let found = seed_entries
+            .iter()
+            .find(|(_, e)| e["domain"] == domain && e["title"] == title);
+        found.unwrap().0.clone()
+    };
+    let entry_name = |id: &str| {
+        let e = seed_entries[id];
+        format!(
+            "{} {}",
+            e["domain"].as_str().unwrap(),
+            e["title"].as_str().unwrap()
+        )
+    };
+    let (lifx, homekit) = (
+        entry_id("lifx", "Desk"),
+        entry_id("homekit_controller", "Desk"),
+    );
+    let seed_devices = store_of(&seed, "core.device_registry");
+    let seed_entities = store_of(&seed, "core.entity_registry");
+    let device_id = |name: &str| -> String {
+        let all = rows(&seed_devices, "devices", "id");
+        let found = all.iter().find(|(_, d)| d["name"] == name);
+        found.unwrap().0.clone()
+    };
+    let (desk, strip) = (device_id("Desk"), device_id("Power strip"));
+
+    for version in CONVERTED {
+        let month: u32 = version.split('.').nth(1).unwrap().parse().unwrap();
+        let src = temp(&format!("round-{version}"));
+        let dest = temp(&format!("round-{version}-dest"));
+        release(version, &src, &[]);
+        let out = hars(&dest, &["import", src.to_str().unwrap()]);
+        assert!(out.status.success(), "{version}: {out:?}");
+        let report = read_json(&dest.join("import-report.json"));
+        let read = |key: &str| read_json(&dest.join(".storage").join(key));
+        let mut found: Vec<Difference> = Vec::new();
+        let mut expected: Vec<Difference> = Vec::new();
+        let mut expect = |path: &str, before: Value, after: Value| {
+            expected.push((path.to_owned(), before, after));
+        };
+        let absent = || json!("(absent)");
+
+        // ----- core.device_registry -----
+        let devices = read("core.device_registry");
+        assert_eq!(
+            (&devices["version"], &devices["minor_version"]),
+            (&json!(1), &json!(12))
+        );
+        let before = rows(&seed_devices, "devices", "id");
+        let after = rows(&devices, "devices", "id");
+        let new_ids: Vec<String> = report["split_devices"][0]["new_ids"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|id| id.as_str().unwrap().to_owned())
+            .collect();
+        assert_eq!(report["split_devices"][0]["old_id"], desk.as_str());
+        let label = |row: &Value| {
+            format!(
+                "devices/{} ({})",
+                row["name"].as_str().unwrap(),
+                entry_name(row["config_entries"][0].as_str().unwrap())
+            )
+        };
+        let mut seen = std::collections::BTreeSet::new();
+        for (id, row) in &after {
+            // A part of the device two integrations shared is compared
+            // with that device. Its id is new (2026.8 gave each part one)
+            // and `split_at` says when; both are checked just below.
+            let old = row["composite_device_id"].as_str().unwrap_or(id);
+            let skip: &[&str] = if old == id { &[] } else { &["id", "split_at"] };
+            if old != id {
+                assert!(new_ids.contains(id) && row["split_at"].is_string(), "{row}");
+            }
+            seen.insert(old.to_owned());
+            row_differences(&label(row), before[old], row, skip, &mut found);
+        }
+        assert_eq!(
+            seen,
+            before.keys().cloned().collect(),
+            "{version}: no device is lost"
+        );
+        assert_eq!(after.len(), before.len() + 1, "{version}");
+        // 2026.8 (`DeviceRegistryStore._async_migrate_func`, version 3)
+        // made the bulb `lifx` and `homekit_controller` shared two
+        // devices, one for each. They stay two: the entities are on the
+        // new ids, and automations made since use them. Each part lists
+        // its one config entry, which is also its primary one, and keeps
+        // the fields that say where it came from (hars writes them back).
+        let (lifx_part, homekit_part) = (
+            format!("devices/Desk ({})", entry_name(&lifx)),
+            format!("devices/Desk ({})", entry_name(&homekit)),
+        );
+        let both = json!([lifx, homekit]);
+        let subentries = |ids: &[&String]| -> Value {
+            ids.iter()
+                .map(|id| ((*id).clone(), json!([null])))
+                .collect::<serde_json::Map<_, _>>()
+                .into()
+        };
+        for (part, entry) in [(&lifx_part, &lifx), (&homekit_part, &homekit)] {
+            expect(
+                &format!("{part}/config_entries"),
+                both.clone(),
+                json!([entry]),
+            );
+            expect(
+                &format!("{part}/config_entries_subentries"),
+                subentries(&[&lifx, &homekit]),
+                subentries(&[entry]),
+            );
+            expect(
+                &format!("{part}/composite_device_id"),
+                absent(),
+                json!(desk),
+            );
+            expect(
+                &format!("{part}/composite_primary_config_entry"),
+                absent(),
+                json!(lifx),
+            );
+        }
+        expect(
+            &format!("{homekit_part}/primary_config_entry"),
+            json!(lifx),
+            json!(homekit),
+        );
+        // `lifx` registered its part again (every start does), which
+        // leaves it the identifiers `lifx` gives; the other integration
+        // did not, so its part still holds a copy of them all and says so.
+        expect(
+            &format!("{lifx_part}/identifiers"),
+            json!([
+                ["homekit_controller:accessory-id", "00:00:00:00:00:01:aid:1"],
+                ["lifx", "d0:73:d5:00:00:01"]
+            ]),
+            json!([["lifx", "d0:73:d5:00:00:01"]]),
+        );
+        expect(
+            &format!("{homekit_part}/has_composite_identifiers"),
+            absent(),
+            json!(true),
+        );
+        // A device reached through the shared one is reached through the
+        // part of its own config entry (version 3.2's `via_device_id`
+        // rule).
+        let homekit_id = after
+            .iter()
+            .find(|(_, d)| label(d) == homekit_part)
+            .map(|(id, _)| (*id).clone())
+            .unwrap();
+        expect(
+            &format!(
+                "devices/Desk sensor ({})/via_device_id",
+                entry_name(&homekit)
+            ),
+            json!(desk),
+            json!(homekit_id),
+        );
+        if month >= 9 {
+            // The generator made the socket a child device of the strip,
+            // as 2026.9 lets an integration do
+            // (`_async_convert_device_to_child`): that drops the fields a
+            // child device doesn't have, and they are not in the file to
+            // bring back. It is a device again, its parent kept on the
+            // row.
+            let socket = format!(
+                "devices/Socket 1 ({})",
+                entry_name(&entry_id("mqtt", "192.0.2.30"))
+            );
+            expect(
+                &format!("{socket}/manufacturer"),
+                json!("Example"),
+                json!(null),
+            );
+            expect(&format!("{socket}/model"), json!("Socket"), json!(null));
+            expect(
+                &format!("{socket}/via_device_id"),
+                json!(strip),
+                json!(null),
+            );
+            expect(
+                &format!("{socket}/parent_device_id"),
+                absent(),
+                json!(strip),
+            );
+        }
+        let hue = format!("({})", entry_name(&entry_id("hue", "Hue Bridge")));
+        if month >= 10 {
+            // 2026.10's `hue` (entry 1.2, `_migrate_zigbee_connections`)
+            // takes the Zigbee addresses out of the `mac` connections and
+            // its setup adds them as `zigbee` ones. They stay as 2026.10
+            // left them: hars reads no connection, and 2026.6.1's `hue`
+            // would add its own again.
+            for (name, n) in [("Hue Bridge", 1), ("Hall", 2)] {
+                expect(
+                    &format!("devices/{name} {hue}/connections"),
+                    json!([["mac", format!("00:17:88:01:00:00:00:0{n}")]]),
+                    json!([["zigbee", format!("00:17:88:01:00:00:00:0{n}")]]),
+                );
+            }
+            // The disabled lamp was not registered again: 2026.10.4 keeps
+            // its address as a `zigbee` connection, 2026.11.2 removes it.
+            expect(
+                &format!("devices/Porch {hue}/connections"),
+                json!([["mac", "00:17:88:01:00:00:00:03"]]),
+                if month >= 11 {
+                    json!([])
+                } else {
+                    json!([["zigbee", "00:17:88:01:00:00:00:03"]])
+                },
+            );
+        }
+        // The generator's own change, through the release.
+        expect(
+            &format!("devices/Hue Bridge {hue}/name_by_user"),
+            json!(null),
+            json!(format!("Bridge ({version})")),
+        );
+        let (before, after) = (
+            rows(&seed_devices, "deleted_devices", "id"),
+            rows(&devices, "deleted_devices", "id"),
+        );
+        assert_eq!(before, after, "{version}: the removed devices");
+
+        // ----- core.entity_registry -----
+        let entities = read("core.entity_registry");
+        assert_eq!(
+            (&entities["version"], &entities["minor_version"]),
+            (&json!(1), &json!(22))
+        );
+        assert_eq!(
+            entities["data"]
+                .as_object()
+                .unwrap()
+                .keys()
+                .collect::<Vec<_>>(),
+            ["deleted_entities", "entities"],
+            "`settings` is 2026.8's"
+        );
+        let before = rows(&seed_entities, "entities", "id");
+        let after = rows(&entities, "entities", "id");
+        for (id, row) in &after {
+            match before.get(id) {
+                Some(old) => {
+                    let path = format!("entities/{}", old["entity_id"].as_str().unwrap());
+                    row_differences(&path, old, row, &[], &mut found);
+                }
+                None => found.push((
+                    format!("entities/{}", row["entity_id"].as_str().unwrap()),
+                    absent(),
+                    json!("(new)"),
+                )),
+            }
+        }
+        assert!(
+            before.keys().all(|id| after.contains_key(id)),
+            "{version}: no entity is lost"
+        );
+        // The entities of the shared device are on the part their
+        // integration owns (`EntityRegistry._async_load`).
+        let lifx_id = new_ids.iter().find(|id| **id != homekit_id).unwrap();
+        for (entity, part) in [
+            ("light.desk", lifx_id),
+            ("button.desk_restart", lifx_id),
+            ("light.desk_homekit", &homekit_id),
+        ] {
+            expect(
+                &format!("entities/{entity}/device_id"),
+                json!(desk),
+                json!(part),
+            );
+        }
+        if month >= 10 {
+            // 2026.10's `lifx` migration rewrote the two unique ids, and
+            // the registry notes the one before each change. The unique
+            // ids are back; what `previous_unique_id` held before is not
+            // in the file.
+            for (entity, was) in [
+                ("light.desk", "d0:73:d5:00:00:01"),
+                ("button.desk_restart", "d0:73:d5:00:00:01_restart"),
+            ] {
+                expect(
+                    &format!("entities/{entity}/previous_unique_id"),
+                    json!(null),
+                    json!(was),
+                );
+            }
+        }
+        if month >= 11 {
+            // Entity registry 1.24 stored "Desk lamp reading light"
+            // without the device's name and with a capital
+            // (`_async_strip_prefix_from_entity_name`): "Reading light".
+            // 2026.11 shows, and gives as the friendly name, the device's
+            // name and that; so does hars. The lower-case "r" is gone.
+            expect(
+                "entities/light.desk/name",
+                json!("Desk lamp reading light"),
+                json!("Desk lamp Reading light"),
+            );
+        }
+        // The generator's own changes, through the release.
+        expect(
+            "entities/light.hall/icon",
+            json!(null),
+            json!("mdi:ceiling-light"),
+        );
+        expect(
+            "entities/switch.towel_rail/entity_id",
+            json!("switch.towel_rail"),
+            json!("switch.towel_warmer"),
+        );
+        let tag = version.replace('.', "_");
+        for new in [
+            "automation.when_the_hall_light_turns_on".to_owned(),
+            format!("person.person_{tag}"),
+            format!("zone.zone_{tag}"),
+        ] {
+            expect(&format!("entities/{new}"), absent(), json!("(new)"));
+        }
+        assert_eq!(
+            rows(&seed_entities, "deleted_entities", "id"),
+            rows(&entities, "deleted_entities", "id"),
+            "{version}: the removed entities"
+        );
+
+        // ----- core.config_entries -----
+        let entries = read("core.config_entries");
+        let after = rows(&entries, "entries", "entry_id");
+        for (id, old) in &seed_entries {
+            let path = format!("entries/{}", entry_name(id));
+            match after.get(id) {
+                Some(row) => row_differences(&path, old, row, &[], &mut found),
+                None => found.push((path, json!("(entry)"), absent())),
+            }
+        }
+        assert!(after.keys().all(|id| seed_entries.contains_key(id)));
+        expect(
+            "entries/sun Sun/title",
+            json!("Sun"),
+            json!(format!("Sun ({version})")),
+        );
+        if month >= 10 {
+            // `hue` 1.2 is left at 1.2: a newer minor version is
+            // compatible by Home Assistant's rule, and 2026.6.1 runs it.
+            expect("entries/hue Hue Bridge/minor_version", json!(1), json!(2));
+            // 2026.10's `lifx` removes the entry from before one entry
+            // per bulb (`async_migrate_entry`). It ran nothing, and it
+            // is not in the file to bring back.
+            expect("entries/lifx LIFX", json!("(entry)"), absent());
+        }
+
+        found.sort_by(|a, b| a.0.cmp(&b.0));
+        expected.sort_by(|a, b| a.0.cmp(&b.0));
+        let show = |all: &[Difference]| -> String {
+            all.iter()
+                .map(|(path, a, b)| format!("{path}: {a} -> {b}\n"))
+                .collect()
+        };
+        assert_eq!(show(&found), show(&expected), "{version}");
+
+        // ----- core.restore_state -----
+        // A last state is found by entity id again. 2026.11 keeps it by
+        // the registry row, so there the renamed switch's state follows
+        // it; before 2026.11 (and in 2026.6.1) it stays under the old id.
+        let restore = read("core.restore_state");
+        let mut ids: Vec<&str> = restore["data"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|row| {
+                let keys: Vec<&String> = row.as_object().unwrap().keys().collect();
+                assert_eq!(keys, ["extra_data", "last_seen", "state"], "{version}");
+                row["state"]["entity_id"].as_str().unwrap()
+            })
+            .collect();
+        ids.sort_unstable();
+        let person = format!("person.person_{tag}");
+        let switch = if month >= 11 {
+            "switch.towel_warmer"
+        } else {
+            "switch.towel_rail"
+        };
+        let mut expected = vec![
+            "light.desk",
+            person.as_str(),
+            "person.test_owner",
+            "scene.evening",
+            switch,
+        ];
+        expected.sort_unstable();
+        assert_eq!(ids, expected, "{version}");
+        let on = restore["data"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|row| row["state"]["entity_id"] == switch)
+            .unwrap();
+        assert_eq!(on["state"]["state"], "on");
+        for d in [src, dest] {
+            let _ = std::fs::remove_dir_all(d);
+        }
+    }
+}
+
+/// A WebSocket connection to hars, logged in: enough of RFC 6455 for one
+/// command and its answer at a time.
+struct Ws(TcpStream);
+
+impl Ws {
+    fn connect(port: u16, access_token: &str) -> Self {
+        let mut s = TcpStream::connect(("127.0.0.1", port)).unwrap();
+        s.set_read_timeout(Some(Duration::from_secs(10))).unwrap();
+        s.write_all(
+            b"GET /api/websocket HTTP/1.1\r\nHost: x\r\nUpgrade: websocket\r\n\
+              Connection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n\
+              Sec-WebSocket-Version: 13\r\n\r\n",
+        )
+        .unwrap();
+        let (mut head, mut byte) = (Vec::new(), [0u8; 1]);
+        while !head.ends_with(b"\r\n\r\n") {
+            s.read_exact(&mut byte).unwrap();
+            head.push(byte[0]);
+        }
+        assert!(
+            head.starts_with(b"HTTP/1.1 101"),
+            "{}",
+            String::from_utf8_lossy(&head)
+        );
+        let mut ws = Self(s);
+        assert_eq!(ws.receive()["type"], "auth_required");
+        ws.send(&json!({"type": "auth", "access_token": access_token}));
+        assert_eq!(ws.receive()["type"], "auth_ok");
+        ws
+    }
+
+    fn send(&mut self, message: &Value) {
+        let payload = message.to_string().into_bytes();
+        // A final text frame, masked (with zeros) as a client's must be.
+        let mut frame = vec![0x81];
+        match payload.len() {
+            n if n < 126 => frame.push(0x80 | n as u8),
+            n => {
+                frame.push(0x80 | 126);
+                frame.extend((n as u16).to_be_bytes());
+            }
+        }
+        frame.extend([0u8; 4]);
+        frame.extend(payload);
+        self.0.write_all(&frame).unwrap();
+    }
+
+    fn receive(&mut self) -> Value {
+        loop {
+            let mut head = [0u8; 2];
+            self.0.read_exact(&mut head).unwrap();
+            let mut len = u64::from(head[1] & 0x7f);
+            if len == 126 {
+                let mut b = [0u8; 2];
+                self.0.read_exact(&mut b).unwrap();
+                len = u64::from(u16::from_be_bytes(b));
+            } else if len == 127 {
+                let mut b = [0u8; 8];
+                self.0.read_exact(&mut b).unwrap();
+                len = u64::from_be_bytes(b);
+            }
+            let mut payload = vec![0u8; len as usize];
+            self.0.read_exact(&mut payload).unwrap();
+            // Text, whole (hars sends no fragments); pings are skipped.
+            if head[0] == 0x81 {
+                return serde_json::from_slice(&payload).unwrap();
+            }
+        }
+    }
+
+    /// A command's result.
+    fn call(&mut self, id: u64, command: &str) -> Value {
+        self.send(&json!({"id": id, "type": command}));
+        loop {
+            let message = self.receive();
+            if message["id"] == id {
+                assert_eq!(message["success"], true, "{message}");
+                return message["result"].clone();
+            }
+        }
+    }
+}
+
+/// A directory from Home Assistant 2026.11.2 runs once converted: the
+/// session 2026.11.2 issued logs in, and the states, devices, entities
+/// and names served are the 2026.6.1 ones.
+#[test]
+fn a_2026_11_install_runs() {
+    let src = temp("runs11-src");
+    let dest = temp("runs11-dest");
+    let fixture = release("2026.11.2", &src, &[]);
+    let out = hars(&dest, &["import", src.to_str().unwrap()]);
+    assert!(out.status.success(), "{out:?}");
+    let report = read_json(&dest.join("import-report.json"));
+    let parts: Vec<&str> = report["split_devices"][0]["new_ids"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|id| id.as_str().unwrap())
+        .collect();
+
+    // No test reaches the network: the integrations that would call a
+    // bridge, a bulb or a cloud stay off. Their entities are then shown
+    // from the registry alone, as `unavailable`.
+    edit_store(&dest, "core.config_entries", |store| {
+        for entry in store["data"]["entries"].as_array_mut().unwrap() {
+            let domain = entry["domain"].as_str().unwrap();
+            if ["met", "hue", "lifx", "switchbot_cloud"].contains(&domain) {
+                entry["disabled_by"] = json!("user");
+            }
+        }
+    });
+    let devices_before =
+        std::fs::read_to_string(dest.join(".storage/core.device_registry")).unwrap();
+
+    let auth = store_of(&fixture, "auth");
+    let session = auth["data"]["refresh_tokens"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|t| t["client_id"] == "http://127.0.0.1:8123/2026.11.2")
+        .unwrap();
+    assert_eq!(session["version"], "2026.11.2");
+
+    let port = free_port();
+    let mut server = Command::new(env!("CARGO_BIN_EXE_hars"))
+        .env("HARS_CONFIG", &dest)
+        .env("HARS_BIND", format!("127.0.0.1:{port}"))
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .unwrap();
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while TcpStream::connect(("127.0.0.1", port)).is_err() {
+        assert!(Instant::now() < deadline, "hars did not start");
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    let form = format!(
+        "grant_type=refresh_token&client_id={}&refresh_token={}",
+        "http%3A%2F%2F127.0.0.1%3A8123%2F2026.11.2",
+        session["token"].as_str().unwrap()
+    );
+    let (status, body) = http(
+        port,
+        "POST",
+        "/auth/token",
+        &[("Content-Type", "application/x-www-form-urlencoded")],
+        &form,
+    );
+    assert_eq!(status, 200, "{body}");
+    let access = serde_json::from_str::<Value>(&body).unwrap()["access_token"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let bearer = format!("Bearer {access}");
+    let state = |entity: &str| -> (u16, Value) {
+        let (status, body) = http(
+            port,
+            "GET",
+            &format!("/api/states/{entity}"),
+            &[("Authorization", &bearer)],
+            "",
+        );
+        (status, serde_json::from_str(&body).unwrap_or_default())
+    };
+
+    // Names: what Home Assistant 2026.11 shows as each entity's friendly
+    // name, stored the 2026.6.1 way.
+    for (entity, name) in [
+        // The user's name, which 1.24 stored without the device's.
+        ("light.desk", "Desk lamp Reading light"),
+        // The user's name was the device's, so 1.24 stored "".
+        ("switch.towel_warmer", "Towel rail"),
+        // Kept apart in `compat_name` by 1.24.
+        ("sensor.hall_temperature", "Warmth downstairs"),
+        ("binary_sensor.hall_motion", "Hall movement"),
+        // Named by the integration.
+        ("sensor.hall_illuminance", "Hall Illuminance"),
+        ("button.desk_restart", "Restart"),
+        // `met`'s entities have the place's name back.
+        ("weather.forecast_cabin", "Cabin"),
+        ("weather.forecast_home", "Home"),
+        ("person.test_owner", "Test Owner"),
+        ("zone.zone_2026_11_2", "Zone 2026.11.2"),
+        ("automation.desk_off_at_night", "Desk off at night"),
+    ] {
+        let (status, state) = state(entity);
+        assert_eq!(status, 200, "{entity}");
+        assert_eq!(state["attributes"]["friendly_name"], name, "{state}");
+    }
+    assert_eq!(state("light.desk").1["state"], "unavailable");
+    assert_eq!(state("automation.desk_off_at_night").1["state"], "on");
+    // Disabled entities have no state, and the old entity id is gone.
+    for gone in [
+        "light.porch",
+        "sensor.porch_signal",
+        "sensor.sun_next_dawn",
+        "switch.towel_rail",
+    ] {
+        assert_eq!(state(gone).0, 404, "{gone}");
+    }
+
+    // The registries, as the 2026.6 app reads them.
+    let mut ws = Ws::connect(port, &access);
+    let devices = ws.call(1, "config/device_registry/list");
+    let devices = devices.as_array().unwrap();
+    // The seed's twelve, the shared one now two.
+    assert_eq!(devices.len(), 13);
+    let named =
+        |name: &str| -> Vec<&Value> { devices.iter().filter(|d| d["name"] == name).collect() };
+    // In 2026.6.1's shape: no field of storage version 3.
+    let fields: Vec<&String> = devices[0].as_object().unwrap().keys().collect();
+    assert_eq!(
+        fields,
+        [
+            "area_id",
+            "config_entries",
+            "config_entries_subentries",
+            "configuration_url",
+            "connections",
+            "created_at",
+            "disabled_by",
+            "entry_type",
+            "hw_version",
+            "id",
+            "identifiers",
+            "labels",
+            "manufacturer",
+            "model",
+            "model_id",
+            "modified_at",
+            "name",
+            "name_by_user",
+            "primary_config_entry",
+            "serial_number",
+            "sw_version",
+            "via_device_id"
+        ]
+    );
+    // The two parts of the shared device, one config entry each.
+    let desks = named("Desk");
+    assert_eq!(desks.len(), 2);
+    for desk in &desks {
+        assert!(parts.contains(&desk["id"].as_str().unwrap()), "{desk}");
+        assert_eq!(desk["config_entries"].as_array().unwrap().len(), 1);
+        assert_eq!(desk["primary_config_entry"], desk["config_entries"][0]);
+        assert_eq!(
+            (&desk["name_by_user"], &desk["area_id"]),
+            (&json!("Desk lamp"), &json!("study"))
+        );
+    }
+    assert_eq!(named("Forecast").len(), 2, "`met`'s devices");
+    assert_eq!(named("Porch")[0]["disabled_by"], "user");
+    assert_eq!(
+        named("Hall")[0]["via_device_id"],
+        named("Hue Bridge")[0]["id"]
+    );
+    let socket = named("Socket 1")[0];
+    let strip = named("Power strip")[0];
+    assert_eq!(socket["config_entries"], strip["config_entries"]);
+    assert_eq!(
+        socket["config_entries_subentries"],
+        strip["config_entries_subentries"]
+    );
+    assert_eq!(socket["via_device_id"], json!(null));
+
+    let entities = ws.call(2, "config/entity_registry/list");
+    let entity = |id: &str| -> &Value {
+        let all = entities.as_array().unwrap();
+        all.iter().find(|e| e["entity_id"] == id).unwrap()
+    };
+    let lifx_part = desks
+        .iter()
+        .find(|d| d["identifiers"] == json!([["lifx", "d0:73:d5:00:00:01"]]))
+        .unwrap();
+    assert_eq!(entity("light.desk")["device_id"], lifx_part["id"]);
+    assert_eq!(entity("light.desk")["name"], "Desk lamp Reading light");
+    assert_eq!(entity("light.desk")["unique_id"], "d0:73:d5:00:00:01");
+    assert_eq!(
+        entity("button.desk_restart")["unique_id"],
+        "d0:73:d5:00:00:01_restart"
+    );
+    assert_eq!(entity("switch.towel_warmer")["name"], "Towel rail");
+    assert_eq!(
+        entity("switch.power_strip_socket_1")["device_id"],
+        socket["id"]
+    );
+    assert!(entity("light.desk").get("compat_name").is_none());
+    assert_eq!(entity("sensor.porch_signal")["disabled_by"], "user");
+    assert_eq!(entity("sensor.hall_illuminance")["hidden_by"], "user");
+    assert_eq!(
+        entity("sensor.hall_temperature")["options"]["sensor"]["display_precision"],
+        1
+    );
+    drop(ws);
+
+    let _ = Command::new("kill")
+        .args(["-TERM", &server.id().to_string()])
+        .status();
+    server.wait().unwrap();
+    // The fields hars keeps on a row without using them are still there.
+    let devices_after =
+        std::fs::read_to_string(dest.join(".storage/core.device_registry")).unwrap();
+    assert_eq!(devices_after, devices_before);
+    assert!(
+        devices_after.contains("\"composite_device_id\"")
+            && devices_after.contains("\"parent_device_id\"")
+    );
+    for d in [src, dest] {
+        let _ = std::fs::remove_dir_all(d);
+    }
+}
+
+/// What hars's integrations look for at run time is there in a converted
+/// 2026.11.2 directory: each finds its device by identifier and its
+/// entities by unique id, in the form its 2026.6.1 code makes them. (No
+/// bulb, bridge or cloud is contacted: these are the lookups alone.)
+#[tokio::test]
+async fn integrations_find_their_rows_in_a_converted_install() {
+    for swapped in [false, true] {
+        let src = temp(&format!("lookups-src-{swapped}"));
+        let dest = temp(&format!("lookups-dest-{swapped}"));
+        release("2026.11.2", &src, &[]);
+        if swapped {
+            // The other integration's part of the shared device first. It
+            // still holds a copy of `lifx`'s identifier.
+            edit_store(&src, "core.device_registry", |store| {
+                let rows = store["data"]["devices"].as_array_mut().unwrap();
+                let at: Vec<usize> = (0..rows.len())
+                    .filter(|&i| rows[i]["name"] == "Desk")
+                    .collect();
+                rows.swap(at[0], at[1]);
+            });
+        }
+        let out = hars(&dest, &["import", src.to_str().unwrap()]);
+        assert!(out.status.success(), "{out:?}");
+        let report = read_json(&dest.join("import-report.json"));
+        let moved = report["converted"][0]["changes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|c| c.as_str().unwrap().contains("is listed before another"));
+        assert_eq!(moved, swapped, "{report}");
+
+        let registries = ha_registry::Registries::load_strict(&dest).unwrap();
+        let entries = read_json(&dest.join(".storage/core.config_entries"));
+        let entry = |domain: &str, title: &str| -> Value {
+            let all = entries["data"]["entries"].as_array().unwrap();
+            let found = all
+                .iter()
+                .find(|e| e["domain"] == domain && e["title"] == title);
+            found.unwrap().clone()
+        };
+        let hass = ha_core::Hass::new();
+
+        // `lifx` (`crates/ha-integrations/src/lifx`): the entry's unique
+        // id is the serial the bulb answers with, written with colons;
+        // the device and the entities are found by it.
+        let lifx = entry("lifx", "Desk");
+        assert_eq!(
+            (&lifx["version"], &lifx["minor_version"]),
+            (&json!(1), &json!(1))
+        );
+        assert_eq!(lifx["unique_id"], "d0:73:d5:00:00:01");
+        assert_eq!(lifx["data"], json!({"host": "192.0.2.21"}));
+        let serial = "d0:73:d5:00:00:01";
+        let names = ha_integrations::naming::Names::new(&hass, &registries, "lifx");
+        let device = names.registry_device(serial).unwrap();
+        assert_eq!(device.config_entries, [lifx["entry_id"].as_str().unwrap()]);
+        assert_eq!(names.device_name(serial, "Desk"), "Desk lamp");
+        let (id, name) = names.entity("light", serial, serial, "Desk", None).unwrap();
+        assert_eq!(
+            (id.as_str(), name.as_str()),
+            ("light.desk", "Desk lamp Reading light")
+        );
+        let restart = format!("{serial}_restart");
+        let (id, name) = names
+            .entity("button", &restart, serial, "Desk", Some("Restart"))
+            .unwrap();
+        assert_eq!(
+            (id.as_str(), name.as_str()),
+            ("button.desk_restart", "Desk lamp Restart")
+        );
+
+        // `switchbot_cloud`: nothing in it changed.
+        let names = ha_integrations::naming::Names::new(&hass, &registries, "switchbot_cloud");
+        let (id, name) = names
+            .entity("switch", "AABBCC000001", "AABBCC000001", "Towel rail", None)
+            .unwrap();
+        assert_eq!(
+            (id.as_str(), name.as_str()),
+            ("switch.towel_warmer", "Towel rail")
+        );
+
+        // `met`: the place from the entry as version 1 has it, the entity
+        // by the unique id made from it, its device "Forecast" (hars
+        // shows "Forecast Cabin", as 2026.6.1 does).
+        let config = ha_core::config::CoreConfig::load(&dest).unwrap();
+        let cabin = entry("met", "Cabin");
+        assert_eq!(
+            (&cabin["version"], &cabin["minor_version"]),
+            (&json!(1), &json!(1))
+        );
+        assert_eq!(
+            cabin["data"],
+            json!({"elevation": 12, "latitude": 60.39, "longitude": 5.32, "name": "Cabin"})
+        );
+        let place =
+            ha_integrations::met::Location::new(cabin["data"].as_object().unwrap(), &config)
+                .unwrap();
+        assert_eq!(
+            (place.unique_id.as_str(), place.name.as_str()),
+            ("60.39-5.32", "Cabin")
+        );
+        assert_eq!(
+            (place.latitude, place.longitude, place.elevation),
+            (60.39, 5.32, 12.0)
+        );
+        let home = entry("met", "Home");
+        assert_eq!(home["data"], json!({"track_home": true}));
+        let place = ha_integrations::met::Location::new(home["data"].as_object().unwrap(), &config)
+            .unwrap();
+        assert_eq!(
+            (place.unique_id.as_str(), place.name.as_str()),
+            ("home", "Home")
+        );
+        for (unique_id, entity_id, name) in [
+            ("60.39-5.32", "weather.forecast_cabin", "Cabin"),
+            ("home", "weather.forecast_home", "Home"),
+        ] {
+            let row = registries
+                .entities
+                .iter()
+                .find(|e| e.platform == "met" && e.unique_id == Some(json!(unique_id)))
+                .unwrap();
+            assert_eq!(row.entity_id, entity_id);
+            assert_eq!(row.original_name.as_deref(), Some(name));
+            assert_eq!(registries.device_name_of(row), Some("Forecast"));
+        }
+
+        // `hue`: each identifier names one device, the `hue` entry's.
+        let hue = entry("hue", "Hue Bridge");
+        for id in [
+            "00000000-0000-4000-8000-000000000100",
+            "00000000-0000-4000-8000-000000000101",
+        ] {
+            let holders: Vec<_> = registries
+                .devices
+                .iter()
+                .filter(|d| d.identifiers.contains(&json!(["hue", id])))
+                .collect();
+            assert_eq!(holders.len(), 1, "{id}");
+            assert_eq!(
+                holders[0].config_entries,
+                [hue["entry_id"].as_str().unwrap()]
+            );
+        }
+
+        // `mobile_app`: a phone that registers again gets its device, not
+        // a new one.
+        let phone = entry("mobile_app", "Test Phone");
+        let before = registries.devices.len();
+        let registry = ha_registry::Registry::in_memory(&hass, registries.clone());
+        let device = registry.get_or_create_device(ha_registry::DeviceInfo {
+            config_entry_id: phone["entry_id"].as_str().unwrap().to_owned(),
+            identifiers: vec![json!(["mobile_app", "synthetic-phone"])],
+            ..Default::default()
+        });
+        assert_eq!(device.name.as_deref(), Some("Test Phone"));
+        assert_eq!(registry.snapshot().devices.len(), before);
+
+        // And hars's own writers give back the files as imported: nothing
+        // on a row is lost when hars next saves a registry.
+        let copy = temp(&format!("lookups-copy-{swapped}"));
+        registries.save_devices(&copy).unwrap();
+        registries.save_entities(&copy).unwrap();
+        for key in ["core.device_registry", "core.entity_registry"] {
+            assert_eq!(
+                std::fs::read(copy.join(".storage").join(key)).unwrap(),
+                std::fs::read(dest.join(".storage").join(key)).unwrap(),
+                "{key}"
+            );
+        }
+        for d in [src, dest, copy] {
+            let _ = std::fs::remove_dir_all(d);
+        }
+    }
+}
+
+/// What the fixtures don't hold, each on Home Assistant 2026.11.2's
+/// directory with one thing changed: the rules of 2026.11's own code for
+/// a last state, an entity still on a split device's old id, a name given
+/// after the update, and a setting 2026.6.1 has no place for.
+#[test]
+fn rows_the_fixtures_do_not_hold_are_converted_by_home_assistants_rules() {
+    let src = temp("corners-src");
+    let dest = temp("corners-dest");
+    let fixture = release("2026.11.2", &src, &[]);
+    let old_device = {
+        let devices = store_of(&fixture, "core.device_registry");
+        let all = devices["data"]["devices"].as_array().unwrap();
+        let part = all
+            .iter()
+            .find(|d| d["composite_device_id"].is_string())
+            .unwrap();
+        part["composite_device_id"].as_str().unwrap().to_owned()
+    };
+    let row = |entity_id: &str, registry_id: Value| {
+        json!({"state": {"entity_id": entity_id, "state": "on", "attributes": {}},
+               "extra_data": null, "last_seen": "2026-11-15T12:00:00+00:00",
+               "entity_registry_id": registry_id})
+    };
+    edit_store(&src, "core.restore_state", |store| {
+        let rows = store["data"].as_array_mut().unwrap();
+        // Stored for an entity with no registry row, under an id a
+        // registered entity has now: 2026.11 never gives it to that one.
+        rows.push(row("light.hall", json!(null)));
+        // Stored for a registry row that is gone, under such an id.
+        rows.push(row("light.hall", json!("gone")));
+        // The same, under an id nothing has: kept, for whoever takes it.
+        rows.push(row("light.attic", json!("gone too")));
+        // A second one for an entity id.
+        rows.push(row("scene.evening", json!(null)));
+    });
+    let old = old_device.clone();
+    edit_store(&src, "core.entity_registry", move |store| {
+        store["data"]["settings"]["entity_id_parts"] = json!(["area", "device", "entity"]);
+        for entity in store["data"]["entities"].as_array_mut().unwrap() {
+            match entity["entity_id"].as_str().unwrap() {
+                // Not moved to its part yet (Home Assistant moves it when
+                // it next loads the file).
+                "light.desk" => entity["device_id"] = json!(old),
+                // On the old id with no part of its own integration.
+                "sensor.towel_rail_battery" => entity["device_id"] = json!(old),
+                // Named by the user in 2026.11: stored without the
+                // device's name, shown with it.
+                "sensor.test_phone_battery_level" => entity["name"] = json!("Charge"),
+                // A name, and no device to put in front of it.
+                "automation.wait_then_off" => entity["name"] = json!("Later"),
+                _ => {}
+            }
+        }
+    });
+    let out = hars(&dest, &["import", src.to_str().unwrap()]);
+    assert!(out.status.success(), "{out:?}");
+    let report = read_json(&dest.join("import-report.json"));
+    let dropped: Vec<(&str, &str)> = report["dropped"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|d| (d["store"].as_str().unwrap(), d["what"].as_str().unwrap()))
+        .collect();
+    let link = format!("sensor.towel_rail_battery's link to the device {old_device}");
+    assert_eq!(
+        dropped,
+        [
+            (
+                "core.entity_registry",
+                "the setting for what a new entity's id is made of (`entity_id_parts`)"
+            ),
+            ("core.entity_registry", link.as_str()),
+            ("core.restore_state", "a last state stored for light.hall"),
+            ("core.restore_state", "a last state stored for light.hall"),
+            (
+                "core.restore_state",
+                "a last state stored for scene.evening"
+            ),
+        ]
+    );
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        stdout.contains("left out of core.restore_state: a last state stored for light.hall"),
+        "{stdout}"
+    );
+
+    let restore = read_json(&dest.join(".storage/core.restore_state"));
+    let mut ids: Vec<&str> = restore["data"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|row| {
+            assert!(row.get("entity_registry_id").is_none(), "{row}");
+            row["state"]["entity_id"].as_str().unwrap()
+        })
+        .collect();
+    ids.sort_unstable();
+    assert_eq!(
+        ids,
+        [
+            "light.attic",
+            "light.desk",
+            "person.person_2026_11_2",
+            "person.test_owner",
+            "scene.evening",
+            "switch.towel_warmer"
+        ]
+    );
+
+    let entities = read_json(&dest.join(".storage/core.entity_registry"));
+    let entity = |id: &str| -> &Value {
+        let all = entities["data"]["entities"].as_array().unwrap();
+        all.iter().find(|e| e["entity_id"] == id).unwrap()
+    };
+    let lifx_part = entity("button.desk_restart")["device_id"].clone();
+    assert!(lifx_part.is_string() && lifx_part != json!(old_device));
+    assert_eq!(entity("light.desk")["device_id"], lifx_part);
+    assert_eq!(entity("light.desk")["name"], "Desk lamp Reading light");
+    assert_eq!(
+        entity("sensor.towel_rail_battery")["device_id"],
+        json!(null)
+    );
+    assert_eq!(
+        entity("sensor.test_phone_battery_level")["name"],
+        "Test Phone Charge"
+    );
+    assert_eq!(entity("automation.wait_then_off")["name"], "Later");
     for d in [src, dest] {
         let _ = std::fs::remove_dir_all(d);
     }

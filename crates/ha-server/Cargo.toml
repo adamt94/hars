@@ -27,7 +27,7 @@ ha-recorder.workspace = true
 ha-registry.workspace = true
 mimalloc = "0.1.52"
 serde = { version = "1.0.229", features = ["derive"] }
-serde_json = "1.0.154"
+serde_json = { version = "1.0.154", features = ["raw_value"] }
 tokio = { version = "1.54.1", features = ["rt-multi-thread", "macros", "signal", "net"] }
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }

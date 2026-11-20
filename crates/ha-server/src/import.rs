@@ -6,24 +6,31 @@
 //! `jwt_key`s) arrive unchanged, and the browser and phone sessions logged in
 //! to HA keep working. Everything else is listed in `import-report.json`.
 //!
-//! Which releases: the rule starts from Home Assistant's own for a
-//! downgrade, and is stricter where `hars` could not keep the data. `hars`
-//! behaves like one pinned release ([`PINNED_HA`]) and imports a directory
-//! from 2026.6 or later as long as no store `hars` reads has a newer major
-//! storage version (`helpers/storage.py` raises
-//! `UnsupportedStorageVersionError`; for a store its bootstrap loads, HA
-//! then starts in recovery mode) and no integration `hars` runs has a
-//! config entry of a newer version (`ConfigEntry.async_migrate`:
-//! `migration_error`). Such a directory is
-//! refused whole, with the store and versions named. A newer *minor*
+//! Which releases: `hars` behaves like one pinned release ([`PINNED_HA`])
+//! and reads and writes only that release's storage formats. A store or a
+//! config entry that Home Assistant 2026.8 to 2026.11 writes in a newer
+//! form is first turned back into that form ([`convert`], in the staged
+//! copy; the rules go by storage version). After that the rule starts from
+//! Home Assistant's own for a downgrade, and is stricter where `hars` could
+//! not keep the data: a store `hars` reads with a newer major storage
+//! version (`helpers/storage.py` raises `UnsupportedStorageVersionError`;
+//! for a store its bootstrap loads, HA then starts in recovery mode), or a
+//! config entry of a newer version for an integration `hars` runs
+//! (`ConfigEntry.async_migrate`: `migration_error`), refuses the directory
+//! whole, with the store and versions named. A newer *minor*
 //! version is compatible by HA's rule and is read where `hars`'s own
 //! reader and writer make that safe ([`Minor`] says which stores); the
 //! rest are refused too. `tests/vectors/import/downgrade.json` is what
 //! 2026.6.1's base bootstrap (registries, config entries, restore state)
-//! did with each fixture; [`TESTED_HA`] lists the releases with one.
+//! did with each fixture, unconverted; [`TESTED_HA`] lists the releases
+//! with one.
 //!
 //! The source directory is only read. Give it a consistent copy, taken with
 //! HA stopped (or a backup), not a live directory HA is writing to.
+
+mod convert;
+
+pub use convert::{ConvertedEntry, ConvertedStore, Dropped, SplitDevice};
 
 use anyhow::{Context, bail};
 use ha_core::storage::Store;
@@ -32,7 +39,7 @@ use serde_json::{Map, Value};
 use std::path::{Path, PathBuf};
 
 /// Bumped whenever what the importer does changes.
-pub const IMPORTER_VERSION: u32 = 3;
+pub const IMPORTER_VERSION: u32 = 4;
 /// The Home Assistant release `hars` behaves like, whichever release the
 /// files come from (docs/ARCHITECTURE.md, "Home Assistant compatibility").
 pub const PINNED_HA: &str = "2026.6.1";
@@ -43,7 +50,14 @@ const OLDEST_HA: (u32, u32) = (2026, 6);
 /// each, `tests/vectors/import/` holds a config directory made by that
 /// release's own code (`scripts/vectors/import_releases.py`). This is the
 /// one place the list lives; the messages and the report read it.
-pub const TESTED_HA: &[(u32, u32)] = &[(2026, 6), (2026, 7)];
+pub const TESTED_HA: &[(u32, u32)] = &[
+    (2026, 6),
+    (2026, 7),
+    (2026, 8),
+    (2026, 9),
+    (2026, 10),
+    (2026, 11),
+];
 const REPORT_FILE: &str = "import-report.json";
 /// Where a commit keeps the destination's previous files until it's done.
 const BACKUP_DIR: &str = ".import-backup";
@@ -138,6 +152,17 @@ pub struct Report {
     /// 2026.6.1 would read them, and written back at `hars_writes`,
     /// without what 2026.6.1 doesn't know, the next time they change.
     pub newer_stores: Vec<NewerStore>,
+    /// Stores Home Assistant 2026.8 or later wrote in a newer form, which
+    /// were put back into the form `hars` reads and writes before they
+    /// were checked and copied.
+    pub converted: Vec<ConvertedStore>,
+    /// Config entries brought back to the version `hars` runs.
+    pub converted_entries: Vec<ConvertedEntry>,
+    /// What the older form has no place for, left out.
+    pub dropped: Vec<Dropped>,
+    /// Devices Home Assistant 2026.8 split by integration, with the files
+    /// that still use the old id.
+    pub split_devices: Vec<SplitDevice>,
     pub dry_run: bool,
     /// Stores copied (or that would be, in a dry run).
     pub imported: Vec<String>,
@@ -215,6 +240,10 @@ pub fn run(opts: &Options) -> anyhow::Result<Report> {
         ha_version,
         behaves_like: PINNED_HA,
         newer_stores: Vec::new(),
+        converted: Vec::new(),
+        converted_entries: Vec::new(),
+        dropped: Vec::new(),
+        split_devices: Vec::new(),
         dry_run: opts.dry_run,
         imported: Vec::new(),
         replaced: Vec::new(),
@@ -277,8 +306,15 @@ pub fn run(opts: &Options) -> anyhow::Result<Report> {
         Store::new(&staging.root, key.clone(), 1, 1, private).save_raw(&bytes)?;
     }
 
-    // 1a. Before anything is loaded: a store, or a config entry, from a
-    //     newer Home Assistant than hars can read refuses the whole import.
+    // 1a. Before anything is loaded: what Home Assistant 2026.8 to 2026.11
+    //     store in a newer form goes back to 2026.6.1's, in the staged
+    //     copy. Then a store, or a config entry, still newer than hars can
+    //     read refuses the whole import.
+    let converted = convert::run(&staging.root, &report.ha_version)?;
+    report.converted = converted.stores;
+    report.converted_entries = converted.entries;
+    report.dropped = converted.dropped;
+    report.split_devices = converted.split_devices;
     report.newer_stores = check_store_versions(&staging, &report.ha_version)?;
     let entries = load_entries(&staging.root)?;
     check_entry_versions(&entries, &report.ha_version)?;
@@ -303,6 +339,26 @@ pub fn run(opts: &Options) -> anyhow::Result<Report> {
         if rel.ends_with("secrets.yaml") {
             use std::os::unix::fs::PermissionsExt;
             std::fs::set_permissions(&to, std::fs::Permissions::from_mode(0o600))?;
+        }
+    }
+
+    // 1c. Where an id that names no device any more is still used.
+    for split in &mut report.split_devices {
+        let mut places: Vec<(String, PathBuf)> = report
+            .yaml
+            .iter()
+            .map(|rel| (rel.clone(), staging.root.join(rel)))
+            .collect();
+        for key in staging.keys()? {
+            if ha_api::Lovelace::is_store(&key) {
+                let path = staging.root.join(".storage").join(&key);
+                places.push((format!(".storage/{key}"), path));
+            }
+        }
+        for (name, path) in places {
+            if std::fs::read_to_string(path).is_ok_and(|text| text.contains(&split.old_id)) {
+                split.used_in.push(name);
+            }
         }
     }
 
@@ -527,10 +583,10 @@ fn newest_tested() -> (u32, u32) {
     *TESTED_HA.last().expect("a tested release")
 }
 
-/// `2026.6 and 2026.7`.
+/// `2026.6 to 2026.11`.
 fn importable() -> String {
-    let names: Vec<String> = TESTED_HA.iter().map(|&l| line_name(l)).collect();
-    names.join(" and ")
+    let first = *TESTED_HA.first().expect("a tested release");
+    format!("{} to {}", line_name(first), line_name(newest_tested()))
 }
 
 /// Every staged store's storage version against the one `hars` reads. A
@@ -564,17 +620,7 @@ fn check_store_versions(staging: &Staging, ha_version: &str) -> anyhow::Result<V
         }
         if found.1 < reads.1 {
             if minor == Minor::Exact {
-                bail!(
-                    "{key} is storage version {}.{}, older than the {}.{} hars reads and \
-                     writes: Home Assistant brings it up to date when it starts. Start \
-                     Home Assistant {} on this config directory once, then copy it again. \
-                     Nothing was imported",
-                    found.0,
-                    found.1,
-                    reads.0,
-                    reads.1,
-                    importable().replace(" and ", " or ")
-                );
+                bail!("{}", too_old(&key, found, reads));
             }
             continue;
         }
@@ -594,17 +640,36 @@ fn check_store_versions(staging: &Staging, ha_version: &str) -> anyhow::Result<V
 fn too_new(key: &str, found: (u32, u32), reads: (u32, u32), ha_version: &str) -> String {
     let mut text = format!(
         "{key} is storage version {}.{}, in a config directory of Home Assistant \
-         {ha_version}; hars reads version {}.{}, as Home Assistant {PINNED_HA} does. ",
+         {ha_version}; hars reads version {}.{}, as Home Assistant {PINNED_HA} does",
         found.0, found.1, reads.0, reads.1
     );
-    if key == ha_registry::DEVICE_KEY && found.0 >= 3 {
+    if key == ha_registry::DEVICE_KEY {
         text.push_str(
-            "Home Assistant 2026.8 and later keep each device under one config entry \
-             (storage version 3), which hars can't read yet. ",
+            ", and converts versions 3.2 and 3.4 to it (Home Assistant 2026.8 to 2026.11)",
+        );
+    } else if key == ha_registry::ENTITY_KEY {
+        text.push_str(
+            ", and converts versions 1.23 and 1.24 to it (Home Assistant 2026.8 to 2026.11)",
         );
     }
+    text.push_str(". ");
     text.push_str(&cannot_import());
     text
+}
+
+/// Why a registry or the config entries at an older minor version stop the
+/// import ([`Minor::Exact`]).
+fn too_old(key: &str, found: (u32, u32), reads: (u32, u32)) -> String {
+    format!(
+        "{key} is storage version {}.{}, older than the {}.{} hars reads and writes: Home \
+         Assistant brings it up to date when it starts. Start Home Assistant {} on this \
+         config directory once, then copy it again. Nothing was imported",
+        found.0,
+        found.1,
+        reads.0,
+        reads.1,
+        importable()
+    )
 }
 
 /// What to do about a directory from too new a release.
@@ -618,20 +683,24 @@ fn cannot_import() -> String {
 }
 
 /// `ConfigEntry.async_migrate`: an entry of an integration `hars` runs,
-/// written by a newer version of its config flow (2026.10 migrates `lifx`
-/// and 2026.11 `met` to version 2), can't be set up. A disabled or ignored
-/// one is refused as well, which is stricter than HA (it only migrates an
-/// entry it sets up): enabling it later would otherwise run it.
+/// written by a newer version of its config flow, can't be set up. The
+/// ones with a rule (`lifx` and `met` at 2.1, from 2026.10 and 2026.11)
+/// are back at version 1 by now ([`convert`]); any other is refused. A
+/// disabled or ignored one is refused as well, which is stricter than HA
+/// (it only migrates an entry it sets up): enabling it later would
+/// otherwise run it.
 fn check_entry_versions(entries: &[Map<String, Value>], ha_version: &str) -> anyhow::Result<()> {
     for e in entries {
         let domain = e.get("domain").and_then(Value::as_str).unwrap_or_default();
         if runs(domain) && ha_integrations::entry_too_new(e) {
             bail!(
-                "the {domain} integration's config entry {:?} is version {}, in a config \
+                "the {domain} integration's config entry {:?} is version {}.{}, in a config \
                  directory of Home Assistant {ha_version}; hars runs version {} of it, as \
-                 Home Assistant {PINNED_HA} does. {}",
+                 Home Assistant {PINNED_HA} does, and has no rule to bring this one back to \
+                 it. {}",
                 e.get("title").and_then(Value::as_str).unwrap_or_default(),
                 e.get("version").cloned().unwrap_or_default(),
+                e.get("minor_version").and_then(Value::as_u64).unwrap_or(1),
                 ha_integrations::ENTRY_VERSION,
                 cannot_import()
             );
@@ -997,8 +1066,9 @@ pub fn summary(report: &Report, dest: &Path) -> String {
     // What someone coming from a newer release should expect.
     if release_line(&report.ha_version).is_some_and(|l| Some(l) != release_line(PINNED_HA)) {
         out.push_str(&format!(
-            "  hars behaves like Home Assistant {PINNED_HA} and serves its frontend: \
-             what Home Assistant added after it is not there\n"
+            "  hars behaves like Home Assistant {PINNED_HA} and shows the {} app: \
+             what Home Assistant added after that is not there\n",
+            line_name(release_line(PINNED_HA).expect("the pin is a release"))
         ));
     }
     if !report.ha_version_tested {
@@ -1015,6 +1085,50 @@ pub fn summary(report: &Report, dest: &Path) -> String {
              {PINNED_HA}, drops what that version doesn't have when it next changes the store\n",
             s.key, s.version, s.hars_writes
         ));
+    }
+    // What was put back into the 2026.6.1 form, one change a line.
+    for c in &report.converted {
+        if c.from == c.to {
+            out.push_str(&format!("  converted {}:\n", c.key));
+        } else {
+            out.push_str(&format!(
+                "  converted {} from storage version {} to {}:\n",
+                c.key, c.from, c.to
+            ));
+        }
+        for change in &c.changes {
+            out.push_str(&format!("    {change}\n"));
+        }
+    }
+    for e in &report.converted_entries {
+        out.push_str(&format!(
+            "  converted the {} entry {:?} from version {} to {}\n",
+            e.domain, e.title, e.from, e.to
+        ));
+        for change in &e.changes {
+            out.push_str(&format!("    {change}\n"));
+        }
+    }
+    for d in &report.dropped {
+        out.push_str(&format!(
+            "  left out of {}: {} ({})\n",
+            d.store, d.what, d.reason
+        ));
+    }
+    for s in &report.split_devices {
+        for file in &s.used_in {
+            out.push_str(&format!(
+                "  {file} still uses the id {} of a device that Home Assistant 2026.8 \
+                 replaced with {} ({}): hars finds no device by it; use the new ids {}\n",
+                s.old_id,
+                match s.new_ids.len() {
+                    2 => "two".to_owned(),
+                    n => n.to_string(),
+                },
+                s.name.as_deref().unwrap_or("unnamed"),
+                s.new_ids.join(", ")
+            ));
+        }
     }
     if !report.replaced.is_empty() {
         out.push_str(&format!("  replaced: {}\n", report.replaced.join(", ")));

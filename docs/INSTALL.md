@@ -42,7 +42,7 @@ macOS, `$env:HARS_PORT = '8124'; irm … | iex` in PowerShell.
 |---|---|
 | `HARS_DIR` | where hars keeps its folder (default: `hars` in your home folder) |
 | `HARS_PORT` | the web port (default: 8123, or the next free one up to 8133) |
-| `HARS_IMPORT` | a copy of a Home Assistant 2026.6 or 2026.7 config folder ([which releases](#which-home-assistant-releases)) to bring over before hars first starts (a new install only; otherwise [import by hand](#importing-by-hand)) |
+| `HARS_IMPORT` | a copy of a Home Assistant 2026.6 to 2026.11 config folder ([which releases](#which-home-assistant-releases)) to bring over before hars first starts (a new install only; otherwise [import by hand](#importing-by-hand)) |
 | `HARS_YES=1` | answer yes to the questions (installing Docker), for unattended installs |
 | `HARS_IMAGE` | another image, such as one you built (`docker build -t hars .`) |
 
@@ -180,34 +180,27 @@ The file `.HA_VERSION` in the config folder says which release wrote it.
 
 | Your Home Assistant | The import |
 |---|---|
-| 2026.6.x or 2026.7.x | works |
-| older than 2026.6 | refused. Update Home Assistant to 2026.7 (not later: `ha core update --version 2026.7.4`, or the `2026.7.4` image tag), let it start once, then copy the folder again |
-| 2026.8 or newer | refused, with the reason, because its device list is in a newer format. None of your files is changed |
+| 2026.6.x or 2026.7.x | works. hars copies the files as they are |
+| 2026.8.x to 2026.11.x | works. hars first puts some files back into the 2026.6 form ([below](#coming-from-20268-to-202611)) |
+| older than 2026.6 | refused. Update Home Assistant to a release from 2026.6 to 2026.11 (not later: `ha core update --version 2026.11.2`, or the `2026.11.2` image tag), let it start once, then copy the folder again |
+| newer than 2026.11 | not tested. hars imports the folder if every file is in a format it reads or converts, and says the release is untested. Otherwise it refuses, names the file, and changes none of your files |
 
-**From 2026.8 on, hars can't import yet.** Home Assistant 2026.8 rewrote
-its device list (`core.device_registry`, storage version 3) so that every
-device belongs to one integration, and split the devices that two
-integrations shared. 2026.10 and 2026.11 then changed how the Hue, LIFX and
-weather (`met`) integrations and entity names are stored. hars reads the
-2026.6 formats, as Home Assistant 2026.6 does, and Home Assistant itself
-can't go back either: it refuses to start on these files. The import says
-which file stopped it, for example:
+hars behaves like Home Assistant 2026.6.1 and shows the 2026.6 app,
+whichever release you come from. The import says so, and
+`import-report.json` records the release (`ha_version`), whether hars is
+tested with it (`ha_version_tested`) and the release hars behaves like
+(`behaves_like`).
 
-```text
-Error: core.device_registry is storage version 3.4, in a config directory of Home Assistant 2026.11.2; hars reads version 1.12, as Home Assistant 2026.6.1 does. ...
-```
+The import decides file by file: it checks each file's own storage version,
+not only `.HA_VERSION`. It never writes to the folder you import from. It
+converts and checks a copy first, and it changes your hars folder only when
+every file has passed.
 
-What you can do today: import a copy of the config folder, or a backup,
-made while Home Assistant was on 2026.7 or older. Everything set up since
-then is not in it. Reading the newer formats is on the
-[roadmap](ROADMAP.md).
+#### Coming from 2026.7
 
-**Coming from 2026.7,** hars still behaves like Home Assistant 2026.6.1 and
-serves the 2026.6 frontend (the import says so). Expect:
-
-- The UI is 2026.6's: pages and cards the frontend gained in 2026.7 aren't
-  there, and a dashboard that uses a card added in 2026.7 shows an error in
-  that card's place.
+- The UI is 2026.6's: pages and cards the frontend gained since aren't
+  there, and a dashboard that uses a newer card shows an error in that
+  card's place.
 - An automation that uses a trigger or condition 2026.7 made generally
   available (`light.turned_on`, `climate.started_heating`, ...; a Labs
   preview in 2026.6) is `unavailable`. `import-report.json` lists each one
@@ -219,22 +212,85 @@ serves the 2026.6 frontend (the import says so). Expect:
   2026.7) are kept in the imported file until hars next changes it, then
   dropped, as Home Assistant 2026.6 would drop them. `newer_stores` in the
   report names such files.
-- Going back to Home Assistant works: hars keeps Home Assistant's file
-  formats, at the 2026.6 versions, and a newer Home Assistant migrates them
-  again when it starts.
 
-`import-report.json` records the release (`ha_version`), whether hars is
-tested with it (`ha_version_tested`) and the release hars behaves like
-(`behaves_like`).
+#### Coming from 2026.8 to 2026.11
 
-hars is tested with 2026.6 and 2026.7. The import decides file by file: it
-checks each file's own storage version, not only `.HA_VERSION`, so what
-stops a 2026.8 or newer folder is the format of its device list, not the
-number.
-It also refuses a folder whose device, entity or area list or integration
-settings are at an *older* storage version than 2026.6 writes: start Home
-Assistant 2026.6 or 2026.7 on the folder once, which brings them up to
-date, and copy it again.
+Everything above applies, and these releases store some things in a newer
+format. hars reads and writes the 2026.6 formats only, so the import
+converts these files. The terminal and `import-report.json` (`converted`,
+`converted_entries`, `dropped`, `split_devices`) say what was converted in
+your folder.
+
+| Since | What changed in Home Assistant | What the import does |
+|---|---|---|
+| 2026.8 | The device list (`core.device_registry`, storage version 3): every device belongs to one integration. A device that two integrations shared became two devices with new ids | Writes the list in the 2026.6 format. The two devices stay two, with the new ids, because your entities already point at them |
+| 2026.8 | The entity list (`core.entity_registry` 1.23) has a setting for how new entity ids are made | Leaves the setting out. If you changed it, the report lists it under `dropped`. hars makes entity ids as 2026.6 does |
+| 2026.9 | Child devices (device list 3.4): a part of a device, such as one socket of a power strip, kept in its own list without a maker or model | Lists each as an ordinary device again. The maker and model are not in your files to bring back. The link to its parent is kept in the file but not shown |
+| 2026.10 | LIFX settings (entry version 2): the bulb's serial is written without colons, in the settings, the device and the entity ids | Writes the serial with colons again, as hars's LIFX code expects it |
+| 2026.10 | Hue settings (entry 1.2): Zigbee addresses moved from one kind of device connection to another | Nothing. hars and Home Assistant 2026.6 both run a 1.2 entry, and hars does not use those connections |
+| 2026.11 | Entity names (`core.entity_registry` 1.24): a name you gave is stored without the device's name, which Home Assistant adds when it shows the name | Stores each name in full again. Every entity keeps the friendly name 2026.11 gave it |
+| 2026.11 | Weather settings (`met`, entry version 2): the place is stored another way, and the forecast's name moved from the entity to the device | Stores the place the 2026.6 way and names the forecast after the entry's title |
+| 2026.11 | Last states (`core.restore_state`) are kept by an entity's registry id | Keeps them by entity id again, under the id each entity has now |
+
+What you will notice:
+
+- **A device that two integrations shared is two devices.** Home Assistant
+  2026.8 did this, and hars keeps it. Home Assistant still accepts the old
+  device id in an action and takes it to mean both devices. hars does not:
+  the old id reaches no device. The import names each YAML file and
+  dashboard that still uses an old id, with the two new ids to use
+  instead. hars does not edit your YAML.
+- **A weather forecast is named as in 2026.6.** In 2026.11 the forecast for
+  a place you named "Cabin" shows as "Cabin". In hars it shows as
+  "Forecast Cabin", as it did before 2026.11. Its entity id is unchanged.
+- **A name can differ in one capital letter.** 2026.11 capitalises what is
+  left of a name after it takes the device's name off the front. "Desk lamp
+  reading light" on the device "Desk lamp" became "Desk lamp Reading
+  light" in 2026.11, and stays so.
+- **The `sun` trigger's `offset_type` (2026.8) and `period` (2026.9), and
+  dashboard cards added since 2026.6, are not in hars.** hars has no `sun`
+  trigger yet, so an automation that uses one is `unavailable` and listed
+  in the report whichever release wrote it. A newer card shows an error in
+  its place.
+- **The LIFX entry from before one entry per bulb is gone.** 2026.10
+  removed it from your settings. It ran nothing.
+
+What stops an import from these releases, with the reason on the terminal:
+
+- A file in a format newer than 2026.11's. For example:
+
+  ```text
+  Error: core.device_registry is storage version 3.5, in a config directory of Home Assistant 2026.12.0; hars reads version 1.12, as Home Assistant 2026.6.1 does, and converts versions 3.2 and 3.4 to it (Home Assistant 2026.8 to 2026.11). ...
+  ```
+
+- A child device that is disabled only because its parent device is
+  disabled. 2026.6 has no such state. Enable the parent in Home Assistant
+  and copy the folder again.
+- Settings of the LIFX or weather integration that don't have the shape
+  2026.10 and 2026.11 write.
+
+The conversion follows Home Assistant's own code: each rule is the reverse
+of a migration in the release that made the change, or what that release
+answers to code written for the old format. It is tested by a round trip:
+one 2026.6.1 install, updated by each release's own code, must come back
+through the import as it was, apart from the differences listed above. The
+install in that test is small and made up. No real 2026.8 to 2026.11
+install has been imported yet, so read the report and look your devices
+over after an import. If something is wrong, your Home Assistant folder is
+as you left it.
+
+#### Going back to Home Assistant
+
+Start Home Assistant on its own folder again. The import did not change
+it. Starting a newer Home Assistant on the folder hars has been running on
+is not tested when the import converted files.
+
+#### Older files
+
+The import also refuses a folder whose device, entity or area list or
+integration settings are at an *older* storage version than 2026.6 writes:
+start Home Assistant 2026.6 to 2026.11 on the folder once, which brings
+them up to date, and copy it again.
 
 ## Troubleshooting
 

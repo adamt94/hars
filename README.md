@@ -133,7 +133,7 @@ settings. Home Assistant in Docker Desktop has the same limit.
 
 | Area | Works today | Not yet |
 |---|---|---|
-| Setup | Home Assistant's onboarding screens in the browser, logins, and import of a Home Assistant 2026.6 or 2026.7 install | Import from Home Assistant 2026.8 or newer. Adding an integration from the UI |
+| Setup | Home Assistant's onboarding screens in the browser, logins, and import of a Home Assistant 2026.6 to 2026.11 install | Adding an integration from the UI |
 | Web UI | The official frontend: dashboards, device controls, the map, history, the logbook, and the automation list and editor in **Settings** | Translated names from integrations. The UI itself is translated, but entity and service names are in English |
 | Automations | YAML automations and ones you make in **Settings**. State, numeric-state, time, and template triggers. Templates in conditions, variables, and service calls. Reload without a restart | Traces, the `delay` and `wait_template` actions, scripts, and blueprints |
 | Templates | States, time, maths, and type casts | Areas, devices, labels, regex, and JSON functions. Live updates of a rendered template |
@@ -164,22 +164,24 @@ list, the limits of each integration, and how to ask for a new one.
 
 ## Move from Home Assistant
 
-hars can take over a Home Assistant **2026.6 or 2026.7** install. It brings
+hars can take over a Home Assistant **2026.6 to 2026.11** install. It brings
 your logins, devices, areas, dashboards, integration settings, location, and
 YAML automations. History starts fresh.
 
-> [!IMPORTANT]
-> **Home Assistant 2026.8 and newer can't be imported yet.** 2026.8 changed
-> how Home Assistant stores devices, and later releases changed more. The
-> import checks first and refuses, with the reason, before it changes any
-> of your files. Until hars reads the new formats, you can import a copy or
-> backup of your config folder from when you ran 2026.7 or older.
-> [Which releases, and why](docs/INSTALL.md#which-home-assistant-releases).
-
 After an import hars behaves like Home Assistant 2026.6.1 and shows the
-2026.6 UI, whichever release you came from. From 2026.7 that means a few
-newer things are missing, such as the triggers 2026.7 added to the
-automation editor. The import lists what it could not bring.
+2026.6 UI, whichever release you came from. Newer things are missing, such
+as the triggers 2026.7 added to the automation editor and dashboard cards
+added since. The import lists what it could not bring.
+
+> [!NOTE]
+> **Coming from Home Assistant 2026.8 to 2026.11?** Those releases store
+> devices, entity names, and the LIFX and weather settings in newer formats.
+> The import puts them back into the 2026.6 form that hars reads and
+> writes, and tells you what it converted. Your Home Assistant folder is
+> not changed. A device that two integrations shared stays the two devices
+> that 2026.8 made of it, so an automation that still uses the old device
+> id needs the new ones. This is tested on a made-up install, not yet on a
+> real one. [What to expect](docs/INSTALL.md#coming-from-20268-to-202611).
 
 > [!WARNING]
 > Don't let Home Assistant and hars run the same home at the same time. Both
