@@ -1316,28 +1316,39 @@ async fn an_enabled_account_takes_over_a_disabled_ones_devices() {
     assert_eq!(hass.states().all().len(), 3);
 }
 
-/// Start-up's placeholder pass and a removal at the same time: the pass
+/// Start-up's placeholder pass and removals at the same time: the pass
 /// is writing `unavailable` for every registered entity nothing provides
-/// when a disabled entry is deleted. Whichever comes first, no state is
-/// left for a row that is gone.
+/// (some rows at a time) when disabled entries are deleted. Whichever
+/// comes first, no state is left for a row that is gone.
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn a_delete_during_the_placeholder_pass_leaves_no_state() {
+    /// The entries that go. Every sixteenth row is one of theirs, in turn,
+    /// so wherever the pass is when a removal comes, a row of that entry
+    /// is among those it has read and not yet written.
+    const GOING: usize = 4;
+    const ROWS: usize = 2048;
+    // Placeholders that take a while to write (the options are copied into
+    // each), so that a removal comes while some are being written.
+    let options: Vec<String> = (0..400).map(|i| format!("option {i}")).collect();
+    let options = ha_registry::RawJson::new(&json!({"options": options}));
     for _ in 0..5 {
         let hass = Hass::new();
-        // Many rows of an entry that stays, then one of the entry that
-        // goes: the pass is still busy with the first when the removal
-        // has come and gone.
-        let row = |i: usize, entry: &str| {
-            Arc::new(ha_registry::Entity {
-                entity_id: format!("sensor.row_{i}"),
-                platform: "switchbot_cloud".into(),
-                unique_id: Some(json!(format!("row-{i}"))),
-                config_entry_id: Some(entry.to_owned()),
-                ..Default::default()
-            })
+        let owner = |i: usize| match i % 16 {
+            15 => format!("goes_{}", (i / 16) % GOING),
+            _ => "stays".to_owned(),
         };
-        let mut entities: Vec<_> = (0..4000).map(|i| row(i, "stays")).collect();
-        entities.push(row(4000, "goes"));
+        let entities: Vec<_> = (0..ROWS)
+            .map(|i| {
+                Arc::new(ha_registry::Entity {
+                    entity_id: format!("select.row_{i}"),
+                    platform: "switchbot_cloud".into(),
+                    unique_id: Some(json!(format!("row-{i}"))),
+                    config_entry_id: Some(owner(i)),
+                    capabilities: Some(options.clone()),
+                    ..Default::default()
+                })
+            })
+            .collect();
         let registry = Registry::in_memory(
             &hass,
             ha_registry::Registries {
@@ -1352,7 +1363,15 @@ async fn a_delete_during_the_placeholder_pass_leaves_no_state() {
             .unwrap()
             .clone()
         };
-        let entries = ConfigEntries::in_memory(&hass, vec![entry("stays"), entry("goes")]);
+        let going = (0..GOING).map(|j| format!("goes_{j}"));
+        let entries = ConfigEntries::in_memory(
+            &hass,
+            going
+                .clone()
+                .map(|id| entry(&id))
+                .chain([entry("stays")])
+                .collect(),
+        );
         let flows = Manager::new(
             &hass,
             entries,
@@ -1367,17 +1386,18 @@ async fn a_delete_during_the_placeholder_pass_leaves_no_state() {
             tokio::task::spawn_blocking(move || registry.write_unavailable_states(&hass))
         };
         // The pass has begun (it has read the rows and written some).
-        while hass.states().all().is_empty() {
+        while hass.states().is_empty() {
             std::hint::spin_loop();
         }
-        assert_eq!(flows.remove_entry("goes").await, Some(false));
+        for id in going {
+            assert_eq!(flows.remove_entry(&id).await, Some(false));
+        }
         pass.await.unwrap();
-        let gone = EntityId::parse("sensor.row_4000").unwrap();
-        assert!(
-            hass.states().get(&gone).is_none(),
+        assert_eq!(
+            hass.states().len(),
+            ROWS - ROWS / 16,
             "a placeholder was written for a row that was removed"
         );
-        assert_eq!(hass.states().all().len(), 4000);
     }
 }
 

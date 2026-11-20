@@ -999,3 +999,75 @@ async fn areas_are_created_once_by_name() {
     assert_eq!(file["data"]["areas"][1]["id"], "living_room_2");
     let _ = std::fs::remove_dir_all(dir);
 }
+
+/// Start-up's placeholder pass takes the writer's lock for a batch of rows
+/// at a time: a change to the registry made while it runs gets its turn
+/// after the batch in hand, long before the last row, and a row that is
+/// gone by the time the pass reaches it gets no placeholder.
+#[test]
+fn a_change_waits_for_a_batch_of_the_placeholder_pass() {
+    const ROWS: usize = 20_000;
+    let last = format!("sensor.row_{}", ROWS - 1);
+    // A thread that is given no time between seeing the pass begin and
+    // asking for its change proves nothing either way: such a run is tried
+    // again. With the lock held for the whole pass, every run is one.
+    for _ in 0..10 {
+        let hass = Hass::new();
+        let entities = (0..ROWS)
+            .map(|i| {
+                Arc::new(Entity {
+                    entity_id: format!("sensor.row_{i}"),
+                    ..Default::default()
+                })
+            })
+            .collect();
+        let reg = Registry::in_memory(
+            &hass,
+            Registries {
+                entities,
+                ..Default::default()
+            },
+        );
+        let written = std::thread::scope(|s| {
+            s.spawn(|| reg.write_unavailable_states(&hass));
+            // The pass has begun: it holds the lock for its first batch.
+            while hass.states().is_empty() {
+                std::hint::spin_loop();
+            }
+            reg.remove_entity(&last);
+            hass.states().len()
+        });
+        if written == ROWS {
+            continue;
+        }
+        assert!(
+            hass.states()
+                .get(&ha_core::EntityId::parse(&last).unwrap())
+                .is_none(),
+            "a placeholder was written for a row that was gone"
+        );
+        assert_eq!(hass.states().len(), ROWS - 1);
+        return;
+    }
+    panic!("the change waited for the whole pass each time");
+}
+
+/// Whether the stores can be written is told from what was loaded, so
+/// asking is no file access (start-up asks on an async thread): the answer
+/// is the same with the files gone.
+#[test]
+fn what_cant_be_written_is_known_without_the_disk() {
+    let (dir, loaded) = before();
+    assert_eq!(loaded.unwritable(), None);
+    assert_eq!(Registries::default().unwritable(), None);
+    // The device file as an older Home Assistant left it.
+    let file = dir.join(".storage").join(DEVICE_KEY);
+    let text = std::fs::read_to_string(&file).unwrap();
+    let current = format!("\"minor_version\": {}", loaded.device_file.minor);
+    assert!(text.contains(&current));
+    let older = format!("\"minor_version\": {}", loaded.device_file.minor - 1);
+    std::fs::write(&file, text.replace(&current, &older)).unwrap();
+    let loaded = Registries::load_strict(&dir).unwrap();
+    std::fs::remove_dir_all(&dir).unwrap();
+    assert_eq!(loaded.unwritable(), Some(DEVICE_KEY));
+}

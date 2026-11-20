@@ -345,6 +345,22 @@ pub struct Entity {
 }
 
 impl Entity {
+    /// `RegistryEntry.write_unavailable_state` at start: an enabled entity
+    /// with no state gets `unavailable`, marked `restored`.
+    pub(crate) fn write_unavailable_state(&self, hass: &ha_core::Hass) {
+        if self.disabled_by.is_some() {
+            return;
+        }
+        let Ok(id) = ha_core::EntityId::parse(&self.entity_id) else {
+            return;
+        };
+        if hass.states().get(&id).is_some() {
+            return;
+        }
+        // Written only if still absent (an integration may write first).
+        hass.set_state_if_absent(id, "unavailable", self.unavailable_attributes());
+    }
+
     /// `RegistryEntry.as_partial_dict`: a row of
     /// `config/entity_registry/list`. `device_name` is the entity's
     /// device's `name_by_user or name`: an entity named the old way, with
@@ -817,13 +833,21 @@ impl Registries {
     /// changed then live in memory only, so nothing whose effect must
     /// outlast a restart (adding or removing a config entry) should be
     /// offered.
-    pub fn unwritable(&self, config_dir: &Path) -> Option<&'static str> {
+    ///
+    /// Told from what was loaded, with no look at the disk: a store that
+    /// had no file was loaded as the current version, and registries that
+    /// were never read from a file (minor version 0) have none to spare.
+    pub fn unwritable(&self) -> Option<&'static str> {
         [
             (ENTITY_KEY, self.entity_file.minor),
             (DEVICE_KEY, self.device_file.minor),
         ]
         .into_iter()
-        .find(|&(key, minor)| check_minor(&store(config_dir, key), minor).is_err())
+        .find(|&(key, minor)| {
+            STORES
+                .iter()
+                .any(|&(k, _, current)| k == key && minor != 0 && current != minor)
+        })
         .map(|(key, _)| key)
     }
 
@@ -1069,15 +1093,8 @@ impl Registries {
     /// no state yet gets `unavailable`, marked `restored`, with what the
     /// registry knows of it (`RegistryEntry.write_unavailable_state`).
     pub fn write_unavailable_states(&self, hass: &ha_core::Hass) {
-        for e in self.entities.iter().filter(|e| e.disabled_by.is_none()) {
-            let Ok(id) = ha_core::EntityId::parse(&e.entity_id) else {
-                continue;
-            };
-            if hass.states().get(&id).is_some() {
-                continue;
-            }
-            // Written only if still absent (an integration may write first).
-            hass.set_state_if_absent(id, "unavailable", e.unavailable_attributes());
+        for e in &self.entities {
+            e.write_unavailable_state(hass);
         }
     }
 

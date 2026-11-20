@@ -13,6 +13,7 @@ use ha_core::{Context, CoreState, Event, EventKind, Hass};
 use parking_lot::{Mutex, RwLock};
 use serde::Serialize;
 use serde_json::{Map, Value, json};
+use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
@@ -186,7 +187,7 @@ impl Registry {
 
     /// Saved to `config_dir/.storage` after changes, as HA does.
     pub fn new(hass: &Hass, config_dir: &Path, registries: Registries) -> Arc<Self> {
-        let read_only = registries.unwritable(config_dir);
+        let read_only = registries.unwritable();
         Arc::new_cyclic(|weak: &std::sync::Weak<Self>| {
             let save = |key: &'static str| {
                 let (weak, dir) = (weak.clone(), config_dir.to_owned());
@@ -223,13 +224,45 @@ impl Registry {
         self.read_only
     }
 
-    /// HA's `_write_unavailable_states` at start, for the rows as they are
-    /// now: no row can be removed between its being read and its
-    /// placeholder being written, so whoever removes rows afterwards (a
-    /// config entry's removal) finds every placeholder there is.
+    /// HA's `_write_unavailable_states` at start. No row can be removed
+    /// between being found to exist and its placeholder being written, so
+    /// whoever removes rows afterwards (a config entry's removal) finds
+    /// every placeholder there is. The rows are done a batch at a time
+    /// under the writer's lock, each checked against the registry as it is
+    /// then, so a change to the registry waits for one batch, not for the
+    /// whole pass.
     pub fn write_unavailable_states(&self, hass: &Hass) {
-        let _turn = self.writer.lock();
-        self.snapshot().write_unavailable_states(hass);
+        /// Rows per turn of the lock.
+        const BATCH: usize = 64;
+        let rows = self.snapshot();
+        // The registry as it was last found changed, and its rows by id.
+        let mut seen = rows.clone();
+        let mut by_id: HashMap<String, Arc<Entity>> = HashMap::new();
+        for batch in rows.entities.chunks(BATCH) {
+            let turn = self.writer.lock();
+            let now = self.snapshot();
+            if Arc::ptr_eq(&now, &rows) {
+                // Nothing has changed: every row of the batch is there.
+                batch.iter().for_each(|e| e.write_unavailable_state(hass));
+            } else {
+                if !Arc::ptr_eq(&now, &seen) {
+                    by_id = now
+                        .entities
+                        .iter()
+                        .map(|e| (e.entity_id.clone(), e.clone()))
+                        .collect();
+                    seen = now;
+                }
+                // Each row as it is now, if it is still there.
+                batch
+                    .iter()
+                    .filter_map(|e| by_id.get(&e.entity_id))
+                    .for_each(|e| e.write_unavailable_state(hass));
+            }
+            // Whoever waits to change the registry goes next, rather than
+            // this pass taking the lock again for its next batch.
+            parking_lot::MutexGuard::unlock_fair(turn);
+        }
     }
 
     /// How to look up a config entry (a device's primary entry; disables
