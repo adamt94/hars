@@ -1317,6 +1317,17 @@ fn what_hars_cannot_convert_is_refused() {
                 .into(),
         ),
         (
+            "met-flat",
+            |src| {
+                entry(src, "met", |e| {
+                    e["data"] = json!({"elevation": 12, "latitude": 60.39, "longitude": 5.32})
+                })
+            },
+            "the met integration's config entry \"Cabin\" is version 2.1 and its coordinates \
+             are not in `location`"
+                .into(),
+        ),
+        (
             "met-location",
             |src| entry(src, "met", |e| e["data"]["location"]["latitude"] = json!("north")),
             "the met integration's config entry \"Cabin\" is version 2.1 and its location is \
@@ -2891,11 +2902,41 @@ fn rows_the_fixtures_do_not_hold_are_converted_by_home_assistants_rules() {
         &strip_id[31..]
     ));
     assert!(!yaml.contains(&strip_id));
+    // A target with 2026.11's `exclude`.
+    yaml.push_str(
+        "- id: all-but\n  alias: All but the hall\n  triggers: [{trigger: time, at: '02:00:00'}]\n  \
+         actions:\n  - action: light.turn_off\n    target:\n      entity_id: all\n      \
+         exclude:\n        entity_id: light.hall\n",
+    );
     std::fs::write(src.join("automations.yaml"), yaml).unwrap();
+
+    // A release before 2026.10 keeps a label to the devices that have it,
+    // so there is nothing to say of the strip's label there.
+    std::fs::write(src.join(".HA_VERSION"), "2026.9.4").unwrap();
+    let out = hars(&dest, &["import", src.to_str().unwrap(), "--dry-run"]);
+    assert!(out.status.success(), "{out:?}");
+    assert!(
+        !String::from_utf8_lossy(&out.stdout).contains("the label(s)"),
+        "{out:?}"
+    );
+    std::fs::write(src.join(".HA_VERSION"), "2026.11.2").unwrap();
 
     let out = hars(&dest, &["import", src.to_str().unwrap()]);
     assert!(out.status.success(), "{out:?}");
     let report = read_json(&dest.join("import-report.json"));
+    let all_but = report["automations"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|a| a["alias"] == "All but the hall")
+        .unwrap();
+    assert!(
+        all_but["warning"]
+            .as_str()
+            .unwrap()
+            .contains("a target in it has `exclude`"),
+        "{all_but}"
+    );
     let dropped: Vec<(&str, &str)> = report["dropped"]
         .as_array()
         .unwrap()
@@ -3077,7 +3118,98 @@ fn a_destination_inside_the_source_is_refused() {
             );
         }
     }
-    let _ = std::fs::remove_dir_all(src);
+    // A destination outside, reached through the source: it is made where
+    // it ends up, and nothing on the way to it.
+    let outside = temp("outside-dest");
+    let through = src
+        .join("new")
+        .join("..")
+        .join("..")
+        .join(outside.file_name().unwrap());
+    let out = hars(&through, &["import", src.to_str().unwrap(), "--dry-run"]);
+    assert!(out.status.success(), "{out:?}");
+    assert!(!src.join("new").exists());
+    let out = hars(&through, &["import", src.to_str().unwrap()]);
+    assert!(out.status.success(), "{out:?}");
+    assert!(!src.join("new").exists() && outside.join("import-report.json").is_file());
+    for d in [src, outside] {
+        let _ = std::fs::remove_dir_all(d);
+    }
+}
+
+/// The names the importer keeps for itself are kept in any case: on a
+/// file system that doesn't tell `IMPORT-REPORT.JSON` from
+/// `import-report.json`, the report would replace the included file.
+#[test]
+fn a_reserved_name_in_another_case_is_refused() {
+    let src = temp("case-src");
+    let dest = temp("case-dest");
+    ha_config(&src);
+    std::fs::write(src.join("IMPORT-REPORT.JSON"), "{\"mine\": 1}\n").unwrap();
+    std::fs::write(
+        src.join("configuration.yaml"),
+        "x: !include IMPORT-REPORT.JSON\n",
+    )
+    .unwrap();
+    let out = hars(&dest, &["import", src.to_str().unwrap()]);
+    assert!(!out.status.success());
+    assert!(
+        String::from_utf8_lossy(&out.stderr).contains("is a path hars keeps for itself"),
+        "{out:?}"
+    );
+    assert!(!dest.join(".storage").exists());
+    for d in [src, dest] {
+        let _ = std::fs::remove_dir_all(d);
+    }
+}
+
+/// A secrets file that only needs its mode put right is replaced in the
+/// commit: where that can't be done, nothing else is changed either.
+#[cfg(unix)]
+#[test]
+fn a_secrets_file_that_cannot_be_replaced_rolls_the_import_back() {
+    use std::os::unix::fs::PermissionsExt;
+    let src = temp("locked-src");
+    let dest = temp("locked-dest");
+    ha_config(&src);
+    std::fs::create_dir_all(src.join("nested")).unwrap();
+    std::fs::write(src.join("nested/a.yaml"), "pw: !secret pw\n").unwrap();
+    std::fs::write(src.join("nested/secrets.yaml"), "pw: secret-value\n").unwrap();
+    std::fs::write(
+        src.join("configuration.yaml"),
+        "x: !include nested/a.yaml\n",
+    )
+    .unwrap();
+    // The destination has the same files, the secrets readable by all,
+    // in a directory nothing can be put into.
+    std::fs::create_dir_all(dest.join("nested")).unwrap();
+    for file in ["a.yaml", "secrets.yaml"] {
+        std::fs::copy(
+            src.join("nested").join(file),
+            dest.join("nested").join(file),
+        )
+        .unwrap();
+    }
+    let secrets = dest.join("nested/secrets.yaml");
+    let mode = |m| std::fs::Permissions::from_mode(m);
+    std::fs::set_permissions(&secrets, mode(0o644)).unwrap();
+    std::fs::set_permissions(dest.join("nested"), mode(0o555)).unwrap();
+    let out = hars(&dest, &["import", src.to_str().unwrap()]);
+    std::fs::set_permissions(dest.join("nested"), mode(0o755)).unwrap();
+    assert!(!out.status.success(), "{out:?}");
+    assert!(
+        String::from_utf8_lossy(&out.stderr).contains("rolled back; nothing changed"),
+        "{out:?}"
+    );
+    assert!(!dest.join(".storage/auth").exists() && !dest.join("configuration.yaml").exists());
+    assert!(!dest.join("import-report.json").exists());
+    assert_eq!(
+        std::fs::metadata(&secrets).unwrap().permissions().mode() & 0o777,
+        0o644
+    );
+    for d in [src, dest] {
+        let _ = std::fs::remove_dir_all(d);
+    }
 }
 
 /// A destination file that is a hard link to the source's is not changed

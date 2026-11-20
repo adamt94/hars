@@ -196,7 +196,7 @@ not only `.HA_VERSION`. It never writes to the folder you import from,
 and refuses to put hars's folder inside it. It converts and checks a copy
 first, and it replaces files in your hars folder only when every file has
 passed. The report is written last. If that fails, the files are already
-in place, and the import prints what the report would have said.
+in place, and the import prints its summary and the error.
 
 #### Coming from 2026.7
 
@@ -246,10 +246,13 @@ What you will notice:
   Home Assistant takes an action on a device to include its child devices.
   hars reaches only the device's own entities. The import names each
   automation, YAML file and dashboard that uses such a device by id, with
-  the child devices to add. It also names each such device that has a
-  label its child devices lack, because an action on the label reached
-  them too. The import finds an id by its text, so it misses one that a
-  template builds.
+  the child devices to add. Coming from 2026.10 or later, it also names
+  each such device that has a label its child devices lack, because from
+  2026.10 an action on the label reached them too. The import looks for
+  an id as text in your YAML and dashboards: it misses one that a
+  template builds, and can name the wrong file of two.
+- **A target with `exclude` (2026.11) fails.** The import marks the
+  automation with a warning. hars has no `exclude` in targets.
 - **A weather forecast has "Forecast" in front of its name again.** In
   2026.11 the forecast of an entry titled "Cabin" shows as "Cabin". In hars
   it shows as "Forecast Cabin", the way 2026.6 names forecasts. The name is
@@ -276,9 +279,11 @@ What stops an import from these releases, with the reason on the terminal:
   Error: core.device_registry is storage version 3.5, in a config directory of Home Assistant 2026.12.0; hars reads version 1.12, as Home Assistant 2026.6.1 does, and converts versions 3.2 and 3.4 to it (Home Assistant 2026.8 to 2026.11). ...
   ```
 
-  Other files follow Home Assistant's own rule, that a newer minor version
-  of a file can be read by an older release. hars imports those and lists
-  them in the report under `newer_stores`.
+  The area, floor, label and category lists and the people are refused at
+  a newer version too. The remaining files follow Home Assistant's own
+  rule, that a newer minor version of a file can be read by an older
+  release. hars imports those and lists them in the report under
+  `newer_stores`.
 
 - A child device that is disabled only because its parent device is
   disabled. 2026.6 has no such state. Enable the parent in Home Assistant

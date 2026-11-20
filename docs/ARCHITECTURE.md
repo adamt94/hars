@@ -430,8 +430,12 @@ entities (`helpers/target.py`). The report names the automations, YAML
 files and dashboards that use such an id (`split_devices`,
 `parent_devices`, an automation's `warning`). And 2026.8 finds a device
 by identifier *and config entry*, where hars finds the first row with the
-identifier: the conversion lists an integration's own row first, and
-refuses a registry where that can't settle it.
+identifier: the conversion lists an integration's own row first. It
+refuses a registry with two rows of the integration's own for one
+identifier, or two rows that each hold a copy of the other's. Other
+leftovers are not refused: a copy whose original is gone is found as the
+integration's device (and said in the report), and a removed device comes
+back for whoever registers its identifier, as in 2026.6.1.
 
 Unchanged from 2026.6.1 through 2026.11.2: `auth`,
 `auth_provider.homeassistant`, `onboarding`, `core.config`,

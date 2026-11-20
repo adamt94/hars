@@ -171,7 +171,8 @@ YAML automations. History starts fresh.
 After an import hars behaves like Home Assistant 2026.6.1 and shows the
 2026.6 UI, whichever release you came from. Newer things are missing, such
 as the triggers 2026.7 added to the automation editor and dashboard cards
-added since. The import lists what it could not bring.
+added since. The import lists what it finds that hars can't do yet. It
+can't find everything, so look your home over afterwards.
 
 > [!NOTE]
 > **Coming from Home Assistant 2026.8 to 2026.11?** Those releases store

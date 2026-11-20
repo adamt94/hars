@@ -1257,6 +1257,11 @@ fn convert_entries(data: &mut Map<String, Value>) -> anyhow::Result<Vec<Converte
             );
         } else {
             match fields.remove("location") {
+                // 2026.11's migration takes the two out of `data`; an entry
+                // that still has them there is not one it wrote.
+                None if fields.contains_key("latitude") || fields.contains_key("longitude") => {
+                    return Err(refuse("its coordinates are not in `location`"));
+                }
                 None => {}
                 // What 2026.11's location selector stores: the two, and a
                 // `radius` if the form gave one, which `met` doesn't use.

@@ -225,7 +225,9 @@ For each of the four converted fixtures it answers `"loads": true`, the
 entity registry `"as hars wrote it"`, and the device registry the same
 apart from the fields 2026.6.1 leaves out (`composite_device_id`,
 `composite_primary_config_entry`, `has_composite_identifiers`,
-`parent_device_id`, `split_at`).
+`parent_device_id`, `split_at`). The comparison is of the data, with
+`modified_at` and the order of every list left aside (Home Assistant
+lists a set in any order), so it does not show a changed order.
 
 `template_functions.py` stops HA's clock (`homeassistant.util.dt.now` and
 `utcnow`) at the home's `now` and sets the process's `TZ`, which Python

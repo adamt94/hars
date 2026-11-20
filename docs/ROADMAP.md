@@ -232,8 +232,10 @@ ids, addresses, names and coordinates replaced with fake ones
         or a device that has child devices, is reported, not rewritten:
         the old id reaches no device, and the parent not its children.
         Integrations find their device by identifier, the first row that
-        has it (the importer orders the rows, and refuses what order can't
-        settle); 2026.8 looks it up per config entry.
+        has it, and bring a removed device back the same way (the importer
+        orders the rows, and refuses two of one integration's own);
+        2026.8 looks both up per config entry. A last state stored under
+        an entity id with a non-ASCII digit is skipped.
         Releases after 2026.11 are imported only if every store is in a
         format with a rule
 - [x] `configuration.yaml` loaded as HA loads it: `!include`, the

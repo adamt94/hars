@@ -213,11 +213,14 @@ pub fn run(opts: &Options) -> anyhow::Result<Report> {
         .with_context(|| format!("reading {}", opts.source.display()))?;
     // Before the destination is made: inside the source it would be
     // a directory written into the folder the import only reads.
-    if planned_path(&opts.dest)?.starts_with(&source) {
+    // It is then made at that resolved path, not the one given: making
+    // `source/new/../../dest` part by part would make `source/new`.
+    let planned = planned_path(&opts.dest)?;
+    if planned.starts_with(&source) {
         bail!("the destination is inside the source, or is the source; use a directory outside it");
     }
-    std::fs::create_dir_all(&opts.dest)?;
-    let dest = std::fs::canonicalize(&opts.dest)?;
+    std::fs::create_dir_all(&planned)?;
+    let dest = std::fs::canonicalize(&planned)?;
     if dest.starts_with(&source) {
         bail!("the destination is inside the source, or is the source; use a directory outside it");
     }
@@ -326,6 +329,14 @@ pub fn run(opts: &Options) -> anyhow::Result<Report> {
     report.dropped = converted.dropped;
     report.split_devices = converted.split_devices;
     report.parent_devices = converted.parent_devices;
+    // An action on a label reaches a labelled device's children from
+    // 2026.10 (`helpers/target.py`; 2026.9 keeps a label to the devices
+    // that have it), so before that there is nothing to say of labels.
+    if release_line(&report.ha_version).is_some_and(|line| line < (2026, 10)) {
+        for parent in &mut report.parent_devices {
+            parent.labels.clear();
+        }
+    }
     report.newer_stores = check_store_versions(&staging, &report.ha_version)?;
     let entries = load_entries(&staging.root)?;
     check_entry_versions(&entries, &report.ha_version)?;
@@ -434,11 +445,17 @@ pub fn run(opts: &Options) -> anyhow::Result<Report> {
             let parsed = ha_automation::config::parse(&item);
             // As loaded, so however the YAML spells the id.
             let loaded = item.to_string();
-            let warnings: Vec<&str> = changed_ids
+            let mut warnings: Vec<&str> = changed_ids
                 .iter()
                 .filter(|(id, _)| loaded.contains(id))
                 .map(|(_, why)| why.as_str())
                 .collect();
+            if excludes(&item) {
+                warnings.push(
+                    "a target in it has `exclude` (Home Assistant 2026.11), which hars doesn't \
+                     have: that action fails when it runs",
+                );
+            }
             report.automations.push(AutomationReport {
                 id: text("id"),
                 alias: text("alias"),
@@ -583,7 +600,20 @@ pub fn run(opts: &Options) -> anyhow::Result<Report> {
             .map(|k| Change::Remove(format!(".storage/{k}"))),
     );
     for rel in &report.yaml {
-        if std::fs::read(dest.join(rel)).ok() != std::fs::read(staging.root.join(rel)).ok() {
+        // A secrets file is owner-only even when its bytes didn't change:
+        // then too it is replaced by the staged one, in the commit, where
+        // a failure is rolled back. (Not changed in place: the file there
+        // may be a hard link to another, the source's even.)
+        #[cfg(unix)]
+        let loose = rel.ends_with("secrets.yaml")
+            && std::fs::metadata(dest.join(rel)).is_ok_and(|m| {
+                use std::os::unix::fs::PermissionsExt;
+                m.permissions().mode() & 0o777 != 0o600
+            });
+        #[cfg(not(unix))]
+        let loose = false;
+        if loose || std::fs::read(dest.join(rel)).ok() != std::fs::read(staging.root.join(rel)).ok()
+        {
             changes.push(Change::Put(rel.clone()));
         }
     }
@@ -591,17 +621,6 @@ pub fn run(opts: &Options) -> anyhow::Result<Report> {
         std::fs::rename(from, to)
     })?;
 
-    // A secrets file is owner-only even when its bytes didn't change. It
-    // is written again as a new file, not changed in place: the one there
-    // may be a hard link to another (the source's, even).
-    #[cfg(unix)]
-    for rel in report.yaml.iter().filter(|r| r.ends_with("secrets.yaml")) {
-        use std::os::unix::fs::PermissionsExt;
-        let path = dest.join(rel);
-        if std::fs::metadata(&path)?.permissions().mode() & 0o777 != 0o600 {
-            ha_core::storage::write_atomic(&path, &std::fs::read(&path)?, true)?;
-        }
-    }
     let json = serde_json::to_vec_pretty(&report)?;
     // A new file, made in the staging directory (this run's own) and
     // renamed into place: never a half-written report, and nothing
@@ -612,7 +631,12 @@ pub fn run(opts: &Options) -> anyhow::Result<Report> {
     if let Err(e) = written {
         // The files are in place and can't be taken back now: what the
         // report would have said is said here.
-        print!("{}", summary(&report, &dest));
+        let said = summary(&report, &dest);
+        let said: Vec<&str> = said
+            .lines()
+            .filter(|l| !l.starts_with("Report: "))
+            .collect();
+        println!("{}", said.join("\n"));
         return Err(e).with_context(|| {
             format!(
                 "everything above was imported, but {REPORT_FILE} could not be written in {}",
@@ -621,6 +645,19 @@ pub fn run(opts: &Options) -> anyhow::Result<Report> {
         });
     }
     Ok(report)
+}
+
+/// Whether a `target` anywhere in an automation has `exclude`, which
+/// 2026.11 added (`helpers/target.py`) and 2026.6.1's service schemas
+/// reject.
+fn excludes(value: &Value) -> bool {
+    match value {
+        Value::Object(map) => map.iter().any(|(key, inner)| {
+            (key == "target" && inner.get("exclude").is_some()) || excludes(inner)
+        }),
+        Value::Array(items) => items.iter().any(excludes),
+        _ => false,
+    }
 }
 
 /// Where a path that may not exist yet will be: absolute, each part that
@@ -1051,7 +1088,10 @@ fn check_path(root: &Path, rel: &Path, source: bool) -> anyhow::Result<()> {
         .next()
         .map(|c| c.as_os_str().to_string_lossy().into_owned())
         .unwrap_or_default();
-    if first == ".storage" || first.starts_with(".import") || first == REPORT_FILE {
+    // Whatever its case: on a file system that takes `IMPORT-REPORT.JSON`
+    // and `import-report.json` for one name, the report would replace it.
+    let lower = first.to_lowercase();
+    if lower == ".storage" || lower.starts_with(".import") || lower == REPORT_FILE {
         bail!("{} is a path hars keeps for itself", rel.display());
     }
     let mut at = root.to_path_buf();
@@ -1273,7 +1313,7 @@ pub fn summary(report: &Report, dest: &Path) -> String {
         if !p.labels.is_empty() {
             out.push_str(&format!(
                 "  the device {} ({name}) has child devices and the label(s) {}. An action on \
-                 such a label reaches the child devices' entities in Home Assistant 2026.9 and \
+                 such a label reaches the child devices' entities in Home Assistant 2026.10 and \
                  later; in hars only if they have the label too ({})\n",
                 p.id,
                 p.labels.join(", "),
