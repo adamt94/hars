@@ -424,14 +424,15 @@ the [budgets](../PERF.md#budgets).
 The Add integration dialog's last step: a device's name, area and labels,
 a new area, the entity ids that follow from a name, and SwitchBot Cloud's
 running entities taking a new name or id. All of it runs when a user
-saves a change and at no other time: no timer, no task, nothing that
-wakes. What stays in memory is one weak reference per running entry that
-follows the registry (an empty, unallocated list on an install with
-none), and per SwitchBot entity the names its id is made from (two short
-strings) behind a lock that only a state write or a rename takes. A state
-write of such an entity now copies its id and friendly name out of that
-lock, where it copied the id and built the name's JSON value before: the
-same number of allocations.
+saves a change and at no other time: no timer and no task of its own,
+nothing that wakes (the changed registry file is saved by the registries'
+existing delayed save). What stays in memory is one reference per
+SwitchBot entry, from its set-up until it is removed (an empty,
+unallocated list on an install with none), and per SwitchBot entity the
+names its id is made from (two short strings) behind a lock that a state
+write and a rename take. A state write of such an entity copies its id
+and builds its friendly name's JSON value under that lock, as it did
+without one before: the same number of allocations.
 
 Release binary (macOS arm64, stripped, `cargo build --release -p
 ha-server`): main (49c08fc) 9,469,328 bytes, branch 9,518,944

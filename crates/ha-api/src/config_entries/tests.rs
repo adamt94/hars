@@ -596,6 +596,17 @@ async fn replay(scenario: &Value) {
         })
         .collect();
     assert_eq!(json!(states), scenario["states"], "{name}: states");
+    // And no state is left under an id that has no row (an old id).
+    let all = home.server.hass.states().all();
+    let orphans: Vec<&str> = all
+        .iter()
+        .map(|s| s.entity_id.as_str())
+        .filter(|id| !states.contains_key(*id))
+        .collect();
+    assert!(
+        orphans.is_empty(),
+        "{name}: states with no row: {orphans:?}"
+    );
 }
 
 fn scenarios() -> Vec<Value> {

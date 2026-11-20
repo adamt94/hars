@@ -125,6 +125,8 @@ pub struct DevicePatch {
 pub enum DeviceRefusal {
     /// No such device (a `KeyError` in HA).
     Unknown,
+    /// The store named can't be written ([`Registry::unwritable`]).
+    Unwritable(&'static str),
     /// Disabling or enabling a device: its entities would have to stop
     /// or start, which `hars`'s don't do while they run.
     Disable,
@@ -140,6 +142,8 @@ pub enum DeviceRefusal {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RenameRefusal {
     Unknown,
+    /// The entities' store can't be written ([`Registry::unwritable`]).
+    Unwritable,
     Registered,
     Invalid,
     Domain,
@@ -155,9 +159,18 @@ impl RenameRefusal {
             Self::Registered => Some("Entity with this ID is already registered"),
             Self::Invalid => Some("Invalid entity ID"),
             Self::Domain => Some("New entity ID should be same domain"),
-            Self::Unknown | Self::Platform(_) => None,
+            Self::Unknown | Self::Unwritable | Self::Platform(_) => None,
         }
     }
+}
+
+/// Why an area was not made.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AreaRefusal {
+    /// HA's `ValueError`, in its words.
+    Invalid(String),
+    /// The areas' store can't be written ([`Registry::unwritable`]).
+    Unwritable,
 }
 
 /// A new area (`async_create`'s arguments).
@@ -437,15 +450,18 @@ impl Registry {
     /// Its id is the name slugified, with `_2`, `_3`, ... when taken
     /// (`generate_id_from_name`). Fires `area_registry_updated` and
     /// schedules the save.
-    pub fn create_area(&self, new: NewArea) -> Result<crate::Area, String> {
+    pub fn create_area(&self, new: NewArea) -> Result<crate::Area, AreaRefusal> {
         let now = now_iso(&self.hass);
+        if self.unwritable(crate::AREA_KEY) {
+            return Err(AreaRefusal::Unwritable);
+        }
         self.write(|tx| {
             let name = &new.name;
             if let Some(area) = tx.r.area_by_name(name) {
-                return Err(format!(
+                return Err(AreaRefusal::Invalid(format!(
                     "The name {name} ({}) is already in use",
                     crate::normalize_name(&area.name)
-                ));
+                )));
             }
             // `_validate_humidity_entity`, then `_validate_temperature_entity`.
             for (entity_id, class) in [
@@ -453,14 +469,19 @@ impl Registry {
                 (&new.temperature_entity_id, "temperature"),
             ] {
                 let Some(entity_id) = entity_id else { continue };
-                let state = ha_core::EntityId::parse(entity_id)
+                // `hass.states.get` lower-cases what it is asked for.
+                let state = ha_core::EntityId::parse(&entity_id.to_lowercase())
                     .ok()
                     .and_then(|id| self.hass.states().get(&id))
-                    .ok_or_else(|| format!("Entity {entity_id} does not exist"))?;
+                    .ok_or_else(|| {
+                        AreaRefusal::Invalid(format!("Entity {entity_id} does not exist"))
+                    })?;
                 if state.entity_id.domain() != "sensor"
                     || state.attributes.get("device_class").and_then(Value::as_str) != Some(class)
                 {
-                    return Err(format!("Entity {entity_id} is not a {class} sensor"));
+                    return Err(AreaRefusal::Invalid(format!(
+                        "Entity {entity_id} is not a {class} sensor"
+                    )));
                 }
             }
             let base = ha_core::slugify(name);
@@ -503,7 +524,9 @@ impl Registry {
     /// new device name: a name is refused for a device with an entity
     /// that wouldn't (see [`DeviceRefusal`]). HA's entity registry changes
     /// nothing of an entity that has its own name beside the device's
-    /// when the device is named or moved.
+    /// when the device is named or moved; an entity the device's disable
+    /// had disabled is enabled again when a change finds the device
+    /// enabled (`async_device_modified`).
     pub fn update_device(
         &self,
         device_id: &str,
@@ -517,6 +540,9 @@ impl Registry {
                     .iter()
                     .position(|d| d.id == device_id)
                     .ok_or(DeviceRefusal::Unknown)?;
+            if self.unwritable(crate::DEVICE_KEY) {
+                return Err(DeviceRefusal::Unwritable(crate::DEVICE_KEY));
+            }
             let mut d = (*tx.r.devices[i]).clone();
             // The old values, in the order HA goes through the fields.
             let mut changes = Map::new();
@@ -560,12 +586,34 @@ impl Registry {
             if changes.is_empty() {
                 return Ok(tx.r.devices[i].clone());
             }
-            d.modified_at = Some(now);
+            // Entities the device's disable had disabled come back with
+            // an enabled device, whatever the change was.
+            let stale: Vec<usize> = match d.disabled_by {
+                Some(_) => Vec::new(),
+                None => (0..tx.r.entities.len())
+                    .filter(|&e| {
+                        let row = &tx.r.entities[e];
+                        row.device_id.as_deref() == Some(device_id)
+                            && row.disabled_by.as_deref() == Some("device")
+                    })
+                    .collect(),
+            };
+            if !stale.is_empty() && self.unwritable(crate::ENTITY_KEY) {
+                return Err(DeviceRefusal::Unwritable(crate::ENTITY_KEY));
+            }
+            d.modified_at = Some(now.clone());
             let device = Arc::new(d);
             tx.r.devices[i] = device.clone();
             tx.device_event(
                 json!({"action": "update", "device_id": device.id, "changes": changes}),
             );
+            let enable = EntityPatch {
+                disabled_by: Some(None),
+                ..Default::default()
+            };
+            for e in stale {
+                update_row(tx, e, &enable, &now, None);
+            }
             Ok(device)
         })
     }
@@ -594,34 +642,43 @@ impl Registry {
 
     /// `async_update_entity` with a `new_entity_id` (and whatever else
     /// `patch` changes, in the same event, which names the old id): the
-    /// old values of what changed, empty if nothing did. `follows` says
-    /// whether an integration's running entities take a new id.
+    /// row as this call left it. `follows` says whether an integration's
+    /// running entities take a new id.
+    ///
+    /// A placeholder state start-up wrote under the old id (an entity
+    /// nothing provides) moves to the new one, as HA's
+    /// `cleanup_restored_states` moves it. A running entity's state is its
+    /// entity's to move: the caller tells it
+    /// (`ha_integrations::components::Components::registry_edit`).
     pub fn rename_entity(
         &self,
         entity_id: &str,
         new_entity_id: &str,
         patch: &EntityPatch,
         follows: &dyn Fn(&str) -> bool,
-    ) -> Result<Map<String, Value>, RenameRefusal> {
+    ) -> Result<Arc<Entity>, RenameRefusal> {
         let now = now_iso(&self.hass);
-        self.write(|tx| {
+        let row = self.write(|tx| {
             let i =
                 tx.r.entities
                     .iter()
                     .position(|e| e.entity_id == entity_id)
                     .ok_or(RenameRefusal::Unknown)?;
+            if self.unwritable(crate::ENTITY_KEY) {
+                return Err(RenameRefusal::Unwritable);
+            }
             let mut row = (*tx.r.entities[i]).clone();
             let mut changes = apply(&mut row, patch);
             if new_entity_id != entity_id {
-                // `_entity_id_available`: not registered, and no state.
-                let parsed = ha_core::EntityId::parse(new_entity_id);
-                let state = parsed
-                    .as_ref()
-                    .is_ok_and(|id| self.hass.states().get(id).is_some());
+                // `_entity_id_available`: not registered, and no state
+                // (the state machine lower-cases what it is asked for).
+                let state = ha_core::EntityId::parse(&new_entity_id.to_lowercase())
+                    .is_ok_and(|id| self.hass.states().get(&id).is_some());
                 if state || tx.r.entities.iter().any(|e| e.entity_id == new_entity_id) {
                     return Err(RenameRefusal::Registered);
                 }
-                let new = parsed.map_err(|_| RenameRefusal::Invalid)?;
+                let new =
+                    ha_core::EntityId::parse(new_entity_id).map_err(|_| RenameRefusal::Invalid)?;
                 if Some(new.domain()) != entity_id.split('.').next() {
                     return Err(RenameRefusal::Domain);
                 }
@@ -632,18 +689,28 @@ impl Registry {
                 row.entity_id = new_entity_id.to_owned();
             }
             if changes.is_empty() {
-                return Ok(changes);
+                return Ok(tx.r.entities[i].clone());
             }
             row.modified_at = Some(now);
-            tx.r.entities[i] = Arc::new(row);
+            let row = Arc::new(row);
+            tx.r.entities[i] = row.clone();
             let mut event = json!({"action": "update", "entity_id": new_entity_id,
                                    "changes": changes});
             if new_entity_id != entity_id {
                 event["old_entity_id"] = json!(entity_id);
             }
             tx.entity_event(event);
-            Ok(changes)
-        })
+            Ok(row)
+        })?;
+        if new_entity_id != entity_id
+            && let Ok(old) = ha_core::EntityId::parse(entity_id)
+            && let Some(state) = self.hass.states().get(&old)
+            && state.attributes.get("restored") == Some(&Value::Bool(true))
+        {
+            self.hass.remove_state(&old);
+            row.write_unavailable_state(&self.hass);
+        }
+        Ok(row)
     }
 
     /// The row for `(domain, platform, unique_id)`.
@@ -1158,8 +1225,8 @@ fn remove_row(tx: &mut Tx, i: usize, now: jiff::Timestamp) {
 /// quadratic.
 struct DeletedKey {
     key: (String, String, Value),
-    /// The unique id as it stands in a row's JSON, when no writer could
-    /// spell it another way (no escapes).
+    /// The unique id as it stands in a row's JSON when its writer spelled
+    /// every character as itself, as HA and `hars` do for these.
     text: Option<String>,
 }
 
@@ -1174,8 +1241,10 @@ impl DeletedKey {
     }
 
     fn is(&self, row: &RawRow) -> bool {
+        // A row that spells a character as `\u….` may spell the id so.
         if let Some(text) = &self.text
             && !row.get().contains(text.as_str())
+            && !row.get().contains("\\u")
         {
             return false;
         }
@@ -1440,7 +1509,8 @@ fn generate_entity_id(
 fn regenerate_entity_id(r: &Registries, hass: &Hass, row: &Entity, reserved: &[String]) -> String {
     let domain = row.entity_id.split('.').next().unwrap_or_default();
     let object_id = match (&row.name, &row.suggested_object_id) {
-        (None, Some(suggested)) if !suggested.is_empty() => suggested.clone(),
+        // On its own, even when empty (then the fallback below).
+        (None, Some(suggested)) => suggested.clone(),
         _ => {
             let device = row
                 .device_id

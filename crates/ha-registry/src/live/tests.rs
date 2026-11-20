@@ -1077,38 +1077,196 @@ fn what_cant_be_written_is_known_without_the_disk() {
     assert_eq!(loaded.unwritable(), Some(DEVICE_KEY));
 }
 
-/// An older deleted row for the same unique id is replaced, whatever its
-/// unique id looks like in the file (one with an escape is found by
-/// parsing), and a deleted row whose text only contains the id of another
-/// stays.
+/// The deleted row for a unique id is found however a file spells the
+/// id: with an escape, or a character written as `\u….` (valid JSON that
+/// another writer may leave), and not confused with a row that has the
+/// same text in another field. It comes back with what it had, and a
+/// removal replaces it rather than adding a second.
 #[test]
-fn a_deleted_row_is_replaced_by_its_unique_id() {
-    for unique in ["plain-1", "quoted \"1\"", "caf\u{e9}/1"] {
-        let hass = Hass::new();
-        let reg = Registry::in_memory(&hass, Registries::default());
-        let make = |unique_id: &str| {
-            reg.get_or_create_entity("sensor", "p", unique_id, None, EntityPatch::default())
+fn a_deleted_row_is_found_by_its_unique_id() {
+    let raw = |text: String| serde_json::value::RawValue::from_string(text).unwrap();
+    for (unique, spelled) in [
+        ("plain-1", r#""plain-1""#),
+        ("plain-1", r#""\u0070lain-1""#),
+        ("quoted \"1\"", r#""quoted \"1\"""#),
+        ("caf\u{e9}/1", r#""caf\u00e9/1""#),
+    ] {
+        let seeded = || Registries {
+            entity_file: crate::FileRest {
+                deleted: Arc::new(vec![
+                    // Another entity's row, with the id's text as its name.
+                    raw(format!(
+                        r#"{{"entity_id":"sensor.other","platform":"p","unique_id":"other","name":{spelled}}}"#
+                    )),
+                    raw(format!(
+                        r#"{{"entity_id":"sensor.kept","platform":"p","unique_id":{spelled},"icon":"mdi:star"}}"#
+                    )),
+                ]),
+                ..Default::default()
+            },
+            ..Default::default()
         };
-        // Another entity's row, with the first's unique id in its text.
-        let other = make(&format!("x {unique}"));
-        reg.remove_entity(&other.entity_id);
-        for _ in 0..2 {
-            let row = make(unique);
-            reg.remove_entity(&row.entity_id);
-        }
-        let deleted = reg.snapshot().entity_file.deleted.clone();
-        let ids: Vec<Value> = deleted
-            .iter()
-            .map(|d| serde_json::from_str::<Value>(d.get()).unwrap()["unique_id"].clone())
-            .collect();
+        let ids = |reg: &Registry| -> Vec<Value> {
+            let deleted = reg.snapshot().entity_file.deleted.clone();
+            deleted
+                .iter()
+                .map(|d| serde_json::from_str::<Value>(d.get()).unwrap()["unique_id"].clone())
+                .collect()
+        };
+        // It comes back, with its id and what the user had set.
+        let hass = Hass::new();
+        let reg = Registry::in_memory(&hass, seeded());
+        let back = reg.get_or_create_entity("sensor", "p", unique, None, EntityPatch::default());
         assert_eq!(
-            ids,
-            [json!(format!("x {unique}")), json!(unique)],
-            "{unique}"
+            (back.entity_id.as_str(), back.icon.as_deref()),
+            ("sensor.kept", Some("mdi:star")),
+            "{spelled}"
         );
-        // And it comes back, with its id.
-        let back = make(unique);
-        assert_eq!(reg.snapshot().entity_file.deleted.len(), 1);
-        assert_eq!(back.unique_id, Some(json!(unique)));
+        assert_eq!(ids(&reg), [json!("other")], "{spelled}");
+        // Removed again, there is one row for it.
+        reg.remove_entity("sensor.kept");
+        assert_eq!(ids(&reg), [json!("other"), json!(unique)], "{spelled}");
+        // An entity removed while an older row for its id is kept
+        // replaces that row.
+        let mut with_row = seeded();
+        with_row.entities.push(Arc::new(Entity {
+            entity_id: "sensor.now".into(),
+            platform: "p".into(),
+            unique_id: Some(json!(unique)),
+            ..Default::default()
+        }));
+        let reg = Registry::in_memory(&hass, with_row);
+        reg.remove_entity("sensor.now");
+        assert_eq!(ids(&reg), [json!("other"), json!(unique)], "{spelled}");
     }
+}
+
+/// A placeholder state start-up wrote for an entity nothing provides
+/// moves with its row to a new id (`cleanup_restored_states`); a state an
+/// entity wrote is its entity's to move, and stays.
+#[test]
+fn a_placeholder_moves_with_its_row() {
+    let hass = Hass::new();
+    let row = |id: &str| {
+        Arc::new(Entity {
+            entity_id: id.to_owned(),
+            platform: "switchbot_cloud".into(),
+            original_name: Some("Rail".into()),
+            ..Default::default()
+        })
+    };
+    let reg = Registry::in_memory(
+        &hass,
+        Registries {
+            entities: vec![row("button.rail"), row("button.live")],
+            ..Default::default()
+        },
+    );
+    let id = |id: &str| ha_core::EntityId::parse(id).unwrap();
+    hass.set_state(id("button.live"), "unknown", Default::default());
+    reg.write_unavailable_states(&hass);
+    let follows = |_: &str| true;
+    reg.rename_entity(
+        "button.rail",
+        "button.towel_rail",
+        &Default::default(),
+        &follows,
+    )
+    .unwrap();
+    assert!(hass.states().get(&id("button.rail")).is_none());
+    let moved = hass.states().get(&id("button.towel_rail")).unwrap();
+    assert_eq!(moved.state.as_str(), "unavailable");
+    assert_eq!(moved.attributes["restored"], true);
+    reg.rename_entity("button.live", "button.other", &Default::default(), &follows)
+        .unwrap();
+    assert!(hass.states().get(&id("button.live")).is_some());
+    assert!(hass.states().get(&id("button.other")).is_none());
+}
+
+/// A store read from a file that says minor version 0 is one its save
+/// would refuse (`check_minor`), so it is known as unwritable and a change
+/// to it is refused where it is made, whoever makes it (onboarding makes
+/// areas without going through the WebSocket). Registries made in memory
+/// with no version given have no file to spare.
+#[tokio::test]
+async fn a_file_at_minor_version_0_is_not_written() {
+    let dir = std::env::temp_dir().join(format!("hars-minor-0-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(dir.join(".storage")).unwrap();
+    let file = dir.join(".storage").join(crate::AREA_KEY);
+    let text = r#"{"version":1,"minor_version":0,"key":"core.area_registry","data":{"areas":[]}}"#;
+    std::fs::write(&file, text).unwrap();
+    let loaded = Registries::load_strict(&dir).unwrap();
+    assert_eq!(
+        loaded.unwritable_stores().collect::<Vec<_>>(),
+        [crate::AREA_KEY]
+    );
+    assert_eq!(Registries::default().unwritable_stores().count(), 0);
+    let hass = Hass::new();
+    let reg = Registry::new(&hass, &dir, loaded);
+    let new = NewArea {
+        name: "Bath".into(),
+        ..Default::default()
+    };
+    assert_eq!(
+        reg.create_area(new).err(),
+        Some(crate::AreaRefusal::Unwritable)
+    );
+    assert!(reg.snapshot().areas.is_empty());
+    assert_eq!(std::fs::read_to_string(&file).unwrap(), text);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// HA's `async_device_modified`: whatever changes of an enabled device, an
+/// entity its disable had disabled is enabled again, with its own event.
+/// And `_async_get_full_entity_name`: an empty `suggested_object_id` is
+/// taken on its own, so the id falls back to the platform and unique id.
+#[test]
+fn a_device_change_enables_what_its_disable_disabled() {
+    let hass = Hass::new();
+    let entity = |id: &str, disabled_by: Option<&str>| {
+        Arc::new(Entity {
+            entity_id: id.to_owned(),
+            platform: "switchbot_cloud".into(),
+            unique_id: Some(json!("u1")),
+            has_entity_name: true,
+            device_id: Some("dev".into()),
+            disabled_by: disabled_by.map(str::to_owned),
+            suggested_object_id: Some(String::new()),
+            ..Default::default()
+        })
+    };
+    let reg = Registry::in_memory(
+        &hass,
+        Registries {
+            devices: vec![Arc::new(Device {
+                id: "dev".into(),
+                name: Some("Rail".into()),
+                ..Default::default()
+            })],
+            entities: vec![
+                entity("sensor.stale", Some("device")),
+                entity("sensor.users", Some("user")),
+            ],
+            ..Default::default()
+        },
+    );
+    let mut rx = hass.bus().subscribe();
+    let patch = DevicePatch {
+        labels: Some(vec!["bath".into()]),
+        ..Default::default()
+    };
+    reg.update_device("dev", &patch, &|_| true).unwrap();
+    let r = reg.snapshot();
+    assert_eq!(r.entities[0].disabled_by, None);
+    assert_eq!(r.entities[1].disabled_by.as_deref(), Some("user"));
+    let fired = events(&mut rx);
+    assert_eq!(fired.len(), 2, "{fired:?}");
+    assert_eq!(
+        fired[1].1,
+        json!({"action": "update", "entity_id": "sensor.stale",
+               "changes": {"disabled_by": "device"}})
+    );
+    let ids = reg.automatic_entity_ids(&["sensor.stale".to_owned()]);
+    assert_eq!(ids[0].1.as_deref(), Some("sensor.switchbot_cloud_u1"));
 }

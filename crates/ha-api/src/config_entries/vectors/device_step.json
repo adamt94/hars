@@ -4791,6 +4791,47 @@
       "user": "admin",
       "msg": {
        "type": "config/area_registry/create",
+       "name": "Sauna",
+       "humidity_entity_id": "Sensor.Hub_2_9D_Humidity"
+      }
+     },
+     "replies": [
+      {
+       "type": "result",
+       "success": true,
+       "result": {
+        "aliases": [],
+        "area_id": "sauna",
+        "floor_id": null,
+        "humidity_entity_id": "Sensor.Hub_2_9D_Humidity",
+        "icon": null,
+        "labels": [],
+        "name": "Sauna",
+        "picture": null,
+        "temperature_entity_id": null,
+        "created_at": "<ts>",
+        "modified_at": "<ts>"
+       }
+      }
+     ],
+     "events": [
+      {
+       "sub": "areas",
+       "event": {
+        "event_type": "area_registry_updated",
+        "data": {
+         "action": "create",
+         "area_id": "sauna"
+        }
+       }
+      }
+     ]
+    },
+    {
+     "ws": {
+      "user": "admin",
+      "msg": {
+       "type": "config/area_registry/create",
        "name": "Loft",
        "temperature_entity_id": "sensor.nope"
       }
@@ -5491,6 +5532,19 @@
          "temperature_entity_id": null,
          "created_at": "<ts>",
          "modified_at": "<ts>"
+        },
+        {
+         "aliases": [],
+         "area_id": "sauna",
+         "floor_id": null,
+         "humidity_entity_id": "Sensor.Hub_2_9D_Humidity",
+         "icon": null,
+         "labels": [],
+         "name": "Sauna",
+         "picture": null,
+         "temperature_entity_id": null,
+         "created_at": "<ts>",
+         "modified_at": "<ts>"
         }
        ]
       }
@@ -6079,6 +6133,19 @@
      "temperature_entity_id": null,
      "created_at": "<time>",
      "modified_at": "<time>"
+    },
+    {
+     "aliases": [],
+     "floor_id": null,
+     "humidity_entity_id": "Sensor.Hub_2_9D_Humidity",
+     "icon": null,
+     "id": "sauna",
+     "labels": [],
+     "name": "Sauna",
+     "picture": null,
+     "temperature_entity_id": null,
+     "created_at": "<time>",
+     "modified_at": "<time>"
     }
    ],
    "deleted_devices": 0,
@@ -6590,6 +6657,49 @@
      "ws": {
       "user": "admin",
       "msg": {
+       "type": "config/entity_registry/get_automatic_entity_ids",
+       "entity_ids": null
+      }
+     },
+     "replies": [
+      {
+       "type": "result",
+       "success": false,
+       "error": {
+        "code": "invalid_format",
+        "message": "Entity IDs cannot be None for dictionary value @ data['entity_ids']. Got None"
+       }
+      }
+     ],
+     "events": []
+    },
+    {
+     "ws": {
+      "user": "admin",
+      "msg": {
+       "type": "config/entity_registry/get_automatic_entity_ids",
+       "entity_ids": {
+        "sensor.hub_2_9d_humidity": 1,
+        "sensor.nope": 2
+       }
+      }
+     },
+     "replies": [
+      {
+       "type": "result",
+       "success": true,
+       "result": {
+        "sensor.hub_2_9d_humidity": "sensor.hub_2_9d_humidity",
+        "sensor.nope": null
+       }
+      }
+     ],
+     "events": []
+    },
+    {
+     "ws": {
+      "user": "admin",
+      "msg": {
        "type": "config/entity_registry/get_automatic_entity_ids"
       }
      },
@@ -6654,6 +6764,48 @@
        "type": "config/entity_registry/update",
        "entity_id": "sensor.hub_2_9d_humidity",
        "new_entity_id": "sensor.Not An Id"
+      }
+     },
+     "replies": [
+      {
+       "type": "result",
+       "success": false,
+       "error": {
+        "code": "invalid_info",
+        "message": "Invalid entity ID"
+       }
+      }
+     ],
+     "events": []
+    },
+    {
+     "ws": {
+      "user": "admin",
+      "msg": {
+       "type": "config/entity_registry/update",
+       "entity_id": "sensor.hub_2_9d_humidity",
+       "new_entity_id": "sensor.Hub_2_9D_Temperature"
+      }
+     },
+     "replies": [
+      {
+       "type": "result",
+       "success": false,
+       "error": {
+        "code": "invalid_info",
+        "message": "Entity with this ID is already registered"
+       }
+      }
+     ],
+     "events": []
+    },
+    {
+     "ws": {
+      "user": "admin",
+      "msg": {
+       "type": "config/entity_registry/update",
+       "entity_id": "sensor.hub_2_9d_humidity",
+       "new_entity_id": "sensor.Damp"
       }
      },
      "replies": [

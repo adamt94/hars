@@ -11,13 +11,15 @@ use crate::switch::Switches;
 use ha_core::Hass;
 use ha_registry::{Lookup, Registries};
 use parking_lot::Mutex;
-use std::sync::{Arc, OnceLock, Weak};
+use std::sync::{Arc, OnceLock};
 
-/// An entry whose running entities take what the registry says of them
-/// when it changes: a device's new name (their friendly names), an
-/// entity's new id. HA's entities each listen for this; here the entry is
-/// told, by whoever made the change.
+/// An entry whose entities take what the registry says of them when it
+/// changes: a device's new name (their friendly names), an entity's new
+/// id. HA's entities each listen for this; here the entry is told, by
+/// whoever makes the change ([`Components::registry_edit`]).
 pub trait Follower: Send + Sync {
+    /// Called with `switchbot_cloud::SETUP` held: no entry is set up or
+    /// removed meanwhile.
     fn registry_changed(&self, components: &Components);
 }
 
@@ -38,9 +40,11 @@ pub struct Components {
     scenes: OnceLock<Arc<Scenes>>,
     buttons: OnceLock<Arc<Buttons>>,
     climates: OnceLock<Arc<Climates>>,
-    /// The entries that run and follow the registry; none while idle
-    /// costs nothing, and one that stopped is dropped at the next change.
-    followers: Mutex<Vec<Weak<dyn Follower>>>,
+    /// The entries that follow the registry, by entry id, from their
+    /// set-up until they are removed (so that one whose task was stopped
+    /// can still move its entities for the removal to find). Empty, and
+    /// unallocated, on an install with none.
+    followers: Mutex<Vec<(String, Arc<dyn Follower>)>>,
 }
 
 impl Components {
@@ -58,22 +62,42 @@ impl Components {
         })
     }
 
-    /// Tell `follower` of registry changes for as long as it lives.
-    pub fn follow(&self, follower: &Arc<dyn Follower>) {
-        self.followers.lock().push(Arc::downgrade(follower));
+    /// Tell `follower` of registry changes until its entry is removed
+    /// ([`Components::unfollow`]). An entry set up again replaces its
+    /// earlier follower.
+    pub fn follow(&self, entry_id: &str, follower: Arc<dyn Follower>) {
+        let mut all = self.followers.lock();
+        all.retain(|(id, _)| id != entry_id);
+        all.push((entry_id.to_owned(), follower));
     }
 
-    /// A device was named or an entity given another id: every running
-    /// entry that follows takes its entities' ids and names again.
-    pub fn registry_changed(&self) {
-        let followers: Vec<Arc<dyn Follower>> = {
-            let mut all = self.followers.lock();
-            all.retain(|f| f.strong_count() > 0);
-            all.iter().filter_map(Weak::upgrade).collect()
-        };
+    /// The entry is gone: nothing of it is left to follow.
+    pub fn unfollow(&self, entry_id: &str) {
+        let mut all = self.followers.lock();
+        all.retain(|(id, _)| id != entry_id);
+        if all.is_empty() {
+            *all = Vec::new();
+        }
+    }
+
+    /// Change a device's name or an entity's id in the registry with
+    /// `edit`, and have every entry that follows take its entities' ids
+    /// and names again before anything else sees the change: no entry is
+    /// set up or removed in between (it would find rows the entities have
+    /// not caught up with), and two such changes take turns.
+    pub fn registry_edit<T>(&self, edit: impl FnOnce() -> T) -> T {
+        let _one = crate::switchbot_cloud::SETUP.lock();
+        let out = edit();
+        let followers: Vec<Arc<dyn Follower>> = self
+            .followers
+            .lock()
+            .iter()
+            .map(|(_, f)| f.clone())
+            .collect();
         for follower in followers {
             follower.registry_changed(self);
         }
+        out
     }
 
     pub fn hass(&self) -> &Hass {

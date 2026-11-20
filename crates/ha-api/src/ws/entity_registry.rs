@@ -67,7 +67,14 @@ fn entity_ids(
     only_keys(msg, &["entity_ids"])?;
     let ids: Vec<String> = match msg.get("entity_ids") {
         None => return Err("required key not provided @ data['entity_ids']".into()),
+        Some(Value::Null) => {
+            return Err(
+                "Entity IDs cannot be None for dictionary value @ data['entity_ids']".into(),
+            );
+        }
         Some(Value::String(s)) => s.split(',').map(|i| i.trim().to_owned()).collect(),
+        // Python goes through a mapping's keys.
+        Some(Value::Object(ids)) => ids.keys().cloned().collect(),
         Some(Value::Array(ids)) => ids
             .iter()
             .map(|i| match i {
@@ -231,43 +238,40 @@ fn update(conn: &Conn, id: u64, msg: &Map<String, Value>) -> Result<(), Invalid>
         labels,
         ..Default::default()
     };
-    let entity_id = match new_entity_id {
-        None => {
-            registry.update_entity(entity_id, patch);
-            entity_id
-        }
-        Some(new) => {
-            use ha_registry::RenameRefusal;
-            let follows = &ha_integrations::components::follows;
-            match registry.rename_entity(entity_id, new, &patch, follows) {
-                Ok(_) => super::device_registry::registry_changed(conn),
-                Err(RenameRefusal::Unknown) => {
-                    not_found(conn, id);
-                    return Ok(());
-                }
-                Err(RenameRefusal::Platform(platform)) => {
-                    conn.out.error(
-                        json!(id),
-                        "not_supported",
-                        &format!(
-                            "hars can't change the id of an entity of the {platform} integration yet"
-                        ),
-                    );
-                    return Ok(());
-                }
-                // A `ValueError`.
-                Err(refused) => {
-                    let why = refused.message().unwrap_or_default();
-                    conn.out.error(json!(id), "invalid_info", why);
-                    return Ok(());
-                }
-            }
-            new
-        }
+    let Some(new) = new_entity_id else {
+        registry.update_entity(entity_id, patch);
+        match extended(entity_id) {
+            Some(row) => conn.out.result(id, json!({"entity_entry": row})),
+            None => not_found(conn, id),
+        };
+        return Ok(());
     };
-    match extended(entity_id) {
-        Some(row) => conn.out.result(id, json!({"entity_entry": row})),
-        None => not_found(conn, id),
+    use ha_registry::RenameRefusal;
+    let follows = &ha_integrations::components::follows;
+    let renamed = super::device_registry::edit(conn, || {
+        registry.rename_entity(entity_id, new, &patch, follows)
+    });
+    match renamed {
+        // The row as this change left it, whatever came after.
+        Ok(row) => {
+            let r = registry.snapshot();
+            let row = row.extended_json(r.device_name_of(&row));
+            conn.out.result(id, json!({"entity_entry": row}))
+        }
+        Err(RenameRefusal::Unknown) => not_found(conn, id),
+        Err(RenameRefusal::Unwritable) => {
+            super::device_registry::unwritable(conn, id, ha_registry::ENTITY_KEY)
+        }
+        Err(RenameRefusal::Platform(platform)) => conn.out.error(
+            json!(id),
+            "not_supported",
+            &format!("hars can't change the id of an entity of the {platform} integration yet"),
+        ),
+        // A `ValueError`.
+        Err(refused) => {
+            let why = refused.message().unwrap_or_default();
+            conn.out.error(json!(id), "invalid_info", why)
+        }
     };
     Ok(())
 }

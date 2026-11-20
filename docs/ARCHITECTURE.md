@@ -201,17 +201,25 @@ parameter, so tests and a debug build's browser run point it at
 listen for their registry row and their device to change. In `hars` an
 entity takes its id and friendly name from the registry when its entry is
 set up, so whoever changes a device's name or an entity's id
-(`ha-api`'s `ws/device_registry.rs` and `ws/entity_registry.rs`) calls
-`Components::registry_changed`, and each running entry that registered as
-a `components::Follower` takes its entities' ids and names again: a new
-name is one more state write, a new id removes the old state and puts the
-entity under the new id in its component, keeping what it had.
-`components::follows` lists the integrations that do this (today
-`switchbot_cloud`); the registry refuses a change the others' entities
-would not follow (`ha_registry::DeviceRefusal`, `RenameRefusal`), and
-the commands refuse one whose store can't be written
-(`Registry::unwritable`). No task or timer is involved: a follower is a
-weak reference in a list that is empty while no such entry runs.
+(`ha-api`'s `ws/device_registry.rs` and `ws/entity_registry.rs`) makes the
+change inside `Components::registry_edit`, which then has each entry that
+registered as a `components::Follower` take its entities' ids and names
+again: a new name is one more state write, a new id removes the old state
+and puts the entity under the new id in its component, with what it had
+(or, as HA's entity added again does, what was kept for a restore under
+that id). The edit and the entities' move happen under the lock that
+entries are set up and removed under, so neither a set-up nor a removal
+sees rows the entities have not caught up with, and an entity writes its
+state under the lock its id is changed under, so no write lands on an id
+it has just left. `components::follows` lists the integrations that do
+this (today `switchbot_cloud`); the registry refuses a change the others'
+entities would not follow (`ha_registry::DeviceRefusal`,
+`RenameRefusal`), and one whose store it would not write
+(`Registry::unwritable`: a version refusal, known before the change; a
+write that fails later is logged, as for every store). No task or timer
+of its own is involved (the registries' saves are delayed as before): a
+follower is a reference kept from an entry's set-up until the entry is
+removed, in a list that is empty on an install with no such entry.
 
 ### Storage and restore
 

@@ -654,7 +654,13 @@ ids, addresses, names and coordinates replaced with fake ones
       `reorder`; an entity's own name, icon and the rest of
       `config/entity_registry/update`; history and statistics moving to
       an entity's new id, as HA's recorder moves them (in `hars` what was
-      recorded stays under the old id)
+      recorded stays under the old id). Known differences in ids and
+      messages, older than these commands: a name in a script HA
+      transliterates (`東京` gives `dong_jing`) slugifies to `unknown`,
+      an entity id with a non-ASCII digit is refused, a message with
+      several invalid fields is told of the first only, and the fields
+      of `config/entity_registry/update` that `hars` refuses are not
+      checked against HA's schema first
 - [ ] Acceptance: every inventory entity matches its HA fixture attributes, and
       every frontend control (light colour/temp, climate mode/setpoint) works
 

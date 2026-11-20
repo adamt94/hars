@@ -19,7 +19,7 @@
 
 use super::{Conn, Invalid, only_keys};
 use ha_auth::Permission;
-use ha_registry::{DevicePatch, DeviceRefusal, NewArea};
+use ha_registry::{AreaRefusal, DevicePatch, DeviceRefusal, NewArea};
 use serde_json::{Map, Value, json};
 
 /// `vol.Any(str, None)`.
@@ -75,12 +75,13 @@ pub(super) fn unwritable(conn: &Conn, id: u64, key: &str) -> bool {
     )
 }
 
-/// Tell the running entities that a device's name or an entity's id
-/// changed, before the command is answered (HA's entities have written
-/// their states by then).
-pub(super) fn registry_changed(conn: &Conn) {
-    if let Some(entities) = &conn.shared.config.entities {
-        entities.registry_changed();
+/// Make a change to a device's name or an entity's id, with the running
+/// entities taking it before anything else sees it and before the command
+/// is answered (HA's entities have written their states by then).
+pub(super) fn edit<T>(conn: &Conn, change: impl FnOnce() -> T) -> T {
+    match &conn.shared.config.entities {
+        Some(entities) => entities.registry_edit(change),
+        None => change(),
     }
 }
 
@@ -121,10 +122,6 @@ fn update(conn: &Conn, id: u64, msg: &Map<String, Value>) -> Result<(), Invalid>
         unknown();
         return Ok(());
     };
-    if registry.unwritable(ha_registry::DEVICE_KEY) {
-        unwritable(conn, id, ha_registry::DEVICE_KEY);
-        return Ok(());
-    }
     let patch = DevicePatch {
         area_id,
         disabled_by,
@@ -133,13 +130,15 @@ fn update(conn: &Conn, id: u64, msg: &Map<String, Value>) -> Result<(), Invalid>
     };
     let follows = &ha_integrations::components::follows;
     let cant = |what: &str| conn.out.error(json!(id), "not_supported", what);
-    match registry.update_device(&device_id, &patch, follows) {
+    match edit(conn, || registry.update_device(&device_id, &patch, follows)) {
         Ok(device) => {
-            registry_changed(conn);
             conn.out.result(id, device.json());
         }
         Err(DeviceRefusal::Unknown) => {
             unknown();
+        }
+        Err(DeviceRefusal::Unwritable(key)) => {
+            unwritable(conn, id, key);
         }
         Err(DeviceRefusal::Disable) => {
             cant("hars can't disable or enable a device yet");
@@ -208,10 +207,6 @@ fn create_area(conn: &Conn, id: u64, msg: &Map<String, Value>) -> Result<(), Inv
         conn.out.error(json!(id), "unknown_error", "Unknown error");
         return Ok(());
     };
-    if registry.unwritable(ha_registry::AREA_KEY) {
-        unwritable(conn, id, ha_registry::AREA_KEY);
-        return Ok(());
-    }
     let new = NewArea {
         name,
         aliases: stripped,
@@ -225,7 +220,8 @@ fn create_area(conn: &Conn, id: u64, msg: &Map<String, Value>) -> Result<(), Inv
     match registry.create_area(new) {
         Ok(area) => conn.out.result(id, area.json()),
         // A `ValueError`.
-        Err(why) => conn.out.error(json!(id), "invalid_info", &why),
+        Err(AreaRefusal::Invalid(why)) => conn.out.error(json!(id), "invalid_info", &why),
+        Err(AreaRefusal::Unwritable) => unwritable(conn, id, ha_registry::AREA_KEY),
     };
     Ok(())
 }

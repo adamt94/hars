@@ -1704,17 +1704,21 @@ fn name_the_bot(registry: &Registry, components: &Components) {
         area_id: Some(Some("kitchen".into())),
         ..Default::default()
     };
-    registry
-        .update_device(&bot.unwrap().id, &patch, follows)
+    components
+        .registry_edit(|| registry.update_device(&bot.unwrap().id, &patch, follows))
         .unwrap();
-    components.registry_changed();
     let old = ["button.towel_switch", "sensor.towel_switch_battery"].map(str::to_owned);
     for (old, new) in registry.automatic_entity_ids(&old) {
-        registry
-            .rename_entity(&old, &new.unwrap(), &Default::default(), follows)
-            .unwrap();
-        components.registry_changed();
+        rename(registry, components, &old, &new.unwrap());
     }
+}
+
+/// Give an entity another id, as `config/entity_registry/update` does.
+fn rename(registry: &Registry, components: &Components, old: &str, new: &str) {
+    let follows = &crate::components::follows;
+    components
+        .registry_edit(|| registry.rename_entity(old, new, &Default::default(), follows))
+        .unwrap();
 }
 
 async fn press(hass: &Hass, entity_id: &str) -> Result<(), ha_core::ServiceError> {
@@ -1835,16 +1839,12 @@ async fn a_command_in_flight_reports_under_the_new_id() {
     while home.api.count() < 1 {
         home.api.arrived.notified().await;
     }
-    let follows = &crate::components::follows;
-    home.registry
-        .rename_entity(
-            "climate.air_conditioner",
-            "climate.bedroom",
-            &Default::default(),
-            follows,
-        )
-        .unwrap();
-    home.flows.components.registry_changed();
+    rename(
+        &home.registry,
+        &home.flows.components,
+        "climate.air_conditioner",
+        "climate.bedroom",
+    );
     // Moved, with the mode it had.
     assert_eq!(state(&home.hass, "climate.air_conditioner"), Value::Null);
     assert_eq!(state(&home.hass, "climate.bedroom")["state"], "cool");
@@ -1870,4 +1870,107 @@ async fn a_command_in_flight_reports_under_the_new_id() {
         .stored(&home.hass, home.hass.clock().now());
     let kept = |id: &str| stored.iter().any(|s| s["state"]["entity_id"] == id);
     assert!(kept("climate.bedroom"), "{stored:?}");
+}
+
+/// An entity given back an id it had before takes what it had there, as
+/// HA's entity, added again under that id, restores its last state for
+/// it: the air conditioner was cooling as `climate.air_conditioner`,
+/// heated under another id, and cools again when it gets the first back.
+#[tokio::test]
+async fn an_entity_given_an_old_id_back_restores_what_it_had_there() {
+    let home = home().await;
+    add(&home, TOKEN).await;
+    let set = |entity_id: &'static str, mode: &'static str| {
+        let hass = home.hass.clone();
+        async move {
+            let data = json!({"entity_id": entity_id, "hvac_mode": mode});
+            let data = data.as_object().unwrap().clone();
+            hass.call_service("climate", "set_hvac_mode", data, None, false, None)
+                .await
+                .unwrap();
+        }
+    };
+    let components = &home.flows.components;
+    set("climate.air_conditioner", "cool").await;
+    rename(
+        &home.registry,
+        components,
+        "climate.air_conditioner",
+        "climate.bedroom",
+    );
+    assert_eq!(state(&home.hass, "climate.bedroom")["state"], "cool");
+    set("climate.bedroom", "heat").await;
+    rename(
+        &home.registry,
+        components,
+        "climate.bedroom",
+        "climate.air_conditioner",
+    );
+    assert_eq!(state(&home.hass, "climate.bedroom"), Value::Null);
+    assert_eq!(
+        state(&home.hass, "climate.air_conditioner")["state"],
+        "cool"
+    );
+}
+
+/// An entity renamed after its entry's task was stopped and before the
+/// removal cleans up (the removal waits for the task in between) is still
+/// moved, so the removal finds it where the registry says it is: no state
+/// and no service target is left under the old id or the new.
+#[tokio::test]
+async fn a_rename_while_its_entry_is_being_removed_leaves_nothing() {
+    let home = home().await;
+    let id = entry_id(&add(&home, TOKEN).await);
+    // The removal's first half: the entry's task is stopped.
+    home.flows.tasks.lock()[0].task.abort();
+    while !home.flows.tasks.lock()[0].task.is_finished() {
+        tokio::task::yield_now().await;
+    }
+    rename(
+        &home.registry,
+        &home.flows.components,
+        "button.towel_switch",
+        "button.rail",
+    );
+    assert_eq!(state(&home.hass, "button.towel_switch"), Value::Null);
+    assert_eq!(home.flows.remove_entry(&id).await, Some(false));
+    for gone in ["button.towel_switch", "button.rail"] {
+        assert_eq!(state(&home.hass, gone), Value::Null, "{gone}");
+        home.api.take();
+        press(&home.hass, gone).await.unwrap();
+        assert_eq!(home.api.count(), 0, "{gone} still reached the Bot");
+    }
+    assert!(home.hass.states().all().is_empty());
+}
+
+/// A sensor that comes back (its entry removed and added again) keeps the
+/// options the user had set on it: the precision the integration suggests
+/// goes beside them, as HA's `async_update_entity_options` puts it.
+#[tokio::test]
+async fn a_sensor_that_comes_back_keeps_its_options() {
+    let home = home().await;
+    let id = entry_id(&add(&home, TOKEN).await);
+    let options = |registry: &Registry| {
+        let r = registry.snapshot();
+        let row = r
+            .entities
+            .iter()
+            .find(|e| e.entity_id == "sensor.hub_2_9d_temperature");
+        row.unwrap().options.value()
+    };
+    assert_eq!(
+        options(&home.registry),
+        json!({"sensor": {"suggested_display_precision": 1}})
+    );
+    let users = json!({"sensor": {"suggested_display_precision": 1, "display_precision": 2},
+                       "conversation": {"should_expose": true}});
+    let patch = ha_registry::EntityPatch {
+        options: Some(users.clone()),
+        ..Default::default()
+    };
+    home.registry
+        .update_entity("sensor.hub_2_9d_temperature", patch);
+    assert_eq!(home.flows.remove_entry(&id).await, Some(false));
+    add(&home, TOKEN).await;
+    assert_eq!(options(&home.registry), users);
 }

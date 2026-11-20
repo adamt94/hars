@@ -10,8 +10,8 @@
 
 mod live;
 pub use live::{
-    DeviceInfo, DevicePatch, DeviceRefusal, EntityPatch, EntryInfo, EntryLookup, Lookup, NewArea,
-    Registry, RenameRefusal, available_entity_id,
+    AreaRefusal, DeviceInfo, DevicePatch, DeviceRefusal, EntityPatch, EntryInfo, EntryLookup,
+    Lookup, NewArea, Registry, RenameRefusal, available_entity_id,
 };
 
 use ha_core::storage::{Store, StoreError};
@@ -693,6 +693,10 @@ pub struct Registries {
     /// The area file's `minor_version` (the current one when there was no
     /// file).
     pub area_minor: u32,
+    /// Read from a config directory ([`Registries::load`]): its minor
+    /// versions are the files'. Otherwise made in memory, where a minor
+    /// version of 0 stands for "no file".
+    pub loaded: bool,
     pub floors: Vec<Floor>,
     pub labels: Vec<Label>,
     /// `core.category_registry`'s `categories`: each scope's rows, as
@@ -823,6 +827,7 @@ impl Registries {
             floors: floors.floors,
             labels: labels.labels,
             categories: Arc::new(categories(config_dir)),
+            loaded: true,
         };
         r.migrate(entity_minor, device_minor, area_minor, floor_minor);
         Ok(r)
@@ -836,8 +841,8 @@ impl Registries {
     /// offered.
     ///
     /// Told from what was loaded, with no look at the disk: a store that
-    /// had no file was loaded as the current version, and registries that
-    /// were never read from a file (minor version 0) have none to spare.
+    /// had no file was loaded as the current version, and registries made
+    /// in memory with no version given have no file to spare.
     pub fn unwritable(&self) -> Option<&'static str> {
         self.unwritable_stores().find(|key| *key != AREA_KEY)
     }
@@ -845,16 +850,18 @@ impl Registries {
     /// [`Registries::unwritable`] for each store `hars` writes: the
     /// entities', the devices' and the areas'.
     pub fn unwritable_stores(&self) -> impl Iterator<Item = &'static str> {
+        let loaded = self.loaded;
         [
             (ENTITY_KEY, self.entity_file.minor),
             (DEVICE_KEY, self.device_file.minor),
             (AREA_KEY, self.area_minor),
         ]
         .into_iter()
-        .filter(|&(key, minor)| {
+        .filter(move |&(key, minor)| {
             STORES
                 .iter()
-                .any(|&(k, _, current)| k == key && minor != 0 && current != minor)
+                .any(|&(k, _, current)| k == key && current != minor)
+                && (loaded || minor != 0)
         })
         .map(|(key, _)| key)
     }

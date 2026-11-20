@@ -827,6 +827,8 @@ impl Manager {
                     self.hass.remove_state(id);
                 }
             }
+            // Its entities are gone: nothing of it follows the registry.
+            self.components.unfollow(entry_id);
             if unloads {
                 self.entries
                     .set_state(entry_id, EntryState::NotLoaded, None);
