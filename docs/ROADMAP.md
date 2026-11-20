@@ -660,7 +660,12 @@ ids, addresses, names and coordinates replaced with fake ones
       an entity id with a non-ASCII digit is refused, a message with
       several invalid fields is told of the first only, and the fields
       of `config/entity_registry/update` that `hars` refuses are not
-      checked against HA's schema first
+      checked against HA's schema first. Two more, of these commands:
+      `get_automatic_entity_ids` given a mapping takes its keys sorted,
+      not as sent, which shows when two of them would get the same id;
+      and an entity that a device change enables again (its row said
+      the device's disable had disabled it) starts with its entry's
+      next set-up, where HA reloads the entry after 30 s
 - [ ] Acceptance: every inventory entity matches its HA fixture attributes, and
       every frontend control (light colour/temp, climate mode/setpoint) works
 

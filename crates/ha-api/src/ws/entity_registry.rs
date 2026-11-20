@@ -73,7 +73,9 @@ fn entity_ids(
             );
         }
         Some(Value::String(s)) => s.split(',').map(|i| i.trim().to_owned()).collect(),
-        // Python goes through a mapping's keys.
+        // Python goes through a mapping's keys, in the order sent. That
+        // order is gone here (a message's maps are sorted), which shows
+        // only when two of the keys would get the same automatic id.
         Some(Value::Object(ids)) => ids.keys().cloned().collect(),
         Some(Value::Array(ids)) => ids
             .iter()

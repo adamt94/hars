@@ -1974,3 +1974,47 @@ async fn a_sensor_that_comes_back_keeps_its_options() {
     add(&home, TOKEN).await;
     assert_eq!(options(&home.registry), users);
 }
+
+/// An air conditioner given an id whose last kept state isn't a mode is
+/// not added under it, as HA's entity fails to be added again there (its
+/// `async_added_to_hass` raises): no state is written at the new id, the
+/// old one is gone, and the services reach nothing.
+#[tokio::test]
+async fn a_climate_is_not_added_under_an_id_with_a_bad_last_state() {
+    let home = home().await;
+    add(&home, TOKEN).await;
+    // What an earlier entity left for `climate.den`.
+    let den = EntityId::parse("climate.den").unwrap();
+    home.hass
+        .set_state(den.clone(), "bogus", Default::default());
+    home.hass.restore().register("climate.den", None);
+    home.hass.restore().unregister(&home.hass, "climate.den");
+    home.hass.remove_state(&den);
+
+    rename(
+        &home.registry,
+        &home.flows.components,
+        "climate.air_conditioner",
+        "climate.den",
+    );
+    assert_eq!(state(&home.hass, "climate.air_conditioner"), Value::Null);
+    assert_eq!(state(&home.hass, "climate.den"), Value::Null);
+    home.api.take();
+    for id in ["climate.air_conditioner", "climate.den"] {
+        let data = json!({"entity_id": id, "hvac_mode": "cool"});
+        let data = data.as_object().unwrap().clone();
+        home.hass
+            .call_service("climate", "set_hvac_mode", data, None, false, None)
+            .await
+            .unwrap();
+    }
+    assert_eq!(home.api.count(), 0);
+    // The remote's switch, renamed too, is where it was put.
+    rename(
+        &home.registry,
+        &home.flows.components,
+        "switch.air_conditioner",
+        "switch.den",
+    );
+    assert_eq!(state(&home.hass, "switch.den")["state"], "unknown");
+}

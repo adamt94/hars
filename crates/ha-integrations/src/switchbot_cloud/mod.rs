@@ -122,20 +122,23 @@ impl Ident {
         self.now.lock().0.clone()
     }
 
-    /// Write the entity's state where it is now, with the attributes
-    /// `attributes` makes of its friendly name. The id can't change
-    /// between being read and the state being written: a write that began
-    /// under the old id is in the state machine before the move takes the
-    /// old state out, and never after.
+    /// Write the entity's state where it is now: the state and attributes
+    /// `payload` makes, given its friendly name. All of it happens under
+    /// the lock the id changes under. So the id can't change between
+    /// being read and the state being written (a write that began under
+    /// the old id is in the state machine before the move takes the old
+    /// state out, never after), and what is written is what the entity
+    /// has at that moment, not a copy taken before a move restored
+    /// something else.
     fn publish(
         &self,
         shared: &Shared,
-        state: &str,
-        attributes: impl FnOnce(&str) -> Attributes,
+        payload: impl FnOnce(&str) -> (String, Attributes),
         context: Option<ha_core::Context>,
     ) {
         let now = self.now.lock();
-        shared.write(now.0.clone(), state, attributes(&now.1), context);
+        let (state, attributes) = payload(&now.1);
+        shared.write(now.0.clone(), &state, attributes, context);
     }
 
     /// Take the id and name `names` has for the entity now. A row that is
@@ -306,16 +309,26 @@ impl crate::components::Follower for Entry {
             }
             b.write();
         }
+        // A climate whose last state under its new id isn't a mode is not
+        // added there (HA's `async_added_to_hass` raises): it is gone
+        // until its entry is set up again.
+        let mut failed: Vec<EntityId> = Vec::new();
         for c in self.climates.lock().iter_mut() {
             match c.ident.follow(&names, &c.device) {
                 Followed::Same => continue,
                 Followed::Named => {}
                 Followed::Moved(old, new) => {
                     gone(&old, true);
-                    // `async_added_to_hass` again, for the new id.
-                    c.st.lock().restore(hass, &new);
-                    hass.restore().register(new.as_str(), None);
                     components.climates().remove(&old);
+                    // `async_added_to_hass` again, for the new id.
+                    if !c.st.lock().restore(hass, &new) {
+                        tracing::error!(
+                            "Error adding entity {new} for domain climate with platform switchbot_cloud: its last state is not a valid HVACMode"
+                        );
+                        failed.push(old);
+                        continue;
+                    }
+                    hass.restore().register(new.as_str(), None);
                     *c = Arc::new(AcClimate {
                         entity_id: new,
                         ..(**c).clone()
@@ -325,6 +338,9 @@ impl crate::components::Follower for Entry {
             }
             c.write();
         }
+        self.climates
+            .lock()
+            .retain(|c| !failed.contains(&c.entity_id));
         for s in self.switches.lock().iter_mut() {
             match s.ident.follow(&names, &s.device) {
                 Followed::Same => continue,
@@ -801,14 +817,18 @@ pub async fn run(
         let entry = build(&hass, &components.registries(), api, &devices, polled);
         entry.add_to(&components);
         entry.write_all();
+        // From here on a device's new name or an entity's new id reaches
+        // the entities. Still under the lock such a change is made under:
+        // none comes between the entities being built from the registry
+        // and their following it, where another entry's set-up could take
+        // a renamed row for one nobody runs.
+        if let Some(entry_id) = entry_id
+            && !entry.is_empty()
+        {
+            components.follow(entry_id, entry.clone());
+        }
         entry
     };
-    // From here on a device's new name or an entity's new id reaches the
-    // entities; one given while they were being built is taken now.
-    if let Some(entry_id) = entry_id {
-        components.follow(entry_id, entry.clone());
-        components.registry_edit(|| ());
-    }
     // When this task ends (its entry was removed), the entities stop
     // writing: whoever stops it waits for that before removing the states.
     struct Stopped(Arc<Shared>);
@@ -896,21 +916,20 @@ struct Sensor {
 impl Sensor {
     fn write(&self) {
         let entry = &self.shared;
-        let state = match entry.polled.lock().get(&self.device) {
-            Some(p) if p.ok => p
-                .data
-                .get(self.key)
-                .and_then(sensor_state)
-                .unwrap_or_else(|| "unknown".into()),
-            _ => "unavailable".into(),
-        };
         self.ident.publish(
             entry,
-            &state,
             |friendly| {
+                let state = match entry.polled.lock().get(&self.device) {
+                    Some(p) if p.ok => p
+                        .data
+                        .get(self.key)
+                        .and_then(sensor_state)
+                        .unwrap_or_else(|| "unknown".into()),
+                    _ => "unavailable".into(),
+                };
                 let mut attrs = self.attrs.clone();
                 attrs.insert("friendly_name".into(), json!(friendly));
-                attrs
+                (state, attrs)
             },
             None,
         );
@@ -935,17 +954,16 @@ impl BotButton {
 
     fn write_with(&self, context: Option<ha_core::Context>) {
         let entry = &self.shared;
-        let state = match entry.ok(&self.device) {
-            true => self.last.lock().clone().unwrap_or_else(|| "unknown".into()),
-            false => "unavailable".into(),
-        };
         self.ident.publish(
             entry,
-            &state,
             |friendly| {
+                let state = match entry.ok(&self.device) {
+                    true => self.last.lock().clone().unwrap_or_else(|| "unknown".into()),
+                    false => "unavailable".into(),
+                };
                 let mut a = Map::new();
                 a.insert("friendly_name".into(), json!(friendly));
-                a
+                (state, a)
             },
             context,
         );
@@ -1058,19 +1076,18 @@ impl AcClimate {
 
     fn write(&self) {
         let entry = &self.shared;
-        let mut a = climate::attributes(self);
-        a.insert("assumed_state".into(), json!(true));
-        a.insert(
-            "supported_features".into(),
-            json!(self.supported_features()),
-        );
-        let mode = self.st.lock().mode.clone();
         self.ident.publish(
             entry,
-            &mode,
-            move |friendly| {
+            |friendly| {
+                let mut a = climate::attributes(self);
+                a.insert("assumed_state".into(), json!(true));
                 a.insert("friendly_name".into(), json!(friendly));
-                a
+                a.insert(
+                    "supported_features".into(),
+                    json!(self.supported_features()),
+                );
+                let mode = self.st.lock().mode.clone();
+                (mode, a)
             },
             None,
         );
@@ -1220,19 +1237,18 @@ struct AcSwitch {
 impl AcSwitch {
     fn write(&self) {
         let entry = &self.shared;
-        let state = match *self.on.lock() {
-            Some(true) => "on",
-            Some(false) => "off",
-            None => "unknown",
-        };
         self.ident.publish(
             entry,
-            state,
             |friendly| {
+                let state = match *self.on.lock() {
+                    Some(true) => "on",
+                    Some(false) => "off",
+                    None => "unknown",
+                };
                 let mut a = Map::new();
                 a.insert("device_class".into(), json!("switch"));
                 a.insert("friendly_name".into(), json!(friendly));
-                a
+                (state.to_owned(), a)
             },
             None,
         );

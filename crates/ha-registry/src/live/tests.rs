@@ -1177,6 +1177,19 @@ fn a_placeholder_moves_with_its_row() {
     let moved = hass.states().get(&id("button.towel_rail")).unwrap();
     assert_eq!(moved.state.as_str(), "unavailable");
     assert_eq!(moved.attributes["restored"], true);
+    // And on, leaving nothing at the id in between.
+    reg.rename_entity(
+        "button.towel_rail",
+        "button.bath",
+        &Default::default(),
+        &follows,
+    )
+    .unwrap();
+    assert!(hass.states().get(&id("button.towel_rail")).is_none());
+    assert_eq!(
+        hass.states().get(&id("button.bath")).unwrap().attributes["restored"],
+        true
+    );
     reg.rename_entity("button.live", "button.other", &Default::default(), &follows)
         .unwrap();
     assert!(hass.states().get(&id("button.live")).is_some());

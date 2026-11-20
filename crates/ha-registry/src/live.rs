@@ -225,6 +225,9 @@ fn random_id() -> String {
 struct Tx {
     r: Registries,
     events: Vec<(&'static str, Value)>,
+    /// Entities given another id: the old id, and the row. A placeholder
+    /// state under the old id moves once the events are out.
+    renamed: Vec<(String, Arc<Entity>)>,
     save_entities: bool,
     save_devices: bool,
     save_areas: bool,
@@ -416,6 +419,7 @@ impl Registry {
         let mut tx = Tx {
             r: (*self.snapshot()).clone(),
             events: Vec::new(),
+            renamed: Vec::new(),
             save_entities: false,
             save_devices: false,
             save_areas: false,
@@ -440,6 +444,17 @@ impl Registry {
                 now,
                 Context::at(now),
             ));
+        }
+        // HA's `cleanup_restored_states`, a listener of the event: still
+        // in this write's turn, so the next change finds it done.
+        for (old, row) in tx.renamed {
+            if let Ok(old) = ha_core::EntityId::parse(&old)
+                && let Some(state) = self.hass.states().get(&old)
+                && state.attributes.get("restored") == Some(&Value::Bool(true))
+            {
+                self.hass.remove_state(&old);
+                row.write_unavailable_state(&self.hass);
+            }
         }
         out
     }
@@ -658,7 +673,7 @@ impl Registry {
         follows: &dyn Fn(&str) -> bool,
     ) -> Result<Arc<Entity>, RenameRefusal> {
         let now = now_iso(&self.hass);
-        let row = self.write(|tx| {
+        self.write(|tx| {
             let i =
                 tx.r.entities
                     .iter()
@@ -698,19 +713,11 @@ impl Registry {
                                    "changes": changes});
             if new_entity_id != entity_id {
                 event["old_entity_id"] = json!(entity_id);
+                tx.renamed.push((entity_id.to_owned(), row.clone()));
             }
             tx.entity_event(event);
             Ok(row)
-        })?;
-        if new_entity_id != entity_id
-            && let Ok(old) = ha_core::EntityId::parse(entity_id)
-            && let Some(state) = self.hass.states().get(&old)
-            && state.attributes.get("restored") == Some(&Value::Bool(true))
-        {
-            self.hass.remove_state(&old);
-            row.write_unavailable_state(&self.hass);
-        }
-        Ok(row)
+        })
     }
 
     /// The row for `(domain, platform, unique_id)`.
