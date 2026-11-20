@@ -41,10 +41,14 @@ An integration reaches hars in one of four ways:
   `button.kitchen_coffee_machine`. History that was recorded under the old
   id stays under it. To undo the integration, open it and delete its entry.
 
+  A rename does not rewrite entity ids that you typed into a dashboard or
+  an automation, as in Home Assistant: change those by hand.
+
   The same name, area and labels can be changed later on the device's page.
-  Two limits apply there today. Only a SwitchBot Cloud device can be
-  renamed: hars refuses a new name for a device of another integration,
-  because its entities would keep the old name until the next start. And a
+  Two limits apply there today. hars refuses a new name for a device that
+  has an entity of another integration than SwitchBot Cloud, because that
+  entity would keep the old name until the next start. (A device with no
+  entities, or with SwitchBot Cloud's only, takes a new name.) And a
   device can't be disabled or enabled. Moving a device to another area and
   labelling it work for every device.
 

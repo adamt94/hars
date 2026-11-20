@@ -134,7 +134,7 @@ settings. Home Assistant in Docker Desktop has the same limit.
 
 | Area | Works today | Not yet |
 |---|---|---|
-| Setup | Home Assistant's onboarding screens in the browser, logins, and import of a Home Assistant 2026.6 to 2026.11 install. SwitchBot Cloud can be added and removed in **Settings > Devices & services**, and its devices named and given an area as they are added. Any device can be moved to another area or labelled | Adding Hue or LIFX from the UI. Renaming a device of another integration than SwitchBot Cloud, disabling a device, and editing or deleting an area |
+| Setup | Home Assistant's onboarding screens in the browser, logins, and import of a Home Assistant 2026.6 to 2026.11 install. SwitchBot Cloud can be added and removed in **Settings > Devices & services**, and its devices named and given an area as they are added. Any device can be moved to another area or labelled | Adding Hue or LIFX from the UI. Renaming a device that has entities of another integration than SwitchBot Cloud, disabling a device, and editing or deleting an area |
 | Web UI | The official frontend: dashboards, device controls, the map, history, the logbook, and the automation list and editor in **Settings** | Translated names from integrations. The UI itself is translated, but entity and service names are in English |
 | Automations | YAML automations and ones you make in **Settings**. State, numeric-state, time, and template triggers. Templates in conditions, variables, and service calls. Reload without a restart | Traces, the `delay` and `wait_template` actions, scripts, and blueprints |
 | Templates | States, time, maths, and type casts | Areas, devices, labels, regex, and JSON functions. Live updates of a rendered template |

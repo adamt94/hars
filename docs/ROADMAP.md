@@ -622,15 +622,25 @@ ids, addresses, names and coordinates replaced with fake ones
       then `update` with each `new_entity_id`, as the dialog sends them).
       SwitchBot Cloud's running entities take a new name (their friendly
       names) and a new id (the old state goes, the entity writes what it
-      had under the new one, the services find it there) at once, as HA's
-      entities do; a restart finds the same ids and names. All 4
+      had under the new one, the services find it there) before the
+      command is answered, as HA's entities do; a restart finds the same
+      ids and names. The registry's row and the running entity change one
+      after the other, not in one step: set-up and removal of an entry
+      wait for both, but a service call does not, so one that names the
+      device or its area in between can select no entity. A climate
+      whose last state kept under its new id isn't a mode is not added
+      there, as in HA: it has no state and no service reaches it until
+      its entry is set up again. Entity ids written into dashboards and
+      automations are not rewritten by a rename, as in HA. All 4
       scenarios of `scripts/vectors/device_step.py` match HA's replies,
       registry and state events, stored rows and states, and the dialog
       is run in Chromium with the pinned frontend. `hars` differs on
       purpose: what its running entities can't follow is refused in words
-      rather than half done (a name for a device of an integration other
-      than SwitchBot Cloud, or with an entity whose own name carries the
-      device's; another id for such an entity; disabling or enabling a
+      rather than half done (a name for a device that has an entity of
+      an integration other than SwitchBot Cloud, or one whose own name
+      carries the device's, so a device with no entity rows takes a name
+      whatever its integration; another id for such an entity; disabling
+      or enabling a
       device), and so is any of these changes when the registry file it
       belongs in can't be written
 - [ ] Clean the registries at start as HA does
@@ -666,6 +676,10 @@ ids, addresses, names and coordinates replaced with fake ones
       and an entity that a device change enables again (its row said
       the device's disable had disabled it) starts with its entry's
       next set-up, where HA reloads the entry after 30 s
+- [ ] A service call's targets (a device or area expanded to entity ids)
+      and the entity it then picks in its component, read under one guard
+      with a rename, so a call made while an entity is given another id
+      always finds it under the old id or the new
 - [ ] Acceptance: every inventory entity matches its HA fixture attributes, and
       every frontend control (light colour/temp, climate mode/setpoint) works
 
