@@ -97,6 +97,11 @@ def snapshot(name):
     return {"snapshot": name}
 
 
+def user_disables(device, entity):
+    """The user disables a device (by its SwitchBot id) and an entity."""
+    return {"user_disables": {"device": device, "entity": entity}}
+
+
 def wait(seconds):
     """Let real time pass (HA retries a setup about 5 s after it failed)."""
     return {"wait": seconds}
@@ -266,13 +271,15 @@ SCENARIOS = [
     ),
     (
         "disabled_account",
-        "An account that was disabled (its devices and entities with it), then a "
-        "second account that lists the same devices: they become the second "
-        "account's, enabled. Written to switchbot_cloud/vectors/disabled_account.json "
+        "An account whose Bot and whose Hub's humidity sensor the user disabled, "
+        "then the account itself disabled (its other devices and entities with it), "
+        "then a second account that lists the same devices: they become the second "
+        "account's, enabled, but for what the user disabled. Written to switchbot_cloud/vectors/disabled_account.json "
         "as the stores before and after, not to flow.json (hars has no "
         "`config_entries/disable` yet).",
         [],
         [START, http("POST", FLOW + "/<flow:1>", GOOD),
+         user_disables(BOT, "sensor.hub_2_9d_humidity"),
          ws({"type": "config_entries/disable", "entry_id": "<entry:1>",
              "disabled_by": "user"}),
          snapshot("before"), START, http("POST", FLOW + "/<flow:2>", OTHER)],
@@ -534,6 +541,18 @@ async def run(subscriptions, steps):
                 }
 
             for step in steps:
+                if "user_disables" in step:
+                    devices, entities = dr.async_get(hass), er.async_get(hass)
+                    device = devices.async_get_device(
+                        identifiers={("switchbot_cloud", step["user_disables"]["device"])})
+                    devices.async_update_device(
+                        device.id, disabled_by=dr.DeviceEntryDisabler.USER)
+                    entities.async_update_entity(
+                        step["user_disables"]["entity"],
+                        disabled_by=er.RegistryEntryDisabler.USER)
+                    for _ in range(3):
+                        await hass.async_block_till_done()
+                    continue
                 if "snapshot" in step:
                     for _ in range(3):
                         await hass.async_block_till_done()

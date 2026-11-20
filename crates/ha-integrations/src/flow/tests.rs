@@ -1219,10 +1219,33 @@ async fn an_enabled_account_takes_over_a_disabled_ones_devices() {
         entities: serde_json::from_value(before["entities"].clone()).unwrap(),
         ..Default::default()
     };
-    assert!(
-        rows.entities
+    // What the account's disable disabled, and what the user had: a Bot
+    // (its entities with it) and the Hub's humidity sensor.
+    let disabled = |rows: &Value, key: &str| -> Vec<(String, Value)> {
+        rows.as_array()
+            .unwrap()
             .iter()
-            .all(|e| e.disabled_by.as_deref() == Some("config_entry"))
+            .map(|r| {
+                (
+                    r[key].as_str().unwrap().to_owned(),
+                    r["disabled_by"].clone(),
+                )
+            })
+            .collect()
+    };
+    let by_user: Vec<(String, Value)> = disabled(&before["entities"], "entity_id")
+        .into_iter()
+        .chain(disabled(&before["devices"], "name"))
+        .filter(|(_, by)| by != "config_entry")
+        .collect();
+    assert_eq!(
+        by_user,
+        [
+            ("button.towel_switch".to_owned(), json!("device")),
+            ("sensor.hub_2_9d_humidity".to_owned(), json!("user")),
+            ("sensor.towel_switch_battery".to_owned(), json!("device")),
+            ("Towel switch".to_owned(), json!("user")),
+        ]
     );
     let hass = Hass::new();
     let (base, _api) = fake().await;
@@ -1266,6 +1289,18 @@ async fn an_enabled_account_takes_over_a_disabled_ones_devices() {
     for (entity_id, s) in after["states"].as_object().unwrap() {
         assert_eq!(state(&hass, entity_id), *s, "{entity_id}");
     }
+    // The user's disables outlive the takeover: still disabled in the
+    // rows (compared above), and nothing runs for them.
+    let still: Vec<(String, Value)> = disabled(&json!(entities), "entity_id")
+        .into_iter()
+        .chain(disabled(&json!(devices), "name"))
+        .filter(|(_, by)| !by.is_null())
+        .collect();
+    assert_eq!(still, by_user);
+    for (entity_id, _) in &by_user[..3] {
+        assert_eq!(state(&hass, entity_id), Value::Null, "{entity_id}");
+    }
+    assert_eq!(hass.states().all().len(), 3);
 }
 
 /// Start-up's placeholder pass and a removal at the same time: the pass
