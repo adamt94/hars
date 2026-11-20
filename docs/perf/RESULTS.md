@@ -435,8 +435,8 @@ and builds its friendly name's JSON value under that lock, as it did
 without one before: the same number of allocations.
 
 Release binary (macOS arm64, stripped, `cargo build --release -p
-ha-server`): main (49c08fc) 9,469,328 bytes, branch 9,518,944
-(+49,616).
+ha-server`): main (49c08fc) 9,469,328 bytes, branch 9,535,472
+(+66,144).
 
 The same change stops the registry from parsing every deleted entity row
 for each entity it removes (the row for the same unique id is now looked
