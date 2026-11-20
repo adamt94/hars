@@ -1,80 +1,177 @@
-# hars
+<h1 align="center">
+  <img src="docs/assets/banner.svg" width="880" alt="hars: Home Assistant's core, rebuilt in Rust. Your whole smart home in about 11 MiB of memory.">
+</h1>
+
+<p align="center">
+  <a href="#get-started"><b>Get started</b></a> ·
+  <a href="#what-works-today">What works today</a> ·
+  <a href="#integrations">Integrations</a> ·
+  <a href="docs/ROADMAP.md">Roadmap</a> ·
+  <a href="docs/README.md">Documentation</a> ·
+  <a href="CONTRIBUTING.md">Contributing</a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/adamt94/homeassistant-rust/actions/workflows/ci.yml"><img src="https://github.com/adamt94/homeassistant-rust/actions/workflows/ci.yml/badge.svg" alt="CI status"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue" alt="License: Apache-2.0"></a>
+  <a href="docs/ARCHITECTURE.md#home-assistant-compatibility"><img src="https://img.shields.io/badge/matches-Home%20Assistant%202026.6.1-eb6834" alt="Matches Home Assistant 2026.6.1"></a>
+</p>
 
 hars is a rebuild of [Home Assistant](https://www.home-assistant.io/)'s core
-in Rust, made to run a smart home in a few megabytes of memory. It serves the
-unchanged official Home Assistant frontend and companion apps, and keeps its
-data in Home Assistant's own file formats. A fresh install idles at about
-7 MiB of memory and no CPU ([measurements](docs/perf/RESULTS.md)).
+in Rust. It runs your smart home in about 11 MiB of memory, where Home
+Assistant uses about 200 MiB. You keep the official Home Assistant web UI and
+phone app, unchanged. hars stores its data in Home Assistant's own file
+formats, so you can bring an existing install with you.
 
-It is early software. **Works today:** setting up in the browser with Home
-Assistant's onboarding screens, the web UI and login, dashboards, history and
-logbook, the iOS companion app (including push notifications to it),
-automations in YAML or made and edited in Settings (state, numeric-state,
-time and template triggers, with templates in their conditions, variables
-and service calls: "it's 28°C in the lounge" to your phone), the `sun`, `met`, `hue`, `lifx`,
-`switchbot_cloud`, `mobile_app`, `person` and `zone` integrations, and
-importing a Home Assistant 2026.6 install. **Not yet:** adding
-integrations from the UI, automation traces, the `delay` and
-`wait_template` actions, templates beyond states, time, maths and type
-casts (no areas, devices, labels, regex or JSON functions yet, and no live
-re-rendering of `render_template`), scripts, other kinds of notifications
-and remote access. If you need those, keep Home Assistant
-for now.
+> [!NOTE]
+> hars is early software. It supports a few integrations so far, and you
+> can't add a device from the UI yet. Read
+> [what works today](#what-works-today) before you switch.
 
-## Install
+## Why use hars
 
-Copy one command, paste it, press Enter. It sets everything up and tells you
-what to open when it's done.
+<p align="center">
+  <img src="docs/assets/perf.svg" width="800" alt="Bar charts that compare Home Assistant and hars on the same home. The table below has the same numbers.">
+</p>
 
-**Mac or Linux:** open the Terminal app and paste:
+| Measured on the same home | Home Assistant 2026.6.1 | hars | Difference |
+|---|---|---|---|
+| Memory | 203 MiB | 10.7 MiB | 19× less |
+| Start-up time | 5.85 s | 0.39 s | 15× faster |
+| CPU at rest, share of one core | 0.199 % | 0.023 % | 9× less |
+| CPU wakeups each second | 3.4 | 0.75 | 4.5× fewer |
 
-```sh
-curl -fsSL https://raw.githubusercontent.com/adamt94/homeassistant-rust/main/install.sh | sh
-```
+Both ran in Docker on one machine with the same devices: Hue, LIFX, and
+SwitchBot, a weather forecast, an iPhone, and 4 automations.
+[The performance results](docs/perf/RESULTS.md#reference-install-hars-and-ha-2026-11-16)
+describe how each number was measured.
 
-**Windows:** open PowerShell (search for it in the Start menu) and paste:
+- **It fits on small hardware.** A new install idles at 10 MiB of memory,
+  with no CPU use and no wakeups. A Raspberry Pi keeps almost all of its
+  memory for other things.
+- **It restarts in under a second.** An upgrade doesn't leave your
+  automations off for long.
+- **It sleeps when your home is quiet.** hars does no background busywork.
+  It wakes for a device message or a timer, then sleeps again, so a small
+  computer's CPU can stay in its sleep states.
+- **Nothing new to learn.** hars serves the official Home Assistant
+  frontend and works with the iOS companion app. Your logins, dashboards,
+  and automations come across when you import.
+- **It is checked against Home Assistant.** Tests compare hars with answers
+  from Home Assistant's own code. hars also ran beside a real install for
+  23 hours and made the same 213 automation triggers and 251 service calls.
+- **The numbers can't drift.** Every pull request is measured in CI. A
+  change that breaks a [resource budget](docs/PERF.md#budgets) doesn't merge.
 
-```powershell
-irm https://raw.githubusercontent.com/adamt94/homeassistant-rust/main/install.ps1 | iex
-```
+## Get started
 
-When it finishes you see something like:
+You need a computer that stays on and about five minutes.
 
-```
-hars is running.
+1. Open a terminal. On a Mac or on Linux, open the **Terminal** app. On
+   Windows, open **PowerShell** from the Start menu.
+2. Paste the command for your computer and press Enter.
 
-  Open  http://192.168.1.20:8123  (on this computer: http://localhost:8123)
-  and create your account.
-```
+   Mac or Linux:
 
-Open that address in a browser, on this computer or any phone or laptop on
-the same Wi-Fi. Create your login, set your home's location, and you're on
-the dashboard.
+   ```sh
+   curl -fsSL https://raw.githubusercontent.com/adamt94/homeassistant-rust/main/install.sh | sh
+   ```
 
-hars runs inside [Docker](https://www.docker.com/). If you don't have it, the
-command offers to install it first (on Windows and Mac that's Docker Desktop,
-which may ask you to accept its terms or restart once; then paste the command
-again). Everything hars keeps goes in a `hars` folder in your home folder.
-Want to see what the command does before running it? Read
-[install.sh](install.sh) or [install.ps1](install.ps1).
+   Windows:
 
-**Which computer?** One that stays on: a Raspberry Pi 4 or 5 (64-bit), a mini
-PC, a NAS or any Linux server is ideal. A Mac or Windows PC works too, with
-one difference: there Docker can't let hars search your network, so if a
-LIFX bulb gets a new IP address, hars won't find it again. Give your bulbs a
-fixed address in your router's settings (Home Assistant in Docker Desktop
-has the same limit).
+   ```powershell
+   irm https://raw.githubusercontent.com/adamt94/homeassistant-rust/main/install.ps1 | iex
+   ```
 
-## Moving from Home Assistant
+3. Wait for this message:
 
-hars can take over a Home Assistant **2026.6** install: your logins (browsers
-and the companion app stay logged in), devices, areas, dashboards,
-integrations' settings, location and YAML automations. History starts fresh.
+   ```
+   hars is running.
 
-1. In Home Assistant, make a backup and unpack it, or stop Home Assistant and
-   copy its config folder (the one with `configuration.yaml` in it). Never
-   use the folder Home Assistant is running from.
-2. Run the install command with the copy's location in front. Mac or Linux:
+     Open  http://192.168.1.20:8123  (on this computer: http://localhost:8123)
+     and create your account.
+   ```
+
+4. Open that address in a browser. Any phone or laptop on the same Wi-Fi
+   can open it too.
+5. Create your login and set your home's location. The dashboard opens with
+   a weather forecast for your home.
+
+To add your phone, install the Home Assistant app on your iPhone and give it
+the same address.
+
+**Do you already run Home Assistant?** Follow
+[Move from Home Assistant](#move-from-home-assistant) instead. An import is
+also the only way to add Hue, LIFX, or SwitchBot devices today.
+
+### What the command does
+
+hars runs inside [Docker](https://www.docker.com/). If Docker is missing, the
+command offers to install it. On a Mac or on Windows, the command installs
+Docker Desktop, which may ask you to accept its terms or to restart once.
+Paste the command again after that.
+
+hars keeps everything in a `hars` folder in your home folder. To see each
+step before you run the command, read [install.sh](install.sh) or
+[install.ps1](install.ps1).
+
+### Which computer to use
+
+Use a computer that stays on. A Raspberry Pi 4 or 5 (64-bit), a mini PC, a
+NAS, or any Linux server is ideal.
+
+A Mac or a Windows PC works too, with one limit. Docker Desktop can't let
+hars search your network. If a LIFX bulb gets a new IP address, hars won't
+find the bulb again. Give your bulbs a fixed address in your router's
+settings. Home Assistant in Docker Desktop has the same limit.
+
+## What works today
+
+| Area | Works today | Not yet |
+|---|---|---|
+| Setup | Home Assistant's onboarding screens in the browser, logins, and import of a Home Assistant 2026.6 install | Adding an integration from the UI |
+| Web UI | The official frontend: dashboards, device controls, the map, history, the logbook, and the automation list and editor in **Settings** | Languages other than English |
+| Automations | YAML automations and ones you make in **Settings**. State, numeric-state, time, and template triggers. Templates in conditions, variables, and service calls. Reload without a restart | Traces, the `delay` and `wait_template` actions, scripts, and blueprints |
+| Templates | States, time, maths, and type casts | Areas, devices, labels, regex, and JSON functions. Live updates of a rendered template |
+| Phone | The iOS companion app: sensors, location, and push notifications ("it's 28°C in the lounge") | Other kinds of notifications. The Android app is untested |
+| Access | Your home network | Remote access |
+
+If you need something in the "Not yet" column, keep Home Assistant for now.
+The [roadmap](docs/ROADMAP.md) tracks every item.
+
+## Integrations
+
+| Integration | What you get | How you add it today |
+|---|---|---|
+| Philips Hue (`hue`) | Lights, rooms and zones, scenes, and motion, temperature, light-level, and battery sensors | Import |
+| LIFX (`lifx`) | Colour bulbs, with identify and restart buttons | Import |
+| SwitchBot Cloud (`switchbot_cloud`) | Bot, Hub 2 temperature and humidity, and an infrared air conditioner | Import |
+| Weather (`met`) | The forecast for your home from met.no | Set during setup |
+| Sun (`sun`) | Sunrise, sunset, and the sun's position | Always on |
+| Companion app (`mobile_app`) | Your iPhone's sensors and location, and notifications to it | Log in from the app |
+| People and zones (`person`, `zone`) | Who is home, and your home zone | Always on |
+
+"Import" means the integration comes across when you
+[move from Home Assistant](#move-from-home-assistant).
+
+MQTT, ESPHome, and zigbee2mqtt are planned.
+[Supported and planned integrations](docs/INTEGRATIONS.md) has the full
+list, the limits of each integration, and how to ask for a new one.
+
+## Move from Home Assistant
+
+hars can take over a Home Assistant **2026.6** install. It brings your
+logins, devices, areas, dashboards, integration settings, location, and YAML
+automations. Browsers and the companion app stay logged in. History starts
+fresh.
+
+1. Copy your Home Assistant config folder, the one that holds
+   `configuration.yaml`. Either make a backup in Home Assistant and unpack
+   it, or stop Home Assistant and copy the folder. Never use the folder that
+   Home Assistant is running from.
+2. Run the install command with the location of the copy.
+
+   Mac or Linux:
 
    ```sh
    curl -fsSL https://raw.githubusercontent.com/adamt94/homeassistant-rust/main/install.sh | HARS_IMPORT=/path/to/ha-copy sh
@@ -86,63 +183,86 @@ integrations' settings, location and YAML automations. History starts fresh.
    $env:HARS_IMPORT = 'C:\path\to\ha-copy'; irm https://raw.githubusercontent.com/adamt94/homeassistant-rust/main/install.ps1 | iex
    ```
 
-3. Log in as you did on Home Assistant. `hars/config/import-report.json`
-   lists each integration and automation and whether hars can run it.
+3. Log in as you did on Home Assistant.
+4. Open `hars/config/import-report.json`. It lists each integration and
+   automation, and says whether hars can run it.
 
 If Home Assistant still runs on the same computer, hars picks the next free
-port (8124) and tells you. To give hars port 8123, stop Home Assistant and
+port (8124) and tells you. To give hars port 8123, stop Home Assistant, then
 run the install command again with `HARS_PORT=8123` in front of `sh`.
-To try hars beside Home Assistant first, with nothing it decides reaching a
-device, see [shadow mode](docs/SHADOW.md).
+
+To try hars beside Home Assistant first, use
+[shadow mode](docs/SHADOW.md). In shadow mode, nothing that hars decides
+reaches a device, and a script compares its decisions with Home Assistant's.
 
 ## Everyday use
 
 | To | Run |
 |---|---|
-| upgrade | the install command again (your data and settings stay) |
-| see what it's doing | `docker logs -f hars` |
-| stop / start | `docker stop hars` / `docker start hars` |
-| change its port or log detail | edit `hars/hars.env` in your home folder, then run the install command again |
-| uninstall | `docker rm -f hars`, then delete the `hars` folder if you don't want your data |
+| Upgrade | The install command again. Your data and settings stay |
+| See what hars is doing | `docker logs -f hars` |
+| Stop or start hars | `docker stop hars` or `docker start hars` |
+| Change the port or the log detail | Edit `hars/hars.env` in your home folder, then run the install command again |
+| Uninstall | `docker rm -f hars`. Delete the `hars` folder too if you don't want your data |
 
 On Linux, if the installer said it uses `sudo`, put `sudo` in front of the
-`docker` commands. hars starts again by itself after a restart.
+`docker` commands. hars starts again by itself after a restart of the
+computer.
 
-**Back up** by copying the `hars` folder while hars is stopped. On Linux some
-files belong to root, so copy with `sudo`. [More on backups and where data
-lives](docs/INSTALL.md#your-data-and-backups).
+To back up, stop hars and copy the `hars` folder. On Linux, some files belong
+to root, so copy with `sudo`.
+[Your data and backups](docs/INSTALL.md#your-data-and-backups) has the
+commands.
 
 ## Troubleshooting
 
-- **The command says Docker isn't running:** open Docker Desktop (Mac,
-  Windows) and wait until it says it's running, then paste the command again.
-- **The page doesn't load from another device:** use the address with
-  numbers the installer printed, not `localhost`, and check both devices are
-  on the same network. On Windows, allow Docker Desktop through the firewall
-  if it asks.
-- **Something went wrong:** `docker logs hars` shows why. For more detail,
-  uncomment `RUST_LOG=debug` in `hars/hars.env` and run the install command
+- **The command says Docker isn't running.** Open Docker Desktop (Mac or
+  Windows) and wait until it says that it is running. Paste the command
   again.
-- **An integration or automation is missing after moving from Home
-  Assistant:** `hars/config/import-report.json` says why.
-- **Limits:** only Home Assistant 2026.6 installs can be imported. The UI is
-  in English. The companion app is tested on iOS. Everything in "Not yet"
-  above. The [roadmap](docs/ROADMAP.md) lists what is done and planned.
+- **The page doesn't load from another device.** Use the address with
+  numbers that the installer printed, not `localhost`. Check that both
+  devices are on the same network. On Windows, allow Docker Desktop through
+  the firewall if it asks.
+- **Something else went wrong.** `docker logs hars` shows why. For more
+  detail, uncomment `RUST_LOG=debug` in `hars/hars.env` and run the install
+  command again.
+- **An integration or automation is missing after an import.**
+  `hars/config/import-report.json` says why.
+- **You found a bug.** [Open an issue](https://github.com/adamt94/homeassistant-rust/issues/new/choose).
+  Report a security problem privately, as the
+  [security policy](SECURITY.md) describes.
 
 ## Other ways to install
 
-[docs/INSTALL.md](docs/INSTALL.md) covers installing with Docker Compose,
-setting hars up from a script without a browser, the installer's settings,
-running the plain binary and building from source.
+[Installing hars: the details](docs/INSTALL.md) covers Docker Compose, setup
+from a script without a browser, the installer's settings, the plain binary,
+and a build from source.
 
-## More
+## Documentation
 
-- [Documentation index](docs/README.md): how hars is built, performance,
-  the roadmap.
-- [Contributing](CONTRIBUTING.md), [security policy](SECURITY.md),
-  [code of conduct](CODE_OF_CONDUCT.md).
+- [Supported and planned integrations](docs/INTEGRATIONS.md)
+- [Roadmap](docs/ROADMAP.md): what is done and what is next
+- [Performance guide](docs/PERF.md) and
+  [measured results](docs/perf/RESULTS.md)
+- [Architecture](docs/ARCHITECTURE.md): how hars is built, and how it stays
+  compatible with Home Assistant
+- [Documentation index](docs/README.md): everything else
+
+## Contributing
+
+Contributions are welcome. hars judges every change on two things: it must
+behave as Home Assistant does, and it must stay inside the resource budgets.
+[CONTRIBUTING.md](CONTRIBUTING.md) explains the setup, the tests, and the
+review. To add a device, start with the
+[integration guide](docs/guides/add-an-integration.md). Everyone who takes
+part follows the [code of conduct](CODE_OF_CONDUCT.md).
 
 ## License
 
-Apache-2.0, as Home Assistant. hars is an independent reimplementation. It is
-not affiliated with or endorsed by the Home Assistant project or Nabu Casa.
+hars is licensed under [Apache-2.0](LICENSE), as Home Assistant is.
+
+hars is an independent project. It is not affiliated with or endorsed by the
+Home Assistant project, the Open Home Foundation, or Nabu Casa. "Home
+Assistant" is a trademark of its owner, and hars uses the name only to say
+what it is compatible with. Please don't ask for support with hars in Home
+Assistant's channels.

@@ -212,7 +212,9 @@ Integrations add code, timers and sockets, so the pull request needs numbers
 
 - Tick the integration's items in the [roadmap](../ROADMAP.md), listing
   deliberate differences from HA.
-- Add the domain to "Works today" in the [README](../../README.md).
+- Add the integration to the "Integrations" table in the
+  [README](../../README.md#integrations) and to
+  [INTEGRATIONS.md](../INTEGRATIONS.md), with what it doesn't do yet.
 - Open the pull request with the template filled in.
 
 ## Checklist
@@ -226,4 +228,4 @@ Integrations add code, timers and sockets, so the pull request needs numbers
 - [ ] Tests: vectors from `scripts/vectors/<domain>.py`, simulated-time
       schedule, wire format
 - [ ] Binary size, a `perf.sh` row and a RESULTS entry
-- [ ] Roadmap and README updated
+- [ ] Roadmap, README and INTEGRATIONS.md updated

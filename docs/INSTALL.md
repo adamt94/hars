@@ -1,6 +1,6 @@
 # Installing hars: the details
 
-The [README](../README.md#install) has the one command most people need.
+The [README](../README.md#get-started) has the one command most people need.
 This page is for when you want to know what it does, change how it runs, or
 install another way.
 

@@ -602,6 +602,10 @@ Fixtures are sanitised (no tokens, coordinates rounded) before they are committe
       ([results](perf/RESULTS.md#reference-install-hars-and-ha-2026-11-16))
 
 ## Post-MVP
+
+[Supported and planned integrations](INTEGRATIONS.md) summarises the
+integration items below for users.
+
 - Remote access, SwitchBot webhooks
 - Jinja templates beyond the first slices: HA's other functions, filters
   and tests (areas, devices, floors, labels, entities, `expand`,

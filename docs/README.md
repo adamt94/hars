@@ -2,10 +2,12 @@
 
 ## Using hars
 
-- [Install, upgrade, troubleshoot](../README.md#install): the main README,
-  with the one-command install.
-- [Moving from Home Assistant](../README.md#moving-from-home-assistant):
+- [Get started, upgrade, troubleshoot](../README.md#get-started): the main
+  README, with the one-command install.
+- [Move from Home Assistant](../README.md#move-from-home-assistant):
   importing an existing install.
+- [Supported and planned integrations](INTEGRATIONS.md): what each
+  integration does today, its limits, and what is planned.
 - [Installing in detail](INSTALL.md): what the install command does and its
   settings, data and backups, Docker Compose, setting up without a browser,
   the plain binary.
@@ -43,7 +45,7 @@
 
 ### Launch checklist
 
-The [install command](../README.md#install) assumes a public repository and
+The [install command](../README.md#get-started) assumes a public repository and
 a public image. Before announcing hars, in this order:
 
 1. Make the repository public (**Settings**, **General**, **Danger Zone**,

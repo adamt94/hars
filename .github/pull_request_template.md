@@ -17,5 +17,5 @@
 - [ ] `scripts/check.sh` passes (fmt, clippy `-D warnings`, tests, script tests)
 - [ ] Every behaviour change has a test; values that must match HA come from vectors made by a script in `scripts/vectors/`
 - [ ] Performance evidence above, and a `docs/perf/RESULTS.md` entry if the numbers moved
-- [ ] Docs updated: roadmap box ticked, `docs/ARCHITECTURE.md` if structure changed, README "works today" if users see it
+- [ ] Docs updated: roadmap box ticked, `docs/ARCHITECTURE.md` if structure changed, README "What works today" and `docs/INTEGRATIONS.md` if users see it
 - [ ] No tokens, keys, personal data or real coordinates in fixtures

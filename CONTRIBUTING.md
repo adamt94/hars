@@ -134,7 +134,8 @@ Where code goes, and when a new crate is justified, is in
   [roadmap](docs/ROADMAP.md) item it finishes, update
   [ARCHITECTURE.md](docs/ARCHITECTURE.md) if it changes structure or adds a
   crate, add a [results](docs/perf/RESULTS.md) entry if it changes the
-  numbers, and update the README's "works today" if users see it.
+  numbers, and update the README's "What works today" and
+  [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md) if users see it.
 
 ## Review
 
