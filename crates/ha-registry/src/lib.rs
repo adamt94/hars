@@ -9,7 +9,9 @@
 //! shapes the frontend reads.
 
 mod live;
-pub use live::{DeviceInfo, EntityPatch, EntryInfo, EntryLookup, Registry, available_entity_id};
+pub use live::{
+    DeviceInfo, EntityPatch, EntryInfo, EntryLookup, Lookup, Registry, available_entity_id,
+};
 
 use ha_core::storage::{Store, StoreError};
 use serde::{Deserialize, Serialize};

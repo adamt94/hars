@@ -32,6 +32,7 @@ rule have no script yet; they are listed
 | `automation_editor.py` | `ha-api/src/automation/vectors/editor.json` (19 scenarios: `automations.yaml` at start and, for each `GET`, `POST` and `DELETE` to `/api/config/automation/config/<id>`, the reply's status, content type and body, the file afterwards, and the automations' `state_changed`, `entity_registry_updated` and `automation_reloaded` events that follow; then the registry rows and states) | HA 2026.6.1's core with `http`, `auth`, `api`, `config` (`EditAutomationConfigView`) and `automation`, booted in a temporary directory with an admin and a non-admin user, over real HTTP (aiohttp 3.13.5, annotatedyaml 1.0.2) |
 | `entity_registry_ws.py` | `ha-api/src/ws/vectors/entity_registry.json` (the entity, device and category registries as stored at start, then 44 messages from an admin and a user: `config/entity_registry/list`, `get`, `get_entries` and `update` of the area, labels and categories, and `config/category_registry/list`, each with its reply, the `entity_registry_updated` events and the rows as stored afterwards) | HA 2026.6.1's core with `http`, `auth`, `websocket_api` and `config` (`entity_registry.py`, `category_registry.py`), booted in a temporary directory, over a real WebSocket (aiohttp 3.13.5) |
 | `import_releases.py` | `ha-server/tests/vectors/import/` (one synthetic install as 2026.6.1, 2026.6.4, 2026.7.0, 2026.7.4, 2026.8.3 and 2026.11.2 leave it on disk: every `.storage` file but `http`'s (it holds the run's port) and the YAML; and `downgrade.json`: whether Home Assistant 2026.6.1's `bootstrap.async_load_base_functionality` loads each of those directories, with the error it logs when it doesn't) and `ha-integrations/src/mobile_app/vectors/store_downgrade.json` (2026.7's `mobile_app` store after 2026.6.1 loaded it, and after its next change) | **Each release's own code**, one virtualenv per release: its registries, `Store`s and their migrations (`bootstrap.async_load_base_functionality`), `auth`, `config_entries` (`ConfigEntry.async_migrate`, so `hue`'s, `lifx`'s and `met`'s `async_migrate_entry`), `core_config`, `person`, `zone`, `lovelace`, `frontend` storage, `restore_state` and `mobile_app`'s store. Only `http` (a free loopback port), `person`, `zone` and `labs` are set up; nothing reaches the network. `downgrade.json` is the result of 2026.6.1's base bootstrap alone |
+| `config_flow.py` | `ha-api/src/config_entries/vectors/flow.json` (12 scenarios of adding SwitchBot Cloud from the UI: each HTTP request to the flow views and each WebSocket message, with the reply, the events `config_entries/subscribe` and `config_entries/flow/subscribe` sent after it, and the entries stored at the end), `ha-integrations/src/switchbot_cloud/vectors/fresh_setup.json` (the device and entity registry rows and the states of the entry the first scenario adds), `two_accounts.json` (the same after a second account lists the same devices), `retry.json` (the entry's changes when a setup that wasn't ready is retried, after 6.5 s of real time) and `ha-api/src/ws/vectors/integration_descriptions.json` (`integration/descriptions` for the integrations hars runs) | HA 2026.6.1's core with `http`, `auth`, `websocket_api`, `config` (`config_entries.py`'s views and commands on `helpers/data_entry_flow.py`), `data_entry_flow.py`, `config_entries.py` and `switchbot_cloud` (its `config_flow.py`, setup and platforms) on switchbot-api 2.11.0, voluptuous 0.15.2 and voluptuous-serialize 2.7.0, booted in a temporary directory with an admin and a non-admin user, the library's `_API_HOST` pointed at a server on 127.0.0.1 that answers with the recorded responses in `switchbot_cloud/vectors/` |
 
 `render_template.py` and `template_functions.py` write two crates'
 vectors because they are two halves of one behaviour: the engine's answers
@@ -160,7 +161,16 @@ cargo test -p ha-api automation::
 cargo test -p ha-api entity_registry
 ```
 
-It runs each scenario on an event loop whose clock moves only when a step
+For `config_flow.py` (HA's own requirements, plus `switchbot_cloud`'s
+library, which imports pycryptodome):
+
+```sh
+.venv-template/bin/pip install --no-deps switchbot-api==2.11.0 pycryptodome
+.venv-template/bin/python -I scripts/vectors/config_flow.py
+cargo test -p ha-api config_entries && cargo test -p ha-integrations flow
+```
+
+`automation_templates.py` and `automation_reload.py` run each scenario on an event loop whose clock moves only when a step
 says so (every timer due on the way runs, in order), with `time.time` and
 `dt_util.utcnow`/`now` following it, and seeds `random` (the time trackers'
 offsets). Automations that one change triggers run side by side in an

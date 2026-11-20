@@ -5,6 +5,7 @@ pub mod button;
 pub mod climate;
 pub mod components;
 pub mod config_entries;
+pub mod flow;
 pub mod hue;
 pub mod lifx;
 pub mod light;
@@ -57,12 +58,56 @@ pub const USER_AGENT: &str = concat!(
     " (+https://github.com/adamt94/homeassistant-rust)"
 );
 
+/// Where the integrations' services are: the real hosts, or stand-ins on
+/// 127.0.0.1 in tests.
+#[derive(Debug, Clone)]
+pub struct Endpoints {
+    /// The SwitchBot API's base URL ([`switchbot_cloud::api::HOST`]).
+    pub switchbot: String,
+}
+
+impl Default for Endpoints {
+    fn default() -> Self {
+        Self {
+            switchbot: switchbot_cloud::api::HOST.to_owned(),
+        }
+    }
+}
+
 /// What [`start`] started.
 pub struct Started {
     /// The domains running, for `get_config`'s `components`.
     pub running: Vec<&'static str>,
     /// The weather entities, for the forecast APIs.
     pub weather: Arc<weather::Weather>,
+    /// The entity components, which entries added later feed too.
+    pub components: Arc<components::Components>,
+    /// The tasks of the entries that can be stopped (`switchbot_cloud`'s),
+    /// by entry id, for [`flow::Manager`].
+    pub tasks: Vec<(String, tokio::task::JoinHandle<()>)>,
+}
+
+/// Start a `switchbot_cloud` entry: at start-up, or when a config flow
+/// has made it. The components exist before the entry's setup, as HA sets
+/// them up before the entries.
+pub(crate) fn spawn_switchbot(
+    components: &Arc<components::Components>,
+    entry: Map<String, Value>,
+    endpoints: &Endpoints,
+    status: config_entries::Status,
+) -> tokio::task::JoinHandle<()> {
+    let _ = (
+        components.buttons(),
+        components.climates(),
+        components.switches(),
+    );
+    tokio::spawn(switchbot_cloud::run(
+        components.clone(),
+        entry,
+        endpoints.switchbot.clone(),
+        components.hass().setup_guard(),
+        status,
+    ))
 }
 
 /// A fresh install (no `core.config_entries` file) gets the entries HA's
@@ -79,12 +124,19 @@ pub fn import_default_entries(entries: &config_entries::ConfigEntries) {
 /// Start the integrations for these config entries (each a
 /// `core.config_entries` item). With no config entries at all (a fresh
 /// install), `sun` is started as HA's default configuration does.
+///
+/// `lookup` is the live registry in `hars` (entries set up later, and the
+/// services' targets, see rows made after start-up); a fixed set in tests.
+/// Not generic: a generic `start` is compiled into the binary crate, and
+/// takes a second copy of the HTTP client with it (150 KiB).
 pub fn start(
     hass: &Hass,
-    registries: Arc<Registries>,
+    lookup: ha_registry::Lookup,
     entries: Option<&[Map<String, Value>]>,
     profiles: light::Profiles,
+    endpoints: &Endpoints,
 ) -> Started {
+    let registries: Arc<Registries> = lookup.get();
     let field =
         |e: &Map<String, Value>, k: &str| e.get(k).and_then(Value::as_str).map(str::to_owned);
     let enabled = |domain: &'static str| {
@@ -143,7 +195,7 @@ pub fn start(
         weather.register_services(hass, registries.clone());
         running.extend(["met", "weather"]);
     }
-    let components = components::Components::new(hass, registries.clone(), profiles);
+    let components = components::Components::new(hass, lookup, profiles);
     let hue: Vec<Map<String, Value>> = enabled(hue::DOMAIN).cloned().collect();
     if !hue.is_empty() {
         let platforms = hue::Platforms::new(&components);
@@ -153,23 +205,17 @@ pub fn start(
         running.extend(["hue", "light", "sensor", "binary_sensor", "switch", "scene"]);
     }
     let switchbot: Vec<Map<String, Value>> = enabled(switchbot_cloud::DOMAIN).cloned().collect();
-    if !switchbot.is_empty() {
-        // The components exist from startup, as HA sets them up before
-        // the entries.
-        let _ = (
-            components.buttons(),
-            components.climates(),
-            components.switches(),
+    let mut tasks = Vec::new();
+    for entry in switchbot {
+        let entry_id = field(&entry, "entry_id").unwrap_or_default();
+        let task = spawn_switchbot(
+            &components,
+            entry,
+            endpoints,
+            config_entries::Status::none(),
         );
-        for entry in switchbot {
-            tokio::spawn(switchbot_cloud::run(
-                components.clone(),
-                entry,
-                switchbot_cloud::api::HOST.to_owned(),
-                hass.setup_guard(),
-            ));
-        }
-        running.extend(["switchbot_cloud", "button", "climate", "sensor", "switch"]);
+        tasks.push((entry_id, task));
+        running.extend(switchbot_cloud::COMPONENTS);
     }
     let lifx: Vec<Map<String, Value>> = enabled(lifx::DOMAIN).cloned().collect();
     if !lifx.is_empty() {
@@ -186,7 +232,12 @@ pub fn start(
     }
     running.sort_unstable();
     running.dedup();
-    Started { running, weather }
+    Started {
+        running,
+        weather,
+        components,
+        tasks,
+    }
 }
 
 #[cfg(test)]
@@ -223,9 +274,10 @@ mod tests {
         let entries = [entry("met", 2, 1), entry("lifx", 2, 1)];
         let started = start(
             &hass,
-            registries,
+            registries.into(),
             Some(&entries),
             light::Profiles::default(),
+            &Endpoints::default(),
         );
         assert!(started.running.is_empty(), "{:?}", started.running);
     }

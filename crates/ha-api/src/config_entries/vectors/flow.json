@@ -1,0 +1,5357 @@
+{
+ "scenarios": [
+  {
+   "name": "add",
+   "doc": "The frontend's Add integration dialog, start to finish: the form, the credentials, the entry set up before the reply.",
+   "subscriptions": [
+    {
+     "sub": "entries",
+     "msg": {
+      "type": "config_entries/subscribe"
+     },
+     "first": [
+      {
+       "id": 1,
+       "type": "result",
+       "success": true,
+       "result": null
+      },
+      {
+       "id": 1,
+       "type": "event",
+       "event": []
+      }
+     ]
+    },
+    {
+     "sub": "flows",
+     "msg": {
+      "type": "config_entries/flow/subscribe"
+     },
+     "first": [
+      {
+       "id": 1,
+       "type": "event",
+       "event": []
+      },
+      {
+       "id": 1,
+       "type": "result",
+       "success": true,
+       "result": null
+      }
+     ]
+    },
+    {
+     "sub": "hubs",
+     "msg": {
+      "type": "config_entries/subscribe",
+      "type_filter": [
+       "hub"
+      ]
+     },
+     "first": [
+      {
+       "id": 1,
+       "type": "result",
+       "success": true,
+       "result": null
+      },
+      {
+       "id": 1,
+       "type": "event",
+       "event": []
+      }
+     ]
+    },
+    {
+     "sub": "helpers",
+     "msg": {
+      "type": "config_entries/subscribe",
+      "type_filter": [
+       "helper"
+      ]
+     },
+     "first": [
+      {
+       "id": 1,
+       "type": "result",
+       "success": true,
+       "result": null
+      },
+      {
+       "id": 1,
+       "type": "event",
+       "event": []
+      }
+     ]
+    }
+   ],
+   "steps": [
+    {
+     "ws": {
+      "user": "admin",
+      "msg": {
+       "type": "config_entries/flow/progress"
+      }
+     },
+     "replies": [
+      {
+       "type": "result",
+       "success": true,
+       "result": []
+      }
+     ],
+     "events": []
+    },
+    {
+     "ws": {
+      "user": "admin",
+      "msg": {
+       "type": "config_entries/get"
+      }
+     },
+     "replies": [
+      {
+       "type": "result",
+       "success": true,
+       "result": []
+      }
+     ],
+     "events": []
+    },
+    {
+     "handlers": "",
+     "status": 200,
+     "known": [
+      "hue",
+      "lifx",
+      "met",
+      "mobile_app",
+      "sun",
+      "switchbot_cloud"
+     ],
+     "has_more": true
+    },
+    {
+     "handlers": "?type=integration",
+     "status": 200,
+     "known": [
+      "hue",
+      "lifx",
+      "met",
+      "mobile_app",
+      "sun",
+      "switchbot_cloud"
+     ],
+     "has_more": true
+    },
+    {
+     "handlers": "?type=helper",
+     "status": 200,
+     "known": [],
+     "has_more": true
+    },
+    {
+     "handlers": "?type=hub",
+     "status": 500,
+     "known": [],
+     "has_more": false
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow",
+      "user": "admin",
+      "sent": "{\"handler\": \"switchbot_cloud\", \"show_advanced_options\": false}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:1>",
+      "handler": "switchbot_cloud",
+      "data_schema": [
+       {
+        "type": "string",
+        "name": "api_token",
+        "required": true
+       },
+       {
+        "type": "string",
+        "name": "api_key",
+        "required": true
+       }
+      ],
+      "errors": {},
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "user"
+     },
+     "events": []
+    },
+    {
+     "http": {
+      "method": "GET",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:1>",
+      "handler": "switchbot_cloud",
+      "data_schema": [
+       {
+        "type": "string",
+        "name": "api_token",
+        "required": true
+       },
+       {
+        "type": "string",
+        "name": "api_key",
+        "required": true
+       }
+      ],
+      "errors": {},
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "user"
+     },
+     "events": []
+    },
+    {
+     "ws": {
+      "user": "admin",
+      "msg": {
+       "type": "config_entries/flow/progress"
+      }
+     },
+     "replies": [
+      {
+       "type": "result",
+       "success": true,
+       "result": []
+      }
+     ],
+     "events": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin",
+      "sent": "{\"api_token\": \"token-one\", \"api_key\": \"secret-one\"}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "create_entry",
+      "flow_id": "<flow:1>",
+      "handler": "switchbot_cloud",
+      "description": null,
+      "description_placeholders": null,
+      "title": "SwitchBot Cloud",
+      "minor_version": 1,
+      "options": {},
+      "subentries": [],
+      "version": 1,
+      "result": {
+       "created_at": "<ts>",
+       "entry_id": "<entry:1>",
+       "domain": "switchbot_cloud",
+       "modified_at": "<ts>",
+       "title": "SwitchBot Cloud",
+       "source": "user",
+       "state": "loaded",
+       "supports_options": false,
+       "supports_remove_device": false,
+       "supports_unload": true,
+       "supports_reconfigure": false,
+       "supported_subentry_types": {},
+       "pref_disable_new_entities": false,
+       "pref_disable_polling": false,
+       "disabled_by": null,
+       "reason": null,
+       "error_reason_translation_key": null,
+       "error_reason_translation_placeholders": null,
+       "num_subentries": 0
+      }
+     },
+     "events": [
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "added",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "switchbot_cloud",
+          "modified_at": "<ts>",
+          "title": "SwitchBot Cloud",
+          "source": "user",
+          "state": "not_loaded",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": false,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "switchbot_cloud",
+          "modified_at": "<ts>",
+          "title": "SwitchBot Cloud",
+          "source": "user",
+          "state": "setup_in_progress",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": false,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "switchbot_cloud",
+          "modified_at": "<ts>",
+          "title": "SwitchBot Cloud",
+          "source": "user",
+          "state": "setup_in_progress",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": true,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "switchbot_cloud",
+          "modified_at": "<ts>",
+          "title": "SwitchBot Cloud",
+          "source": "user",
+          "state": "loaded",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": true,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "hubs",
+       "event": [
+        {
+         "type": "added",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "switchbot_cloud",
+          "modified_at": "<ts>",
+          "title": "SwitchBot Cloud",
+          "source": "user",
+          "state": "not_loaded",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": false,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "hubs",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "switchbot_cloud",
+          "modified_at": "<ts>",
+          "title": "SwitchBot Cloud",
+          "source": "user",
+          "state": "setup_in_progress",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": false,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "hubs",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "switchbot_cloud",
+          "modified_at": "<ts>",
+          "title": "SwitchBot Cloud",
+          "source": "user",
+          "state": "setup_in_progress",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": true,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "hubs",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "switchbot_cloud",
+          "modified_at": "<ts>",
+          "title": "SwitchBot Cloud",
+          "source": "user",
+          "state": "loaded",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": true,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "http": {
+      "method": "GET",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin"
+     },
+     "status": 404,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "message": "Invalid flow specified"
+     },
+     "events": []
+    },
+    {
+     "http": {
+      "method": "DELETE",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin"
+     },
+     "status": 404,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "message": "Invalid flow specified"
+     },
+     "events": []
+    },
+    {
+     "ws": {
+      "user": "admin",
+      "msg": {
+       "type": "config_entries/get"
+      }
+     },
+     "replies": [
+      {
+       "type": "result",
+       "success": true,
+       "result": [
+        {
+         "created_at": "<ts>",
+         "entry_id": "<entry:1>",
+         "domain": "switchbot_cloud",
+         "modified_at": "<ts>",
+         "title": "SwitchBot Cloud",
+         "source": "user",
+         "state": "loaded",
+         "supports_options": false,
+         "supports_remove_device": false,
+         "supports_unload": true,
+         "supports_reconfigure": false,
+         "supported_subentry_types": {},
+         "pref_disable_new_entities": false,
+         "pref_disable_polling": false,
+         "disabled_by": null,
+         "reason": null,
+         "error_reason_translation_key": null,
+         "error_reason_translation_placeholders": null,
+         "num_subentries": 0
+        }
+       ]
+      }
+     ],
+     "events": []
+    },
+    {
+     "ws": {
+      "user": "admin",
+      "msg": {
+       "type": "config_entries/get",
+       "domain": "switchbot_cloud"
+      }
+     },
+     "replies": [
+      {
+       "type": "result",
+       "success": true,
+       "result": [
+        {
+         "created_at": "<ts>",
+         "entry_id": "<entry:1>",
+         "domain": "switchbot_cloud",
+         "modified_at": "<ts>",
+         "title": "SwitchBot Cloud",
+         "source": "user",
+         "state": "loaded",
+         "supports_options": false,
+         "supports_remove_device": false,
+         "supports_unload": true,
+         "supports_reconfigure": false,
+         "supported_subentry_types": {},
+         "pref_disable_new_entities": false,
+         "pref_disable_polling": false,
+         "disabled_by": null,
+         "reason": null,
+         "error_reason_translation_key": null,
+         "error_reason_translation_placeholders": null,
+         "num_subentries": 0
+        }
+       ]
+      }
+     ],
+     "events": []
+    },
+    {
+     "ws": {
+      "user": "admin",
+      "msg": {
+       "type": "config_entries/get",
+       "domain": "hue"
+      }
+     },
+     "replies": [
+      {
+       "type": "result",
+       "success": true,
+       "result": []
+      }
+     ],
+     "events": []
+    },
+    {
+     "ws": {
+      "user": "admin",
+      "msg": {
+       "type": "config_entries/get",
+       "type_filter": [
+        "hub"
+       ]
+      }
+     },
+     "replies": [
+      {
+       "type": "result",
+       "success": true,
+       "result": [
+        {
+         "created_at": "<ts>",
+         "entry_id": "<entry:1>",
+         "domain": "switchbot_cloud",
+         "modified_at": "<ts>",
+         "title": "SwitchBot Cloud",
+         "source": "user",
+         "state": "loaded",
+         "supports_options": false,
+         "supports_remove_device": false,
+         "supports_unload": true,
+         "supports_reconfigure": false,
+         "supported_subentry_types": {},
+         "pref_disable_new_entities": false,
+         "pref_disable_polling": false,
+         "disabled_by": null,
+         "reason": null,
+         "error_reason_translation_key": null,
+         "error_reason_translation_placeholders": null,
+         "num_subentries": 0
+        }
+       ]
+      }
+     ],
+     "events": []
+    },
+    {
+     "ws": {
+      "user": "admin",
+      "msg": {
+       "type": "config_entries/get",
+       "type_filter": "hub"
+      }
+     },
+     "replies": [
+      {
+       "type": "result",
+       "success": true,
+       "result": [
+        {
+         "created_at": "<ts>",
+         "entry_id": "<entry:1>",
+         "domain": "switchbot_cloud",
+         "modified_at": "<ts>",
+         "title": "SwitchBot Cloud",
+         "source": "user",
+         "state": "loaded",
+         "supports_options": false,
+         "supports_remove_device": false,
+         "supports_unload": true,
+         "supports_reconfigure": false,
+         "supported_subentry_types": {},
+         "pref_disable_new_entities": false,
+         "pref_disable_polling": false,
+         "disabled_by": null,
+         "reason": null,
+         "error_reason_translation_key": null,
+         "error_reason_translation_placeholders": null,
+         "num_subentries": 0
+        }
+       ]
+      }
+     ],
+     "events": []
+    },
+    {
+     "ws": {
+      "user": "admin",
+      "msg": {
+       "type": "config_entries/get",
+       "type_filter": [
+        "helper"
+       ]
+      }
+     },
+     "replies": [
+      {
+       "type": "result",
+       "success": true,
+       "result": []
+      }
+     ],
+     "events": []
+    },
+    {
+     "ws": {
+      "user": "admin",
+      "msg": {
+       "type": "config_entries/get",
+       "type_filter": [
+        "device",
+        "service"
+       ]
+      }
+     },
+     "replies": [
+      {
+       "type": "result",
+       "success": true,
+       "result": []
+      }
+     ],
+     "events": []
+    },
+    {
+     "ws": {
+      "user": "admin",
+      "msg": {
+       "type": "config_entries/get",
+       "type_filter": [
+        5
+       ]
+      }
+     },
+     "replies": [
+      {
+       "type": "result",
+       "success": false,
+       "error": {
+        "code": "invalid_format",
+        "message": "expected str @ data['type_filter'][0]. Got 5"
+       }
+      }
+     ],
+     "events": []
+    },
+    {
+     "ws": {
+      "user": "admin",
+      "msg": {
+       "type": "config_entries/get",
+       "domain": 5
+      }
+     },
+     "replies": [
+      {
+       "type": "result",
+       "success": false,
+       "error": {
+        "code": "invalid_format",
+        "message": "expected str for dictionary value @ data['domain']. Got 5"
+       }
+      }
+     ],
+     "events": []
+    },
+    {
+     "ws": {
+      "user": "admin",
+      "msg": {
+       "type": "config_entries/get",
+       "extra": 1
+      }
+     },
+     "replies": [
+      {
+       "type": "result",
+       "success": false,
+       "error": {
+        "code": "invalid_format",
+        "message": "extra keys not allowed @ data['extra']. Got 1"
+       }
+      }
+     ],
+     "events": []
+    }
+   ],
+   "entries": [
+    {
+     "created_at": "<time>",
+     "data": {
+      "api_key": "secret-one",
+      "api_token": "token-one",
+      "webhook_id": "<webhook>"
+     },
+     "disabled_by": null,
+     "discovery_keys": {},
+     "domain": "switchbot_cloud",
+     "entry_id": "<entry:1>",
+     "minor_version": 1,
+     "modified_at": "<time>",
+     "options": {},
+     "pref_disable_new_entities": false,
+     "pref_disable_polling": false,
+     "source": "user",
+     "subentries": [],
+     "title": "SwitchBot Cloud",
+     "unique_id": "token-one",
+     "version": 1
+    }
+   ],
+   "deleted_devices": 0,
+   "deleted_entities": 0
+  },
+  {
+   "name": "bad_credentials",
+   "doc": "A token the API refuses shows the form again with `invalid_auth`; the same flow then takes the right one.",
+   "subscriptions": [
+    {
+     "sub": "entries",
+     "msg": {
+      "type": "config_entries/subscribe"
+     },
+     "first": [
+      {
+       "id": 1,
+       "type": "result",
+       "success": true,
+       "result": null
+      },
+      {
+       "id": 1,
+       "type": "event",
+       "event": []
+      }
+     ]
+    },
+    {
+     "sub": "flows",
+     "msg": {
+      "type": "config_entries/flow/subscribe"
+     },
+     "first": [
+      {
+       "id": 1,
+       "type": "event",
+       "event": []
+      },
+      {
+       "id": 1,
+       "type": "result",
+       "success": true,
+       "result": null
+      }
+     ]
+    }
+   ],
+   "steps": [
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow",
+      "user": "admin",
+      "sent": "{\"handler\": \"switchbot_cloud\", \"show_advanced_options\": false}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:1>",
+      "handler": "switchbot_cloud",
+      "data_schema": [
+       {
+        "type": "string",
+        "name": "api_token",
+        "required": true
+       },
+       {
+        "type": "string",
+        "name": "api_key",
+        "required": true
+       }
+      ],
+      "errors": {},
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "user"
+     },
+     "events": []
+    },
+    {
+     "api": "forbidden"
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin",
+      "sent": "{\"api_token\": \"token-one\", \"api_key\": \"secret-one\"}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:1>",
+      "handler": "switchbot_cloud",
+      "data_schema": [
+       {
+        "type": "string",
+        "name": "api_token",
+        "required": true
+       },
+       {
+        "type": "string",
+        "name": "api_key",
+        "required": true
+       }
+      ],
+      "errors": {
+       "base": "invalid_auth"
+      },
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "user"
+     },
+     "events": []
+    },
+    {
+     "http": {
+      "method": "GET",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:1>",
+      "handler": "switchbot_cloud",
+      "data_schema": [
+       {
+        "type": "string",
+        "name": "api_token",
+        "required": true
+       },
+       {
+        "type": "string",
+        "name": "api_key",
+        "required": true
+       }
+      ],
+      "errors": {},
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "user"
+     },
+     "events": []
+    },
+    {
+     "api": "ok"
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin",
+      "sent": "{\"api_token\": \"token-one\", \"api_key\": \"secret-one\"}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "create_entry",
+      "flow_id": "<flow:1>",
+      "handler": "switchbot_cloud",
+      "description": null,
+      "description_placeholders": null,
+      "title": "SwitchBot Cloud",
+      "minor_version": 1,
+      "options": {},
+      "subentries": [],
+      "version": 1,
+      "result": {
+       "created_at": "<ts>",
+       "entry_id": "<entry:1>",
+       "domain": "switchbot_cloud",
+       "modified_at": "<ts>",
+       "title": "SwitchBot Cloud",
+       "source": "user",
+       "state": "loaded",
+       "supports_options": false,
+       "supports_remove_device": false,
+       "supports_unload": true,
+       "supports_reconfigure": false,
+       "supported_subentry_types": {},
+       "pref_disable_new_entities": false,
+       "pref_disable_polling": false,
+       "disabled_by": null,
+       "reason": null,
+       "error_reason_translation_key": null,
+       "error_reason_translation_placeholders": null,
+       "num_subentries": 0
+      }
+     },
+     "events": [
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "added",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "switchbot_cloud",
+          "modified_at": "<ts>",
+          "title": "SwitchBot Cloud",
+          "source": "user",
+          "state": "not_loaded",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": false,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "switchbot_cloud",
+          "modified_at": "<ts>",
+          "title": "SwitchBot Cloud",
+          "source": "user",
+          "state": "setup_in_progress",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": false,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "switchbot_cloud",
+          "modified_at": "<ts>",
+          "title": "SwitchBot Cloud",
+          "source": "user",
+          "state": "setup_in_progress",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": true,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "switchbot_cloud",
+          "modified_at": "<ts>",
+          "title": "SwitchBot Cloud",
+          "source": "user",
+          "state": "loaded",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": true,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "entries": [
+    {
+     "created_at": "<time>",
+     "data": {
+      "api_key": "secret-one",
+      "api_token": "token-one",
+      "webhook_id": "<webhook>"
+     },
+     "disabled_by": null,
+     "discovery_keys": {},
+     "domain": "switchbot_cloud",
+     "entry_id": "<entry:1>",
+     "minor_version": 1,
+     "modified_at": "<time>",
+     "options": {},
+     "pref_disable_new_entities": false,
+     "pref_disable_polling": false,
+     "source": "user",
+     "subentries": [],
+     "title": "SwitchBot Cloud",
+     "unique_id": "token-one",
+     "version": 1
+    }
+   ],
+   "deleted_devices": 0,
+   "deleted_entities": 0
+  },
+  {
+   "name": "cannot_connect",
+   "doc": "What the API's failures show: an error status, an error `statusCode` and a refused connection are `cannot_connect`; a body that isn't JSON or has no lists is `unknown`.",
+   "subscriptions": [
+    {
+     "sub": "entries",
+     "msg": {
+      "type": "config_entries/subscribe"
+     },
+     "first": [
+      {
+       "id": 1,
+       "type": "result",
+       "success": true,
+       "result": null
+      },
+      {
+       "id": 1,
+       "type": "event",
+       "event": []
+      }
+     ]
+    },
+    {
+     "sub": "flows",
+     "msg": {
+      "type": "config_entries/flow/subscribe"
+     },
+     "first": [
+      {
+       "id": 1,
+       "type": "event",
+       "event": []
+      },
+      {
+       "id": 1,
+       "type": "result",
+       "success": true,
+       "result": null
+      }
+     ]
+    }
+   ],
+   "steps": [
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow",
+      "user": "admin",
+      "sent": "{\"handler\": \"switchbot_cloud\", \"show_advanced_options\": false}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:1>",
+      "handler": "switchbot_cloud",
+      "data_schema": [
+       {
+        "type": "string",
+        "name": "api_token",
+        "required": true
+       },
+       {
+        "type": "string",
+        "name": "api_key",
+        "required": true
+       }
+      ],
+      "errors": {},
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "user"
+     },
+     "events": []
+    },
+    {
+     "api": "http500"
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin",
+      "sent": "{\"api_token\": \"token-one\", \"api_key\": \"secret-one\"}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:1>",
+      "handler": "switchbot_cloud",
+      "data_schema": [
+       {
+        "type": "string",
+        "name": "api_token",
+        "required": true
+       },
+       {
+        "type": "string",
+        "name": "api_key",
+        "required": true
+       }
+      ],
+      "errors": {
+       "base": "cannot_connect"
+      },
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "user"
+     },
+     "events": []
+    },
+    {
+     "api": "status190"
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin",
+      "sent": "{\"api_token\": \"token-one\", \"api_key\": \"secret-one\"}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:1>",
+      "handler": "switchbot_cloud",
+      "data_schema": [
+       {
+        "type": "string",
+        "name": "api_token",
+        "required": true
+       },
+       {
+        "type": "string",
+        "name": "api_key",
+        "required": true
+       }
+      ],
+      "errors": {
+       "base": "cannot_connect"
+      },
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "user"
+     },
+     "events": []
+    },
+    {
+     "api": "refused"
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin",
+      "sent": "{\"api_token\": \"token-one\", \"api_key\": \"secret-one\"}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:1>",
+      "handler": "switchbot_cloud",
+      "data_schema": [
+       {
+        "type": "string",
+        "name": "api_token",
+        "required": true
+       },
+       {
+        "type": "string",
+        "name": "api_key",
+        "required": true
+       }
+      ],
+      "errors": {
+       "base": "cannot_connect"
+      },
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "user"
+     },
+     "events": []
+    },
+    {
+     "api": "not_json"
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin",
+      "sent": "{\"api_token\": \"token-one\", \"api_key\": \"secret-one\"}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:1>",
+      "handler": "switchbot_cloud",
+      "data_schema": [
+       {
+        "type": "string",
+        "name": "api_token",
+        "required": true
+       },
+       {
+        "type": "string",
+        "name": "api_key",
+        "required": true
+       }
+      ],
+      "errors": {
+       "base": "unknown"
+      },
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "user"
+     },
+     "events": []
+    },
+    {
+     "api": "no_lists"
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin",
+      "sent": "{\"api_token\": \"token-one\", \"api_key\": \"secret-one\"}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:1>",
+      "handler": "switchbot_cloud",
+      "data_schema": [
+       {
+        "type": "string",
+        "name": "api_token",
+        "required": true
+       },
+       {
+        "type": "string",
+        "name": "api_key",
+        "required": true
+       }
+      ],
+      "errors": {
+       "base": "unknown"
+      },
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "user"
+     },
+     "events": []
+    },
+    {
+     "api": "offline"
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin",
+      "sent": "{\"api_token\": \"token-one\", \"api_key\": \"secret-one\"}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:1>",
+      "handler": "switchbot_cloud",
+      "data_schema": [
+       {
+        "type": "string",
+        "name": "api_token",
+        "required": true
+       },
+       {
+        "type": "string",
+        "name": "api_key",
+        "required": true
+       }
+      ],
+      "errors": {
+       "base": "unknown"
+      },
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "user"
+     },
+     "events": []
+    },
+    {
+     "api": "ok"
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin",
+      "sent": "{\"api_token\": \"token-one\", \"api_key\": \"secret-one\"}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "create_entry",
+      "flow_id": "<flow:1>",
+      "handler": "switchbot_cloud",
+      "description": null,
+      "description_placeholders": null,
+      "title": "SwitchBot Cloud",
+      "minor_version": 1,
+      "options": {},
+      "subentries": [],
+      "version": 1,
+      "result": {
+       "created_at": "<ts>",
+       "entry_id": "<entry:1>",
+       "domain": "switchbot_cloud",
+       "modified_at": "<ts>",
+       "title": "SwitchBot Cloud",
+       "source": "user",
+       "state": "loaded",
+       "supports_options": false,
+       "supports_remove_device": false,
+       "supports_unload": true,
+       "supports_reconfigure": false,
+       "supported_subentry_types": {},
+       "pref_disable_new_entities": false,
+       "pref_disable_polling": false,
+       "disabled_by": null,
+       "reason": null,
+       "error_reason_translation_key": null,
+       "error_reason_translation_placeholders": null,
+       "num_subentries": 0
+      }
+     },
+     "events": [
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "added",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "switchbot_cloud",
+          "modified_at": "<ts>",
+          "title": "SwitchBot Cloud",
+          "source": "user",
+          "state": "not_loaded",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": false,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "switchbot_cloud",
+          "modified_at": "<ts>",
+          "title": "SwitchBot Cloud",
+          "source": "user",
+          "state": "setup_in_progress",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": false,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "switchbot_cloud",
+          "modified_at": "<ts>",
+          "title": "SwitchBot Cloud",
+          "source": "user",
+          "state": "setup_in_progress",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": true,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "switchbot_cloud",
+          "modified_at": "<ts>",
+          "title": "SwitchBot Cloud",
+          "source": "user",
+          "state": "loaded",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": true,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "entries": [
+    {
+     "created_at": "<time>",
+     "data": {
+      "api_key": "secret-one",
+      "api_token": "token-one",
+      "webhook_id": "<webhook>"
+     },
+     "disabled_by": null,
+     "discovery_keys": {},
+     "domain": "switchbot_cloud",
+     "entry_id": "<entry:1>",
+     "minor_version": 1,
+     "modified_at": "<time>",
+     "options": {},
+     "pref_disable_new_entities": false,
+     "pref_disable_polling": false,
+     "source": "user",
+     "subentries": [],
+     "title": "SwitchBot Cloud",
+     "unique_id": "token-one",
+     "version": 1
+    }
+   ],
+   "deleted_devices": 0,
+   "deleted_entities": 0
+  },
+  {
+   "name": "duplicate",
+   "doc": "The account's token is the entry's unique id: a second flow with it aborts, one with another token makes a second entry.",
+   "subscriptions": [
+    {
+     "sub": "entries",
+     "msg": {
+      "type": "config_entries/subscribe"
+     },
+     "first": [
+      {
+       "id": 1,
+       "type": "result",
+       "success": true,
+       "result": null
+      },
+      {
+       "id": 1,
+       "type": "event",
+       "event": []
+      }
+     ]
+    },
+    {
+     "sub": "flows",
+     "msg": {
+      "type": "config_entries/flow/subscribe"
+     },
+     "first": [
+      {
+       "id": 1,
+       "type": "event",
+       "event": []
+      },
+      {
+       "id": 1,
+       "type": "result",
+       "success": true,
+       "result": null
+      }
+     ]
+    }
+   ],
+   "steps": [
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow",
+      "user": "admin",
+      "sent": "{\"handler\": \"switchbot_cloud\", \"show_advanced_options\": false}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:1>",
+      "handler": "switchbot_cloud",
+      "data_schema": [
+       {
+        "type": "string",
+        "name": "api_token",
+        "required": true
+       },
+       {
+        "type": "string",
+        "name": "api_key",
+        "required": true
+       }
+      ],
+      "errors": {},
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "user"
+     },
+     "events": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin",
+      "sent": "{\"api_token\": \"token-one\", \"api_key\": \"secret-one\"}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "create_entry",
+      "flow_id": "<flow:1>",
+      "handler": "switchbot_cloud",
+      "description": null,
+      "description_placeholders": null,
+      "title": "SwitchBot Cloud",
+      "minor_version": 1,
+      "options": {},
+      "subentries": [],
+      "version": 1,
+      "result": {
+       "created_at": "<ts>",
+       "entry_id": "<entry:1>",
+       "domain": "switchbot_cloud",
+       "modified_at": "<ts>",
+       "title": "SwitchBot Cloud",
+       "source": "user",
+       "state": "loaded",
+       "supports_options": false,
+       "supports_remove_device": false,
+       "supports_unload": true,
+       "supports_reconfigure": false,
+       "supported_subentry_types": {},
+       "pref_disable_new_entities": false,
+       "pref_disable_polling": false,
+       "disabled_by": null,
+       "reason": null,
+       "error_reason_translation_key": null,
+       "error_reason_translation_placeholders": null,
+       "num_subentries": 0
+      }
+     },
+     "events": [
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "added",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "switchbot_cloud",
+          "modified_at": "<ts>",
+          "title": "SwitchBot Cloud",
+          "source": "user",
+          "state": "not_loaded",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": false,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "switchbot_cloud",
+          "modified_at": "<ts>",
+          "title": "SwitchBot Cloud",
+          "source": "user",
+          "state": "setup_in_progress",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": false,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "switchbot_cloud",
+          "modified_at": "<ts>",
+          "title": "SwitchBot Cloud",
+          "source": "user",
+          "state": "setup_in_progress",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": true,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "switchbot_cloud",
+          "modified_at": "<ts>",
+          "title": "SwitchBot Cloud",
+          "source": "user",
+          "state": "loaded",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": true,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow",
+      "user": "admin",
+      "sent": "{\"handler\": \"switchbot_cloud\", \"show_advanced_options\": false}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:2>",
+      "handler": "switchbot_cloud",
+      "data_schema": [
+       {
+        "type": "string",
+        "name": "api_token",
+        "required": true
+       },
+       {
+        "type": "string",
+        "name": "api_key",
+        "required": true
+       }
+      ],
+      "errors": {},
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "user"
+     },
+     "events": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:2>",
+      "user": "admin",
+      "sent": "{\"api_token\": \"token-one\", \"api_key\": \"another-secret\"}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "abort",
+      "flow_id": "<flow:2>",
+      "handler": "switchbot_cloud",
+      "reason": "already_configured",
+      "description_placeholders": null
+     },
+     "events": []
+    },
+    {
+     "http": {
+      "method": "GET",
+      "path": "/api/config/config_entries/flow/<flow:2>",
+      "user": "admin"
+     },
+     "status": 404,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "message": "Invalid flow specified"
+     },
+     "events": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow",
+      "user": "admin",
+      "sent": "{\"handler\": \"switchbot_cloud\", \"show_advanced_options\": false}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:3>",
+      "handler": "switchbot_cloud",
+      "data_schema": [
+       {
+        "type": "string",
+        "name": "api_token",
+        "required": true
+       },
+       {
+        "type": "string",
+        "name": "api_key",
+        "required": true
+       }
+      ],
+      "errors": {},
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "user"
+     },
+     "events": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:3>",
+      "user": "admin",
+      "sent": "{\"api_token\": \"token-two\", \"api_key\": \"secret-two\"}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "create_entry",
+      "flow_id": "<flow:3>",
+      "handler": "switchbot_cloud",
+      "description": null,
+      "description_placeholders": null,
+      "title": "SwitchBot Cloud",
+      "minor_version": 1,
+      "options": {},
+      "subentries": [],
+      "version": 1,
+      "result": {
+       "created_at": "<ts>",
+       "entry_id": "<entry:2>",
+       "domain": "switchbot_cloud",
+       "modified_at": "<ts>",
+       "title": "SwitchBot Cloud",
+       "source": "user",
+       "state": "loaded",
+       "supports_options": false,
+       "supports_remove_device": false,
+       "supports_unload": true,
+       "supports_reconfigure": false,
+       "supported_subentry_types": {},
+       "pref_disable_new_entities": false,
+       "pref_disable_polling": false,
+       "disabled_by": null,
+       "reason": null,
+       "error_reason_translation_key": null,
+       "error_reason_translation_placeholders": null,
+       "num_subentries": 0
+      }
+     },
+     "events": [
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "added",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:2>",
+          "domain": "switchbot_cloud",
+          "modified_at": "<ts>",
+          "title": "SwitchBot Cloud",
+          "source": "user",
+          "state": "not_loaded",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": false,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:2>",
+          "domain": "switchbot_cloud",
+          "modified_at": "<ts>",
+          "title": "SwitchBot Cloud",
+          "source": "user",
+          "state": "setup_in_progress",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": false,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:2>",
+          "domain": "switchbot_cloud",
+          "modified_at": "<ts>",
+          "title": "SwitchBot Cloud",
+          "source": "user",
+          "state": "setup_in_progress",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": true,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:2>",
+          "domain": "switchbot_cloud",
+          "modified_at": "<ts>",
+          "title": "SwitchBot Cloud",
+          "source": "user",
+          "state": "loaded",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": true,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "ws": {
+      "user": "admin",
+      "msg": {
+       "type": "config_entries/get"
+      }
+     },
+     "replies": [
+      {
+       "type": "result",
+       "success": true,
+       "result": [
+        {
+         "created_at": "<ts>",
+         "entry_id": "<entry:1>",
+         "domain": "switchbot_cloud",
+         "modified_at": "<ts>",
+         "title": "SwitchBot Cloud",
+         "source": "user",
+         "state": "loaded",
+         "supports_options": false,
+         "supports_remove_device": false,
+         "supports_unload": true,
+         "supports_reconfigure": false,
+         "supported_subentry_types": {},
+         "pref_disable_new_entities": false,
+         "pref_disable_polling": false,
+         "disabled_by": null,
+         "reason": null,
+         "error_reason_translation_key": null,
+         "error_reason_translation_placeholders": null,
+         "num_subentries": 0
+        },
+        {
+         "created_at": "<ts>",
+         "entry_id": "<entry:2>",
+         "domain": "switchbot_cloud",
+         "modified_at": "<ts>",
+         "title": "SwitchBot Cloud",
+         "source": "user",
+         "state": "loaded",
+         "supports_options": false,
+         "supports_remove_device": false,
+         "supports_unload": true,
+         "supports_reconfigure": false,
+         "supported_subentry_types": {},
+         "pref_disable_new_entities": false,
+         "pref_disable_polling": false,
+         "disabled_by": null,
+         "reason": null,
+         "error_reason_translation_key": null,
+         "error_reason_translation_placeholders": null,
+         "num_subentries": 0
+        }
+       ]
+      }
+     ],
+     "events": []
+    }
+   ],
+   "entries": [
+    {
+     "created_at": "<time>",
+     "data": {
+      "api_key": "secret-one",
+      "api_token": "token-one",
+      "webhook_id": "<webhook>"
+     },
+     "disabled_by": null,
+     "discovery_keys": {},
+     "domain": "switchbot_cloud",
+     "entry_id": "<entry:1>",
+     "minor_version": 1,
+     "modified_at": "<time>",
+     "options": {},
+     "pref_disable_new_entities": false,
+     "pref_disable_polling": false,
+     "source": "user",
+     "subentries": [],
+     "title": "SwitchBot Cloud",
+     "unique_id": "token-one",
+     "version": 1
+    },
+    {
+     "created_at": "<time>",
+     "data": {
+      "api_key": "secret-two",
+      "api_token": "token-two",
+      "webhook_id": "<webhook>"
+     },
+     "disabled_by": null,
+     "discovery_keys": {},
+     "domain": "switchbot_cloud",
+     "entry_id": "<entry:2>",
+     "minor_version": 1,
+     "modified_at": "<time>",
+     "options": {},
+     "pref_disable_new_entities": false,
+     "pref_disable_polling": false,
+     "source": "user",
+     "subentries": [],
+     "title": "SwitchBot Cloud",
+     "unique_id": "token-two",
+     "version": 1
+    }
+   ],
+   "deleted_devices": 0,
+   "deleted_entities": 0
+  },
+  {
+   "name": "two_flows",
+   "doc": "Two flows in progress for one integration: both stay until each is answered.",
+   "subscriptions": [
+    {
+     "sub": "entries",
+     "msg": {
+      "type": "config_entries/subscribe"
+     },
+     "first": [
+      {
+       "id": 1,
+       "type": "result",
+       "success": true,
+       "result": null
+      },
+      {
+       "id": 1,
+       "type": "event",
+       "event": []
+      }
+     ]
+    },
+    {
+     "sub": "flows",
+     "msg": {
+      "type": "config_entries/flow/subscribe"
+     },
+     "first": [
+      {
+       "id": 1,
+       "type": "event",
+       "event": []
+      },
+      {
+       "id": 1,
+       "type": "result",
+       "success": true,
+       "result": null
+      }
+     ]
+    }
+   ],
+   "steps": [
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow",
+      "user": "admin",
+      "sent": "{\"handler\": \"switchbot_cloud\", \"show_advanced_options\": false}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:1>",
+      "handler": "switchbot_cloud",
+      "data_schema": [
+       {
+        "type": "string",
+        "name": "api_token",
+        "required": true
+       },
+       {
+        "type": "string",
+        "name": "api_key",
+        "required": true
+       }
+      ],
+      "errors": {},
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "user"
+     },
+     "events": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow",
+      "user": "admin",
+      "sent": "{\"handler\": \"switchbot_cloud\", \"show_advanced_options\": false}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:2>",
+      "handler": "switchbot_cloud",
+      "data_schema": [
+       {
+        "type": "string",
+        "name": "api_token",
+        "required": true
+       },
+       {
+        "type": "string",
+        "name": "api_key",
+        "required": true
+       }
+      ],
+      "errors": {},
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "user"
+     },
+     "events": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin",
+      "sent": "{\"api_token\": \"token-one\", \"api_key\": \"secret-one\"}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "create_entry",
+      "flow_id": "<flow:1>",
+      "handler": "switchbot_cloud",
+      "description": null,
+      "description_placeholders": null,
+      "title": "SwitchBot Cloud",
+      "minor_version": 1,
+      "options": {},
+      "subentries": [],
+      "version": 1,
+      "result": {
+       "created_at": "<ts>",
+       "entry_id": "<entry:1>",
+       "domain": "switchbot_cloud",
+       "modified_at": "<ts>",
+       "title": "SwitchBot Cloud",
+       "source": "user",
+       "state": "loaded",
+       "supports_options": false,
+       "supports_remove_device": false,
+       "supports_unload": true,
+       "supports_reconfigure": false,
+       "supported_subentry_types": {},
+       "pref_disable_new_entities": false,
+       "pref_disable_polling": false,
+       "disabled_by": null,
+       "reason": null,
+       "error_reason_translation_key": null,
+       "error_reason_translation_placeholders": null,
+       "num_subentries": 0
+      }
+     },
+     "events": [
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "added",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "switchbot_cloud",
+          "modified_at": "<ts>",
+          "title": "SwitchBot Cloud",
+          "source": "user",
+          "state": "not_loaded",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": false,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "switchbot_cloud",
+          "modified_at": "<ts>",
+          "title": "SwitchBot Cloud",
+          "source": "user",
+          "state": "setup_in_progress",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": false,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "switchbot_cloud",
+          "modified_at": "<ts>",
+          "title": "SwitchBot Cloud",
+          "source": "user",
+          "state": "setup_in_progress",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": true,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "switchbot_cloud",
+          "modified_at": "<ts>",
+          "title": "SwitchBot Cloud",
+          "source": "user",
+          "state": "loaded",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": true,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "http": {
+      "method": "GET",
+      "path": "/api/config/config_entries/flow/<flow:2>",
+      "user": "admin"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:2>",
+      "handler": "switchbot_cloud",
+      "data_schema": [
+       {
+        "type": "string",
+        "name": "api_token",
+        "required": true
+       },
+       {
+        "type": "string",
+        "name": "api_key",
+        "required": true
+       }
+      ],
+      "errors": {},
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "user"
+     },
+     "events": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:2>",
+      "user": "admin",
+      "sent": "{\"api_token\": \"token-one\", \"api_key\": \"secret-one\"}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "abort",
+      "flow_id": "<flow:2>",
+      "handler": "switchbot_cloud",
+      "reason": "already_configured",
+      "description_placeholders": null
+     },
+     "events": []
+    },
+    {
+     "http": {
+      "method": "GET",
+      "path": "/api/config/config_entries/flow/<flow:2>",
+      "user": "admin"
+     },
+     "status": 404,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "message": "Invalid flow specified"
+     },
+     "events": []
+    }
+   ],
+   "entries": [
+    {
+     "created_at": "<time>",
+     "data": {
+      "api_key": "secret-one",
+      "api_token": "token-one",
+      "webhook_id": "<webhook>"
+     },
+     "disabled_by": null,
+     "discovery_keys": {},
+     "domain": "switchbot_cloud",
+     "entry_id": "<entry:1>",
+     "minor_version": 1,
+     "modified_at": "<time>",
+     "options": {},
+     "pref_disable_new_entities": false,
+     "pref_disable_polling": false,
+     "source": "user",
+     "subentries": [],
+     "title": "SwitchBot Cloud",
+     "unique_id": "token-one",
+     "version": 1
+    }
+   ],
+   "deleted_devices": 0,
+   "deleted_entities": 0
+  },
+  {
+   "name": "invalid_input",
+   "doc": "What the form's schema refuses, and bodies that aren't an object.",
+   "subscriptions": [],
+   "steps": [
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow",
+      "user": "admin",
+      "sent": "{\"handler\": \"switchbot_cloud\", \"show_advanced_options\": false}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:1>",
+      "handler": "switchbot_cloud",
+      "data_schema": [
+       {
+        "type": "string",
+        "name": "api_token",
+        "required": true
+       },
+       {
+        "type": "string",
+        "name": "api_key",
+        "required": true
+       }
+      ],
+      "errors": {},
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "user"
+     },
+     "events": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin",
+      "sent": "{\"api_key\": \"x\"}"
+     },
+     "status": 400,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "errors": {
+       "api_token": "required key not provided"
+      }
+     },
+     "events": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin",
+      "sent": "{\"api_token\": \"x\"}"
+     },
+     "status": 400,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "errors": {
+       "api_key": "required key not provided"
+      }
+     },
+     "events": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin",
+      "sent": "{\"api_token\": 5, \"api_key\": \"x\"}"
+     },
+     "status": 400,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "errors": {
+       "api_token": "expected str"
+      }
+     },
+     "events": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin",
+      "sent": "{\"api_token\": \"x\", \"api_key\": null}"
+     },
+     "status": 400,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "errors": {
+       "api_key": "expected str"
+      }
+     },
+     "events": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin",
+      "sent": "{\"api_token\": \"token-one\", \"api_key\": \"secret-one\", \"extra\": 1}"
+     },
+     "status": 400,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "errors": {
+       "base": [
+        "extra keys not allowed @ data['extra']"
+       ]
+      }
+     },
+     "events": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin",
+      "sent": "{\"api_token\": \"token-one\", \"api_key\": \"secret-one\", \"extra\": 1, \"more\": 2}"
+     },
+     "status": 400,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "errors": {
+       "base": [
+        "extra keys not allowed @ data['extra']",
+        "extra keys not allowed @ data['more']"
+       ]
+      }
+     },
+     "events": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin",
+      "sent": "{\"api_token\": 5, \"api_key\": \"x\", \"extra\": 1}"
+     },
+     "status": 400,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "errors": {
+       "api_token": "expected str",
+       "base": [
+        "extra keys not allowed @ data['extra']"
+       ]
+      }
+     },
+     "events": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin",
+      "sent": "[]"
+     },
+     "status": 400,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "message": "Message format incorrect: expected dict"
+     },
+     "events": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin",
+      "sent": "5"
+     },
+     "status": 400,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "message": "Message format incorrect: expected dict"
+     },
+     "events": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin",
+      "sent": "\"text\""
+     },
+     "status": 400,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "message": "Message format incorrect: expected dict"
+     },
+     "events": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin",
+      "sent": "null"
+     },
+     "status": 400,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "message": "Message format incorrect: expected dict"
+     },
+     "events": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin",
+      "sent": "{not json"
+     },
+     "status": 400,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "errors": {
+       "api_key": "required key not provided",
+       "api_token": "required key not provided"
+      }
+     },
+     "events": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin",
+      "sent": ""
+     },
+     "status": 400,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "errors": {
+       "api_key": "required key not provided",
+       "api_token": "required key not provided"
+      }
+     },
+     "events": []
+    },
+    {
+     "http": {
+      "method": "GET",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:1>",
+      "handler": "switchbot_cloud",
+      "data_schema": [
+       {
+        "type": "string",
+        "name": "api_token",
+        "required": true
+       },
+       {
+        "type": "string",
+        "name": "api_key",
+        "required": true
+       }
+      ],
+      "errors": {},
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "user"
+     },
+     "events": []
+    }
+   ],
+   "entries": [],
+   "deleted_devices": 0,
+   "deleted_entities": 0
+  },
+  {
+   "name": "init_errors",
+   "doc": "Starting a flow for what has none, and flows that don't exist.",
+   "subscriptions": [],
+   "steps": [
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow",
+      "user": "admin",
+      "sent": "{\"handler\": \"nope\"}"
+     },
+     "status": 404,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "message": "Invalid handler specified"
+     },
+     "events": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow",
+      "user": "admin",
+      "sent": "{\"handler\": \"api\"}"
+     },
+     "status": 404,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "message": "Invalid handler specified"
+     },
+     "events": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow",
+      "user": "admin",
+      "sent": "{}"
+     },
+     "status": 400,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "message": "Message format incorrect: required key not provided @ data['handler']"
+     },
+     "events": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow",
+      "user": "admin",
+      "sent": "{\"handler\": 5}"
+     },
+     "status": 400,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "message": "Message format incorrect: expected str for dictionary value @ data['handler']"
+     },
+     "events": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow",
+      "user": "admin",
+      "sent": "{\"handler\": null}"
+     },
+     "status": 400,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "message": "Message format incorrect: expected str for dictionary value @ data['handler']"
+     },
+     "events": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow",
+      "user": "admin",
+      "sent": "[]"
+     },
+     "status": 400,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "message": "Message format incorrect: expected a dictionary"
+     },
+     "events": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow",
+      "user": "admin",
+      "sent": "{not json"
+     },
+     "status": 400,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "message": "Invalid JSON."
+     },
+     "events": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow",
+      "user": "admin",
+      "sent": ""
+     },
+     "status": 400,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "message": "Invalid JSON."
+     },
+     "events": []
+    },
+    {
+     "http": {
+      "method": "GET",
+      "path": "/api/config/config_entries/flow",
+      "user": "admin"
+     },
+     "status": 405,
+     "content_type": "text/plain; charset=utf-8",
+     "allow": "POST",
+     "text": "405: Method Not Allowed",
+     "events": []
+    },
+    {
+     "http": {
+      "method": "DELETE",
+      "path": "/api/config/config_entries/flow",
+      "user": "admin"
+     },
+     "status": 405,
+     "content_type": "text/plain; charset=utf-8",
+     "allow": "GET,OPTIONS,POST",
+     "text": "405: Method Not Allowed",
+     "events": []
+    },
+    {
+     "http": {
+      "method": "GET",
+      "path": "/api/config/config_entries/flow/nope",
+      "user": "admin"
+     },
+     "status": 404,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "message": "Invalid flow specified"
+     },
+     "events": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/nope",
+      "user": "admin",
+      "sent": "{}"
+     },
+     "status": 404,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "message": "Invalid flow specified"
+     },
+     "events": []
+    },
+    {
+     "http": {
+      "method": "DELETE",
+      "path": "/api/config/config_entries/flow/nope",
+      "user": "admin"
+     },
+     "status": 404,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "message": "Invalid flow specified"
+     },
+     "events": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow",
+      "user": "admin",
+      "sent": "{\"handler\": \"switchbot_cloud\", \"entry_id\": \"nope\"}"
+     },
+     "status": 400,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "message": "Handler SwitchBotCloudConfigFlow doesn't support step reconfigure"
+     },
+     "events": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow",
+      "user": "admin",
+      "sent": "{\"handler\": \"switchbot_cloud\", \"entry_id\": 5}"
+     },
+     "status": 400,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "message": "Handler SwitchBotCloudConfigFlow doesn't support step reconfigure"
+     },
+     "events": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow",
+      "user": "admin",
+      "sent": "{\"handler\": \"switchbot_cloud\", \"entry_id\": null}"
+     },
+     "status": 400,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "message": "Message format incorrect: string value is None for dictionary value @ data['entry_id']"
+     },
+     "events": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow",
+      "user": "admin",
+      "sent": "{\"handler\": \"switchbot_cloud\", \"entry_id\": []}"
+     },
+     "status": 400,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "message": "Message format incorrect: value should be a string for dictionary value @ data['entry_id']"
+     },
+     "events": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow",
+      "user": "admin",
+      "sent": "{\"handler\": \"switchbot_cloud\", \"entry_id\": \"\"}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:1>",
+      "handler": "switchbot_cloud",
+      "data_schema": [
+       {
+        "type": "string",
+        "name": "api_token",
+        "required": true
+       },
+       {
+        "type": "string",
+        "name": "api_key",
+        "required": true
+       }
+      ],
+      "errors": {},
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "user"
+     },
+     "events": []
+    },
+    {
+     "http": {
+      "method": "DELETE",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "message": "Flow aborted"
+     },
+     "events": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow",
+      "user": "admin",
+      "sent": "{\"handler\": [\"switchbot_cloud\"]}"
+     },
+     "status": 500,
+     "content_type": "text/plain; charset=utf-8",
+     "allow": null,
+     "text": "500 Internal Server Error\n\nServer got itself in trouble",
+     "events": []
+    },
+    {
+     "http": {
+      "method": "PUT",
+      "path": "/api/config/config_entries/flow/nope",
+      "user": "admin",
+      "sent": "{}"
+     },
+     "status": 405,
+     "content_type": "text/plain; charset=utf-8",
+     "allow": "DELETE,GET,OPTIONS,POST",
+     "text": "405: Method Not Allowed",
+     "events": []
+    },
+    {
+     "ws": {
+      "user": "admin",
+      "msg": {
+       "type": "config_entries/flow/progress"
+      }
+     },
+     "replies": [
+      {
+       "type": "result",
+       "success": true,
+       "result": []
+      }
+     ],
+     "events": []
+    }
+   ],
+   "entries": [],
+   "deleted_devices": 0,
+   "deleted_entities": 0
+  },
+  {
+   "name": "abandon",
+   "doc": "Closing the dialog deletes the flow.",
+   "subscriptions": [
+    {
+     "sub": "entries",
+     "msg": {
+      "type": "config_entries/subscribe"
+     },
+     "first": [
+      {
+       "id": 1,
+       "type": "result",
+       "success": true,
+       "result": null
+      },
+      {
+       "id": 1,
+       "type": "event",
+       "event": []
+      }
+     ]
+    },
+    {
+     "sub": "flows",
+     "msg": {
+      "type": "config_entries/flow/subscribe"
+     },
+     "first": [
+      {
+       "id": 1,
+       "type": "event",
+       "event": []
+      },
+      {
+       "id": 1,
+       "type": "result",
+       "success": true,
+       "result": null
+      }
+     ]
+    }
+   ],
+   "steps": [
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow",
+      "user": "admin",
+      "sent": "{\"handler\": \"switchbot_cloud\", \"show_advanced_options\": false}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:1>",
+      "handler": "switchbot_cloud",
+      "data_schema": [
+       {
+        "type": "string",
+        "name": "api_token",
+        "required": true
+       },
+       {
+        "type": "string",
+        "name": "api_key",
+        "required": true
+       }
+      ],
+      "errors": {},
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "user"
+     },
+     "events": []
+    },
+    {
+     "http": {
+      "method": "DELETE",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "message": "Flow aborted"
+     },
+     "events": []
+    },
+    {
+     "http": {
+      "method": "GET",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin"
+     },
+     "status": 404,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "message": "Invalid flow specified"
+     },
+     "events": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin",
+      "sent": "{\"api_token\": \"token-one\", \"api_key\": \"secret-one\"}"
+     },
+     "status": 404,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "message": "Invalid flow specified"
+     },
+     "events": []
+    },
+    {
+     "http": {
+      "method": "DELETE",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin"
+     },
+     "status": 404,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "message": "Invalid flow specified"
+     },
+     "events": []
+    },
+    {
+     "ws": {
+      "user": "admin",
+      "msg": {
+       "type": "config_entries/get"
+      }
+     },
+     "replies": [
+      {
+       "type": "result",
+       "success": true,
+       "result": []
+      }
+     ],
+     "events": []
+    }
+   ],
+   "entries": [],
+   "deleted_devices": 0,
+   "deleted_entities": 0
+  },
+  {
+   "name": "who_may",
+   "doc": "What needs an admin, and what a signed-in user or nobody may do.",
+   "subscriptions": [
+    {
+     "sub": "entries",
+     "msg": {
+      "type": "config_entries/subscribe"
+     },
+     "first": [
+      {
+       "id": 1,
+       "type": "result",
+       "success": true,
+       "result": null
+      },
+      {
+       "id": 1,
+       "type": "event",
+       "event": []
+      }
+     ]
+    }
+   ],
+   "steps": [
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow",
+      "user": "admin",
+      "sent": "{\"handler\": \"switchbot_cloud\", \"show_advanced_options\": false}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:1>",
+      "handler": "switchbot_cloud",
+      "data_schema": [
+       {
+        "type": "string",
+        "name": "api_token",
+        "required": true
+       },
+       {
+        "type": "string",
+        "name": "api_key",
+        "required": true
+       }
+      ],
+      "errors": {},
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "user"
+     },
+     "events": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow",
+      "user": "user",
+      "sent": "{\"handler\": \"switchbot_cloud\"}"
+     },
+     "status": 401,
+     "content_type": "text/plain; charset=utf-8",
+     "allow": null,
+     "text": "401: Unauthorized",
+     "events": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow",
+      "user": null,
+      "sent": "{\"handler\": \"switchbot_cloud\"}"
+     },
+     "status": 401,
+     "content_type": "text/plain; charset=utf-8",
+     "allow": null,
+     "text": "401: Unauthorized",
+     "events": []
+    },
+    {
+     "http": {
+      "method": "GET",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "user"
+     },
+     "status": 401,
+     "content_type": "text/plain; charset=utf-8",
+     "allow": null,
+     "text": "401: Unauthorized",
+     "events": []
+    },
+    {
+     "http": {
+      "method": "GET",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": null
+     },
+     "status": 401,
+     "content_type": "text/plain; charset=utf-8",
+     "allow": null,
+     "text": "401: Unauthorized",
+     "events": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "user",
+      "sent": "{\"api_token\": \"token-one\", \"api_key\": \"secret-one\"}"
+     },
+     "status": 401,
+     "content_type": "text/plain; charset=utf-8",
+     "allow": null,
+     "text": "401: Unauthorized",
+     "events": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": null,
+      "sent": "{\"api_token\": \"token-one\", \"api_key\": \"secret-one\"}"
+     },
+     "status": 401,
+     "content_type": "text/plain; charset=utf-8",
+     "allow": null,
+     "text": "401: Unauthorized",
+     "events": []
+    },
+    {
+     "http": {
+      "method": "DELETE",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": null
+     },
+     "status": 401,
+     "content_type": "text/plain; charset=utf-8",
+     "allow": null,
+     "text": "401: Unauthorized",
+     "events": []
+    },
+    {
+     "http": {
+      "method": "GET",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:1>",
+      "handler": "switchbot_cloud",
+      "data_schema": [
+       {
+        "type": "string",
+        "name": "api_token",
+        "required": true
+       },
+       {
+        "type": "string",
+        "name": "api_key",
+        "required": true
+       }
+      ],
+      "errors": {},
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "user"
+     },
+     "events": []
+    },
+    {
+     "http": {
+      "method": "DELETE",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "user"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "message": "Flow aborted"
+     },
+     "events": []
+    },
+    {
+     "http": {
+      "method": "GET",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin"
+     },
+     "status": 404,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "message": "Invalid flow specified"
+     },
+     "events": []
+    },
+    {
+     "http": {
+      "method": "GET",
+      "path": "/api/config/config_entries/flow_handlers",
+      "user": "user"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "known": [
+      "hue",
+      "lifx",
+      "met",
+      "mobile_app",
+      "sun",
+      "switchbot_cloud"
+     ],
+     "has_more": true,
+     "events": []
+    },
+    {
+     "http": {
+      "method": "GET",
+      "path": "/api/config/config_entries/flow_handlers",
+      "user": null
+     },
+     "status": 401,
+     "content_type": "text/plain; charset=utf-8",
+     "allow": null,
+     "text": "401: Unauthorized",
+     "events": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow",
+      "user": "admin",
+      "sent": "{\"handler\": \"switchbot_cloud\", \"show_advanced_options\": false}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:2>",
+      "handler": "switchbot_cloud",
+      "data_schema": [
+       {
+        "type": "string",
+        "name": "api_token",
+        "required": true
+       },
+       {
+        "type": "string",
+        "name": "api_key",
+        "required": true
+       }
+      ],
+      "errors": {},
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "user"
+     },
+     "events": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:2>",
+      "user": "admin",
+      "sent": "{\"api_token\": \"token-one\", \"api_key\": \"secret-one\"}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "create_entry",
+      "flow_id": "<flow:2>",
+      "handler": "switchbot_cloud",
+      "description": null,
+      "description_placeholders": null,
+      "title": "SwitchBot Cloud",
+      "minor_version": 1,
+      "options": {},
+      "subentries": [],
+      "version": 1,
+      "result": {
+       "created_at": "<ts>",
+       "entry_id": "<entry:1>",
+       "domain": "switchbot_cloud",
+       "modified_at": "<ts>",
+       "title": "SwitchBot Cloud",
+       "source": "user",
+       "state": "loaded",
+       "supports_options": false,
+       "supports_remove_device": false,
+       "supports_unload": true,
+       "supports_reconfigure": false,
+       "supported_subentry_types": {},
+       "pref_disable_new_entities": false,
+       "pref_disable_polling": false,
+       "disabled_by": null,
+       "reason": null,
+       "error_reason_translation_key": null,
+       "error_reason_translation_placeholders": null,
+       "num_subentries": 0
+      }
+     },
+     "events": [
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "added",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "switchbot_cloud",
+          "modified_at": "<ts>",
+          "title": "SwitchBot Cloud",
+          "source": "user",
+          "state": "not_loaded",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": false,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "switchbot_cloud",
+          "modified_at": "<ts>",
+          "title": "SwitchBot Cloud",
+          "source": "user",
+          "state": "setup_in_progress",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": false,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "switchbot_cloud",
+          "modified_at": "<ts>",
+          "title": "SwitchBot Cloud",
+          "source": "user",
+          "state": "setup_in_progress",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": true,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "switchbot_cloud",
+          "modified_at": "<ts>",
+          "title": "SwitchBot Cloud",
+          "source": "user",
+          "state": "loaded",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": true,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "ws": {
+      "user": "user",
+      "msg": {
+       "type": "config_entries/flow/progress"
+      }
+     },
+     "replies": [
+      {
+       "type": "result",
+       "success": false,
+       "error": {
+        "code": "unauthorized",
+        "message": "Unauthorized"
+       }
+      }
+     ],
+     "events": []
+    },
+    {
+     "ws": {
+      "user": "user",
+      "msg": {
+       "type": "config_entries/flow/subscribe"
+      }
+     },
+     "replies": [
+      {
+       "type": "result",
+       "success": false,
+       "error": {
+        "code": "unauthorized",
+        "message": "Unauthorized"
+       }
+      }
+     ],
+     "events": []
+    },
+    {
+     "ws": {
+      "user": "user",
+      "msg": {
+       "type": "integration/descriptions"
+      }
+     },
+     "replies": [
+      {
+       "type": "result",
+       "success": false,
+       "error": {
+        "code": "unauthorized",
+        "message": "Unauthorized"
+       }
+      }
+     ],
+     "events": []
+    },
+    {
+     "ws": {
+      "user": "user",
+      "msg": {
+       "type": "config_entries/get"
+      }
+     },
+     "replies": [
+      {
+       "type": "result",
+       "success": true,
+       "result": [
+        {
+         "created_at": "<ts>",
+         "entry_id": "<entry:1>",
+         "domain": "switchbot_cloud",
+         "modified_at": "<ts>",
+         "title": "SwitchBot Cloud",
+         "source": "user",
+         "state": "loaded",
+         "supports_options": false,
+         "supports_remove_device": false,
+         "supports_unload": true,
+         "supports_reconfigure": false,
+         "supported_subentry_types": {},
+         "pref_disable_new_entities": false,
+         "pref_disable_polling": false,
+         "disabled_by": null,
+         "reason": null,
+         "error_reason_translation_key": null,
+         "error_reason_translation_placeholders": null,
+         "num_subentries": 0
+        }
+       ]
+      }
+     ],
+     "events": []
+    },
+    {
+     "ws": {
+      "user": "user",
+      "msg": {
+       "type": "config_entries/subscribe"
+      }
+     },
+     "replies": [
+      {
+       "type": "result",
+       "success": true,
+       "result": null
+      }
+     ],
+     "events": []
+    },
+    {
+     "http": {
+      "method": "DELETE",
+      "path": "/api/config/config_entries/entry/<entry:1>",
+      "user": "user"
+     },
+     "status": 401,
+     "content_type": "text/plain; charset=utf-8",
+     "allow": null,
+     "text": "401: Unauthorized",
+     "events": []
+    },
+    {
+     "http": {
+      "method": "DELETE",
+      "path": "/api/config/config_entries/entry/<entry:1>",
+      "user": null
+     },
+     "status": 401,
+     "content_type": "text/plain; charset=utf-8",
+     "allow": null,
+     "text": "401: Unauthorized",
+     "events": []
+    },
+    {
+     "ws": {
+      "user": "admin",
+      "msg": {
+       "type": "config_entries/get"
+      }
+     },
+     "replies": [
+      {
+       "type": "result",
+       "success": true,
+       "result": [
+        {
+         "created_at": "<ts>",
+         "entry_id": "<entry:1>",
+         "domain": "switchbot_cloud",
+         "modified_at": "<ts>",
+         "title": "SwitchBot Cloud",
+         "source": "user",
+         "state": "loaded",
+         "supports_options": false,
+         "supports_remove_device": false,
+         "supports_unload": true,
+         "supports_reconfigure": false,
+         "supported_subentry_types": {},
+         "pref_disable_new_entities": false,
+         "pref_disable_polling": false,
+         "disabled_by": null,
+         "reason": null,
+         "error_reason_translation_key": null,
+         "error_reason_translation_placeholders": null,
+         "num_subentries": 0
+        }
+       ]
+      }
+     ],
+     "events": []
+    }
+   ],
+   "entries": [
+    {
+     "created_at": "<time>",
+     "data": {
+      "api_key": "secret-one",
+      "api_token": "token-one",
+      "webhook_id": "<webhook>"
+     },
+     "disabled_by": null,
+     "discovery_keys": {},
+     "domain": "switchbot_cloud",
+     "entry_id": "<entry:1>",
+     "minor_version": 1,
+     "modified_at": "<time>",
+     "options": {},
+     "pref_disable_new_entities": false,
+     "pref_disable_polling": false,
+     "source": "user",
+     "subentries": [],
+     "title": "SwitchBot Cloud",
+     "unique_id": "token-one",
+     "version": 1
+    }
+   ],
+   "deleted_devices": 0,
+   "deleted_entities": 0
+  },
+  {
+   "name": "setup_not_ready",
+   "doc": "The flow's check passes but the entry's setup can't read a device: the entry is made and retried.",
+   "subscriptions": [
+    {
+     "sub": "entries",
+     "msg": {
+      "type": "config_entries/subscribe"
+     },
+     "first": [
+      {
+       "id": 1,
+       "type": "result",
+       "success": true,
+       "result": null
+      },
+      {
+       "id": 1,
+       "type": "event",
+       "event": []
+      }
+     ]
+    },
+    {
+     "sub": "flows",
+     "msg": {
+      "type": "config_entries/flow/subscribe"
+     },
+     "first": [
+      {
+       "id": 1,
+       "type": "event",
+       "event": []
+      },
+      {
+       "id": 1,
+       "type": "result",
+       "success": true,
+       "result": null
+      }
+     ]
+    }
+   ],
+   "steps": [
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow",
+      "user": "admin",
+      "sent": "{\"handler\": \"switchbot_cloud\", \"show_advanced_options\": false}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:1>",
+      "handler": "switchbot_cloud",
+      "data_schema": [
+       {
+        "type": "string",
+        "name": "api_token",
+        "required": true
+       },
+       {
+        "type": "string",
+        "name": "api_key",
+        "required": true
+       }
+      ],
+      "errors": {},
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "user"
+     },
+     "events": []
+    },
+    {
+     "api": "status_down"
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin",
+      "sent": "{\"api_token\": \"token-one\", \"api_key\": \"secret-one\"}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "create_entry",
+      "flow_id": "<flow:1>",
+      "handler": "switchbot_cloud",
+      "description": null,
+      "description_placeholders": null,
+      "title": "SwitchBot Cloud",
+      "minor_version": 1,
+      "options": {},
+      "subentries": [],
+      "version": 1,
+      "result": {
+       "created_at": "<ts>",
+       "entry_id": "<entry:1>",
+       "domain": "switchbot_cloud",
+       "modified_at": "<ts>",
+       "title": "SwitchBot Cloud",
+       "source": "user",
+       "state": "setup_retry",
+       "supports_options": false,
+       "supports_remove_device": false,
+       "supports_unload": true,
+       "supports_reconfigure": false,
+       "supported_subentry_types": {},
+       "pref_disable_new_entities": false,
+       "pref_disable_polling": false,
+       "disabled_by": null,
+       "reason": "Error communicating with API: ",
+       "error_reason_translation_key": null,
+       "error_reason_translation_placeholders": null,
+       "num_subentries": 0
+      }
+     },
+     "events": [
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "added",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "switchbot_cloud",
+          "modified_at": "<ts>",
+          "title": "SwitchBot Cloud",
+          "source": "user",
+          "state": "not_loaded",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": false,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "switchbot_cloud",
+          "modified_at": "<ts>",
+          "title": "SwitchBot Cloud",
+          "source": "user",
+          "state": "setup_in_progress",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": false,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "switchbot_cloud",
+          "modified_at": "<ts>",
+          "title": "SwitchBot Cloud",
+          "source": "user",
+          "state": "setup_retry",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": true,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": "Error communicating with API: ",
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "ws": {
+      "user": "admin",
+      "msg": {
+       "type": "config_entries/get"
+      }
+     },
+     "replies": [
+      {
+       "type": "result",
+       "success": true,
+       "result": [
+        {
+         "created_at": "<ts>",
+         "entry_id": "<entry:1>",
+         "domain": "switchbot_cloud",
+         "modified_at": "<ts>",
+         "title": "SwitchBot Cloud",
+         "source": "user",
+         "state": "setup_retry",
+         "supports_options": false,
+         "supports_remove_device": false,
+         "supports_unload": true,
+         "supports_reconfigure": false,
+         "supported_subentry_types": {},
+         "pref_disable_new_entities": false,
+         "pref_disable_polling": false,
+         "disabled_by": null,
+         "reason": "Error communicating with API: ",
+         "error_reason_translation_key": null,
+         "error_reason_translation_placeholders": null,
+         "num_subentries": 0
+        }
+       ]
+      }
+     ],
+     "events": []
+    }
+   ],
+   "entries": [
+    {
+     "created_at": "<time>",
+     "data": {
+      "api_key": "secret-one",
+      "api_token": "token-one"
+     },
+     "disabled_by": null,
+     "discovery_keys": {},
+     "domain": "switchbot_cloud",
+     "entry_id": "<entry:1>",
+     "minor_version": 1,
+     "modified_at": "<time>",
+     "options": {},
+     "pref_disable_new_entities": false,
+     "pref_disable_polling": false,
+     "source": "user",
+     "subentries": [],
+     "title": "SwitchBot Cloud",
+     "unique_id": "token-one",
+     "version": 1
+    }
+   ],
+   "deleted_devices": 0,
+   "deleted_entities": 0
+  },
+  {
+   "name": "remove_while_retrying",
+   "doc": "Removing an entry whose setup waits to be tried again: nothing to unload.",
+   "subscriptions": [
+    {
+     "sub": "entries",
+     "msg": {
+      "type": "config_entries/subscribe"
+     },
+     "first": [
+      {
+       "id": 1,
+       "type": "result",
+       "success": true,
+       "result": null
+      },
+      {
+       "id": 1,
+       "type": "event",
+       "event": []
+      }
+     ]
+    },
+    {
+     "sub": "flows",
+     "msg": {
+      "type": "config_entries/flow/subscribe"
+     },
+     "first": [
+      {
+       "id": 1,
+       "type": "event",
+       "event": []
+      },
+      {
+       "id": 1,
+       "type": "result",
+       "success": true,
+       "result": null
+      }
+     ]
+    }
+   ],
+   "steps": [
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow",
+      "user": "admin",
+      "sent": "{\"handler\": \"switchbot_cloud\", \"show_advanced_options\": false}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:1>",
+      "handler": "switchbot_cloud",
+      "data_schema": [
+       {
+        "type": "string",
+        "name": "api_token",
+        "required": true
+       },
+       {
+        "type": "string",
+        "name": "api_key",
+        "required": true
+       }
+      ],
+      "errors": {},
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "user"
+     },
+     "events": []
+    },
+    {
+     "api": "status_down"
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin",
+      "sent": "{\"api_token\": \"token-one\", \"api_key\": \"secret-one\"}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "create_entry",
+      "flow_id": "<flow:1>",
+      "handler": "switchbot_cloud",
+      "description": null,
+      "description_placeholders": null,
+      "title": "SwitchBot Cloud",
+      "minor_version": 1,
+      "options": {},
+      "subentries": [],
+      "version": 1,
+      "result": {
+       "created_at": "<ts>",
+       "entry_id": "<entry:1>",
+       "domain": "switchbot_cloud",
+       "modified_at": "<ts>",
+       "title": "SwitchBot Cloud",
+       "source": "user",
+       "state": "setup_retry",
+       "supports_options": false,
+       "supports_remove_device": false,
+       "supports_unload": true,
+       "supports_reconfigure": false,
+       "supported_subentry_types": {},
+       "pref_disable_new_entities": false,
+       "pref_disable_polling": false,
+       "disabled_by": null,
+       "reason": "Error communicating with API: ",
+       "error_reason_translation_key": null,
+       "error_reason_translation_placeholders": null,
+       "num_subentries": 0
+      }
+     },
+     "events": [
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "added",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "switchbot_cloud",
+          "modified_at": "<ts>",
+          "title": "SwitchBot Cloud",
+          "source": "user",
+          "state": "not_loaded",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": false,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "switchbot_cloud",
+          "modified_at": "<ts>",
+          "title": "SwitchBot Cloud",
+          "source": "user",
+          "state": "setup_in_progress",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": false,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "switchbot_cloud",
+          "modified_at": "<ts>",
+          "title": "SwitchBot Cloud",
+          "source": "user",
+          "state": "setup_retry",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": true,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": "Error communicating with API: ",
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "http": {
+      "method": "DELETE",
+      "path": "/api/config/config_entries/entry/<entry:1>",
+      "user": "admin"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "require_restart": false
+     },
+     "events": [
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "switchbot_cloud",
+          "modified_at": "<ts>",
+          "title": "SwitchBot Cloud",
+          "source": "user",
+          "state": "not_loaded",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": true,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "removed",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "switchbot_cloud",
+          "modified_at": "<ts>",
+          "title": "SwitchBot Cloud",
+          "source": "user",
+          "state": "not_loaded",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": true,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "ws": {
+      "user": "admin",
+      "msg": {
+       "type": "config_entries/get"
+      }
+     },
+     "replies": [
+      {
+       "type": "result",
+       "success": true,
+       "result": []
+      }
+     ],
+     "events": []
+    }
+   ],
+   "entries": [],
+   "deleted_devices": 0,
+   "deleted_entities": 0
+  },
+  {
+   "name": "remove",
+   "doc": "Removing the entry: its devices and entities go with it.",
+   "subscriptions": [
+    {
+     "sub": "entries",
+     "msg": {
+      "type": "config_entries/subscribe"
+     },
+     "first": [
+      {
+       "id": 1,
+       "type": "result",
+       "success": true,
+       "result": null
+      },
+      {
+       "id": 1,
+       "type": "event",
+       "event": []
+      }
+     ]
+    },
+    {
+     "sub": "flows",
+     "msg": {
+      "type": "config_entries/flow/subscribe"
+     },
+     "first": [
+      {
+       "id": 1,
+       "type": "event",
+       "event": []
+      },
+      {
+       "id": 1,
+       "type": "result",
+       "success": true,
+       "result": null
+      }
+     ]
+    }
+   ],
+   "steps": [
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow",
+      "user": "admin",
+      "sent": "{\"handler\": \"switchbot_cloud\", \"show_advanced_options\": false}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:1>",
+      "handler": "switchbot_cloud",
+      "data_schema": [
+       {
+        "type": "string",
+        "name": "api_token",
+        "required": true
+       },
+       {
+        "type": "string",
+        "name": "api_key",
+        "required": true
+       }
+      ],
+      "errors": {},
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "user"
+     },
+     "events": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin",
+      "sent": "{\"api_token\": \"token-one\", \"api_key\": \"secret-one\"}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "create_entry",
+      "flow_id": "<flow:1>",
+      "handler": "switchbot_cloud",
+      "description": null,
+      "description_placeholders": null,
+      "title": "SwitchBot Cloud",
+      "minor_version": 1,
+      "options": {},
+      "subentries": [],
+      "version": 1,
+      "result": {
+       "created_at": "<ts>",
+       "entry_id": "<entry:1>",
+       "domain": "switchbot_cloud",
+       "modified_at": "<ts>",
+       "title": "SwitchBot Cloud",
+       "source": "user",
+       "state": "loaded",
+       "supports_options": false,
+       "supports_remove_device": false,
+       "supports_unload": true,
+       "supports_reconfigure": false,
+       "supported_subentry_types": {},
+       "pref_disable_new_entities": false,
+       "pref_disable_polling": false,
+       "disabled_by": null,
+       "reason": null,
+       "error_reason_translation_key": null,
+       "error_reason_translation_placeholders": null,
+       "num_subentries": 0
+      }
+     },
+     "events": [
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "added",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "switchbot_cloud",
+          "modified_at": "<ts>",
+          "title": "SwitchBot Cloud",
+          "source": "user",
+          "state": "not_loaded",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": false,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "switchbot_cloud",
+          "modified_at": "<ts>",
+          "title": "SwitchBot Cloud",
+          "source": "user",
+          "state": "setup_in_progress",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": false,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "switchbot_cloud",
+          "modified_at": "<ts>",
+          "title": "SwitchBot Cloud",
+          "source": "user",
+          "state": "setup_in_progress",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": true,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "switchbot_cloud",
+          "modified_at": "<ts>",
+          "title": "SwitchBot Cloud",
+          "source": "user",
+          "state": "loaded",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": true,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "http": {
+      "method": "DELETE",
+      "path": "/api/config/config_entries/entry/nope",
+      "user": "admin"
+     },
+     "status": 404,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "message": "Invalid entry specified"
+     },
+     "events": []
+    },
+    {
+     "http": {
+      "method": "DELETE",
+      "path": "/api/config/config_entries/entry/<entry:1>",
+      "user": "admin"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "require_restart": false
+     },
+     "events": [
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "switchbot_cloud",
+          "modified_at": "<ts>",
+          "title": "SwitchBot Cloud",
+          "source": "user",
+          "state": "unload_in_progress",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": true,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "switchbot_cloud",
+          "modified_at": "<ts>",
+          "title": "SwitchBot Cloud",
+          "source": "user",
+          "state": "not_loaded",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": true,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "removed",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "switchbot_cloud",
+          "modified_at": "<ts>",
+          "title": "SwitchBot Cloud",
+          "source": "user",
+          "state": "not_loaded",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": true,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "http": {
+      "method": "DELETE",
+      "path": "/api/config/config_entries/entry/<entry:1>",
+      "user": "admin"
+     },
+     "status": 404,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "message": "Invalid entry specified"
+     },
+     "events": []
+    },
+    {
+     "ws": {
+      "user": "admin",
+      "msg": {
+       "type": "config_entries/get"
+      }
+     },
+     "replies": [
+      {
+       "type": "result",
+       "success": true,
+       "result": []
+      }
+     ],
+     "events": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow",
+      "user": "admin",
+      "sent": "{\"handler\": \"switchbot_cloud\", \"show_advanced_options\": false}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:2>",
+      "handler": "switchbot_cloud",
+      "data_schema": [
+       {
+        "type": "string",
+        "name": "api_token",
+        "required": true
+       },
+       {
+        "type": "string",
+        "name": "api_key",
+        "required": true
+       }
+      ],
+      "errors": {},
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "user"
+     },
+     "events": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:2>",
+      "user": "admin",
+      "sent": "{\"api_token\": \"token-one\", \"api_key\": \"secret-one\"}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "create_entry",
+      "flow_id": "<flow:2>",
+      "handler": "switchbot_cloud",
+      "description": null,
+      "description_placeholders": null,
+      "title": "SwitchBot Cloud",
+      "minor_version": 1,
+      "options": {},
+      "subentries": [],
+      "version": 1,
+      "result": {
+       "created_at": "<ts>",
+       "entry_id": "<entry:2>",
+       "domain": "switchbot_cloud",
+       "modified_at": "<ts>",
+       "title": "SwitchBot Cloud",
+       "source": "user",
+       "state": "loaded",
+       "supports_options": false,
+       "supports_remove_device": false,
+       "supports_unload": true,
+       "supports_reconfigure": false,
+       "supported_subentry_types": {},
+       "pref_disable_new_entities": false,
+       "pref_disable_polling": false,
+       "disabled_by": null,
+       "reason": null,
+       "error_reason_translation_key": null,
+       "error_reason_translation_placeholders": null,
+       "num_subentries": 0
+      }
+     },
+     "events": [
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "added",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:2>",
+          "domain": "switchbot_cloud",
+          "modified_at": "<ts>",
+          "title": "SwitchBot Cloud",
+          "source": "user",
+          "state": "not_loaded",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": false,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:2>",
+          "domain": "switchbot_cloud",
+          "modified_at": "<ts>",
+          "title": "SwitchBot Cloud",
+          "source": "user",
+          "state": "setup_in_progress",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": false,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:2>",
+          "domain": "switchbot_cloud",
+          "modified_at": "<ts>",
+          "title": "SwitchBot Cloud",
+          "source": "user",
+          "state": "setup_in_progress",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": true,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:2>",
+          "domain": "switchbot_cloud",
+          "modified_at": "<ts>",
+          "title": "SwitchBot Cloud",
+          "source": "user",
+          "state": "loaded",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": true,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "ws": {
+      "user": "admin",
+      "msg": {
+       "type": "config_entries/get"
+      }
+     },
+     "replies": [
+      {
+       "type": "result",
+       "success": true,
+       "result": [
+        {
+         "created_at": "<ts>",
+         "entry_id": "<entry:2>",
+         "domain": "switchbot_cloud",
+         "modified_at": "<ts>",
+         "title": "SwitchBot Cloud",
+         "source": "user",
+         "state": "loaded",
+         "supports_options": false,
+         "supports_remove_device": false,
+         "supports_unload": true,
+         "supports_reconfigure": false,
+         "supported_subentry_types": {},
+         "pref_disable_new_entities": false,
+         "pref_disable_polling": false,
+         "disabled_by": null,
+         "reason": null,
+         "error_reason_translation_key": null,
+         "error_reason_translation_placeholders": null,
+         "num_subentries": 0
+        }
+       ]
+      }
+     ],
+     "events": []
+    }
+   ],
+   "entries": [
+    {
+     "created_at": "<time>",
+     "data": {
+      "api_key": "secret-one",
+      "api_token": "token-one",
+      "webhook_id": "<webhook>"
+     },
+     "disabled_by": null,
+     "discovery_keys": {},
+     "domain": "switchbot_cloud",
+     "entry_id": "<entry:2>",
+     "minor_version": 1,
+     "modified_at": "<time>",
+     "options": {},
+     "pref_disable_new_entities": false,
+     "pref_disable_polling": false,
+     "source": "user",
+     "subentries": [],
+     "title": "SwitchBot Cloud",
+     "unique_id": "token-one",
+     "version": 1
+    }
+   ],
+   "deleted_devices": 0,
+   "deleted_entities": 0
+  }
+ ]
+}

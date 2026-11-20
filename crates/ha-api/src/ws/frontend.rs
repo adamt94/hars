@@ -140,7 +140,9 @@ fn integrations(msg: &Map<String, Value>) -> Result<Option<Vec<&str>>, Invalid> 
 
 /// `frontend/get_translations`: English (HA's fallback language) for the
 /// integrations asked for, else for those loaded. `config_flow` alone asks
-/// for integrations with a config flow that aren't loaded: none in `hars`.
+/// for integrations with a config flow that aren't loaded
+/// (`async_get_config_flows(hass) - hass.config.components`), which is how
+/// the Add integration dialog names them.
 fn get_translations(conn: &mut Conn, id: u64, msg: &Map<String, Value>) -> Result<(), Invalid> {
     only_keys(msg, &["language", "category", "integration", "config_flow"])?;
     required_str(msg, "language")?;
@@ -151,12 +153,21 @@ fn get_translations(conn: &mut Conn, id: u64, msg: &Map<String, Value>) -> Resul
         Some(Value::Bool(b)) => *b,
         Some(_) => return Err("expected bool for dictionary value @ data['config_flow']".into()),
     };
-    let loaded;
+    let mut loaded = crate::components(&conn.shared.config);
     let domains: &[&str] = match &integrations {
         Some(list) => list,
-        None if config_flow => &[],
         None => {
-            loaded = crate::components(&conn.shared.config);
+            if config_flow {
+                let handlers: &[&ha_integrations::flow::Handler] = match conn.shared.config.flows {
+                    Some(_) => ha_integrations::flow::HANDLERS,
+                    None => &[],
+                };
+                loaded = handlers
+                    .iter()
+                    .map(|h| h.domain)
+                    .filter(|d| !loaded.contains(d))
+                    .collect();
+            }
             &loaded
         }
     };

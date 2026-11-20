@@ -83,7 +83,9 @@ as they are, and the importer carries them over.
   `google_translate` TTS, `radio_browser`, `go2rtc`, `backup`, `analytics`, Assist
 - Blueprints, scripts/scenes YAML, Jinja templates beyond the first slices
   (`render_template`'s and automations')
-- Config flows for *adding* integrations, the UI automation editor, dashboard
+- Config flows for *adding* integrations beyond the first
+  ([M4](#m4-integrations-binary-and-rss-cost-recorded-in-docsperfresultsmd-as-each-lands):
+  SwitchBot Cloud's is in), the UI automation editor, dashboard
   editing beyond `lovelace/config/save`, long-term statistics, the add-on store, HACS
 - Importing HA's history database: `hars` history starts fresh at cutover
 
@@ -257,9 +259,10 @@ ids, addresses, names and coordinates replaced with fake ones
       the core config step, met's onboarding flow creates its entry, so a
       fresh install gets `weather.forecast_home`; a fresh install's first
       start saves `sun`'s entry as HA's import does. Vectors from HA's own
-      views (`scripts/vectors/onboarding.py`). Left out: an entry's setup
-      state (`config_entries/subscribe` says `loaded`/`not_loaded`) and live
-      entry updates; `update_units` (no suggested units kept); the
+      views (`scripts/vectors/onboarding.py`). Left out: the setup state
+      of an entry started at start-up (`config_entries/subscribe` says
+      `loaded`/`not_loaded`; an entry a config flow adds reports its own);
+      `update_units` (no suggested units kept); the
       `WWW-Authenticate` header HA adds to 401s; the other onboarding flows
       (`google_translate`, `radio_browser`, `shopping_list`), as hars has
       none of those integrations
@@ -399,8 +402,8 @@ ids, addresses, names and coordinates replaced with fake ones
       `blueprint/list` (none). All 44 steps of
       `scripts/vectors/entity_registry_ws.py` match; in Chromium with the
       pinned frontend an automation is renamed and saved from the editor.
-      Other Settings pages open but have gaps: adding integrations and
-      helpers, users (`config/auth/list`), backups, system health, the
+      Other Settings pages open but have gaps: adding helpers, users
+      (`config/auth/list`), backups, system health, the
       event tool (`/api/events`), exposing entities to Assist
 - [ ] Traces; the editor's `trigger_platforms/subscribe`,
       `condition_platforms/subscribe` and `validate_config` (the pages work
@@ -533,6 +536,55 @@ ids, addresses, names and coordinates replaced with fake ones
       entities, the 40-call service sequence, command errors, polling,
       setup failures, restore cases; checked once against the real API
 - [ ] `switchbot_cloud`: Bots in switch mode and the other device types
+- [x] Config flows: an integration is added from the UI (Settings >
+      Devices & services > Add integration), starting with SwitchBot
+      Cloud. A small flow engine (`ha_integrations::flow`: forms with
+      HA's serialised schema and its check of the answer, `create_entry`,
+      `abort`, `already_configured` on a known unique id, flows dropped
+      when the dialog closes; nothing held or run while no flow is open);
+      HA's views `POST /api/config/config_entries/flow`, `GET`/`POST`/
+      `DELETE …/flow/{flow_id}`, `GET …/flow_handlers` and `DELETE
+      …/entry/{entry_id}`; WS `config_entries/get`,
+      `config_entries/flow/progress`, `integration/descriptions`, and
+      `config_entries/subscribe` now pushes `added`/`updated`/`removed`;
+      `get_translations`'s `config_flow`. `switchbot_cloud`'s user step
+      as HA's (token and secret checked by listing the devices;
+      `invalid_auth`, `cannot_connect`, `unknown`; the token as unique id).
+      The entry is saved, its integration starts before the reply and
+      reports `setup_in_progress`/`loaded`/`setup_retry`, and its setup
+      makes HA's device and entity registry rows (on every setup, as HA;
+      rows an import brought are left as HA wrote them), so the devices
+      show at once and keep their entity ids over a restart. The entity
+      services resolve device and area targets against the live
+      registry. Removing an entry stops `switchbot_cloud` (entities,
+      states and registry rows go; a command still in flight writes
+      nothing after) and a companion app's registration (its webhook
+      stops answering); an integration with no stop hook is
+      removed as HA removes one that can't unload (`require_restart`).
+      A second account that lists the same devices adds none of them
+      again, as HA's platform refuses a unique id that already runs.
+      Not offered when `core.config_entries` can't be written (another
+      version's file). All 12 scenarios of
+      `scripts/vectors/config_flow.py` match HA's
+      own views (forms, each error, duplicates, bad bodies, unknown
+      flows and handlers, who may do what, a setup that retries,
+      removal, with and without a retry pending), and the registry rows
+      and states of a fresh set-up, of two accounts, and the changes of a
+      retry that works are HA's; in Chromium with the pinned frontend SwitchBot Cloud is
+      added against a stand-in API, with its error for bad credentials.
+      `hars` differs on purpose: only the integrations it has a flow for
+      are offered (each on its own, not under HA's brands); no webhook id
+      is added to the entry (see above)
+- [ ] Config flows: Hue (find the bridge or type its host, press the
+      link button) and LIFX (type a host or pick a found bulb); the
+      dialog's last step, naming a device and giving it an area (WS
+      `config/device_registry/update`, `config/area_registry/create`;
+      "Skip and finish" works); options, reauth, reconfigure, discovery
+      and import flows; `single_config_entry`; a stop hook for the other
+      integrations; taking a removed phone's tracker out of its person
+      (HA's `person` does); `config_entries/get_single`, `update`, `disable`, the
+      reload view; `logger/log_info` and `entity/source`, which the
+      integration's page asks for and works without
 - [ ] Acceptance: every inventory entity matches its HA fixture attributes, and
       every frontend control (light colour/temp, climate mode/setpoint) works
 
@@ -667,7 +719,7 @@ integration items below for users.
   `at`, `enabled`, a trigger's `variables`, the `variables`, `if` and
   `repeat` actions), `custom_templates` imports; scripts, scenes YAML,
   blueprints
-- Config flows for adding integrations; UI automation/script editor
+- Config flows for adding the integrations beyond the MVP's; UI script editor
 - Long-term statistics
 - MQTT, ESPHome native API, zigbee2mqtt; `input_*` / `template` helpers, `todo`, TTS
 - Synthetic-scale HA vs `hars` benchmark harness

@@ -10,7 +10,6 @@ mod profiles;
 pub use profiles::Profiles;
 
 use ha_core::{EntityId, EntityTarget, Hass, Kind, Range, Schema, ServiceError, SupportsResponse};
-use ha_registry::Registries;
 use parking_lot::RwLock;
 use serde_json::{Map, Value, json};
 use std::future::Future;
@@ -735,7 +734,12 @@ impl Lights {
     }
 
     /// Register `light.turn_on`, `light.turn_off` and `light.toggle`.
-    pub fn register_services(self: &Arc<Self>, hass: &Hass, registries: Arc<Registries>) {
+    pub fn register_services(
+        self: &Arc<Self>,
+        hass: &Hass,
+        registries: impl Into<ha_registry::Lookup>,
+    ) {
+        let registries = registries.into();
         for (name, service) in [
             ("turn_on", Service::TurnOn),
             ("turn_off", Service::TurnOff),
@@ -758,7 +762,7 @@ impl Lights {
                     let registries = registries.clone();
                     async move {
                         let target = call.entity_ids()?;
-                        let indirect = registries.target_entities(&call.data);
+                        let indirect = registries.get().target_entities(&call.data);
                         let mut params = Params::from_data(&call.data);
                         preprocess(&mut params, &lights.profiles);
                         let targets = lights.targets(&target, &indirect);

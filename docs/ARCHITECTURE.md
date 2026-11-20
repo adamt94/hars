@@ -32,7 +32,7 @@ Ten crates in `crates/`. `ha-server` builds the only binary, `hars`.
 | `ha-http` | The one outbound HTTP(S) client: HTTP/1.1, rustls with compiled-in roots, timeouts, redirects as aiohttp follows them (no `Authorization`, `Cookie` or `Proxy-Authorization` to another origin), server-sent events | `aiohttp` client session |
 | `ha-recorder` | History: an append-only segment log, its intake, retention, and the history and logbook queries | `components/recorder`, `history`, `logbook` |
 | `ha-components` | Built-in `zone` and `person`; new entity ids for them (with `ha_core::slugify`, re-exported here) | `components/zone`, `components/person` |
-| `ha-integrations` | Config entries; the shared entity components (`light`, `switch`, `scene`, `button`, `climate`, `weather`); every integration (`sun`, `met`, `hue`, `lifx`, `switchbot_cloud`, `mobile_app`); the config flows onboarding starts (`met`'s) | `config_entries.py`, `components/<domain>`, `components/onboarding/views.py` |
+| `ha-integrations` | Config entries; the shared entity components (`light`, `switch`, `scene`, `button`, `climate`, `weather`); every integration (`sun`, `met`, `hue`, `lifx`, `switchbot_cloud`, `mobile_app`); config flows (`flow`: the engine, and `switchbot_cloud`'s); the config flows onboarding starts (`met`'s) | `config_entries.py`, `data_entry_flow.py`, `components/<domain>`, `components/onboarding/views.py` |
 | `ha-automation` | YAML automations: triggers, conditions, actions, modes | `components/automation`, `helpers/script.py` |
 | `ha-api` | Everything served over HTTP: REST, WebSocket, auth views, the companion app's webhook, the frontend, brands | `components/api`, `websocket_api`, `http`, `frontend`, `auth` views |
 | `ha-server` | The `hars` binary: start-up wiring, signals, the allocator, the `auth add` and `import` commands, shadow mode's log | `__main__.py`, `bootstrap.py` |
@@ -164,7 +164,36 @@ domain and spawns one task per entry. Each integration's `run` function:
    entity registry, and then sleeps until the next push, poll or timer.
 
 Integrations have no stop hook: their tasks end with the runtime. Anything
-that must reach disk at stop registers with `hass.on_final_write`.
+that must reach disk at stop registers with `hass.on_final_write`. The one
+exception is `switchbot_cloud`, whose entry's task `flow::Manager` keeps a
+handle to and aborts (and waits for) when the entry is removed; a
+`mobile_app` entry's registration is stopped the way a re-pair stops it.
+
+**Config flows** (`ha_integrations::flow`) add an entry while `hars` runs.
+An integration registers a `flow::Handler` in `flow::HANDLERS`; each flow
+is one `flow::Flow` value the handler makes, and its fields are what the
+flow remembers between steps. A step returns a `flow::Step`: a form (its
+fields serialised as HA's `voluptuous_serialize` does, and the answer
+checked against them), an abort, or the entry to create. `flow::Manager`
+keeps the flows in progress (an empty, unallocated list while no dialog is
+open; a flow leaves when it is answered or deleted, with no timer), and on
+`CreateEntry` adds the entry (`ConfigEntries::add_tracked`), starts its
+integration and waits for the first setup attempt before answering, as
+HA's `async_add` does. The integration's `run` reports where its setup is
+through a `config_entries::Status` (`setup_in_progress`, `loaded`,
+`setup_retry` with HA's reason), and `ConfigEntries` tells
+`config_entries/subscribe` each `added`, `updated` and `removed`.
+
+An entry set up at runtime needs registry rows nobody imported, so
+`switchbot_cloud`'s setup makes its devices' and entities' rows with
+`Registry::get_or_create_device` and `get_or_create_entity`, as HA's
+platforms do on every setup, then names its entities from the registry as
+before. `Components` holds an `ha_registry::Lookup`: the live registry in
+`hars` (a fixed set in tests), so the entity services resolve device and
+area targets against rows made after start-up. What `hars` calls outside
+(`ha_integrations::Endpoints`: the SwitchBot API's base URL) is a
+parameter, so tests and a debug build's browser run point it at
+127.0.0.1.
 
 ### Storage and restore
 
@@ -280,6 +309,7 @@ All of it is in `ha-api`; `ha_api::router` builds it.
 | Companion app webhook `/api/webhook/{id}` | `mobile_app/` | The webhook id is the credential; encryption is required for registrations with `supports_encryption` enabled |
 | Companion app push channel (WS `mobile_app/push_notification_*`) | `ws/mobile_app.rs` | The commands only; the channels, the confirm timers and cloud push (through `ha-http`) are `ha_integrations::mobile_app::notify`'s, reached through `ApiConfig.mobile_app` |
 | Frontend `/`, `/frontend_latest/…` | `frontend.rs` | Served from `HARS_FRONTEND` on disk with precompressed files ([ADR 0004](adr/0004-frontend-from-disk.md)) |
+| Config flows `/api/config/config_entries/…` | `config_entries.rs`, `ws/config_entries.rs`, `ws/manifest.rs` | HA's flow views (start, show, answer, delete), `flow_handlers` and the entry's delete, over `ha_integrations::flow::Manager` (`ApiConfig.flows`); WS `config_entries/get`, `subscribe`, `flow/progress` and `integration/descriptions`. Only the integrations `hars` has a flow for are offered |
 | Onboarding `/api/onboarding/…` | `onboarding.rs` | HA's views, registered only while a step is left. The status, installation type, `users` and `integration/wait` views are anonymous; the other steps need a `Bearer` token |
 | Brands `/api/brands/…` | `brands.rs` | Proxied from HA's CDN with HA's disk cache |
 | Map tiles `/hars/map_tiles/…` | `map_tiles.rs` | Not HA's: OpenStreetMap tiles relayed for the frontend's maps, which the image build points here ([ADR 0010](adr/0010-map-tiles-from-osm.md)) |
@@ -312,7 +342,7 @@ How it is kept:
   run through HA's own code at the pinned version. A new vector set commits
   the script that made it in `scripts/vectors/` (`onboarding.py`,
   `render_template.py`, `mobile_app_notify.py`, `template_functions.py`,
-  `automation_templates.py`).
+  `automation_templates.py`, `config_flow.py`, …).
   The sets made before that rule have no script yet;
   they are listed as a backlog in
   [scripts/vectors/README.md](../scripts/vectors/README.md#vector-sets-made-before-this-rule)
@@ -426,6 +456,7 @@ size of moving the pin, and is on the [roadmap](ROADMAP.md).
 | You are adding | It goes in | Notes |
 |---|---|---|
 | An integration (a config entry domain) | `crates/ha-integrations/src/<domain>/` | Started from `ha_integrations::start`, listed in `SUPPORTED`. [Guide](guides/add-an-integration.md) |
+| A config flow for an integration (adding it from the UI) | `crates/ha-integrations/src/<domain>/config_flow.rs`: a `flow::Handler` listed in `flow::HANDLERS`, started by `flow::Manager::setup_entry` | [Guide](guides/add-an-integration.md#4b-a-config-flow) |
 | An entity platform for an existing domain (a new kind of light) | The integration's module, implementing that component's trait (`light::Light`, `switch::Switch`, …) | Add it with `components.lights().add(...)` |
 | A new entity domain with services (`cover`, `fan`) | `crates/ha-integrations/src/<domain>.rs`, plus an accessor on `components::Components` | [Guide](guides/add-an-entity-component.md) |
 | A domain with no services (`sensor`, `binary_sensor`) | Nothing shared: the integration writes states | |
@@ -457,5 +488,8 @@ and to the diagram above in the same pull request.
   the state itself; sharing one `Arc<str>` per change is on the roadmap.
 - **Runtime.** A multi-thread tokio runtime today. A `current_thread`
   runtime may suit single-core devices; it needs measuring.
-- **Integration stop hooks.** Integrations end with the runtime. If one needs
-  to say goodbye to a device, it should use `on_final_write` or a new hook.
+- **Integration stop hooks.** Integrations end with the runtime, except
+  that `switchbot_cloud`'s task is aborted when its entry is removed. If
+  one needs to say goodbye to a device, it should use `on_final_write` or a
+  new hook; removing or reloading the other integrations' entries without a
+  restart needs one too.

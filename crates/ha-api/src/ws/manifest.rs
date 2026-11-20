@@ -1,8 +1,16 @@
-//! `manifest/list` and `manifest/get` (`websocket_api/commands.py`): the
-//! embedded manifests (`manifests_data.rs`, generated from HA's wheel).
+//! `manifest/list`, `manifest/get` and `integration/descriptions`
+//! (`websocket_api/commands.py`): the embedded manifests and descriptions
+//! (`manifests_data.rs`, generated from HA's wheel).
+//!
+//! Where `hars` differs from HA: `integration/descriptions` lists the
+//! integrations `hars` has a config flow for, each on its own, so the Add
+//! integration dialog offers what can be added. HA lists every
+//! integration it ships, some grouped under a brand (`switchbot` holds
+//! SwitchBot Bluetooth, SwitchBot Cloud and Matter).
 
 use super::{Conn, Invalid};
-use crate::manifests_data::MANIFESTS;
+use crate::manifests_data::{DESCRIPTIONS, MANIFESTS};
+use ha_auth::Permission;
 use serde_json::{Map, Value, json};
 
 fn manifest(domain: &str) -> Option<&'static str> {
@@ -14,7 +22,7 @@ fn manifest(domain: &str) -> Option<&'static str> {
 
 /// `Integration.integration_type` (`hub` when the manifest doesn't say),
 /// for integrations with an embedded manifest.
-pub(super) fn integration_type(domain: &str) -> Option<String> {
+pub(crate) fn integration_type(domain: &str) -> Option<String> {
     let manifest: Value = serde_json::from_str(manifest(domain)?).ok()?;
     Some(
         manifest
@@ -107,6 +115,38 @@ pub(super) fn dispatch(
                 seen.push(d);
             }
             conn.out.result_raw(id, &format!("[{}]", parts.join(",")));
+        }),
+        // `require_admin`. `loader.async_get_integration_descriptions`,
+        // with no custom integrations.
+        "integration/descriptions" => super::only_keys(msg, &[]).map(|()| {
+            if conn.principal.permission < Permission::Admin {
+                conn.out.error(json!(id), "unauthorized", "Unauthorized");
+                return;
+            }
+            let handlers: &[&ha_integrations::flow::Handler] = match conn.shared.config.flows {
+                Some(_) => ha_integrations::flow::HANDLERS,
+                None => &[],
+            };
+            let described = || {
+                handlers.iter().filter_map(|h| {
+                    DESCRIPTIONS.iter().find(|(domain, ..)| *domain == h.domain)
+                })
+            };
+            let integrations: Vec<String> = described()
+                .map(|(domain, description, _)| format!("\"{domain}\":{description}"))
+                .collect();
+            let translated: Vec<String> = described()
+                .filter(|(.., translated)| *translated)
+                .map(|(domain, ..)| format!("\"{domain}\""))
+                .collect();
+            conn.out.result_raw(
+                id,
+                &format!(
+                    r#"{{"core":{{"integration":{{{}}},"helper":{{}},"translated_name":[{}]}},"custom":{{"integration":{{}},"helper":{{}}}}}}"#,
+                    integrations.join(","),
+                    translated.join(",")
+                ),
+            );
         }),
         "manifest/get" => check(msg, "integration").map(|()| {
             let d = msg["integration"].as_str().unwrap_or_default();

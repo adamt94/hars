@@ -17,7 +17,7 @@ memory and wakeup cost is measured before it merges.
 |---|---|---|---|
 | [Philips Hue](#philips-hue) | `hue` | Local, pushed by the bridge | Import |
 | [LIFX](#lifx) | `lifx` | Local, polled every 10 s | Import |
-| [SwitchBot Cloud](#switchbot-cloud) | `switchbot_cloud` | Cloud, polled every 600 s | Import |
+| [SwitchBot Cloud](#switchbot-cloud) | `switchbot_cloud` | Cloud, polled every 600 s | The UI, or import |
 | [Weather](#weather) | `met` | Cloud, fetched about once an hour | Onboarding |
 | [Sun](#sun) | `sun` | None, calculated | On by default |
 | [Companion app](#companion-app) | `mobile_app` | The app calls hars | Log in from the app |
@@ -29,9 +29,14 @@ The domains that hars starts from config entries are the `SUPPORTED` list in
 
 ### How you add an integration
 
-You can't add an integration from the UI yet. An integration reaches hars in
-one of three ways:
+An integration reaches hars in one of four ways:
 
+- **The UI.** Open **Settings > Devices & services**, choose **Add
+  integration**, and pick the integration. Today the list holds SwitchBot
+  Cloud only. hars checks what you type before it saves anything, starts the
+  integration at once, and shows the devices that it found. Choose **Skip
+  and finish** in the last step: hars can't yet save a name or an area from
+  that step. To undo it, open the integration and delete its entry.
 - **Import.** Set the integration up in Home Assistant 2026.6 or 2026.7
   ([newer releases can't be imported yet](INSTALL.md#which-home-assistant-releases)), then
   [move the install to hars](../README.md#move-from-home-assistant). The
@@ -90,9 +95,11 @@ hars has been checked against one colour bulb.
 
 ### SwitchBot Cloud
 
-hars uses SwitchBot's cloud API with the token and secret from your Home
-Assistant install. It asks for the state of the Bot and of the Hub 2 every
-600 seconds, which is Home Assistant's interval.
+hars uses SwitchBot's cloud API. Add it in **Settings > Devices & services >
+Add integration** with the token and the secret key that the SwitchBot app
+shows under its developer options, or import an install that has it. hars
+asks for the state of the Bot and of the Hub 2 every 600 seconds, which is
+Home Assistant's interval.
 
 - **Bot:** a button that presses the Bot, and a battery sensor.
 - **Hub 2:** temperature and humidity.
@@ -182,7 +189,7 @@ New integrations and features:
 
 | Planned | What it brings |
 |---|---|
-| Adding integrations from the UI | Set up a device in **Settings** with no import |
+| Adding Hue and LIFX from the UI | Set up a bridge or a bulb in **Settings** with no import, as SwitchBot Cloud is today |
 | MQTT (`mqtt`) | Devices that publish to an MQTT broker |
 | zigbee2mqtt | Zigbee devices, through MQTT |
 | ESPHome (`esphome`) | ESPHome devices, over their native API |

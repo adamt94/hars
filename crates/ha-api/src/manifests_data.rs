@@ -68,3 +68,11 @@ pub(crate) const MANIFESTS: &[(&str, &str)] = &[
     ("zeroconf", r#"{"domain":"zeroconf","name":"Zero-configuration networking (zeroconf)","codeowners":["@bdraco"],"dependencies":["network","api"],"documentation":"https://www.home-assistant.io/integrations/zeroconf","integration_type":"system","iot_class":"local_push","loggers":["zeroconf"],"quality_scale":"internal","requirements":["zeroconf==0.149.16"],"is_built_in":true,"overwrites_built_in":false}"#),
     ("zone", r#"{"domain":"zone","name":"Zone","codeowners":["@home-assistant/core"],"config_flow":false,"documentation":"https://www.home-assistant.io/integrations/zone","integration_type":"system","quality_scale":"internal","is_built_in":true,"overwrites_built_in":false}"#),
 ];
+
+/// (domain, its `integration/descriptions` entry, in `translated_name`),
+/// sorted by domain.
+pub(crate) const DESCRIPTIONS: &[(&str, &str, bool)] = &[
+    ("hue", r#"{"integration_type":"hub","config_flow":true,"iot_class":"local_push","name":"Philips Hue"}"#, false),
+    ("lifx", r#"{"name":"LIFX","integration_type":"device","config_flow":true,"iot_class":"local_polling"}"#, false),
+    ("switchbot_cloud", r#"{"integration_type":"hub","config_flow":true,"iot_class":"cloud_polling","name":"SwitchBot Cloud"}"#, false),
+];

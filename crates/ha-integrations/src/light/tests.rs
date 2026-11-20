@@ -388,7 +388,7 @@ async fn services_reach_the_targeted_available_lights() {
             calls: calls.clone(),
         }));
     }
-    let registries = Registries {
+    let registries = ha_registry::Registries {
         entities: ha_registry::rows![ha_registry::Entity {
             entity_id: "light.b".into(),
             platform: "hue".into(),

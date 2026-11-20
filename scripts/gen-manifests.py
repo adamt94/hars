@@ -10,6 +10,12 @@ as HA's `json_bytes` does. Only the domains below are embedded, to keep the
 binary small: what hars runs or will run, `default_config`'s
 dependencies, and other integrations an imported install commonly has
 config entries for (the frontend asks for those by name).
+
+`integration/descriptions` answers with the entries of HA's
+`generated/integrations.json` for the integrations a config flow can add:
+`DESCRIPTIONS` holds, for each domain in `FLOW_DOMAINS` (described on its
+own or inside a brand), the entry as HA sends it and whether the domain is
+in `translated_name`.
 """
 
 import json
@@ -25,6 +31,9 @@ DOMAINS = set(
     zone analytics backup shopping_list google_translate radio_browser tts
     """.split()
 )
+
+# What hars has a config flow for, or will next (docs/ROADMAP.md).
+FLOW_DOMAINS = {"hue", "lifx", "switchbot_cloud"}
 
 
 def main(wheel):
@@ -45,6 +54,25 @@ def main(wheel):
         text = json.dumps(m, separators=(",", ":"), ensure_ascii=False)
         assert '"#' not in text
         out.append(f'    ("{d}", r#"{text}"#),')
+    out.append("];")
+    listed = json.loads(z.read("homeassistant/generated/integrations.json"))
+    described = {}
+    for domain, item in listed["integration"].items():
+        if "integration_type" in item:
+            described[domain] = item
+        for inner, description in item.get("integrations", {}).items():
+            described[inner] = description
+    out += [
+        "",
+        "/// (domain, its `integration/descriptions` entry, in `translated_name`),",
+        "/// sorted by domain.",
+        "pub(crate) const DESCRIPTIONS: &[(&str, &str, bool)] = &[",
+    ]
+    for d in sorted(FLOW_DOMAINS):
+        text = json.dumps(described[d], separators=(",", ":"), ensure_ascii=False)
+        assert '"#' not in text
+        translated = "true" if d in listed["translated_name"] else "false"
+        out.append(f'    ("{d}", r#"{text}"#, {translated}),')
     out.append("];")
     open("crates/ha-api/src/manifests_data.rs", "w").write("\n".join(out) + "\n")
 

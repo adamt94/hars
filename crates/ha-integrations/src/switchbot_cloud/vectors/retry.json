@@ -1,0 +1,41 @@
+{
+ "doc": "The retry of a setup that wasn't ready, once the API answers: written to switchbot_cloud/vectors/retry.json as the entry's changes, not to flow.json.",
+ "changes": [
+  {
+   "type": "added",
+   "state": "not_loaded",
+   "reason": null,
+   "supports_unload": false
+  },
+  {
+   "type": "updated",
+   "state": "setup_in_progress",
+   "reason": null,
+   "supports_unload": false
+  },
+  {
+   "type": "updated",
+   "state": "setup_retry",
+   "reason": "Error communicating with API: ",
+   "supports_unload": true
+  },
+  {
+   "type": "updated",
+   "state": "setup_in_progress",
+   "reason": null,
+   "supports_unload": true
+  },
+  {
+   "type": "updated",
+   "state": "setup_in_progress",
+   "reason": null,
+   "supports_unload": true
+  },
+  {
+   "type": "updated",
+   "state": "loaded",
+   "reason": null,
+   "supports_unload": true
+  }
+ ]
+}

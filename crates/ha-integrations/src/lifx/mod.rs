@@ -459,7 +459,8 @@ pub fn bulb(
     timing: Timing,
 ) -> (Arc<Bulb>, tokio::task::JoinHandle<()>) {
     let hass = components.hass();
-    let names = crate::naming::Names::new(hass, components.registries(), DOMAIN);
+    let registries = components.registries();
+    let names = crate::naming::Names::new(hass, &registries, DOMAIN);
     let serial = proto::mac(&found.serial);
     let label = found.cached.label.clone();
     let light = names.entity("light", &serial, &serial, &label, None);

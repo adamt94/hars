@@ -34,6 +34,46 @@ pub struct Registry {
     entries: RwLock<Option<EntryLookup>>,
 }
 
+/// The registries as something long-lived reads them (a service resolving
+/// its targets, an integration set up while `hars` runs): one fixed set
+/// (tests), or whatever the live registry holds when asked, so rows made
+/// after start-up are seen.
+#[derive(Clone)]
+pub enum Lookup {
+    Fixed(Arc<Registries>),
+    Live(Arc<Registry>),
+}
+
+impl Lookup {
+    /// The registries as they are now.
+    pub fn get(&self) -> Arc<Registries> {
+        match self {
+            Self::Fixed(r) => r.clone(),
+            Self::Live(r) => r.snapshot(),
+        }
+    }
+
+    /// The live registry, where rows can be made.
+    pub fn live(&self) -> Option<&Arc<Registry>> {
+        match self {
+            Self::Fixed(_) => None,
+            Self::Live(r) => Some(r),
+        }
+    }
+}
+
+impl From<Arc<Registries>> for Lookup {
+    fn from(r: Arc<Registries>) -> Self {
+        Self::Fixed(r)
+    }
+}
+
+impl From<Arc<Registry>> for Lookup {
+    fn from(r: Arc<Registry>) -> Self {
+        Self::Live(r)
+    }
+}
+
 /// What an integration wants a row to have (HA's keyword arguments to
 /// `async_get_or_create` / `async_update_entity`): `None` leaves a field
 /// as it is, `Some(None)` clears it.

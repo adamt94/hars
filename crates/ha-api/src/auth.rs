@@ -147,6 +147,11 @@ fn required_permission(method: &Method, path: Option<&str>) -> Permission {
         (&Method::POST, Some("/api/services/{domain}/{service}")) => Permission::Control,
         // `require_admin` on every method of the config views.
         (_, Some("/api/config/automation/config/{id}")) => Permission::Admin,
+        // Starting, reading and answering a config flow, and removing an
+        // entry. Deleting a flow has no check in HA.
+        (&Method::POST, Some(crate::config_entries::FLOW)) => Permission::Admin,
+        (&Method::GET | &Method::POST, Some(crate::config_entries::FLOW_ID)) => Permission::Admin,
+        (&Method::DELETE, Some(crate::config_entries::ENTRY_ID)) => Permission::Admin,
         _ => Permission::Read,
     }
 }

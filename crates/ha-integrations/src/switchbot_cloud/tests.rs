@@ -5,7 +5,7 @@ use super::*;
 use crate::light::Profiles;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-fn fixture(name: &str) -> Value {
+pub(crate) fn fixture(name: &str) -> Value {
     let text = match name {
         "devices" => include_str!("vectors/devices.json"),
         "bot" => include_str!("vectors/status_Bot.json"),
@@ -20,7 +20,7 @@ fn fixture(name: &str) -> Value {
     serde_json::from_str(text).unwrap()
 }
 
-fn registries() -> Registries {
+pub(crate) fn registries() -> Registries {
     let areas = fixture("areas")["areas"]
         .as_array()
         .unwrap()
@@ -39,27 +39,31 @@ fn registries() -> Registries {
     }
 }
 
-const BOT: &str = "AABBCC000001";
+pub(crate) const BOT: &str = "AABBCC000001";
 const HUB: &str = "AABBCC000002";
-const AC: &str = "01-202301010000-00000001";
+pub(crate) const AC: &str = "01-202301010000-00000001";
 
 /// A request as the fake server saw it.
 #[derive(Debug, Clone)]
-struct Seen {
-    method: String,
-    path: String,
+pub(crate) struct Seen {
+    pub(crate) method: String,
+    pub(crate) path: String,
     headers: Vec<(String, String)>,
     body: String,
 }
 
 /// A reply: status, content type (none if empty), body.
-type Reply = (u16, &'static str, String);
+pub(crate) type Reply = (u16, &'static str, String);
 
 #[derive(Default)]
-struct Server {
+pub(crate) struct Server {
     seen: parking_lot::Mutex<Vec<Seen>>,
     /// Replies by `"METHOD path"`, instead of the real ones.
     replies: parking_lot::Mutex<HashMap<String, Reply>>,
+    /// When set, a request is seen and then held until this is notified.
+    pub(crate) hold: parking_lot::Mutex<Option<Arc<tokio::sync::Notify>>>,
+    /// Told each request as it is seen.
+    pub(crate) arrived: tokio::sync::Notify,
 }
 
 impl Server {
@@ -79,19 +83,24 @@ impl Server {
         }
     }
 
-    fn set(&self, method: &str, path: &str, reply: Reply) {
+    pub(crate) fn set(&self, method: &str, path: &str, reply: Reply) {
         self.replies
             .lock()
             .insert(format!("{method} {path}"), reply);
     }
 
-    fn take(&self) -> Vec<Seen> {
+    /// How many requests have arrived (and not been taken).
+    pub(crate) fn count(&self) -> usize {
+        self.seen.lock().len()
+    }
+
+    pub(crate) fn take(&self) -> Vec<Seen> {
         std::mem::take(&mut *self.seen.lock())
     }
 }
 
 /// A SwitchBot API on 127.0.0.1, closing each connection as the real one.
-async fn fake() -> (String, Arc<Server>) {
+pub(crate) async fn fake() -> (String, Arc<Server>) {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let base = format!("http://{}", listener.local_addr().unwrap());
     let server = Arc::new(Server::default());
@@ -139,6 +148,11 @@ async fn fake() -> (String, Arc<Server>) {
                     headers,
                     body,
                 });
+                srv.arrived.notify_one();
+                let hold = srv.hold.lock().clone();
+                if let Some(hold) = hold {
+                    hold.notified().await;
+                }
                 let ct = match ct {
                     "" => String::new(),
                     ct => format!("Content-Type: {ct}\r\n"),
@@ -761,4 +775,83 @@ async fn an_api_error_is_logged_without_its_body() {
         let said = format!("{error:?} {error} {:?}", logged.0.lock());
         assert!(!said.contains(TOKEN) && !said.contains(SECRET), "{said}");
     }
+}
+
+/// A setup over the rows HA itself wrote for these devices (an imported
+/// install: the user's areas, the conversation options, the versions)
+/// changes none of them and fires nothing: what `hars` registers is what
+/// HA registered.
+#[tokio::test]
+async fn registering_leaves_has_rows_alone() {
+    let hass = Hass::new();
+    let imported = registries();
+    let entry_id = imported.devices[0].config_entries[0].clone();
+    let registry = ha_registry::Registry::in_memory(&hass, imported);
+    let before = registry.snapshot();
+    let mut events = hass.bus().subscribe();
+    let (base, _) = fake().await;
+    let (devices, polled) = fetch(&api(&base)).await.unwrap();
+    register(&hass, &registry, &entry_id, false, &devices, &polled);
+    let after = registry.snapshot();
+    assert_eq!(
+        serde_json::to_value(&after.devices).unwrap(),
+        serde_json::to_value(&before.devices).unwrap()
+    );
+    assert_eq!(
+        serde_json::to_value(&after.entities).unwrap(),
+        serde_json::to_value(&before.entities).unwrap()
+    );
+    assert!(events.try_recv().is_err(), "a registry event was fired");
+    // The app's rename of a device is the one thing that moves.
+    let mut renamed = devices.clone();
+    renamed[0].name = "Towel rail".into();
+    register(&hass, &registry, &entry_id, false, &renamed, &polled);
+    // The entry's "disable new entities" changes no row that exists...
+    let before = registry.snapshot();
+    register(&hass, &registry, &entry_id, true, &renamed, &polled);
+    assert_eq!(
+        serde_json::to_value(&registry.snapshot().entities).unwrap(),
+        serde_json::to_value(&before.entities).unwrap()
+    );
+    // ...and a row made under it starts disabled by the integration
+    // (`RegistryEntryDisabler.INTEGRATION`), so nothing runs for it.
+    let fresh = ha_registry::Registry::in_memory(&hass, Default::default());
+    register(&hass, &fresh, &entry_id, true, &devices, &polled);
+    let rows = fresh.snapshot();
+    assert_eq!(rows.entities.len(), 6);
+    assert!(
+        rows.entities
+            .iter()
+            .all(|e| e.disabled_by.as_deref() == Some("integration"))
+    );
+    let entry = build(&hass, &rows, api(&base), &devices, polled);
+    assert!(entry.is_empty());
+    let device = registry.snapshot().devices[0].clone();
+    assert_eq!(device.name.as_deref(), Some("Towel rail"));
+    assert_eq!(device.area_id.as_deref(), Some("bedroom"));
+}
+
+/// An account whose devices another entry already runs (their entities
+/// have states): it builds none of them, as HA's platform refuses a unique
+/// id that is in use, and so polls nothing.
+#[tokio::test]
+async fn devices_another_entry_runs_are_left_alone() {
+    let hass = Hass::new();
+    let (first, server, _components) = started(&hass).await;
+    assert!(!first.is_empty());
+    let (base, second_server) = fake().await;
+    let second = setup(&hass, &registries(), api(&base)).await.unwrap();
+    assert!(second.is_empty());
+    assert!(second.shared.polled.lock().is_empty());
+    second_server.take();
+    second.poll().await;
+    assert_eq!(
+        second_server.count(),
+        0,
+        "it asked for a device it doesn't run"
+    );
+    // The first entry still polls its own.
+    server.take();
+    first.poll().await;
+    assert_eq!(server.count(), 2);
 }

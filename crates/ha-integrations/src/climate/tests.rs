@@ -68,7 +68,7 @@ impl Climate for Ac {
 fn setup() -> (Hass, Arc<Ac>) {
     let hass = Hass::new();
     let climates = Arc::new(Climates::default());
-    climates.register_services(&hass, Arc::new(Registries::default()));
+    climates.register_services(&hass, Arc::new(ha_registry::Registries::default()));
     let ac = Arc::new(Ac {
         id: EntityId::parse("climate.air_conditioner").unwrap(),
         mode: Mutex::new("fan_only".into()),
@@ -258,7 +258,7 @@ impl Climate for Heater {
 async fn base_turn_on_and_off_set_modes() {
     let hass = Hass::new();
     let climates = Arc::new(Climates::default());
-    climates.register_services(&hass, Arc::new(Registries::default()));
+    climates.register_services(&hass, Arc::new(ha_registry::Registries::default()));
     let h = Arc::new(Heater {
         id: EntityId::parse("climate.heater").unwrap(),
         calls: Mutex::default(),

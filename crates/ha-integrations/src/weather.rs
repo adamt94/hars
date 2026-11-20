@@ -4,7 +4,6 @@
 
 use crate::met::forecast::{Item, Num, round, round_int};
 use ha_core::{EntityId, EntityTarget, Hass, Schema, ServiceError, SupportsResponse};
-use ha_registry::Registries;
 use parking_lot::RwLock;
 use serde_json::{Map, Value, json};
 use std::sync::Arc;
@@ -421,7 +420,12 @@ impl Weather {
 
     /// Register `weather.get_forecasts` (response only). `registries`
     /// resolve device, area, floor and label targets.
-    pub fn register_services(self: &Arc<Self>, hass: &Hass, registries: Arc<Registries>) {
+    pub fn register_services(
+        self: &Arc<Self>,
+        hass: &Hass,
+        registries: impl Into<ha_registry::Lookup>,
+    ) {
+        let registries = registries.into();
         let schema = Schema::entity_service().required(
             "type",
             ha_core::Kind::OneOf(&["daily", "hourly", "twice_daily"]),
@@ -445,7 +449,7 @@ impl Weather {
                             ServiceError::Invalid("required key not provided @ data['type']".into())
                         })?;
                     let target = call.entity_ids()?;
-                    let indirect = registries.target_entities(&call.data);
+                    let indirect = registries.get().target_entities(&call.data);
                     weather.get_forecasts(&target, &indirect, kind).map(Some)
                 }
             },

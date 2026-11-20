@@ -5,7 +5,6 @@
 use crate::light::BoxFuture;
 use crate::switch::select;
 use ha_core::{Context, EntityId, Hass, Schema, SupportsResponse};
-use ha_registry::Registries;
 use parking_lot::RwLock;
 use std::sync::Arc;
 
@@ -49,7 +48,12 @@ impl Buttons {
     }
 
     /// Register `button.press`.
-    pub fn register_services(self: &Arc<Self>, hass: &Hass, registries: Arc<Registries>) {
+    pub fn register_services(
+        self: &Arc<Self>,
+        hass: &Hass,
+        registries: impl Into<ha_registry::Lookup>,
+    ) {
+        let registries = registries.into();
         let buttons = self.clone();
         // The clock, not `hass`: the handler lives in `hass`'s registry.
         let clock = hass.clock().clone();
@@ -64,7 +68,7 @@ impl Buttons {
                 let clock = clock.clone();
                 async move {
                     let target = call.entity_ids()?;
-                    let indirect = registries.target_entities(&call.data);
+                    let indirect = registries.get().target_entities(&call.data);
                     let items = buttons.items.read().clone();
                     let chosen = select(
                         &items,
@@ -161,7 +165,7 @@ mod tests {
     async fn press_writes_the_time_first_even_when_it_fails() {
         let hass = Hass::new();
         let buttons = Arc::new(Buttons::default());
-        buttons.register_services(&hass, Arc::new(Registries::default()));
+        buttons.register_services(&hass, Arc::new(ha_registry::Registries::default()));
         let id = EntityId::parse("button.towel_switch").unwrap();
         let b = Arc::new(Fake {
             id: id.clone(),
@@ -211,7 +215,7 @@ mod tests {
     fn services_hold_no_cycle() {
         let hass = Hass::new();
         let buttons = Arc::new(Buttons::default());
-        buttons.register_services(&hass, Arc::new(Registries::default()));
+        buttons.register_services(&hass, Arc::new(ha_registry::Registries::default()));
         let weak = Arc::downgrade(&buttons);
         drop((hass, buttons));
         assert!(weak.upgrade().is_none());

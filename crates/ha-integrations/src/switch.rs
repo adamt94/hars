@@ -4,7 +4,6 @@
 
 use crate::light::BoxFuture;
 use ha_core::{EntityId, EntityTarget, Hass, Schema, SupportsResponse};
-use ha_registry::Registries;
 use parking_lot::RwLock;
 use std::sync::Arc;
 
@@ -56,7 +55,12 @@ impl Switches {
     }
 
     /// Register `switch.turn_on`, `switch.turn_off` and `switch.toggle`.
-    pub fn register_services(self: &Arc<Self>, hass: &Hass, registries: Arc<Registries>) {
+    pub fn register_services(
+        self: &Arc<Self>,
+        hass: &Hass,
+        registries: impl Into<ha_registry::Lookup>,
+    ) {
+        let registries = registries.into();
         for name in ["turn_on", "turn_off", "toggle"] {
             let switches = self.clone();
             let registries = registries.clone();
@@ -70,7 +74,7 @@ impl Switches {
                     let registries = registries.clone();
                     async move {
                         let target = call.entity_ids()?;
-                        let indirect = registries.target_entities(&call.data);
+                        let indirect = registries.get().target_entities(&call.data);
                         let items = switches.items.read().clone();
                         let chosen = select(
                             &items,

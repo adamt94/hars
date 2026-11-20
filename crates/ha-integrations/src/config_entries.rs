@@ -1,7 +1,15 @@
 //! `.storage/core.config_entries` (1.5) at runtime: the entries as loaded,
-//! and HA's `async_update_entry` for integrations that change their data
-//! (the companion app's registration), saved 1 s after the last change
+//! HA's `async_add` and `async_remove` (config flows, onboarding) and
+//! `async_update_entry` for integrations that change their data (the
+//! companion app's registration), saved 1 s after the last change
 //! (`config_entries.py`'s `SAVE_DELAY`).
+//!
+//! What subscribers hear (`SIGNAL_CONFIG_ENTRY_CHANGED`): an entry added,
+//! updated (its data, or where its setup is) or removed.
+//!
+//! An entry's state (`ConfigEntryState`) is kept only for entries whose
+//! setup reports it: those a config flow added while `hars` runs. The API
+//! shows the others as `loaded` while their integration runs.
 
 use ha_core::Hass;
 use ha_core::storage::{DelayedSave, Store};
@@ -16,11 +24,101 @@ pub const KEY: &str = "core.config_entries";
 const MINOR: u32 = 5;
 const SAVE_DELAY: Duration = Duration::from_secs(1);
 
+/// `ConfigEntryState`, as far as `hars` gets.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EntryState {
+    NotLoaded,
+    SetupInProgress,
+    Loaded,
+    SetupError,
+    SetupRetry,
+    UnloadInProgress,
+}
+
+impl EntryState {
+    /// The enum's value, as the API sends it.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::NotLoaded => "not_loaded",
+            Self::SetupInProgress => "setup_in_progress",
+            Self::Loaded => "loaded",
+            Self::SetupError => "setup_error",
+            Self::SetupRetry => "setup_retry",
+            Self::UnloadInProgress => "unload_in_progress",
+        }
+    }
+}
+
+/// Where an entry's setup is, for the entries that report it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Runtime {
+    pub state: EntryState,
+    /// `ConfigEntry.reason`: why the setup is being retried.
+    pub reason: Option<String>,
+    /// The integration was loaded for it (a setup attempt has ended), which
+    /// is when HA knows `supports_unload`.
+    pub integration_loaded: bool,
+}
+
+/// `ConfigEntryChange`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Change {
+    Added,
+    Removed,
+    Updated,
+}
+
+impl Change {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Added => "added",
+            Self::Removed => "removed",
+            Self::Updated => "updated",
+        }
+    }
+}
+
+/// How an entry's setup says where it is. [`Status::none`] says nothing:
+/// the entries started at start-up, whose state the API works out.
+#[derive(Clone)]
+pub struct Status(Option<(Arc<ConfigEntries>, String)>);
+
+impl Status {
+    pub fn none() -> Self {
+        Self(None)
+    }
+
+    pub fn new(entries: Arc<ConfigEntries>, entry_id: &str) -> Self {
+        Self(Some((entries, entry_id.to_owned())))
+    }
+
+    pub fn set(&self, state: EntryState, reason: Option<String>) {
+        if let Some((entries, entry_id)) = &self.0 {
+            entries.set_state(entry_id, state, reason);
+        }
+    }
+}
+
+/// A subscription's `live` flag: false once unsubscribed or closed.
+pub type Live = Arc<parking_lot::Mutex<bool>>;
+/// Told each change with the entry as it is then; `false` drops it.
+pub type Listener = Box<dyn Fn(Change, &Map<String, Value>) -> bool + Send + Sync>;
+
 pub struct ConfigEntries {
     hass: Hass,
     /// `None`: there was no file (a fresh install).
     entries: RwLock<Option<Vec<Map<String, Value>>>>,
     save: Option<Arc<DelayedSave>>,
+    /// The file couldn't be read as this version, so it is never
+    /// written: nothing added now would outlive a restart.
+    read_only: bool,
+    /// By entry id, for entries whose setup reports its state. Empty until
+    /// a config flow adds an entry.
+    runtime: parking_lot::Mutex<Vec<(String, Runtime)>>,
+    /// Wakes whoever waits for a setup to settle.
+    settled: tokio::sync::Notify,
+    /// `config_entries/subscribe`rs. Empty while nobody subscribes.
+    listeners: parking_lot::Mutex<Vec<(Live, Listener)>>,
 }
 
 impl std::fmt::Debug for ConfigEntries {
@@ -39,6 +137,17 @@ fn store(dir: &Path) -> Store {
 struct File {
     #[serde(default)]
     entries: Vec<Map<String, Value>>,
+}
+
+/// Tell the listeners a change, dropping those that have gone.
+fn tell(listeners: &mut Vec<(Live, Listener)>, change: Change, entry: &Map<String, Value>) {
+    if listeners.is_empty() {
+        return;
+    }
+    listeners.retain(|(_, listener)| listener(change, entry));
+    if listeners.is_empty() {
+        *listeners = Vec::new();
+    }
 }
 
 impl ConfigEntries {
@@ -69,6 +178,10 @@ impl ConfigEntries {
                 hass: hass.clone(),
                 entries: RwLock::new(entries),
                 save,
+                read_only: !writable,
+                runtime: Default::default(),
+                settled: tokio::sync::Notify::new(),
+                listeners: Default::default(),
             }
         })
     }
@@ -79,7 +192,17 @@ impl ConfigEntries {
             hass: hass.clone(),
             entries: RwLock::new(Some(entries)),
             save: None,
+            read_only: false,
+            runtime: Default::default(),
+            settled: tokio::sync::Notify::new(),
+            listeners: Default::default(),
         })
+    }
+
+    /// Whether the entries can't be saved (see [`Self::load`]): then
+    /// nothing should be added from the UI.
+    pub fn read_only(&self) -> bool {
+        self.read_only
     }
 
     /// The entries; `None` on a fresh install.
@@ -87,17 +210,57 @@ impl ConfigEntries {
         self.entries.read().clone()
     }
 
-    /// `async_add`: a new entry, saved.
+    /// The entry with this id.
+    pub fn get(&self, entry_id: &str) -> Option<Map<String, Value>> {
+        let guard = self.entries.read();
+        guard
+            .iter()
+            .flatten()
+            .find(|e| e.get("entry_id").and_then(Value::as_str) == Some(entry_id))
+            .cloned()
+    }
+
+    /// `async_add`: a new entry, saved; subscribers hear `added`.
     pub fn add(&self, entry: Map<String, Value>) {
+        self.insert(entry, false);
+    }
+
+    /// [`Self::add`] for an entry whose setup will report its state: it
+    /// starts `not_loaded`, as HA's new entry does.
+    pub fn add_tracked(&self, entry: Map<String, Value>) {
+        self.insert(entry, true);
+    }
+
+    /// The listeners are held from before a change until they have heard
+    /// it, here and wherever an entry changes: someone subscribing sees
+    /// the change in its first list or as news, never both or neither.
+    fn insert(&self, entry: Map<String, Value>, tracked: bool) {
+        let mut listeners = self.listeners.lock();
+        if let (true, Some(id)) = (tracked, entry.get("entry_id").and_then(Value::as_str)) {
+            self.runtime.lock().push((
+                id.to_owned(),
+                Runtime {
+                    state: EntryState::NotLoaded,
+                    reason: None,
+                    integration_loaded: false,
+                },
+            ));
+        }
         self.entries
             .write()
             .get_or_insert_with(Vec::new)
-            .push(entry);
+            .push(entry.clone());
         self.schedule();
+        tell(&mut listeners, Change::Added, &entry);
     }
 
-    /// `async_remove`: the entry, if it was there; saved.
+    /// `async_remove`'s end: the entry, if it was there, leaves the list
+    /// and the file, subscribers hear `removed` with the state it ended
+    /// in, that state is forgotten and whoever waits for its setup is let
+    /// go. Call it once what belonged to the entry is cleaned up
+    /// (`_async_clean_up` tells last).
     pub fn remove(&self, entry_id: &str) -> Option<Map<String, Value>> {
+        let mut listeners = self.listeners.lock();
         let removed = {
             let mut guard = self.entries.write();
             let list = guard.as_mut()?;
@@ -107,7 +270,104 @@ impl ConfigEntries {
             list.remove(i)
         };
         self.schedule();
+        tell(&mut listeners, Change::Removed, &removed);
+        {
+            let mut runtime = self.runtime.lock();
+            runtime.retain(|(e, _)| e != entry_id);
+            if runtime.is_empty() {
+                // Nothing is held while no entry reports its state.
+                *runtime = Vec::new();
+            }
+        }
+        drop(listeners);
+        self.settled.notify_waiters();
         Some(removed)
+    }
+
+    /// Hear every change from now on, while `live` is true. `first` runs
+    /// before any of them: it reads the entries as they are (its first
+    /// list), and no change can come between that and the listening.
+    pub fn subscribe(&self, live: Live, listener: Listener, first: impl FnOnce()) {
+        let mut listeners = self.listeners.lock();
+        listeners.retain(|(live, _)| *live.lock());
+        first();
+        listeners.push((live, listener));
+    }
+
+    /// Drop the listeners whose subscription has ended (call when one
+    /// ends, after its `live` is false and released), so a closed
+    /// connection leaves nothing behind.
+    pub fn prune(&self) {
+        let mut listeners = self.listeners.lock();
+        listeners.retain(|(live, _)| *live.lock());
+        if listeners.is_empty() {
+            *listeners = Vec::new();
+        }
+    }
+
+    /// Where the entry's setup is, if it reports it.
+    pub fn runtime(&self, entry_id: &str) -> Option<Runtime> {
+        self.runtime
+            .lock()
+            .iter()
+            .find(|(e, _)| e == entry_id)
+            .map(|(_, r)| r.clone())
+    }
+
+    /// `ConfigEntry._async_set_state`: subscribers hear `updated`, and
+    /// whoever waits for the setup to settle is woken. Nothing for an
+    /// entry that is gone.
+    pub fn set_state(&self, entry_id: &str, state: EntryState, reason: Option<String>) {
+        let mut listeners = self.listeners.lock();
+        let Some(entry) = self.get(entry_id) else {
+            return;
+        };
+        {
+            let mut runtime = self.runtime.lock();
+            // An entry being unloaded was loaded.
+            let ended = matches!(
+                state,
+                EntryState::Loaded
+                    | EntryState::SetupError
+                    | EntryState::SetupRetry
+                    | EntryState::UnloadInProgress
+            );
+            match runtime.iter_mut().find(|(e, _)| e == entry_id) {
+                Some((_, r)) => {
+                    r.state = state;
+                    r.reason = reason;
+                    r.integration_loaded |= ended;
+                }
+                None => runtime.push((
+                    entry_id.to_owned(),
+                    Runtime {
+                        state,
+                        reason,
+                        integration_loaded: ended,
+                    },
+                )),
+            }
+        }
+        tell(&mut listeners, Change::Updated, &entry);
+        drop(listeners);
+        self.settled.notify_waiters();
+    }
+
+    /// Wait until the entry's first setup attempt has ended (it is loaded,
+    /// failed, or being retried), as `async_add` awaits `async_setup`; or
+    /// until the entry is removed.
+    pub async fn setup_attempted(&self, entry_id: &str) {
+        loop {
+            let woken = self.settled.notified();
+            tokio::pin!(woken);
+            // Registered before the check, so no change is missed.
+            woken.as_mut().enable();
+            match self.runtime(entry_id) {
+                Some(r) if r.state == EntryState::SetupInProgress => {}
+                _ => return,
+            }
+            woken.await;
+        }
     }
 
     /// The entry of `domain` with this `unique_id`.
@@ -183,6 +443,7 @@ impl ConfigEntries {
     /// replaced, `modified_at` moves and the save is scheduled. `false`
     /// for no change (or no such entry).
     pub fn update_data(&self, entry_id: &str, data: Map<String, Value>) -> bool {
+        let mut listeners = self.listeners.lock();
         {
             let mut guard = self.entries.write();
             let Some(entry) = guard
@@ -202,6 +463,9 @@ impl ConfigEntries {
             );
         }
         self.schedule();
+        if let Some(entry) = self.get(entry_id) {
+            tell(&mut listeners, Change::Updated, &entry);
+        }
         true
     }
 
@@ -288,6 +552,87 @@ mod tests {
         let saved = std::fs::read_to_string(&file).unwrap();
         assert!(saved.contains(r#""x":25.096823722419074"#), "{saved}");
         assert!(saved.contains(r#""z":12345678901234567890"#), "{saved}");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// A subscriber's first look and the changes after it never overlap,
+    /// and a subscription that ended leaves nothing behind.
+    #[tokio::test]
+    async fn subscribers_hear_each_change_once_and_are_dropped() {
+        let entries = ConfigEntries::in_memory(&Hass::new(), Vec::new());
+        let entry = entries.new_entry("sun", "import", "Sun", None, Map::new());
+        let id = entry["entry_id"].as_str().unwrap().to_owned();
+        entries.add_tracked(entry);
+        let heard = Arc::new(parking_lot::Mutex::new(Vec::new()));
+        let live: Live = Arc::new(parking_lot::Mutex::new(true));
+        let listener: Listener = {
+            let (heard, live) = (heard.clone(), live.clone());
+            Box::new(move |change, entry| {
+                heard.lock().push((change, entry["entry_id"].clone()));
+                *live.lock()
+            })
+        };
+        let mut first = None;
+        entries.subscribe(live.clone(), listener, || {
+            first = entries.list().map(|l| l.len());
+        });
+        assert_eq!(first, Some(1));
+        assert!(heard.lock().is_empty(), "what was there isn't news");
+        entries.set_state(&id, EntryState::Loaded, None);
+        entries.set_state("gone", EntryState::Loaded, None);
+        assert_eq!(
+            *heard.lock(),
+            [(Change::Updated, Value::String(id.clone()))]
+        );
+        assert_eq!(entries.runtime("gone"), None);
+        // Unsubscribed: dropped at once, and the list gives its memory back.
+        *live.lock() = false;
+        entries.prune();
+        assert_eq!(entries.listeners.lock().capacity(), 0);
+        // Removed: its state is forgotten too.
+        entries.remove(&id).unwrap();
+        assert_eq!(entries.runtime.lock().capacity(), 0);
+        assert_eq!(heard.lock().len(), 1);
+        // A subscriber never hears `removed` for an entry its first list
+        // didn't hold: the entry leaves the list as it is told.
+        let entry = entries.new_entry("sun", "import", "Sun", None, Map::new());
+        let id = entry["entry_id"].as_str().unwrap().to_owned();
+        entries.add(entry);
+        let live: Live = Arc::new(parking_lot::Mutex::new(true));
+        let listed = Arc::new(parking_lot::Mutex::new(None));
+        let listener: Listener = {
+            let (heard, listed) = (heard.clone(), listed.clone());
+            Box::new(move |change, entry| {
+                assert_eq!(*listed.lock(), Some(1), "told before the first list");
+                heard.lock().push((change, entry["entry_id"].clone()));
+                true
+            })
+        };
+        entries.subscribe(live, listener, || {
+            *listed.lock() = entries.list().map(|l| l.len());
+        });
+        entries.remove(&id).unwrap();
+        assert_eq!(
+            heard.lock().last(),
+            Some(&(Change::Removed, Value::String(id)))
+        );
+    }
+
+    /// A file of another version is never written, so nothing should be
+    /// added to it from the UI.
+    #[tokio::test]
+    async fn a_file_of_another_version_is_read_only() {
+        let dir = std::env::temp_dir().join(format!("hars-entries-ro-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join(".storage")).unwrap();
+        let text = include_str!("config_entries/vectors/before.json");
+        std::fs::write(dir.join(".storage").join(KEY), text).unwrap();
+        assert!(!ConfigEntries::load(&Hass::new(), &dir).read_only());
+        let older = text.replace("\"minor_version\": 5", "\"minor_version\": 4");
+        assert_ne!(older, text);
+        std::fs::write(dir.join(".storage").join(KEY), older).unwrap();
+        assert!(ConfigEntries::load(&Hass::new(), &dir).read_only());
+        assert!(!ConfigEntries::in_memory(&Hass::new(), Vec::new()).read_only());
         let _ = std::fs::remove_dir_all(&dir);
     }
 

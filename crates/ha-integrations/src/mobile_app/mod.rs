@@ -448,10 +448,14 @@ impl MobileApp {
         if let Some(old) = &old {
             old.retire().await;
             self.unload(ctx, old);
-            entries.remove(&old.entry_id);
             self.save_deleted(&old.webhook_id).await;
         }
         entries.add(entry.clone());
+        // `async_finish_flow`: the old entry's `removed` follows the new
+        // one's `added`.
+        if let Some(old) = &old {
+            entries.remove(&old.entry_id);
+        }
         let reg = Arc::new(Registration::from_entry(&entry)?);
         self.registrations
             .write()
@@ -515,6 +519,24 @@ impl MobileApp {
         if let Some(n) = self.notifier.get() {
             n.register_services();
         }
+    }
+
+    /// A registration's entry is being removed from the UI
+    /// (`async_unload_entry`, then `async_remove_entry`): its requests
+    /// finish, its entities go, its webhook stops answering and its id is
+    /// saved as deleted. An entry with no registration here (a disabled
+    /// one) has nothing to unload, and its id is saved all the same.
+    pub async fn stop_entry(&self, entry: &Map<String, Value>) {
+        let _turn = self.registering.lock().await;
+        let Some(stored) = Registration::from_entry(entry) else {
+            return;
+        };
+        let live = self.registrations.read().get(&*stored.webhook_id).cloned();
+        if let (Some(reg), Some(ctx)) = (live, self.ctx.get()) {
+            reg.retire().await;
+            self.unload(ctx, &reg);
+        }
+        self.save_deleted(&stored.webhook_id).await;
     }
 
     /// `async_unload_entry`: the entities go and the webhook stops
@@ -597,4 +619,4 @@ impl MobileApp {
 }
 
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;

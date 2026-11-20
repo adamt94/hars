@@ -9,13 +9,14 @@ use crate::light::{Lights, Profiles};
 use crate::scene::Scenes;
 use crate::switch::Switches;
 use ha_core::Hass;
-use ha_registry::Registries;
+use ha_registry::{Lookup, Registries};
 use parking_lot::Mutex;
 use std::sync::{Arc, OnceLock};
 
 pub struct Components {
     hass: Hass,
-    registries: Arc<Registries>,
+    /// The live registry in `hars`; a fixed set in tests.
+    registries: Lookup,
     profiles: Mutex<Option<Profiles>>,
     lights: OnceLock<Arc<Lights>>,
     switches: OnceLock<Arc<Switches>>,
@@ -25,10 +26,10 @@ pub struct Components {
 }
 
 impl Components {
-    pub fn new(hass: &Hass, registries: Arc<Registries>, profiles: Profiles) -> Arc<Self> {
+    pub fn new(hass: &Hass, registries: impl Into<Lookup>, profiles: Profiles) -> Arc<Self> {
         Arc::new(Self {
             hass: hass.clone(),
-            registries,
+            registries: registries.into(),
             profiles: Mutex::new(Some(profiles)),
             lights: OnceLock::new(),
             switches: OnceLock::new(),
@@ -42,8 +43,15 @@ impl Components {
         &self.hass
     }
 
-    pub fn registries(&self) -> &Arc<Registries> {
-        &self.registries
+    /// The registries as they are now: what an entry reads at setup.
+    pub fn registries(&self) -> Arc<Registries> {
+        self.registries.get()
+    }
+
+    /// Where an entry makes its device and entity rows (`None` in tests
+    /// that run on a fixed set).
+    pub fn registry(&self) -> Option<&Arc<ha_registry::Registry>> {
+        self.registries.live()
     }
 
     pub fn lights(&self) -> Arc<Lights> {

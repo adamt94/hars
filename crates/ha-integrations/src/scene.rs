@@ -4,7 +4,6 @@
 use crate::light::BoxFuture;
 use crate::switch::select;
 use ha_core::{EntityId, Hass, Kind, Schema, SupportsResponse};
-use ha_registry::Registries;
 use parking_lot::RwLock;
 use serde_json::Value;
 use std::sync::Arc;
@@ -34,7 +33,12 @@ impl Scenes {
     }
 
     /// Register `scene.turn_on` (`transition`: clamped to 0..6553 s).
-    pub fn register_services(self: &Arc<Self>, hass: &Hass, registries: Arc<Registries>) {
+    pub fn register_services(
+        self: &Arc<Self>,
+        hass: &Hass,
+        registries: impl Into<ha_registry::Lookup>,
+    ) {
+        let registries = registries.into();
         let scenes = self.clone();
         hass.services().register_with_schema(
             DOMAIN,
@@ -46,7 +50,7 @@ impl Scenes {
                 let registries = registries.clone();
                 async move {
                     let target = call.entity_ids()?;
-                    let indirect = registries.target_entities(&call.data);
+                    let indirect = registries.get().target_entities(&call.data);
                     let transition = call.data.get("transition").and_then(Value::as_f64);
                     let items = scenes.items.read().clone();
                     let chosen = select(

@@ -418,3 +418,46 @@ been stopped since the cutover, so it was not run again.
 Against HA on the same host and devices: about 1/18th of the memory, 1/13th
 of the CPU, a fifth of the wakeups and a tenth of the start-up time. Within
 the [budgets](../PERF.md#budgets).
+
+### Config flows, 2026-11-20
+
+Adding an integration from the UI: the flow engine and SwitchBot Cloud's
+flow, HA's flow views and four WebSocket commands, the registry rows a
+set-up makes, removing an entry. Nothing in it runs or holds memory while
+no flow is open: no timer, no task and no cache (the list of flows in
+progress is empty and unallocated; a subscriber's listener exists only
+while its WebSocket subscription does). A fresh install, as CI's gate
+measures it (`scripts/perf-docker.sh 15 60`, Docker on an Apple-silicon
+Mac, linux/aarch64), each row one run:
+
+| | binary | start→/api/ | idle RSS | anonymous | idle CPU | wakeups/s | threads |
+|---|---|---|---|---|---|---|---|
+| main (064778f) | 9.84 MiB | 10 ms | 8.6 MiB | 2.80 MiB | 0.000 % | 0.00 | 12 |
+| main (064778f) | 9.84 MiB | 8 ms | 9.8 MiB | 2.81 MiB | 0.000 % | 0.00 | 12 |
+| branch | 9.96 MiB | 16 ms | 9.3 MiB | 2.82 MiB | 0.000 % | 0.00 | 12 |
+| branch | 9.96 MiB | 7 ms | 11.6 MiB | 2.94 MiB | 0.000 % | 0.00 | 12 |
+
+Idle CPU and wakeups are unchanged. The RSS of a run is the anonymous
+memory plus however much of the binary the kernel happens to keep mapped
+(`Pss_File` moved between 5.6 and 8.1 MiB from run to run of one binary),
+so compare the anonymous column: within 0.14 MiB, and three runs of main
+one commit earlier (385d917) spanned 2.88 to 3.00 MiB by themselves.
+
+Release binary (macOS arm64, stripped, `cargo build --release -p
+ha-server`):
+
+| | bytes |
+|---|---|
+| main (064778f) | 9,122,224 |
+| branch | 9,238,176 (+115,952) |
+
+The growth is the six views, the flow manager, the set-up's registry rows
+and stopping an entry. A first version grew 297,840 bytes:
+`ha_integrations::start` had become generic over its registry argument, so
+it was compiled into the binary crate and took a third copy of the HTTPS
+client's futures with it (hyper's `send_request` alone went from 36,568 to
+54,068 bytes). Found by comparing symbol sizes of two `--profile profiling`
+builds; `start` now takes a plain `ha_registry::Lookup`. Two checkouts must
+not share one `CARGO_TARGET_DIR` for such a comparison: cargo names a
+workspace member's artifacts the same in both and can reuse the other
+tree's.

@@ -5,6 +5,7 @@ mod analytics;
 mod auth;
 mod automation;
 pub mod brands;
+mod config_entries;
 mod cors;
 mod cv;
 mod frontend;
@@ -65,6 +66,9 @@ pub struct ApiConfig {
     /// The config flows onboarding starts after its core config step
     /// (`met`), and what they started.
     pub onboarding: Option<Arc<ha_integrations::onboarding::Onboarding>>,
+    /// The config flows a user starts (Add integration), and the entries
+    /// they started. `None` serves no flow views.
+    pub flows: Option<Arc<ha_integrations::flow::Manager>>,
     /// The frontend's per-user and system settings.
     pub frontend_data: Arc<FrontendData>,
     /// Home Assistant Labs' preview features.
@@ -146,6 +150,9 @@ pub(crate) fn components(config: &ApiConfig) -> Vec<&'static str> {
     if let Some(o) = &config.onboarding {
         c.extend(o.started());
     }
+    if let Some(f) = &config.flows {
+        c.extend(f.started());
+    }
     c.sort_unstable();
     c.dedup();
     c
@@ -223,6 +230,7 @@ pub fn router(hass: Hass, auth: Auth, config: &ApiConfig) -> Router {
             config.config_dir.clone().into(),
             config.automations.clone(),
         ))
+        .merge(config_entries::routes(shared.clone()))
         .merge(mobile_app::registration_routes(shared.clone()));
     if let Some(views) = &onboarding {
         api = api.merge(views.authed_routes());

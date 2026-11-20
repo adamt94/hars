@@ -130,7 +130,49 @@ If your integration provides entities of a domain with a shared component,
 take it from `components` (`components.lights()`, `components.switches()` …)
 and add each entity with `.add(Arc::new(...))`. Touch the component in
 `start` even before entities exist, so its services are registered at start
-as in HA (see the `switchbot_cloud` block).
+as in HA (see `spawn_switchbot`).
+
+## 4b. A config flow
+
+Without a flow, an integration only reaches hars through an imported
+entry. To let a user add it from **Settings > Devices & services > Add
+integration**, port HA's `components/<domain>/config_flow.py` as
+`crates/ha-integrations/src/<domain>/config_flow.rs`.
+`switchbot_cloud/config_flow.rs` is the example (one step); the engine is
+`crates/ha-integrations/src/flow.rs`.
+
+1. **The handler.** A `flow::Handler` const: the domain, HA's class name
+   (its errors quote it), `VERSION`/`MINOR_VERSION`, the step ids, and `new`,
+   which makes a `Box<dyn flow::Flow>`. Add it to `flow::HANDLERS`.
+2. **The steps.** `Flow::step(cx, step_id, input)` is HA's
+   `async_step_<step_id>`: `input` is `None` when the step is shown and the
+   checked answer when the form is sent. Return `Step::form(…)` (fields as
+   `flow::Field`s; add a `flow::Kind` for a field type that isn't there
+   yet), `Step::abort(reason)` or `Step::CreateEntry { title, data }`. Use
+   HA's step ids, field names, error keys and abort reasons: the frontend
+   translates them from the `config` category that `gen-i18n.py` already
+   generates. A flow with several steps keeps what it has learnt (a host, a
+   bridge id) in its struct's fields, and returns the next step's form.
+3. **The unique id.** `cx.set_unique_id(…)`, then
+   `cx.abort_if_unique_id_configured()` before `CreateEntry`.
+4. **Starting the entry.** Add the domain to `flow::Manager::setup_entry`,
+   which spawns the same `run` as start-up does with a
+   `config_entries::Status`; `run` must report `Loaded`, `SetupRetry(reason)`
+   or `SetupError` after its first attempt, because the flow's reply waits
+   for it. Keep the task's handle if the entry can be stopped.
+5. **Registry rows.** An imported install has them; a fresh one doesn't.
+   Make them in the setup as HA's platforms do
+   (`Registry::get_or_create_device`, `get_or_create_entity`; see
+   `switchbot_cloud::register`), before reading ids and names.
+6. **Outside addresses** go in `ha_integrations::Endpoints`, so tests point
+   the flow at a listener on 127.0.0.1.
+7. **Description.** Add the domain to `FLOW_DOMAINS` in
+   `scripts/gen-manifests.py` and regenerate: the dialog lists what
+   `integration/descriptions` returns.
+8. **Vectors.** Extend `scripts/vectors/config_flow.py` (or add a script
+   beside it) so HA's own flow manager and views answer the same requests
+   with the device or service faked, and replay them in
+   `crates/ha-api/src/config_entries/tests.rs`.
 
 ## 5. Integration-specific services and API
 
@@ -224,6 +266,8 @@ Integrations add code, timers and sockets, so the pull request needs numbers
 - [ ] `crates/ha-integrations/src/<domain>/` with `DOMAIN` and `run`
 - [ ] `pub mod`, `SUPPORTED` and a `start` block in `lib.rs`
 - [ ] Ids and names from the registry; disabled entities skipped
+- [ ] If it can be added from the UI: a `flow::Handler`, its registry rows,
+      and vectors from HA's flow
 - [ ] `ready.done()` after the first write or failure; HA's retry ladder
 - [ ] No polling faster than HA; no blocking calls on async threads
 - [ ] Domain added to `gen-i18n.py` and `gen-manifests.py`, tables regenerated
