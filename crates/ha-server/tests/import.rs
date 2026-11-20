@@ -418,7 +418,7 @@ fn refuses_other_ha_versions_and_its_own_directory() {
     std::fs::write(src.join(".HA_VERSION"), "2026.6.1").unwrap();
     let out = hars(&src, &["import", src.to_str().unwrap()]);
     assert!(!out.status.success());
-    assert!(String::from_utf8_lossy(&out.stderr).contains("same directory"));
+    assert!(String::from_utf8_lossy(&out.stderr).contains("or is the source"));
 
     let no_ha = temp("not-ha");
     std::fs::create_dir_all(&no_ha).unwrap();
@@ -1233,8 +1233,9 @@ fn what_hars_cannot_convert_is_refused() {
             edit(rows.iter_mut().find(|d| d["name"] == name).unwrap());
         });
     }
-    let past = "hars imports Home Assistant 2026.6 to 2026.11: import a copy or backup of this \
-                config directory made before it was updated past 2026.11. Nothing was imported";
+    let past = "hars imports Home Assistant 2026.6 to 2026.11, and none of those releases \
+                writes this: import a copy or backup of this config directory made while it ran \
+                one of them. Nothing was imported";
     let cases: Vec<(&str, Change, String)> =
         vec![
         // A minor version after 2026.11's: a later release's format.
@@ -1317,7 +1318,7 @@ fn what_hars_cannot_convert_is_refused() {
         ),
         (
             "met-location",
-            |src| entry(src, "met", |e| e["data"]["location"]["radius"] = json!(5)),
+            |src| entry(src, "met", |e| e["data"]["location"]["latitude"] = json!("north")),
             "the met integration's config entry \"Cabin\" is version 2.1 and its location is \
              not a latitude and a longitude"
                 .into(),
@@ -2829,6 +2830,13 @@ fn rows_the_fixtures_do_not_hold_are_converted_by_home_assistants_rules() {
         rows.push(row("scene.evening", "f", Some(json!(null))));
         // Stored before 2026.11, for an entity that is registered.
         rows.push(row("sensor.hall_temperature", "g", None));
+        // Not an entity id: Home Assistant skips the row, whatever
+        // registry id it carries, and so it replaces nothing here.
+        let hall = rows
+            .iter()
+            .find(|r| r["state"]["entity_id"] == "light.desk")
+            .map(|r| r["entity_registry_id"].clone());
+        rows.push(row("Invalid", "h", hall));
     });
     let old = old_device.clone();
     edit_store(&src, "core.entity_registry", move |store| {
@@ -2855,6 +2863,7 @@ fn rows_the_fixtures_do_not_hold_are_converted_by_home_assistants_rules() {
         for d in store["data"]["devices"].as_array_mut().unwrap() {
             if d["name"] == "Power strip" {
                 d["area_id"] = json!("hall");
+                d["labels"] = json!(["lights"]);
             }
         }
         // A removed child device, disabled through its parent when it
@@ -2936,6 +2945,7 @@ fn rows_the_fixtures_do_not_hold_are_converted_by_home_assistants_rules() {
     assert_eq!(
         states,
         [
+            ("Invalid", "h"),
             ("light.desk", "off"),
             ("person.person_2026_11_2", "unknown"),
             ("person.test_owner", "unknown"),
@@ -3015,7 +3025,7 @@ fn rows_the_fixtures_do_not_hold_are_converted_by_home_assistants_rules() {
     assert_eq!(
         report["parent_devices"],
         json!([{"id": strip_id, "name": "Power strip", "children": [socket_id],
-                "used_in": ["configuration.yaml or a file it includes"]}])
+                "used_in": ["configuration.yaml or a file it includes"], "labels": ["lights"]}])
     );
     let strip_off = report["automations"]
         .as_array()
@@ -3033,7 +3043,8 @@ fn rows_the_fixtures_do_not_hold_are_converted_by_home_assistants_rules() {
     );
     assert!(
         stdout.contains("automation Strip off loads, but it names the device")
-            && stdout.contains("name the child devices too"),
+            && stdout.contains("name the child devices too")
+            && stdout.contains("has child devices and the label(s) lights"),
         "{stdout}"
     );
     for d in [src, dest] {
@@ -3048,14 +3059,131 @@ fn a_destination_inside_the_source_is_refused() {
     let src = temp("outside-src");
     release("2026.7.4", &src, &[]);
     for flag in ["--dry-run", "--force"] {
-        let dest = src.join("hars").join("config");
-        let out = hars(&dest, &["import", src.to_str().unwrap(), flag]);
-        assert!(!out.status.success(), "{flag}");
-        assert!(
-            String::from_utf8_lossy(&out.stderr).contains("the destination is inside the source"),
-            "{out:?}"
-        );
-        assert!(!src.join("hars").exists(), "{flag}");
+        // Plainly inside, and through a `..` over a directory not there yet.
+        for dest in [
+            src.join("hars").join("config"),
+            src.join("new").join("..").join("hars"),
+        ] {
+            let out = hars(&dest, &["import", src.to_str().unwrap(), flag]);
+            assert!(!out.status.success(), "{flag} {dest:?}");
+            assert!(
+                String::from_utf8_lossy(&out.stderr)
+                    .contains("the destination is inside the source"),
+                "{out:?}"
+            );
+            assert!(
+                !src.join("hars").exists() && !src.join("new").exists(),
+                "{flag}"
+            );
+        }
     }
     let _ = std::fs::remove_dir_all(src);
+}
+
+/// A destination file that is a hard link to the source's is not changed
+/// in place: making `secrets.yaml` owner-only leaves the source's mode.
+#[cfg(unix)]
+#[test]
+fn a_hard_linked_secrets_file_is_replaced_not_changed() {
+    use std::os::unix::fs::PermissionsExt;
+    let src = temp("linked-src");
+    let dest = temp("linked-dest");
+    ha_config(&src);
+    std::fs::write(src.join("configuration.yaml"), "http:\n  key: !secret pw\n").unwrap();
+    let theirs = src.join("secrets.yaml");
+    std::fs::set_permissions(&theirs, std::fs::Permissions::from_mode(0o644)).unwrap();
+    std::fs::create_dir_all(&dest).unwrap();
+    std::fs::hard_link(&theirs, dest.join("secrets.yaml")).unwrap();
+    let out = hars(&dest, &["import", src.to_str().unwrap()]);
+    assert!(out.status.success(), "{out:?}");
+    let mode = |p: &Path| std::fs::metadata(p).unwrap().permissions().mode() & 0o777;
+    assert_eq!(mode(&theirs), 0o644, "the source's");
+    assert_eq!(mode(&dest.join("secrets.yaml")), 0o600);
+    assert_eq!(
+        std::fs::read(dest.join("secrets.yaml")).unwrap(),
+        std::fs::read(&theirs).unwrap()
+    );
+    for d in [src, dest] {
+        let _ = std::fs::remove_dir_all(d);
+    }
+}
+
+/// `met` entries of 2026.11 that the fixture doesn't hold: a location with
+/// the radius the selector can store, which `met` doesn't use, and an
+/// entry with no place at all (2026.11's migration leaves one so when the
+/// old entry had none).
+#[test]
+fn met_entries_of_2026_11_convert() {
+    for (name, edit, says) in [
+        (
+            "radius",
+            (|data: &mut Value| data["location"]["radius"] = json!(150)) as fn(&mut Value),
+            "the location's `radius`, which `met` doesn't use, left out",
+        ),
+        (
+            "no-place",
+            |data: &mut Value| {
+                data.as_object_mut().unwrap().remove("location");
+            },
+            "it has no place",
+        ),
+    ] {
+        let src = temp(&format!("met-{name}-src"));
+        let dest = temp(&format!("met-{name}-dest"));
+        release("2026.11.2", &src, &[]);
+        edit_store(&src, "core.config_entries", |s| {
+            let entries = s["data"]["entries"].as_array_mut().unwrap();
+            edit(&mut entries.iter_mut().find(|e| e["title"] == "Cabin").unwrap()["data"]);
+        });
+        let out = hars(&dest, &["import", src.to_str().unwrap()]);
+        assert!(out.status.success(), "{name}: {out:?}");
+        let stdout = String::from_utf8_lossy(&out.stdout);
+        assert!(stdout.contains(says), "{name}: {stdout}");
+        let entries = read_json(&dest.join(".storage/core.config_entries"));
+        let cabin = entries["data"]["entries"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|e| e["title"] == "Cabin")
+            .unwrap();
+        let expected = if name == "radius" {
+            json!({"elevation": 12, "latitude": 60.39, "longitude": 5.32, "name": "Cabin"})
+        } else {
+            json!({"elevation": 12, "name": "Cabin"})
+        };
+        assert_eq!(
+            (&cabin["version"], &cabin["data"]),
+            (&json!(1), &expected),
+            "{name}"
+        );
+        for d in [src, dest] {
+            let _ = std::fs::remove_dir_all(d);
+        }
+    }
+}
+
+/// A part of a split device that still holds a copy of `lifx`'s
+/// identifier, with `lifx`'s own part gone: imported, and said.
+#[test]
+fn a_copy_of_an_identifier_without_its_original_is_said() {
+    let src = temp("copy-src");
+    let dest = temp("copy-dest");
+    release("2026.11.2", &src, &[]);
+    edit_store(&src, "core.device_registry", |s| {
+        let rows = s["data"]["devices"].as_array_mut().unwrap();
+        rows.retain(|d| !(d["name"] == "Desk" && d["has_composite_identifiers"] == false));
+    });
+    let out = hars(&dest, &["import", src.to_str().unwrap()]);
+    assert!(out.status.success(), "{out:?}");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        stdout.contains(
+            "1 identifier is of an integration hars runs on a device that Home Assistant 2026.8 \
+             split off for another integration, and that integration's own part is gone"
+        ),
+        "{stdout}"
+    );
+    for d in [src, dest] {
+        let _ = std::fs::remove_dir_all(d);
+    }
 }

@@ -195,7 +195,8 @@ The import decides file by file: it checks each file's own storage version,
 not only `.HA_VERSION`. It never writes to the folder you import from,
 and refuses to put hars's folder inside it. It converts and checks a copy
 first, and it replaces files in your hars folder only when every file has
-passed.
+passed. The report is written last. If that fails, the files are already
+in place, and the import prints what the report would have said.
 
 #### Coming from 2026.7
 
@@ -229,9 +230,9 @@ your folder.
 | 2026.9 | Child devices (device list 3.4): a part of a device, such as one socket of a power strip, kept in its own list without a maker or model | Lists each as an ordinary device again, in its parent's area if it has none of its own. The maker and model are not in your files to bring back. The link to its parent is kept in the file but not shown |
 | 2026.10 | LIFX settings (entry version 2): the bulb's serial is written without colons, in the settings, the device and the entity ids | Writes the serial with colons again, as hars's LIFX code expects it |
 | 2026.10 | Hue settings (entry 1.2): Zigbee addresses moved from one kind of device connection to another | Nothing. hars and Home Assistant 2026.6 both run a 1.2 entry, and hars does not use those connections |
-| 2026.11 | Entity names (`core.entity_registry` 1.24): a name you gave is stored without the device's name, which Home Assistant adds when it shows the name | Stores each name in full again. Every entity keeps the friendly name 2026.11 gave it |
+| 2026.11 | Entity names (`core.entity_registry` 1.24): a name you gave is stored without the device's name, which Home Assistant adds when it shows the name | Stores each name in full again. A name you gave an entity shows as 2026.11 showed it |
 | 2026.11 | Weather settings (`met`, entry version 2): the place is stored another way, and the forecast's own name is gone. 2026.11 shows the entry's title instead | Stores the place the 2026.6 way and gives the forecast the entry's title as its name |
-| 2026.11 | Last states (`core.restore_state`) are kept by an entity's registry id | Keeps them by entity id again, under the id each entity has now. A last state that 2026.11 would give to no entity is left out and listed under `dropped` |
+| 2026.11 | Last states (`core.restore_state`) are kept by an entity's registry id | Keeps them by entity id again, under the id each entity has now. A last state that 2026.11 would give to no entity in your registry is left out and listed under `dropped`. That includes the last state of an entity you removed: if it comes back, it starts without it |
 
 What you will notice:
 
@@ -245,7 +246,10 @@ What you will notice:
   Home Assistant takes an action on a device to include its child devices.
   hars reaches only the device's own entities. The import names each
   automation, YAML file and dashboard that uses such a device by id, with
-  the child devices to add.
+  the child devices to add. It also names each such device that has a
+  label its child devices lack, because an action on the label reached
+  them too. The import finds an id by its text, so it misses one that a
+  template builds.
 - **A weather forecast has "Forecast" in front of its name again.** In
   2026.11 the forecast of an entry titled "Cabin" shows as "Cabin". In hars
   it shows as "Forecast Cabin", the way 2026.6 names forecasts. The name is
@@ -265,11 +269,16 @@ What you will notice:
 
 What stops an import from these releases, with the reason on the terminal:
 
-- A file in a format newer than 2026.11's. For example:
+- The device list, the entity list, the last states or an integration's
+  settings in a format newer than 2026.11's. For example:
 
   ```text
   Error: core.device_registry is storage version 3.5, in a config directory of Home Assistant 2026.12.0; hars reads version 1.12, as Home Assistant 2026.6.1 does, and converts versions 3.2 and 3.4 to it (Home Assistant 2026.8 to 2026.11). ...
   ```
+
+  Other files follow Home Assistant's own rule, that a newer minor version
+  of a file can be read by an older release. hars imports those and lists
+  them in the report under `newer_stores`.
 
 - A child device that is disabled only because its parent device is
   disabled. 2026.6 has no such state. Enable the parent in Home Assistant

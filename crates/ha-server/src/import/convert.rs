@@ -122,8 +122,12 @@ pub struct ParentDevice {
     pub name: Option<String>,
     /// The devices that were its children.
     pub children: Vec<String>,
-    /// The YAML files and dashboards that use `id`.
+    /// The YAML files and dashboards that use `id` (found by its text,
+    /// so a use built by a template is not seen).
     pub used_in: Vec<String>,
+    /// Its labels that a child device doesn't have: an action on one of
+    /// them reaches the children in 2026.9, and in `hars` it doesn't.
+    pub labels: Vec<String>,
 }
 
 #[derive(Deserialize)]
@@ -304,10 +308,34 @@ pub(super) fn run(root: &Path, ha_version: &str) -> anyhow::Result<Conversion> {
                         .iter()
                         .find(|d| d.id == parent)
                         .and_then(|d| d.display_name().map(str::to_owned)),
+                    labels: Vec::new(),
                     id: parent,
                     children: vec![child.id.clone()],
                     used_in: Vec::new(),
                 }),
+            }
+            let of_parent = devices
+                .iter()
+                .find(|d| d.id == child_parent(&done, &child.id));
+            let missing: Vec<String> = of_parent
+                .map(|p| {
+                    p.labels
+                        .iter()
+                        .filter(|l| !child.labels.contains(l))
+                        .cloned()
+                        .collect()
+                })
+                .unwrap_or_default();
+            if let Some(p) = done
+                .parent_devices
+                .iter_mut()
+                .find(|p| p.children.contains(&child.id))
+            {
+                for label in missing {
+                    if !p.labels.contains(&label) {
+                        p.labels.push(label);
+                    }
+                }
             }
             devices.push(child);
         }
@@ -408,6 +436,38 @@ pub(super) fn run(root: &Path, ha_version: &str) -> anyhow::Result<Conversion> {
             })
             .collect();
         let order = order_shared_identifiers(&holders, &domain_of, true)?;
+        // A copy with no original: the part of a split device that still
+        // holds the identifier of an integration whose own part is gone.
+        // Home Assistant 2026.8 would not find it for that integration;
+        // hars, as 2026.6.1 (where it was the integration's device too),
+        // will.
+        let owned = |d: &Device, domain: &str| {
+            let entries = &d.config_entries;
+            entries
+                .iter()
+                .any(|e| domain_of.get(e).map(String::as_str) == Some(domain))
+        };
+        let copies = devices
+            .iter()
+            .filter(|d| d.extra.get("has_composite_identifiers") == Some(&Value::Bool(true)))
+            .flat_map(|d| d.identifiers.iter().map(move |i| (d, i)))
+            .filter(|(d, i)| {
+                let domain = i[0].as_str().unwrap_or_default();
+                runs(domain)
+                    && !owned(d, domain)
+                    && !devices
+                        .iter()
+                        .any(|o| owned(o, domain) && o.identifiers.contains(i))
+            })
+            .count();
+        if copies > 0 {
+            device_changes.push(format!(
+                "{} of an integration hars runs on a device that Home Assistant 2026.8 split \
+                 off for another integration, and that integration's own part is gone: hars, \
+                 as 2026.6.1, takes the device to be the integration's again",
+                count(copies, "identifier is", "identifiers are")
+            ));
+        }
         let removed: Vec<Holder> = deleted.iter().map(deleted_holder).collect();
         let removed_order = order_shared_identifiers(&removed, &domain_of, false)?;
         if order.is_some() || removed_order.is_some() {
@@ -520,6 +580,15 @@ pub(super) fn run(root: &Path, ha_version: &str) -> anyhow::Result<Conversion> {
         })
         .collect();
     Ok(done)
+}
+
+/// The parent recorded for a child device.
+fn child_parent(done: &Conversion, child: &str) -> String {
+    done.parent_devices
+        .iter()
+        .find(|p| p.children.iter().any(|c| c == child))
+        .map(|p| p.id.clone())
+        .unwrap_or_default()
 }
 
 fn id_of(row: &Map<String, Value>) -> String {
@@ -790,12 +859,23 @@ fn order_shared_identifiers(
         order.insert(to, row);
     }
     if strict {
-        let (identifier, at) = &shared[0];
-        return Err(refuse(
-            at[0],
-            at[1],
-            identifier[0].as_str().unwrap_or_default(),
-        ));
+        // The identifier still out of place: its own row, and the row
+        // that holds a copy of it and comes first.
+        let place = |i: usize| order.iter().position(|&x| x == i).unwrap_or_default();
+        for (identifier, at) in &shared {
+            let domain = identifier[0].as_str().unwrap_or_default();
+            let owners: Vec<usize> = at.iter().copied().filter(|&i| own(i, domain)).collect();
+            let first = at
+                .iter()
+                .copied()
+                .min_by_key(|&i| place(i))
+                .unwrap_or_default();
+            if let [one] = owners[..] {
+                if one != first {
+                    return Err(refuse(one, first, domain));
+                }
+            }
+        }
     }
     Ok(None)
 }
@@ -992,7 +1072,8 @@ fn convert_entities(
 /// - the row of a registered entity takes that entity's current id, which
 ///   differs when the entity was renamed since;
 /// - a row for a registry id that is gone is dropped: 2026.11 gives it to
-///   nobody (unless that same registry row comes back), and under its
+///   nobody but that same registry row, should a removed entity come back
+///   (it would then start without this state in `hars`), and under its
 ///   entity id 2026.6.1 would give it to whatever takes that id;
 /// - a row without a registry id stays, unless a registered entity has its
 ///   entity id now: 2026.11 doesn't give it to that entity, and 2026.6.1
@@ -1039,7 +1120,9 @@ fn convert_restore_state(
         let registry_id = row
             .as_object_mut()
             .and_then(|o| o.remove("entity_registry_id"));
-        let Some(stored) = stored else {
+        // `valid_entity_id`: Home Assistant puts no other row in either
+        // table.
+        let Some(stored) = stored.filter(|id| ha_core::EntityId::parse(id).is_ok()) else {
             kept.push((Key::Other(n), row));
             continue;
         };
@@ -1062,8 +1145,9 @@ fn convert_restore_state(
                 None => {
                     dropped.push((
                         stored,
-                        "the entity it was stored for is not in the registry any more; Home \
-                         Assistant 2026.11 gives it to no other",
+                        "the entity it was stored for is not in the registry any more, and \
+                         Home Assistant 2026.11 gives it to no other. If that entity comes \
+                         back, it starts without this state",
                     ));
                     continue;
                 }
@@ -1174,19 +1258,36 @@ fn convert_entries(data: &mut Map<String, Value>) -> anyhow::Result<Vec<Converte
         } else {
             match fields.remove("location") {
                 None => {}
-                Some(Value::Object(location))
+                // What 2026.11's location selector stores: the two, and a
+                // `radius` if the form gave one, which `met` doesn't use.
+                Some(Value::Object(mut location))
                     if location.get("latitude").is_some_and(Value::is_number)
                         && location.get("longitude").is_some_and(Value::is_number)
-                        && location.len() == 2
+                        && location.get("radius").is_none_or(Value::is_number)
+                        && location
+                            .keys()
+                            .all(|k| ["latitude", "longitude", "radius"].contains(&k.as_str()))
                         && !fields.contains_key("latitude")
                         && !fields.contains_key("longitude") =>
                 {
+                    if location.remove("radius").is_some() {
+                        changes.push(
+                            "the location's `radius`, which `met` doesn't use, left out".into(),
+                        );
+                    }
                     fields.extend(location);
                     changes.push("`latitude` and `longitude` out of `location`".into());
                 }
                 Some(_) => return Err(refuse("its location is not a latitude and a longitude")),
             }
             let home = fields.get("track_home").and_then(Value::as_bool) == Some(true);
+            if !home && !(fields.contains_key("latitude") && fields.contains_key("longitude")) {
+                changes.push(
+                    "it has no place (it had none before 2026.11 either): neither Home \
+                     Assistant nor hars can make a forecast from it"
+                        .into(),
+                );
+            }
             if !home && !fields.contains_key("name") {
                 fields.insert("name".into(), Value::String(title.clone()));
                 changes.push("`name` is the entry's title, which 2026.11 shows instead".into());
@@ -1318,6 +1419,23 @@ mod tests {
         let crossed = [holder("lamp", "h", &both), holder("bulb", "l", &both)];
         let err = order(&crossed, true).unwrap_err().to_string();
         assert!(err.contains("Nothing was imported"), "{err}");
+        // The refusal names that pair, not a pair that is in order.
+        let fine = json!([["switchbot_cloud", "b"]]);
+        let rows = [
+            holder("fine", "s", &fine),
+            holder("fine-copy", "k", &fine),
+            crossed[0].clone(),
+            crossed[1].clone(),
+        ];
+        let mut with_switchbot = domain_of.clone();
+        with_switchbot.insert("s".into(), "switchbot_cloud".into());
+        let err = order_shared_identifiers(&rows, &with_switchbot, true)
+            .unwrap_err()
+            .to_string();
+        assert!(
+            err.contains("lamp") && err.contains("bulb") && !err.contains("fine"),
+            "{err}"
+        );
         assert_eq!(order(&crossed, false).unwrap(), None);
     }
 }

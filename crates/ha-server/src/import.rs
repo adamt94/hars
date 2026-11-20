@@ -213,26 +213,13 @@ pub fn run(opts: &Options) -> anyhow::Result<Report> {
         .with_context(|| format!("reading {}", opts.source.display()))?;
     // Before the destination is made: inside the source it would be
     // a directory written into the folder the import only reads.
-    let mut inside = std::path::absolute(&opts.dest)?;
-    let mut below = Vec::new();
-    while !inside.exists() {
-        match (inside.file_name().map(|n| n.to_owned()), inside.parent()) {
-            (Some(name), Some(parent)) => {
-                below.push(name);
-                inside = parent.to_path_buf();
-            }
-            _ => break,
-        }
-    }
-    let mut planned = std::fs::canonicalize(&inside).unwrap_or(inside);
-    planned.extend(below.iter().rev());
-    if planned != source && planned.starts_with(&source) {
-        bail!("the destination is inside the source; use a directory outside it");
+    if planned_path(&opts.dest)?.starts_with(&source) {
+        bail!("the destination is inside the source, or is the source; use a directory outside it");
     }
     std::fs::create_dir_all(&opts.dest)?;
     let dest = std::fs::canonicalize(&opts.dest)?;
-    if dest == source {
-        bail!("the source and destination are the same directory");
+    if dest.starts_with(&source) {
+        bail!("the destination is inside the source, or is the source; use a directory outside it");
     }
     // The import stages, backs up and replaces files under the destination.
     if source.starts_with(&dest) {
@@ -474,12 +461,16 @@ pub fn run(opts: &Options) -> anyhow::Result<Report> {
             })
             .collect();
         let yaml_uses = |id: &str| -> Vec<String> {
+            // In a comment only: not a use.
+            if !loaded.contains(id) {
+                return Vec::new();
+            }
             let mut found: Vec<String> = files
                 .iter()
                 .filter(|(_, text)| text.contains(id))
                 .map(|(rel, _)| rel.clone())
                 .collect();
-            if found.is_empty() && loaded.contains(id) {
+            if found.is_empty() {
                 found.push("configuration.yaml or a file it includes".into());
             }
             found
@@ -512,8 +503,11 @@ pub fn run(opts: &Options) -> anyhow::Result<Report> {
             }
         }
     }
-    // A parent nothing names by id needs no mention.
-    report.parent_devices.retain(|p| !p.used_in.is_empty());
+    // A parent nothing names by id, and with no label an action could
+    // name, needs no mention.
+    report
+        .parent_devices
+        .retain(|p| !p.used_in.is_empty() || !p.labels.is_empty());
     for key in staging.keys()? {
         if key == "frontend.system_data" || key.starts_with(USER_DATA_PREFIX) {
             let store = Store::new(&staging.root, key.clone(), 1, 1, false);
@@ -597,26 +591,58 @@ pub fn run(opts: &Options) -> anyhow::Result<Report> {
         std::fs::rename(from, to)
     })?;
 
-    // A secrets file is owner-only even when its bytes didn't change.
+    // A secrets file is owner-only even when its bytes didn't change. It
+    // is written again as a new file, not changed in place: the one there
+    // may be a hard link to another (the source's, even).
     #[cfg(unix)]
     for rel in report.yaml.iter().filter(|r| r.ends_with("secrets.yaml")) {
         use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(dest.join(rel), std::fs::Permissions::from_mode(0o600))?;
+        let path = dest.join(rel);
+        if std::fs::metadata(&path)?.permissions().mode() & 0o777 != 0o600 {
+            ha_core::storage::write_atomic(&path, &std::fs::read(&path)?, true)?;
+        }
     }
     let json = serde_json::to_vec_pretty(&report)?;
     // A new file, made in the staging directory (this run's own) and
     // renamed into place: never a half-written report, and nothing
     // written through, or over, a file that was already there.
     let staged = staging.root.join(REPORT_FILE);
-    std::fs::write(&staged, json)
-        .and_then(|()| std::fs::rename(&staged, dest.join(REPORT_FILE)))
-        .with_context(|| {
+    let written = std::fs::write(&staged, json)
+        .and_then(|()| std::fs::rename(&staged, dest.join(REPORT_FILE)));
+    if let Err(e) = written {
+        // The files are in place and can't be taken back now: what the
+        // report would have said is said here.
+        print!("{}", summary(&report, &dest));
+        return Err(e).with_context(|| {
             format!(
-                "everything was imported, but {REPORT_FILE} could not be written in {}",
+                "everything above was imported, but {REPORT_FILE} could not be written in {}",
                 dest.display()
             )
-        })?;
+        });
+    }
     Ok(report)
+}
+
+/// Where a path that may not exist yet will be: absolute, each part that
+/// exists resolved (symlinks), and a `..` taken off what is before it, as
+/// the system takes it once the directories are made.
+fn planned_path(path: &Path) -> std::io::Result<PathBuf> {
+    let mut out = PathBuf::new();
+    for part in std::path::absolute(path)?.components() {
+        match part {
+            std::path::Component::ParentDir => {
+                out.pop();
+            }
+            std::path::Component::CurDir => {}
+            part => {
+                out.push(part);
+                if let Ok(real) = std::fs::canonicalize(&out) {
+                    out = real;
+                }
+            }
+        }
+    }
+    Ok(out)
 }
 
 /// Whether `hars` reads a store, and whether it is written owner-only.
@@ -763,10 +789,10 @@ fn too_old(key: &str, found: (u32, u32), reads: (u32, u32)) -> String {
 /// What to do about a directory from too new a release.
 fn cannot_import() -> String {
     format!(
-        "hars imports Home Assistant {}: import a copy or backup of this config directory \
-         made before it was updated past {}. Nothing was imported",
-        importable(),
-        line_name(newest_tested())
+        "hars imports Home Assistant {}, and none of those releases writes this: import a \
+         copy or backup of this config directory made while it ran one of them. Nothing was \
+         imported",
+        importable()
     )
 }
 
@@ -1233,15 +1259,27 @@ pub fn summary(report: &Report, dest: &Path) -> String {
         }
     }
     for p in &report.parent_devices {
-        out.push_str(&format!(
-            "  {} names the device {} ({}) by id. It has child devices, and Home Assistant \
-             2026.9 and later reach their entities through it; hars reaches only its own: \
-             name the child devices too ({})\n",
-            p.used_in.join(", "),
-            p.id,
-            p.name.as_deref().unwrap_or("unnamed"),
-            p.children.join(", ")
-        ));
+        let name = p.name.as_deref().unwrap_or("unnamed");
+        if !p.used_in.is_empty() {
+            out.push_str(&format!(
+                "  {} names the device {} ({name}) by id. It has child devices, and Home \
+                 Assistant 2026.9 and later reach their entities through it; hars reaches only \
+                 its own: name the child devices too ({})\n",
+                p.used_in.join(", "),
+                p.id,
+                p.children.join(", ")
+            ));
+        }
+        if !p.labels.is_empty() {
+            out.push_str(&format!(
+                "  the device {} ({name}) has child devices and the label(s) {}. An action on \
+                 such a label reaches the child devices' entities in Home Assistant 2026.9 and \
+                 later; in hars only if they have the label too ({})\n",
+                p.id,
+                p.labels.join(", "),
+                p.children.join(", ")
+            ));
+        }
     }
     if !report.replaced.is_empty() {
         out.push_str(&format!("  replaced: {}\n", report.replaced.join(", ")));
