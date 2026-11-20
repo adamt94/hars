@@ -219,6 +219,11 @@ pub fn run(opts: &Options) -> anyhow::Result<Report> {
     if planned.starts_with(&source) {
         bail!("the destination is inside the source, or is the source; use a directory outside it");
     }
+    // And by what the directories are, not only what they are called: one
+    // directory mounted in two places has two paths.
+    if let Some(overlap) = overlap(&source, &planned, file_id) {
+        bail!("{overlap}");
+    }
     std::fs::create_dir_all(&planned)?;
     let dest = std::fs::canonicalize(&planned)?;
     if dest.starts_with(&source) {
@@ -675,6 +680,35 @@ fn excludes(value: &Value) -> bool {
         Value::Array(items) => items.iter().any(excludes),
         _ => false,
     }
+}
+
+/// Whether the source and the place the destination will be are one
+/// directory, or one is inside the other, going by what each directory is
+/// to its file system (`id`) and not by its path: the same directory
+/// mounted twice (two bind mounts, say) has two paths that share nothing.
+/// Checked before anything is made. The paths are absolute.
+fn overlap<Id: PartialEq>(
+    source: &Path,
+    planned: &Path,
+    id: impl Fn(&Path) -> Option<Id>,
+) -> Option<&'static str> {
+    let source_id = id(source)?;
+    // The destination, or the nearest directory above it that exists, and
+    // every directory above that.
+    if planned.ancestors().filter_map(&id).any(|a| a == source_id) {
+        return Some(
+            "the destination is inside the source, or is the source (the same directory under \
+             another path); use a directory outside it",
+        );
+    }
+    let dest_id = id(planned)?;
+    if source.ancestors().filter_map(&id).any(|a| a == dest_id) {
+        return Some(
+            "the source is inside the destination (the same directory under another path); \
+             copy it somewhere else first",
+        );
+    }
+    None
 }
 
 /// Whether a name is one the file system has under another spelling: it
@@ -1653,6 +1687,70 @@ mod tests {
         assert!(!dest.join(".import-backup").exists());
         drop(staging);
         std::fs::remove_dir_all(dest).unwrap();
+    }
+
+    /// One directory under two paths, as two bind mounts of it are: the
+    /// paths share nothing, and the directories are the same.
+    #[test]
+    fn the_same_directory_under_two_paths() {
+        // `/mnt/a` and `/mnt/b` are one directory; so then are what is in
+        // them. `/mnt/b/new` isn't there yet.
+        let id = |p: &Path| match p.to_str()? {
+            "/" => Some(1),
+            "/mnt" => Some(2),
+            "/mnt/a" | "/mnt/b" => Some(3),
+            "/mnt/a/ha" | "/mnt/b/ha" => Some(4),
+            "/mnt/a/hars" | "/mnt/b/hars" => Some(5),
+            "/elsewhere" => Some(6),
+            _ => None,
+        };
+        let check =
+            |source: &str, planned: &str| overlap(Path::new(source), Path::new(planned), id);
+        let inside_source =
+            |o: Option<&str>| o.is_some_and(|o| o.starts_with("the destination is"));
+        let inside_dest = |o: Option<&str>| o.is_some_and(|o| o.starts_with("the source is"));
+        // The same folder; a destination in the source, there or not yet.
+        assert!(inside_source(check("/mnt/a", "/mnt/b")));
+        assert!(inside_source(check("/mnt/a", "/mnt/b/hars")));
+        assert!(inside_source(check("/mnt/a", "/mnt/b/new/config")));
+        assert!(inside_source(check("/mnt/a/ha", "/mnt/b/ha")));
+        // The source in the destination.
+        assert!(inside_dest(check("/mnt/a/ha", "/mnt/b")));
+        // Side by side, under either path, and somewhere else altogether.
+        assert_eq!(check("/mnt/a/ha", "/mnt/b/hars"), None);
+        assert_eq!(check("/mnt/a/ha", "/mnt/b/new"), None);
+        assert_eq!(check("/mnt/a", "/elsewhere"), None);
+        assert_eq!(check("/mnt/a", "/elsewhere/new"), None);
+
+        // On the file system: a directory is itself however it is reached.
+        let dir = std::env::temp_dir().join(format!("hars-import-same-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("ha/sub")).unwrap();
+        std::fs::create_dir_all(dir.join("hars")).unwrap();
+        assert!(same_file(&dir.join("ha"), &dir.join("ha/sub/..")));
+        assert!(!same_file(&dir.join("ha"), &dir.join("hars")));
+        assert!(inside_source(overlap(
+            &dir.join("ha"),
+            &dir.join("ha/sub/../new"),
+            file_id
+        )));
+        assert_eq!(overlap(&dir.join("ha"), &dir.join("hars"), file_id), None);
+        #[cfg(unix)]
+        {
+            // A second path to the source, as a mount gives one.
+            std::os::unix::fs::symlink(dir.join("ha"), dir.join("mounted")).unwrap();
+            assert!(inside_source(overlap(
+                &dir.join("ha"),
+                &dir.join("mounted"),
+                file_id
+            )));
+            assert!(inside_dest(overlap(
+                &dir.join("ha/sub"),
+                &dir.join("mounted"),
+                file_id
+            )));
+        }
+        std::fs::remove_dir_all(dir).unwrap();
     }
 
     /// A name found though not listed is another file's name.
