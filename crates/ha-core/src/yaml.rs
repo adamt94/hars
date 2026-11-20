@@ -408,11 +408,20 @@ struct Loader {
 }
 
 /// The files a load read (the entry file, every include, and each
-/// `secrets.yaml` a secret came from) and the secret values it used.
+/// `secrets.yaml` a secret came from), the directories its
+/// `!include_dir_*` tags read ([`dir_files`] says which files of one), and
+/// the secret values it used.
 #[derive(Debug, Default, Clone)]
 pub struct Trace {
     pub files: Vec<PathBuf>,
+    pub dirs: Vec<PathBuf>,
     pub secret_values: Vec<String>,
+}
+
+/// The files an `!include_dir_*` tag loads from a directory: what is in
+/// it now, so also files a load traced earlier didn't see.
+pub fn dir_files(dir: &Path) -> Vec<PathBuf> {
+    yaml_files(dir)
 }
 
 /// [`load_file`], with what it read: the importer copies exactly the
@@ -612,7 +621,9 @@ impl Loader {
                 if value.is_empty() {
                     return err(format!("{tag} needs an argument."));
                 }
-                let files = yaml_files(&dir().join(value));
+                let included = dir().join(value);
+                self.trace.borrow_mut().dirs.push(included.clone());
+                let files = yaml_files(&included);
                 let mut map: Vec<(Yaml, Yaml)> = Vec::new();
                 let mut list = Vec::new();
                 for f in files {

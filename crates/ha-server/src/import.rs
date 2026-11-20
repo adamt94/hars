@@ -173,7 +173,9 @@ pub struct Report {
     /// Of those, the ones that replaced a different copy in the destination.
     pub replaced: Vec<String>,
     /// Supported stores the destination had and the source doesn't: removed,
-    /// so the destination matches the source.
+    /// so the destination matches the source. And YAML files (by their
+    /// path) the destination had in a directory the imported configuration
+    /// includes whole (`!include_dir_*`) and the source doesn't.
     pub removed: Vec<String>,
     /// Stores left behind, and why.
     pub skipped: Vec<Skipped>,
@@ -351,8 +353,10 @@ pub fn run(opts: &Options) -> anyhow::Result<Report> {
     // 1b. The YAML configuration, staged byte for byte with its mode bits
     //     (`secrets.yaml` owner-only).
     let mut secret_values = Vec::new();
+    // The directories an `!include_dir_*` tag reads, whole.
+    let mut include_dirs = Vec::new();
     if source.join("configuration.yaml").is_file() {
-        (report.yaml, secret_values) = yaml_files(&source)?;
+        (report.yaml, secret_values, include_dirs) = yaml_files(&source)?;
         for rel in &report.yaml {
             check_path(&dest, Path::new(rel), false)?;
         }
@@ -594,6 +598,26 @@ pub fn run(opts: &Options) -> anyhow::Result<Report> {
             report.replaced.push(rel.clone());
         }
     }
+    // A directory the configuration includes whole is loaded whole: a
+    // file the destination has there and the import doesn't bring would
+    // be loaded beside the imported ones at the next start (an old
+    // automation, running again). Like a store the source doesn't have,
+    // it is removed, which needs `--force`.
+    let removed_stores = report.removed.clone();
+    let mut stale_yaml = Vec::new();
+    for dir in &include_dirs {
+        for file in ha_core::yaml::dir_files(&dest.join(dir)) {
+            let Ok(rel) = file.strip_prefix(&dest) else {
+                continue;
+            };
+            let name = rel.to_string_lossy().into_owned();
+            if !report.yaml.contains(&name) && !stale_yaml.contains(&name) {
+                check_path(&dest, rel, false)?;
+                stale_yaml.push(name);
+            }
+        }
+    }
+    report.removed.extend(stale_yaml.iter().cloned());
     report.imported = staged.clone();
     if !opts.force && !opts.dry_run && !(report.replaced.is_empty() && report.removed.is_empty()) {
         let mut changed = report.replaced.clone();
@@ -616,11 +640,11 @@ pub fn run(opts: &Options) -> anyhow::Result<Report> {
         }
     }
     changes.extend(
-        report
-            .removed
+        removed_stores
             .iter()
             .map(|k| Change::Remove(format!(".storage/{k}"))),
     );
+    changes.extend(stale_yaml.iter().cloned().map(Change::Remove));
     for rel in &report.yaml {
         // A secrets file is owner-only even when its bytes didn't change:
         // then too it is replaced by the staged one, in the commit, where
@@ -1242,8 +1266,9 @@ fn commit(
 /// file its `!include*` tags reach, and each `secrets.yaml` a secret came
 /// from. Relative paths, sorted, and the secret values used. Anything
 /// outside the config directory, through a symlink, or in a path the
-/// importer reserves is refused.
-fn yaml_files(source: &Path) -> anyhow::Result<(Vec<String>, Vec<String>)> {
+/// importer reserves is refused. Last, the directories its
+/// `!include_dir_*` tags read.
+fn yaml_files(source: &Path) -> anyhow::Result<(Vec<String>, Vec<String>, Vec<PathBuf>)> {
     let secrets = ha_core::yaml::Secrets {
         config_dir: source.to_path_buf(),
     };
@@ -1267,7 +1292,19 @@ fn yaml_files(source: &Path) -> anyhow::Result<(Vec<String>, Vec<String>)> {
     }
     files.sort();
     files.dedup();
-    Ok((files, trace.secret_values))
+    let mut dirs = Vec::new();
+    for dir in &trace.dirs {
+        let rel = dir.strip_prefix(source).ok().and_then(normalize);
+        dirs.push(rel.ok_or_else(|| {
+            anyhow::anyhow!(
+                "an include reaches {}, outside the config directory",
+                dir.display()
+            )
+        })?);
+    }
+    dirs.sort();
+    dirs.dedup();
+    Ok((files, trace.secret_values, dirs))
 }
 
 /// `a/./b/../c` as `a/c`, or `None` if it leaves the root (or is absolute).

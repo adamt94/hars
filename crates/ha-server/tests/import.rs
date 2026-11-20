@@ -3464,3 +3464,113 @@ fn a_destination_file_under_another_spelling_is_refused() {
         }
     }
 }
+
+/// A directory the configuration includes whole (`!include_dir_*`) is
+/// loaded whole. A YAML file the destination has in one, which the import
+/// doesn't bring, would be loaded beside the imported ones: an old
+/// automation running again. It stops a plain import, and `--force`
+/// removes it with what else it replaces. All four tags, and directories
+/// inside the included one.
+#[test]
+fn yaml_left_in_an_included_directory_is_not_left_active() {
+    let src = temp("stale-src");
+    let dest = temp("stale-dest");
+    ha_config(&src);
+    let write = |root: &Path, rel: &str, text: &str| {
+        let path = root.join(rel);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, text).unwrap();
+    };
+    write(
+        &src,
+        "configuration.yaml",
+        "automation: !include_dir_merge_list parts\na: !include_dir_list lists\n\
+         b: !include_dir_named named\nc: !include_dir_merge_named merged\n",
+    );
+    write(&src, "parts/new.yaml", "- id: new\n");
+    write(&src, "lists/one.yaml", "1\n");
+    write(&src, "named/one.yaml", "x: 1\n");
+    write(&src, "merged/one.yaml", "x: 1\n");
+    write(&src, "merged/deep/two.yaml", "y: 2\n");
+    // In the destination only: one per tag, two of them further in.
+    let stale = [
+        "lists/sub/old.yaml",
+        "merged/deep/old.yaml",
+        "named/old.yaml",
+        "parts/old.yaml",
+    ];
+    for rel in stale {
+        write(&dest, rel, "- id: old\n");
+    }
+    // What no include would load stays: not YAML, hidden, a secrets
+    // file, and a directory the configuration doesn't include.
+    let kept = [
+        "parts/notes.txt",
+        "parts/.hidden.yaml",
+        "named/secrets.yaml",
+        "other/keep.yaml",
+    ];
+    for rel in kept {
+        write(&dest, rel, "mine\n");
+    }
+
+    // A plain import stops, and says which files.
+    let out = hars(&dest, &["import", src.to_str().unwrap()]);
+    assert!(!out.status.success(), "{out:?}");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    for rel in stale {
+        assert!(
+            stderr.contains(&format!("{rel} (removed)")),
+            "{rel}: {stderr}"
+        );
+    }
+    assert!(stderr.contains("--force"), "{stderr}");
+    for rel in stale.iter().chain(&kept) {
+        assert!(dest.join(rel).is_file(), "{rel}");
+    }
+    assert!(!dest.join(".storage").exists() && !dest.join("configuration.yaml").exists());
+
+    // A dry run says what `--force` would remove.
+    let out = hars(&dest, &["import", src.to_str().unwrap(), "--dry-run"]);
+    assert!(out.status.success(), "{out:?}");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        stdout.contains(&format!("removed: {}", stale.join(", "))),
+        "{stdout}"
+    );
+    assert!(dest.join("parts/old.yaml").is_file());
+
+    let out = hars(&dest, &["import", src.to_str().unwrap(), "--force"]);
+    assert!(out.status.success(), "{out:?}");
+    assert_eq!(
+        read_json(&dest.join("import-report.json"))["removed"],
+        json!(stale)
+    );
+    for rel in stale {
+        assert!(!dest.join(rel).exists(), "{rel}");
+    }
+    for rel in kept {
+        assert_eq!(
+            std::fs::read_to_string(dest.join(rel)).unwrap(),
+            "mine\n",
+            "{rel}"
+        );
+    }
+    for rel in ["parts/new.yaml", "merged/deep/two.yaml", "lists/one.yaml"] {
+        assert!(dest.join(rel).is_file(), "{rel}");
+    }
+    assert!(!dest.join(".import-backup").exists());
+    // What hars loads now is what the source's configuration says.
+    let loaded = ha_core::yaml::load_file(&dest.join("configuration.yaml"), None).unwrap();
+    assert_eq!(
+        loaded.to_json(),
+        json!({"automation": [{"id": "new"}], "a": [1], "b": {"one": {"x": 1}},
+               "c": {"x": 1, "y": 2}})
+    );
+    // And the same import again has nothing to remove.
+    let out = hars(&dest, &["import", src.to_str().unwrap()]);
+    assert!(out.status.success(), "{out:?}");
+    for d in [src, dest] {
+        let _ = std::fs::remove_dir_all(d);
+    }
+}
