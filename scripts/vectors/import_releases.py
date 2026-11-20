@@ -24,8 +24,8 @@ It writes crates/ha-server/tests/vectors/import/:
   entries for the integrations hars runs (and two it doesn't), areas, a
   floor, a label, a category, devices (one shared by two config entries)
   and entities (one renamed by the user, one disabled, one deleted), the
-  restore state, `mobile_app`'s store and the default YAML with two
-  automations.
+  restore state, the analytics choices, `mobile_app`'s store and the
+  default YAML with two automations.
 - `<release>.json` (`upgrade`, run under each later release): that
   directory after the release started on it, as a user who updated Home
   Assistant has it. The release's own code loads every store (running its
@@ -39,7 +39,11 @@ It writes crates/ha-server/tests/vectors/import/:
   2026.6.1 itself does with each of those directories. `loads`: whether
   its `bootstrap.async_load_base_functionality` (registries, config
   entries, restore state) accepts it, with the errors it logged when it
-  doesn't; hars imports a directory exactly when this is true.
+  doesn't; hars imports a directory exactly when this is true. This is
+  the base of 2026.6.1's start-up only: it sets no integration up, and it
+  stops at the first store it can't read (the device registry, for 2026.8
+  and later), so it says nothing about what else in those directories
+  2026.6.1 could not use.
 
 and, also from `downgrade`,
 crates/ha-integrations/src/mobile_app/vectors/store_downgrade.json: for
@@ -55,7 +59,10 @@ versions before and after), the
 files exactly as Home Assistant wrote them except for what changes from run
 to run: ids, tokens and times are replaced by fixed synthetic ones
 (`normalise` below), and the session's `expire_at` is far in the future so
-the fixture doesn't expire. Passwords are hashed with a fixed salt.
+the fixture doesn't expire. Passwords are hashed with a fixed salt. The
+restore state's times are fixed too, so its rows are older than the seven
+days Home Assistant keeps an unclaimed one: before a release starts on the
+directory they are made current (`refresh_restore_state`).
 
 Everything is synthetic: no real install is read, the coordinates are a
 rounded city centre, the hosts are documentation addresses (192.0.2.0/24)
@@ -71,6 +78,7 @@ virtualenvs also need the packages `mobile_app_notify.py` lists
 """
 
 import asyncio
+import datetime
 import gc
 import hashlib
 import importlib.metadata
@@ -244,6 +252,18 @@ def write_dir(root, files):
         path.write_text(text)
 
 
+def refresh_restore_state(config_dir):
+    """Make the restore state's times now.
+
+    The fixed times a fixture holds are in the past, and Home Assistant
+    drops a restored state it hasn't seen for seven days when it next
+    dumps them. `normalise` fixes the times again afterwards.
+    """
+    path = config_dir / ".storage/core.restore_state"
+    now = datetime.datetime.now(datetime.UTC).isoformat()
+    path.write_text(ISO.sub(now, path.read_text()))
+
+
 def save_fixture(name, payload):
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / name).write_text(json.dumps(payload, indent=1, ensure_ascii=False) + "\n")
@@ -340,6 +360,7 @@ async def seed(config_dir):
     from homeassistant import config as conf_util
     from homeassistant.auth.const import GROUP_ID_ADMIN
     from homeassistant.components import onboarding, person, zone
+    from homeassistant.components.analytics.analytics import Analytics
     from homeassistant.components.frontend import storage as frontend_storage
     from homeassistant.components.lovelace import dashboard
     from homeassistant.core import State
@@ -582,6 +603,12 @@ async def seed(config_dir):
         {"deleted_ids": [hashlib.sha256(b"a deleted phone").hexdigest()]}
     )
 
+    # Onboarding's analytics step, with nothing shared (so nothing is ever
+    # sent).
+    analytics = Analytics(hass)
+    await analytics.load()
+    await analytics.save_preferences({"base": False, "diagnostics": False})
+
     await stop(hass)
     return {}
 
@@ -597,6 +624,7 @@ async def upgrade(config_dir):
     """Start this release on the install and change every store through it."""
     from homeassistant import loader
     from homeassistant.components import person, zone
+    from homeassistant.components.analytics.analytics import Analytics
     from homeassistant.components.frontend import storage as frontend_storage
     from homeassistant.components.lovelace import dashboard
     from homeassistant.components.mobile_app import const as mobile_app_const
@@ -617,6 +645,7 @@ async def upgrade(config_dir):
     if month >= 7:
         with (config_dir / "automations.yaml").open("a") as f:
             f.write(AUTOMATION_NEW_TRIGGER)
+    refresh_restore_state(config_dir)
     hass, loads = await boot(config_dir)
     assert loads
     notes = {}
@@ -691,6 +720,10 @@ async def upgrade(config_dir):
 
     await restore_state.async_get(hass).async_dump_states()
 
+    analytics = Analytics(hass)
+    await analytics.load()
+    await analytics.save_preferences({"diagnostics": month % 2 == 0})
+
     # `mobile_app.async_setup`: load the store (migrating it) ...
     store = mobile_app_store(hass)
     app_config = await store.async_load()
@@ -719,6 +752,9 @@ async def upgrade(config_dir):
         await store.async_save(savable_state(hass))
 
     await stop(hass)
+    # The scene's last state, which nothing claimed, is still there.
+    restored = json.loads((config_dir / ".storage/core.restore_state").read_text())
+    assert "scene.evening" in [row["state"]["entity_id"] for row in restored["data"]]
     return notes
 
 
@@ -748,6 +784,7 @@ async def downgrade():
         with tempfile.TemporaryDirectory() as tmp:
             config_dir = pathlib.Path(tmp)
             write_dir(config_dir, fixture["files"])
+            refresh_restore_state(config_dir)
             # `bootstrap.async_load_base_functionality`: the registries,
             # the config entries and the restore state. It answers False,
             # and Home Assistant starts in recovery mode with the files

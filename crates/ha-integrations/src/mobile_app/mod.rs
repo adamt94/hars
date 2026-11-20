@@ -259,14 +259,25 @@ pub enum Webhook {
     Unknown,
 }
 
+/// `.storage/mobile_app`'s data.
+#[derive(serde::Deserialize, Default)]
+struct Stored {
+    #[serde(default)]
+    deleted_ids: Vec<String>,
+}
+
 impl MobileApp {
+    /// Whether `.storage/mobile_app` decodes as [`MobileApp::load`]
+    /// decodes it (a missing file does): for checking a copy before
+    /// importing it.
+    pub fn check_store(config_dir: &Path) -> Result<(), ha_core::storage::StoreError> {
+        ha_core::storage::Store::new(config_dir, DOMAIN, 1, 1, true)
+            .load::<Stored>()
+            .map(drop)
+    }
+
     /// The enabled `mobile_app` entries and `.storage/mobile_app`.
     pub fn load(config_dir: &Path, entries: &[Map<String, Value>]) -> Self {
-        #[derive(serde::Deserialize, Default)]
-        struct Stored {
-            #[serde(default)]
-            deleted_ids: Vec<String>,
-        }
         let store = ha_core::storage::Store::new(config_dir, DOMAIN, 1, 1, true);
         let deleted_ids = match store.load::<Stored>() {
             Ok(s) => s.unwrap_or_default().deleted_ids,

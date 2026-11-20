@@ -178,7 +178,7 @@ The file `.HA_VERSION` in the config folder says which release wrote it.
 |---|---|
 | 2026.6.x or 2026.7.x | works |
 | older than 2026.6 | refused. Update Home Assistant to 2026.7 (not later: `ha core update --version 2026.7.4`, or the `2026.7.4` image tag), let it start once, then copy the folder again |
-| 2026.8 or newer | refused, with the reason. Nothing is changed |
+| 2026.8 or newer | refused, with the reason, because its device list is in a newer format. Nothing is changed |
 
 **From 2026.8 on, hars can't import yet.** Home Assistant 2026.8 rewrote
 its device list (`core.device_registry`, storage version 3) so that every
@@ -190,7 +190,7 @@ can't go back either: it refuses to start on these files. The import says
 which file stopped it, for example:
 
 ```text
-Error: core.device_registry is storage version 3.4, written by Home Assistant 2026.11.2; hars reads version 1.12, as Home Assistant 2026.6.1 does. ...
+Error: core.device_registry is storage version 3.4, in a config directory of Home Assistant 2026.11.2; hars reads version 1.12, as Home Assistant 2026.6.1 does. ...
 ```
 
 What you can do today: import a copy of the config folder, or a backup,
@@ -222,6 +222,12 @@ serves the 2026.6 frontend (the import says so). Expect:
 `import-report.json` records the release (`ha_version`), whether hars is
 tested with it (`ha_version_tested`) and the release hars behaves like
 (`behaves_like`).
+
+The import checks each file's own storage version, not only `.HA_VERSION`.
+It also refuses a folder whose device, entity or area list or integration
+settings are at an *older* storage version than 2026.6 writes: start Home
+Assistant 2026.6 or 2026.7 on the folder once, which brings them up to
+date, and copy it again.
 
 ## Troubleshooting
 

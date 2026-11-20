@@ -48,6 +48,13 @@ fn store(dir: &Path) -> Store {
 }
 
 impl Analytics {
+    /// Whether `.storage/core.analytics` decodes as [`Analytics::load`]
+    /// decodes it (a missing file does): for checking a copy before
+    /// importing it.
+    pub fn check(config_dir: &Path) -> Result<(), ha_core::storage::StoreError> {
+        store(config_dir).load::<Data>().map(drop)
+    }
+
     /// Read `.storage/core.analytics` (blocking; at start-up). A file that
     /// can't be read is logged and treated as no choice made yet.
     pub fn load(config_dir: &Path) -> Self {

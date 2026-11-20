@@ -77,23 +77,32 @@ fn feature(
     FEATURES.iter().find(|f| f.0 == domain && f.1 == feature)
 }
 
+/// `core.labs`' data.
+#[derive(serde::Deserialize)]
+struct Stored {
+    #[serde(default)]
+    preview_feature_status: Vec<StoredFeature>,
+}
+
+#[derive(serde::Deserialize)]
+struct StoredFeature {
+    domain: String,
+    preview_feature: String,
+}
+
 impl Labs {
+    /// Whether `.storage/core.labs` decodes as [`Labs::load`] decodes it (a
+    /// missing file does): for checking a copy before importing it.
+    pub fn check(config_dir: &Path) -> Result<(), ha_core::storage::StoreError> {
+        store(config_dir).load::<Stored>().map(drop)
+    }
+
     /// Read `.storage/core.labs` (blocking; at start-up), dropping features
     /// that no longer exist and saving if any were, as HA. A file that
     /// can't be read is logged and treated as none enabled.
     pub fn load(config_dir: &Path) -> Self {
-        #[derive(serde::Deserialize)]
-        struct Data {
-            #[serde(default)]
-            preview_feature_status: Vec<Item>,
-        }
-        #[derive(serde::Deserialize)]
-        struct Item {
-            domain: String,
-            preview_feature: String,
-        }
         let store = store(config_dir);
-        let items = match store.load::<Data>() {
+        let items = match store.load::<Stored>() {
             Ok(d) => d.map(|d| d.preview_feature_status).unwrap_or_default(),
             Err(e) => {
                 tracing::error!("{e}; no Labs features enabled");

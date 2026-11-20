@@ -180,12 +180,16 @@ ids, addresses, names and coordinates replaced with fake ones
   - [x] Releases after the pin: the importer takes any config directory
         Home Assistant 2026.6.1 would itself load after a downgrade, which
         is 2026.6.x and 2026.7.x (`TESTED_HA`). A store of a newer major
-        storage version, a registry or `core.config_entries` of a newer
-        minor version, or a config entry of a newer version for an
-        integration `hars` runs refuses the whole import, naming the store
-        and both versions; other newer minor versions are read and written
-        back as 2026.6.1 writes them (`mobile_app`'s 1.2 store from 2026.7:
-        vectors from 2026.6.1's own code). `import-report.json` has
+        storage version, a registry or `person` store of a newer minor
+        version, an entity, device or area registry or
+        `core.config_entries` of any minor version but the one `hars`
+        writes, or a config entry of a newer version for an integration
+        `hars` runs refuses the whole import, naming the store and both
+        versions; other newer minor versions are read and written back as
+        2026.6.1 writes them (`mobile_app`'s 1.2 store from 2026.7: vectors
+        from 2026.6.1's own code). `mobile_app`'s store and
+        `core.analytics` are imported, and every store is decoded with the
+        server's own decoder first. `import-report.json` has
         `ha_version_tested`, `behaves_like` and `newer_stores`. Tested on
         one synthetic install as 2026.6.1, 2026.6.4, 2026.7.0, 2026.7.4,
         2026.8.3 and 2026.11.2 leave it, each made by that release's code,

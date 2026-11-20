@@ -41,6 +41,13 @@ fn store(dir: &Path) -> Store {
 }
 
 impl RestoreState {
+    /// Whether `.storage/core.restore_state` decodes as
+    /// [`RestoreState::load`] decodes it (a missing file does): for
+    /// checking a copy before importing it.
+    pub fn check(config_dir: &Path) -> Result<(), crate::storage::StoreError> {
+        store(config_dir).load::<Vec<Value>>().map(drop)
+    }
+
     /// Read `.storage/core.restore_state` (blocking; at start-up). One that
     /// can't be read is logged and treated as empty, as HA does.
     pub fn load(config_dir: &Path) -> Self {

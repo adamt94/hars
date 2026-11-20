@@ -350,11 +350,26 @@ config directory that Home Assistant 2026.6.1 would itself load.
   a config entry of a newer **version** for an integration hars runs
   (`ConfigEntry.async_migrate` answers `migration_error`). The whole import
   is refused, with the store and both versions named; nothing is written.
-- A newer **minor** storage version is compatible by HA's rule. hars reads
-  it and, like HA, writes its own minor version the next time the store
-  changes, without the fields 2026.6.1 doesn't have. The registries and
-  `core.config_entries` are the exception: hars never writes those at
-  another minor version, so a newer one is refused too.
+- A newer **minor** storage version is compatible by HA's rule: HA loads
+  the data as it is and saves it at its own minor version. hars takes one
+  only where its own reader and writer make that safe, store by store
+  (`Minor` in `crates/ha-server/src/import.rs`):
+  - most stores: read, and written at hars's minor version the next time
+    they change, with what hars's writer for that store keeps (`mobile_app`:
+    the deleted ids only, as 2026.6.1; the frontend's settings and the
+    dashboards: every key);
+  - the entity, device and area registries and `core.config_entries`: only
+    the exact minor version hars writes. hars never writes these over a
+    file of another minor version, so every later change would be lost at
+    the next restart. A newer one is refused, and an older one too (HA
+    migrates it and saves it when it starts, so a directory 2026.6 or
+    2026.7 has run on is at these versions);
+  - the floor and label registries and `person`: not a newer one
+    (2026.6.1's own `person` migration fails on one).
+- Each store is also decoded with the decoder the server uses at start, so
+  a file the server would start without (and then overwrite) stops the
+  import. Frontend settings that don't decode are the exception: they are
+  left out and listed in the report.
 - Releases older than 2026.6 are refused: update Home Assistant first.
 
 | Home Assistant | `hars import` | What that release changed in what hars reads |
@@ -376,11 +391,18 @@ The evidence is in the tests: `crates/ha-server/tests/vectors/import/` holds
 one synthetic install as each of 2026.6.1, 2026.6.4, 2026.7.0, 2026.7.4,
 2026.8.3 and 2026.11.2 leaves it on disk, made by running each release's own
 storage code (`scripts/vectors/import_releases.py`), and `downgrade.json`
-there is what Home Assistant 2026.6.1 itself did with each one: it loads
-the first four and refuses the last two, naming `core.device_registry`.
-hars must agree on every one. The list of tested releases is `TESTED_HA` in
-`crates/ha-server/src/import.rs`. A later release whose stores all pass is
-imported too, with `ha_version_tested: false` in the report.
+there is what Home Assistant 2026.6.1's base bootstrap (registries, config
+entries, restore state; no integration is set up) did with each one: it
+loads the first four and refuses the last two, naming
+`core.device_registry`, the first store it can't read. hars must agree on
+every one. The list of tested releases is `TESTED_HA` in
+`crates/ha-server/src/import.rs`.
+
+The decision is made per store, not from `.HA_VERSION`: a directory that
+says it is from a later release and whose stores and entries all pass is
+imported, with `ha_version_tested: false` in the report and a warning. A
+real 2026.8 install doesn't pass, because Home Assistant rewrites the
+device registry the first time 2026.8 starts.
 
 After an import from 2026.7, hars still behaves like 2026.6.1 and serves
 2026.6's frontend. What the user should expect is in

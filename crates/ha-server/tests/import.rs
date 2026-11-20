@@ -488,7 +488,19 @@ fn a_symlinked_store_is_refused() {
 fn bad_frontend_settings_are_skipped_without_quoting_them() {
     let src = temp("bad-frontend");
     let owner = ha_config(&src);
+    // A newer major version is not "settings that don't load": it refuses
+    // the import, as for any store.
     write_store(&src, "frontend.system_data", 2, 1, json!({}));
+    let dest = temp("newer-frontend-dest");
+    let out = hars(&dest, &["import", src.to_str().unwrap()]);
+    assert!(!out.status.success());
+    assert!(
+        String::from_utf8_lossy(&out.stderr)
+            .contains("frontend.system_data is storage version 2.1"),
+        "{out:?}"
+    );
+    assert!(!dest.join(".storage").exists());
+    write_store(&src, "frontend.system_data", 1, 1, json!("not a mapping"));
     let user_data = format!("frontend.user_data_{owner}");
     std::fs::write(
         src.join(".storage").join(&user_data),
@@ -767,12 +779,21 @@ fn stores(fixture: &Value) -> Vec<String> {
         .collect()
 }
 
-/// A refused import changed nothing: no stores, no report, no staging.
+/// A refused import changed nothing: no stores, no report, no staging in
+/// the destination (the config directory `hars` makes when it starts).
 fn nothing_imported(dest: &Path) {
     let left: Vec<_> = std::fs::read_dir(dest)
         .map(|d| d.map(|e| e.unwrap().file_name()).collect())
         .unwrap_or_default();
     assert!(left.is_empty(), "{left:?}");
+}
+
+/// One store of a config directory, changed.
+fn edit_store(dir: &Path, key: &str, edit: impl FnOnce(&mut Value)) {
+    let path = dir.join(".storage").join(key);
+    let mut store = read_json(&path);
+    edit(&mut store);
+    std::fs::write(path, serde_json::to_vec_pretty(&store).unwrap()).unwrap();
 }
 
 /// hars imports a release's directory exactly when Home Assistant 2026.6.1
@@ -821,11 +842,11 @@ fn imports_the_directories_home_assistant_2026_6_1_loads() {
             let minor = if version == "2026.8.3" { 2 } else { 4 };
             assert!(
                 stderr.contains(&format!(
-                    "core.device_registry is storage version 3.{minor}, written by Home \
-                     Assistant {version}; hars reads version 1.12, as Home Assistant 2026.6.1 \
-                     does. Home Assistant 2026.8 and later keep each device under one config \
-                     entry (storage version 3), which hars can't read yet. hars imports Home \
-                     Assistant 2026.6 and 2026.7: import a copy or backup of this config \
+                    "core.device_registry is storage version 3.{minor}, in a config directory \
+                     of Home Assistant {version}; hars reads version 1.12, as Home Assistant \
+                     2026.6.1 does. Home Assistant 2026.8 and later keep each device under one \
+                     config entry (storage version 3), which hars can't read yet. hars imports \
+                     Home Assistant 2026.6 and 2026.7: import a copy or backup of this config \
                      directory made before it was updated past 2026.7. Nothing was imported"
                 )),
                 "{stderr}"
@@ -917,6 +938,17 @@ fn a_2026_7_install_runs() {
     let fixture = release("2026.7.4", &src, &[]);
     let out = hars(&dest, &["import", src.to_str().unwrap()]);
     assert!(out.status.success(), "{out:?}");
+
+    // No test reaches the network: the integrations that would call a
+    // bridge, a bulb or a cloud stay off.
+    edit_store(&dest, "core.config_entries", |store| {
+        for entry in store["data"]["entries"].as_array_mut().unwrap() {
+            let domain = entry["domain"].as_str().unwrap();
+            if ["met", "hue", "lifx", "switchbot_cloud"].contains(&domain) {
+                entry["disabled_by"] = json!("user");
+            }
+        }
+    });
 
     let auth: Value =
         serde_json::from_str(fixture["files"][".storage/auth"].as_str().unwrap()).unwrap();
@@ -1032,15 +1064,16 @@ fn stores_and_entries_from_newer_releases_are_refused() {
         // a newer minor version of a store hars would never write back.
         (
             &[(device, "2026.7.4")],
-            "core.entity_registry is storage version 1.24, written by Home Assistant \
-             2026.11.2; hars reads version 1.22, as Home Assistant 2026.6.1 does. hars imports",
+            "core.entity_registry is storage version 1.24, in a config directory of Home \
+             Assistant 2026.11.2; hars reads version 1.22, as Home Assistant 2026.6.1 does. \
+             hars imports",
         ),
         // `met` at config entry version 2 (2026.11 nests its location).
         (
             &[(device, "2026.7.4"), (entity, "2026.7.4")],
-            "the met integration's config entry \"Home\" is version 2, migrated by Home \
-             Assistant 2026.11.2; hars runs version 1 of it, as Home Assistant 2026.6.1 does. \
-             hars imports Home Assistant 2026.6 and 2026.7",
+            "the met integration's config entry \"Home\" is version 2, in a config directory \
+             of Home Assistant 2026.11.2; hars runs version 1 of it, as Home Assistant 2026.6.1 \
+             does. hars imports Home Assistant 2026.6 and 2026.7",
         ),
         // Everything from 2026.11.2 at once: the device registry is named.
         (&[], "core.device_registry is storage version 3.4"),
@@ -1078,6 +1111,151 @@ fn stores_and_entries_from_newer_releases_are_refused() {
     assert!(!out.status.success());
     assert_eq!(std::fs::read(dest.join(".storage/auth")).unwrap(), before);
     assert!(!dest.join(".import-staging").exists());
+    for d in [src, dest] {
+        let _ = std::fs::remove_dir_all(d);
+    }
+}
+
+/// Directories hars could not keep safely are refused whole, each on a
+/// 2026.7.4 directory with one thing changed.
+#[test]
+fn directories_hars_could_not_keep_are_refused() {
+    type Change = fn(&Path);
+    let cases: [(&str, Change, &str); 7] = [
+        // hars only writes the config entries at 1.5: at 1.4 a phone's
+        // registration would be gone after a restart. Home Assistant
+        // migrates the file when it starts.
+        (
+            "older-entries",
+            |src| {
+                edit_store(src, "core.config_entries", |s| {
+                    s["minor_version"] = json!(4)
+                })
+            },
+            "core.config_entries is storage version 1.4, older than the 1.5 hars reads and \
+             writes: Home Assistant brings it up to date when it starts. Start Home Assistant \
+             2026.6 or 2026.7 on this config directory once",
+        ),
+        (
+            "older-entities",
+            |src| {
+                edit_store(src, "core.entity_registry", |s| {
+                    s["minor_version"] = json!(21)
+                })
+            },
+            "core.entity_registry is storage version 1.21, older than the 1.22",
+        ),
+        // 2026.6.1's own person migration fails on a newer minor version.
+        (
+            "newer-person",
+            |src| edit_store(src, "person", |s| s["minor_version"] = json!(2)),
+            "person is storage version 2.2, in a config directory of Home Assistant 2026.7.4; \
+             hars reads version 2.1",
+        ),
+        // Stores the server would start without, and then overwrite.
+        (
+            "restore-shape",
+            |src| edit_store(src, "core.restore_state", |s| s["data"] = json!({})),
+            "core.restore_state doesn't load",
+        ),
+        (
+            "deleted-ids-shape",
+            |src| edit_store(src, "mobile_app", |s| s["data"]["deleted_ids"] = json!("x")),
+            "mobile_app's store doesn't load",
+        ),
+        (
+            "analytics-shape",
+            |src| {
+                edit_store(src, "core.analytics", |s| {
+                    s["data"]["preferences"] = json!(1)
+                })
+            },
+            "core.analytics doesn't load",
+        ),
+        (
+            "version-text",
+            |src| std::fs::write(src.join(".HA_VERSION"), "2026.7.wrong").unwrap(),
+            ".HA_VERSION says \"2026.7.wrong\", which is not a Home Assistant version",
+        ),
+    ];
+    for (name, change, says) in cases {
+        let src = temp(&format!("refused-{name}"));
+        let dest = temp(&format!("refused-{name}-dest"));
+        release("2026.7.4", &src, &[]);
+        change(&src);
+        for flags in [&["--dry-run"][..], &["--force"], &[]] {
+            let mut args = vec!["import", src.to_str().unwrap()];
+            args.extend(flags);
+            let out = hars(&dest, &args);
+            assert!(!out.status.success(), "{name} {flags:?}");
+            let stderr = String::from_utf8_lossy(&out.stderr);
+            assert!(stderr.contains(says), "{name}: {stderr}");
+            nothing_imported(&dest);
+        }
+        let _ = std::fs::remove_dir_all(src);
+    }
+
+    // A pre-release of a tested line is that line.
+    let src = temp("beta-src");
+    let dest = temp("beta-dest");
+    release("2026.7.4", &src, &[]);
+    std::fs::write(src.join(".HA_VERSION"), "2026.7.0b3").unwrap();
+    let out = hars(&dest, &["import", src.to_str().unwrap(), "--dry-run"]);
+    assert!(out.status.success(), "{out:?}");
+    assert!(!String::from_utf8_lossy(&out.stdout).contains("not tested"));
+    nothing_imported(&dest);
+    let _ = std::fs::remove_dir_all(src);
+}
+
+/// The import works under the destination (staging, backup): a source in
+/// there is refused before anything is touched, a dry run included.
+#[test]
+fn a_source_inside_the_destination_is_refused() {
+    let dest = temp("inside-dest");
+    for inside in [".import-staging", "ha-copy"] {
+        let src = dest.join(inside);
+        std::fs::create_dir_all(&src).unwrap();
+        let fixture = release("2026.7.4", &src, &[]);
+        for flag in ["--dry-run", "--force"] {
+            let out = hars(&dest, &["import", src.to_str().unwrap(), flag]);
+            assert!(!out.status.success(), "{inside} {flag}");
+            assert!(
+                String::from_utf8_lossy(&out.stderr)
+                    .contains("the source is inside the destination"),
+                "{out:?}"
+            );
+            for (rel, text) in fixture["files"].as_object().unwrap() {
+                assert_eq!(
+                    std::fs::read_to_string(src.join(rel)).unwrap(),
+                    text.as_str().unwrap(),
+                    "{inside} {flag} {rel}"
+                );
+            }
+            assert!(!dest.join(".storage").exists());
+        }
+        std::fs::remove_dir_all(&src).unwrap();
+    }
+    let _ = std::fs::remove_dir_all(dest);
+}
+
+/// The report is written last: a path it can't be written to stops the
+/// import before anything is replaced.
+#[test]
+fn an_unwritable_report_path_is_refused_before_any_change() {
+    let src = temp("report-src");
+    let dest = temp("report-dest");
+    release("2026.7.4", &src, &[]);
+    assert!(hars(&dest, &["auth", "add", "bob", "pw"]).status.success());
+    let before = std::fs::read(dest.join(".storage/auth")).unwrap();
+    std::fs::create_dir(dest.join("import-report.json")).unwrap();
+    let out = hars(&dest, &["import", src.to_str().unwrap(), "--force"]);
+    assert!(!out.status.success());
+    assert!(
+        String::from_utf8_lossy(&out.stderr).contains("import-report.json is not a regular file"),
+        "{out:?}"
+    );
+    assert_eq!(std::fs::read(dest.join(".storage/auth")).unwrap(), before);
+    assert!(!dest.join(".import-backup").exists() && !dest.join(".import-staging").exists());
     for d in [src, dest] {
         let _ = std::fs::remove_dir_all(d);
     }
