@@ -255,6 +255,13 @@ commands.
   command again.
 - **An integration or automation is missing after an import.**
   `hars/config/import-report.json` says why.
+- **"Integrations can't be added or removed here"** when you pick an
+  integration in **Add integration**, or nothing happens when you delete
+  one. Your config folder has a file from an older Home Assistant release,
+  which hars reads but won't overwrite, so it couldn't save the change. The
+  message and the log name the file. Start Home Assistant 2026.6 or 2026.7
+  once on the folder, then
+  [import it again](docs/INSTALL.md#which-home-assistant-releases).
 - **You found a bug.** [Open an issue](https://github.com/adamt94/homeassistant-rust/issues/new/choose).
   Report a security problem privately, as the
   [security policy](SECURITY.md) describes.

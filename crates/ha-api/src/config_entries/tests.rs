@@ -647,3 +647,81 @@ async fn a_full_house_is_refused_in_words() {
         "Too many integrations are being set up at once. Try again in a moment."
     );
 }
+
+/// When a store can't be written, adding and removing are off, and the
+/// user is told why where they tried: the integration is still in the
+/// dialog's list, starting its flow answers with the reason in words (the
+/// frontend's dialog shows a text body as it is), and so does a delete.
+#[tokio::test]
+async fn an_unwritable_store_is_said_where_the_user_tries() {
+    let why = ha_integrations::flow::Unwritable {
+        key: "core.entity_registry",
+    }
+    .to_string();
+    let hass = Hass::new();
+    let entry = json!({"entry_id": "one", "domain": "switchbot_cloud", "title": "SwitchBot Cloud",
+                       "disabled_by": null, "data": {}})
+    .as_object()
+    .unwrap()
+    .clone();
+    let entries = ConfigEntries::in_memory(&hass, vec![entry]);
+    let config = crate::ApiConfig {
+        config_entries: Some(entries.clone()),
+        flows_unavailable: Some(why.clone().into()),
+        ..Default::default()
+    };
+    let server = server_on(hass, config.clone()).await;
+    let admin = token(&server.auth).0;
+    let router = crate::router(server.hass.clone(), server.auth.clone(), &config);
+    let send = |method: &str, path: &str, body: &str| {
+        let mut req = Request::builder()
+            .method(method)
+            .uri(path)
+            .header("authorization", format!("Bearer {admin}"))
+            .body(Body::from(body.to_owned()))
+            .unwrap();
+        req.extensions_mut()
+            .insert(ConnectInfo(std::net::SocketAddr::from(([127, 0, 0, 1], 1))));
+        let router = router.clone();
+        async move {
+            let res = router.oneshot(req).await.unwrap();
+            let (status, content_type) = (
+                res.status().as_u16(),
+                res.headers()
+                    .get("content-type")
+                    .map(|v| v.to_str().unwrap().to_owned()),
+            );
+            let body = axum::body::to_bytes(res.into_body(), 1 << 20)
+                .await
+                .unwrap();
+            (
+                status,
+                content_type,
+                String::from_utf8(body.to_vec()).unwrap(),
+            )
+        }
+    };
+    let text = Some("text/plain; charset=utf-8".to_owned());
+    assert_eq!(
+        send("POST", super::FLOW, r#"{"handler":"switchbot_cloud"}"#).await,
+        (400, text.clone(), why.clone())
+    );
+    assert_eq!(
+        send("DELETE", "/api/config/config_entries/entry/one", "").await,
+        (400, text, why.clone())
+    );
+    assert_eq!(entries.list().unwrap().len(), 1, "nothing was removed");
+    // No flow exists, and the integration is still offered.
+    assert_eq!(send("GET", &format!("{}/x", super::FLOW), "").await.0, 404);
+    assert_eq!(
+        send("GET", &format!("{}_handlers", super::FLOW), "")
+            .await
+            .2,
+        r#"["switchbot_cloud"]"#
+    );
+    let mut ws = Client::authed(&server, &admin).await;
+    ws.send(json!({"id": 1, "type": "integration/descriptions"}))
+        .await;
+    let reply = ws.recv().await;
+    assert!(reply["result"]["core"]["integration"]["switchbot_cloud"].is_object());
+}

@@ -69,6 +69,9 @@ pub struct ApiConfig {
     /// The config flows a user starts (Add integration), and the entries
     /// they started. `None` serves no flow views.
     pub flows: Option<Arc<ha_integrations::flow::Manager>>,
+    /// Why there are no flows though this install could have them (a
+    /// store can't be written): what the flow views answer instead.
+    pub flows_unavailable: Option<Arc<str>>,
     /// The frontend's per-user and system settings.
     pub frontend_data: Arc<FrontendData>,
     /// Home Assistant Labs' preview features.

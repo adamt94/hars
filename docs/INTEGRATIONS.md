@@ -37,6 +37,15 @@ An integration reaches hars in one of four ways:
   integration at once, and shows the devices that it found. Choose **Skip
   and finish** in the last step: hars can't yet save a name or an area from
   that step. To undo it, open the integration and delete its entry.
+
+  Adding and deleting are off when hars can't save the change. That
+  happens when the config folder came from a Home Assistant release older
+  than 2026.6, so the file that lists the integrations, the devices or the
+  entities is in a format that hars reads but doesn't write. hars then says
+  so when you pick the integration, and in its log at start. To fix it,
+  start Home Assistant 2026.6 or 2026.7 once on that folder, so that it
+  updates its files, and
+  [import the folder again](INSTALL.md#which-home-assistant-releases).
 - **Import.** Set the integration up in Home Assistant 2026.6 or 2026.7
   ([newer releases can't be imported yet](INSTALL.md#which-home-assistant-releases)), then
   [move the install to hars](../README.md#move-from-home-assistant). The

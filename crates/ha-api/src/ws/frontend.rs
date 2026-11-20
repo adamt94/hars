@@ -158,11 +158,7 @@ fn get_translations(conn: &mut Conn, id: u64, msg: &Map<String, Value>) -> Resul
         Some(list) => list,
         None => {
             if config_flow {
-                let handlers: &[&ha_integrations::flow::Handler] = match conn.shared.config.flows {
-                    Some(_) => ha_integrations::flow::HANDLERS,
-                    None => &[],
-                };
-                loaded = handlers
+                loaded = crate::config_entries::handlers_of(&conn.shared.config)
                     .iter()
                     .map(|h| h.domain)
                     .filter(|d| !loaded.contains(d))

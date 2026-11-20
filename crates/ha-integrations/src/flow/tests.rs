@@ -1057,7 +1057,11 @@ impl Disk {
         &self,
         hass: &Hass,
         base: &str,
-    ) -> (Arc<ConfigEntries>, Arc<Registry>, Option<Arc<Manager>>) {
+    ) -> (
+        Arc<ConfigEntries>,
+        Arc<Registry>,
+        Result<Arc<Manager>, Unwritable>,
+    ) {
         let entries = ConfigEntries::load(hass, &self.dir);
         let loaded = ha_registry::Registries::load(&self.dir).unwrap();
         let registry = Registry::new(hass, &self.dir, loaded);
@@ -1185,7 +1189,17 @@ async fn flows_and_removal_need_all_three_stores_writable() {
         let hass = Hass::new();
         let (entries, registry, flows) = disk.start(&hass, &base);
         assert_eq!(registry.read_only(), Some(key));
-        assert!(flows.is_none(), "{key}: flows and removal were offered");
+        // Refused, with the file and the way out for whoever asks.
+        let Err(why) = flows else {
+            panic!("flows and removal were offered");
+        };
+        assert_eq!(why.key, key);
+        let said = why.to_string();
+        assert!(said.contains(&format!(".storage/{key}")), "{said}");
+        assert!(
+            said.contains("Start Home Assistant 2026.6 or 2026.7 once"),
+            "{said}"
+        );
         // Nothing can have been half removed: the three files still agree.
         hass.setups_done().await;
         entries.flush().await;

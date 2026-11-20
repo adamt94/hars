@@ -197,15 +197,18 @@ async fn run(thp_disabled: std::io::Result<bool>) -> anyhow::Result<()> {
     );
     api_config.mobile_app = Some(std::sync::Arc::new(mobile_app));
     // The config flows a user starts from the UI, and the entries they add.
-    // Not offered (`None`) when the entries or a registry can't be saved.
-    api_config.flows = ha_integrations::flow::Manager::new(
+    // When the entries or a registry can't be saved, the views say so.
+    match ha_integrations::flow::Manager::new(
         &hass,
         config_entries.clone(),
         started.components,
         endpoints,
         started.tasks,
         api_config.mobile_app.clone(),
-    );
+    ) {
+        Ok(flows) => api_config.flows = Some(flows),
+        Err(why) => api_config.flows_unavailable = Some(why.to_string().into()),
+    }
     // `configuration.yaml`'s automations (written now; triggers attach at
     // `homeassistant_started`).
     let automations = match config_yaml.as_ref() {

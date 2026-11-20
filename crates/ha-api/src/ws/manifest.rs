@@ -123,10 +123,7 @@ pub(super) fn dispatch(
                 conn.out.error(json!(id), "unauthorized", "Unauthorized");
                 return;
             }
-            let handlers: &[&ha_integrations::flow::Handler] = match conn.shared.config.flows {
-                Some(_) => ha_integrations::flow::HANDLERS,
-                None => &[],
-            };
+            let handlers = crate::config_entries::handlers_of(&conn.shared.config);
             let described = || {
                 handlers.iter().filter_map(|h| {
                     DESCRIPTIONS.iter().find(|(domain, ..)| *domain == h.domain)

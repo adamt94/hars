@@ -30,14 +30,28 @@ const HANDLERS: &str = "/api/config/config_entries/flow_handlers";
 #[derive(Clone)]
 struct Views {
     shared: Shared,
-    flows: Arc<Manager>,
+    /// The flows, or why adding and removing is off (a store that can't be
+    /// written): then starting a flow and removing an entry say so, and no
+    /// flow exists.
+    flows: Result<Arc<Manager>, Arc<str>>,
+}
+
+/// The integrations a flow can add, for the dialog's list: also when
+/// adding is off for now, so that choosing one says why.
+pub(crate) fn handlers_of(config: &crate::ApiConfig) -> &'static [&'static flow::Handler] {
+    match config.flows.is_some() || config.flows_unavailable.is_some() {
+        true => flow::HANDLERS,
+        false => &[],
+    }
 }
 
 /// The views, when `hars` runs config flows (HA registers them with its
 /// `config` integration).
 pub(crate) fn routes(shared: Shared) -> Router {
-    let Some(flows) = shared.config.flows.clone() else {
-        return Router::new();
+    let flows = match (&shared.config.flows, &shared.config.flows_unavailable) {
+        (Some(flows), _) => Ok(flows.clone()),
+        (None, Some(why)) => Err(why.clone()),
+        (None, None) => return Router::new(),
     };
     Router::new()
         .route(
@@ -100,6 +114,12 @@ fn plain(status: StatusCode, text: String) -> Response {
         text,
     )
         .into_response()
+}
+
+/// Adding and removing is off: the reason, as a failed dependency is told
+/// (a 400 in words). Not HA's: it writes every version's stores.
+fn unavailable(why: &str) -> Response {
+    plain(StatusCode::BAD_REQUEST, why.to_owned())
 }
 
 /// `RequestDataValidator`'s refusal.
@@ -232,13 +252,20 @@ async fn init(State(views): State<Views>, body: Bytes) -> Response {
         Some(Value::String(id)) if id.is_empty() => flow::SOURCE_USER,
         Some(_) => flow::SOURCE_RECONFIGURE,
     };
-    let result = views.flows.init(handler, source).await;
+    let flows = match &views.flows {
+        Ok(flows) => flows,
+        Err(why) => return unavailable(why),
+    };
+    let result = flows.init(handler, source).await;
     reply(&views, result)
 }
 
 /// `FlowManagerResourceView.get`: the flow's current step, shown again.
 async fn show(State(views): State<Views>, Path(flow_id): Path<String>) -> Response {
-    let result = views.flows.configure(&flow_id, None).await;
+    let result = match &views.flows {
+        Ok(flows) => flows.configure(&flow_id, None).await,
+        Err(_) => Err(Error::UnknownFlow),
+    };
     reply(&views, result)
 }
 
@@ -317,15 +344,18 @@ async fn answer(State(views): State<Views>, Path(flow_id): Path<String>, body: B
         Ok(Body::Other) => return incorrect("expected dict"),
         Err(_) => Vec::new(),
     };
-    let result = views.flows.configure(&flow_id, Some(input)).await;
+    let result = match &views.flows {
+        Ok(flows) => flows.configure(&flow_id, Some(input)).await,
+        Err(_) => Err(Error::UnknownFlow),
+    };
     reply(&views, result)
 }
 
 /// `FlowManagerResourceView.delete`: the dialog closed.
 async fn abort(State(views): State<Views>, Path(flow_id): Path<String>) -> Response {
-    match views.flows.abort(&flow_id) {
-        Ok(()) => json_message(StatusCode::OK, "Flow aborted"),
-        Err(_) => json_message(StatusCode::NOT_FOUND, "Invalid flow specified"),
+    match views.flows.as_ref().map(|flows| flows.abort(&flow_id)) {
+        Ok(Ok(())) => json_message(StatusCode::OK, "Flow aborted"),
+        _ => json_message(StatusCode::NOT_FOUND, "Invalid flow specified"),
     }
 }
 
@@ -355,7 +385,11 @@ async fn handlers(Query(query): Query<Vec<(String, String)>>) -> Response {
 
 /// `ConfigManagerEntryResourceView.delete`.
 async fn remove_entry(State(views): State<Views>, Path(entry_id): Path<String>) -> Response {
-    match views.flows.remove_entry(&entry_id).await {
+    let flows = match &views.flows {
+        Ok(flows) => flows,
+        Err(why) => return unavailable(why),
+    };
+    match flows.remove_entry(&entry_id).await {
         Some(require_restart) => {
             Json(json!({ "require_restart": require_restart })).into_response()
         }

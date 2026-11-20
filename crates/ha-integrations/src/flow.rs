@@ -33,8 +33,9 @@
 //!   [`MAX_FLOWS`] are kept (the one longest untouched goes first). HA
 //!   keeps every abandoned form until it restarts; `hars` bounds what a
 //!   client that vanished (or an admin's script) can leave in memory.
-//! - Flows are offered only when the entries and both registries can be
-//!   saved ([`Manager::new`]).
+//! - Flows and removals work only when the entries and both registries
+//!   can be saved ([`Manager::new`]); otherwise the views say why
+//!   ([`Unwritable`]).
 //!
 //! Nothing here runs or wakes while no flow is open: a flow lives from its
 //! first form until it is answered or deleted (the dialog closing deletes
@@ -296,6 +297,31 @@ pub enum Error {
     Busy,
 }
 
+/// Why integrations can't be added or removed from the UI: a store that
+/// a flow or a removal changes won't be written.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Unwritable {
+    /// `core.config_entries`, `core.entity_registry` or
+    /// `core.device_registry`.
+    pub key: &'static str,
+}
+
+impl std::fmt::Display for Unwritable {
+    /// What the user is told where they tried: which file, why, and what
+    /// to do about it.
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Integrations can't be added or removed here, because hars would not be able to \
+             save the change: .storage/{} was written by a Home Assistant version whose format \
+             hars reads but doesn't write (or it couldn't be read). Start Home Assistant \
+             2026.6 or 2026.7 once on this config folder, so it updates its files, then import \
+             the folder into hars again.",
+            self.key
+        )
+    }
+}
+
 /// A flow in progress, as `async_progress` lists it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InProgress {
@@ -379,12 +405,12 @@ impl Manager {
     /// `components` are the entity components start-up made, and `tasks`
     /// the entries it started that can be stopped ([`crate::Started`]).
     ///
-    /// `None`, with a warning, when what a flow or a removal changes
-    /// couldn't all be saved: `core.config_entries`, `core.entity_registry`
-    /// or `core.device_registry` is another version's file, which `hars`
-    /// never overwrites. An entry added then would be gone at a restart,
-    /// and one removed would leave its devices and entities behind,
-    /// pointing at an entry that no longer exists.
+    /// [`Unwritable`], logged once here, when what a flow or a removal
+    /// changes couldn't all be saved: `core.config_entries`,
+    /// `core.entity_registry` or `core.device_registry` is another
+    /// version's file, which `hars` never overwrites. An entry added then
+    /// would be gone at a restart, and one removed would leave its devices
+    /// and entities behind, pointing at an entry that no longer exists.
     pub fn new(
         hass: &Hass,
         entries: Arc<ConfigEntries>,
@@ -392,19 +418,18 @@ impl Manager {
         endpoints: Endpoints,
         tasks: Vec<Running>,
         mobile_app: Option<Arc<crate::mobile_app::MobileApp>>,
-    ) -> Option<Arc<Self>> {
+    ) -> Result<Arc<Self>, Unwritable> {
         let unwritable = match components.registry().and_then(|r| r.read_only()) {
             Some(key) => Some(key),
             None if entries.read_only() => Some(crate::config_entries::KEY),
             None => None,
         };
         if let Some(key) = unwritable {
-            tracing::warn!(
-                "{key} can't be written (it is another version's file): integrations can't be added or removed from the UI"
-            );
-            return None;
+            let unwritable = Unwritable { key };
+            tracing::warn!("{unwritable}");
+            return Err(unwritable);
         }
-        Some(Arc::new(Self {
+        Ok(Arc::new(Self {
             hass: hass.clone(),
             entries,
             components,
