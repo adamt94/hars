@@ -24,8 +24,8 @@ It writes crates/ha-server/tests/vectors/import/:
   entries for the integrations hars runs (and two it doesn't), areas, a
   floor, a label, a category, devices (one shared by two config entries)
   and entities (one renamed by the user, one disabled, one deleted), the
-  restore state, the analytics choices, `mobile_app`'s store and the
-  default YAML with two automations.
+  restore state, the analytics choices, a Labs preview switched on,
+  `mobile_app`'s store and the default YAML with two automations.
 - `<release>.json` (`upgrade`, run under each later release): that
   directory after the release started on it, as a user who updated Home
   Assistant has it. The release's own code loads every store (running its
@@ -66,9 +66,10 @@ directory they are made current (`refresh_restore_state`).
 
 Everything is synthetic: no real install is read, the coordinates are a
 rounded city centre, the hosts are documentation addresses (192.0.2.0/24)
-and the keys are made up. Nothing reaches the network: no integration is
-set up, only its storage code runs. Run it twice: the output must not
-change.
+and the keys are made up. Nothing reaches the network: the only
+integrations set up are `http` (on a free loopback port), `person`, `zone`
+and `labs`; of the others only the storage and migration code runs. Run
+it twice: the output must not change.
 
 `mobile_app`'s store class and its Live Activity tokens live in the
 integration itself, which imports its camera and cloud libraries: the
@@ -362,6 +363,7 @@ async def seed(config_dir):
     from homeassistant.components import onboarding, person, zone
     from homeassistant.components.analytics.analytics import Analytics
     from homeassistant.components.frontend import storage as frontend_storage
+    from homeassistant.components.labs.helpers import async_update_preview_feature
     from homeassistant.components.lovelace import dashboard
     from homeassistant.core import State
     from homeassistant.helpers import (
@@ -603,6 +605,11 @@ async def seed(config_dir):
         {"deleted_ids": [hashlib.sha256(b"a deleted phone").hexdigest()]}
     )
 
+    # A Labs preview switched on (2026.7 makes it a plain feature and
+    # drops the entry).
+    assert await async_setup_component(hass, "labs", {})
+    await async_update_preview_feature(hass, "automation", "new_triggers_conditions", True)
+
     # Onboarding's analytics step, with nothing shared (so nothing is ever
     # sent).
     analytics = Analytics(hass)
@@ -723,6 +730,10 @@ async def upgrade(config_dir):
     analytics = Analytics(hass)
     await analytics.load()
     await analytics.save_preferences({"diagnostics": month % 2 == 0})
+
+    # `labs.async_setup` loads `core.labs` and drops (and saves without)
+    # the previews this release no longer has.
+    assert await async_setup_component(hass, "labs", {})
 
     # `mobile_app.async_setup`: load the store (migrating it) ...
     store = mobile_app_store(hass)

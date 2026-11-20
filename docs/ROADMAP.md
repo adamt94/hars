@@ -189,7 +189,11 @@ ids, addresses, names and coordinates replaced with fake ones
         2026.6.1 writes them (`mobile_app`'s 1.2 store from 2026.7: vectors
         from 2026.6.1's own code). `mobile_app`'s store and
         `core.analytics` are imported, and every store is decoded with the
-        server's own decoder first. `import-report.json` has
+        server's own decoder first. Also refused before any change: a
+        source inside the destination, a symlinked `.storage`, and a
+        directory where a YAML file or the report would go; settings
+        skipped as unreadable no longer remove the destination's own.
+        `import-report.json` has
         `ha_version_tested`, `behaves_like` and `newer_stores`. Tested on
         one synthetic install as 2026.6.1, 2026.6.4, 2026.7.0, 2026.7.4,
         2026.8.3 and 2026.11.2 leave it, each made by that release's code,

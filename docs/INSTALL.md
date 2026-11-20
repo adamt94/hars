@@ -178,7 +178,7 @@ The file `.HA_VERSION` in the config folder says which release wrote it.
 |---|---|
 | 2026.6.x or 2026.7.x | works |
 | older than 2026.6 | refused. Update Home Assistant to 2026.7 (not later: `ha core update --version 2026.7.4`, or the `2026.7.4` image tag), let it start once, then copy the folder again |
-| 2026.8 or newer | refused, with the reason, because its device list is in a newer format. Nothing is changed |
+| 2026.8 or newer | refused, with the reason, because its device list is in a newer format. None of your files is changed |
 
 **From 2026.8 on, hars can't import yet.** Home Assistant 2026.8 rewrote
 its device list (`core.device_registry`, storage version 3) so that every

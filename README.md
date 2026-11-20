@@ -171,8 +171,8 @@ YAML automations. History starts fresh.
 > [!IMPORTANT]
 > **Home Assistant 2026.8 and newer can't be imported yet.** 2026.8 changed
 > how Home Assistant stores devices, and later releases changed more. The
-> import checks first and refuses, with the reason, before it changes
-> anything. Until hars reads the new formats, you can import a copy or
+> import checks first and refuses, with the reason, before it changes any
+> of your files. Until hars reads the new formats, you can import a copy or
 > backup of your config folder from when you ran 2026.7 or older.
 > [Which releases, and why](docs/INSTALL.md#which-home-assistant-releases).
 

@@ -525,7 +525,22 @@ fn bad_frontend_settings_are_skipped_without_quoting_them() {
         "{skipped:?}"
     );
     assert!(!dest.join(".storage/frontend.system_data").exists());
-    for d in [src, dest] {
+
+    // Settings left out because they don't load are not "the source has
+    // none": a destination keeps the settings it has, with --force too.
+    let kept = temp("bad-frontend-kept");
+    std::fs::create_dir_all(kept.join(".storage")).unwrap();
+    write_store(&kept, "frontend.system_data", 1, 1, json!({"mine": 1}));
+    let mine = std::fs::read(kept.join(".storage/frontend.system_data")).unwrap();
+    let out = hars(&kept, &["import", src.to_str().unwrap(), "--force"]);
+    assert!(out.status.success(), "{out:?}");
+    let report = read_json(&kept.join("import-report.json"));
+    assert_eq!(report["removed"], json!([]));
+    assert_eq!(
+        std::fs::read(kept.join(".storage/frontend.system_data")).unwrap(),
+        mine
+    );
+    for d in [src, dest, kept] {
         let _ = std::fs::remove_dir_all(d);
     }
 }
@@ -1121,7 +1136,7 @@ fn stores_and_entries_from_newer_releases_are_refused() {
 #[test]
 fn directories_hars_could_not_keep_are_refused() {
     type Change = fn(&Path);
-    let cases: [(&str, Change, &str); 7] = [
+    let cases: [(&str, Change, &str); 9] = [
         // hars only writes the config entries at 1.5: at 1.4 a phone's
         // registration would be gone after a restart. Home Assistant
         // migrates the file when it starts.
@@ -1171,6 +1186,21 @@ fn directories_hars_could_not_keep_are_refused() {
                 })
             },
             "core.analytics doesn't load",
+        ),
+        (
+            "labs-shape",
+            |src| {
+                edit_store(src, "core.labs", |s| {
+                    s["data"]["preview_feature_status"] = json!([{"domain": 1}])
+                })
+            },
+            "core.labs doesn't load",
+        ),
+        // hars only lists the categories, and reads them leniently.
+        (
+            "categories-torn",
+            |src| std::fs::write(src.join(".storage/core.category_registry"), "{").unwrap(),
+            "core.category_registry doesn't load",
         ),
         (
             "version-text",
@@ -1256,6 +1286,101 @@ fn an_unwritable_report_path_is_refused_before_any_change() {
     );
     assert_eq!(std::fs::read(dest.join(".storage/auth")).unwrap(), before);
     assert!(!dest.join(".import-backup").exists() && !dest.join(".import-staging").exists());
+
+    // An old report that can't be written to is replaced, not written
+    // through: the import ends with its report.
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let report = dest.join("import-report.json");
+        std::fs::remove_dir(&report).unwrap();
+        std::fs::write(&report, "old").unwrap();
+        std::fs::set_permissions(&report, std::fs::Permissions::from_mode(0o444)).unwrap();
+        let out = hars(&dest, &["import", src.to_str().unwrap(), "--force"]);
+        assert!(out.status.success(), "{out:?}");
+        assert_eq!(read_json(&report)["ha_version"], "2026.7.4");
+        assert_ne!(std::fs::read(dest.join(".storage/auth")).unwrap(), before);
+    }
+    for d in [src, dest] {
+        let _ = std::fs::remove_dir_all(d);
+    }
+}
+
+/// With `.storage` a symlink the two directories can share files, and what
+/// the import clears or replaces in the destination would be the source's.
+#[cfg(unix)]
+#[test]
+fn a_symlinked_storage_directory_is_refused() {
+    use std::os::unix::fs::symlink;
+    // The source's `.storage` is the destination's staging directory.
+    let src = temp("alias-src");
+    let dest = temp("alias-dest");
+    release("2026.7.4", &src, &[]);
+    let real = dest.join(".import-staging/.storage");
+    std::fs::create_dir_all(dest.join(".import-staging")).unwrap();
+    std::fs::rename(src.join(".storage"), &real).unwrap();
+    symlink(&real, src.join(".storage")).unwrap();
+    let auth = std::fs::read(real.join("auth")).unwrap();
+    for flag in ["--dry-run", "--force"] {
+        let out = hars(&dest, &["import", src.to_str().unwrap(), flag]);
+        assert!(!out.status.success(), "{flag}");
+        assert!(
+            String::from_utf8_lossy(&out.stderr).contains("the source's .storage"),
+            "{out:?}"
+        );
+        assert_eq!(std::fs::read(real.join("auth")).unwrap(), auth, "{flag}");
+    }
+    for d in [src, dest] {
+        let _ = std::fs::remove_dir_all(d);
+    }
+
+    // The destination's `.storage` is the source's.
+    let src = temp("alias2-src");
+    let dest = temp("alias2-dest");
+    release("2026.7.4", &src, &[]);
+    std::fs::create_dir_all(&dest).unwrap();
+    symlink(src.join(".storage"), dest.join(".storage")).unwrap();
+    let before = std::fs::read(src.join(".storage/http.auth")).unwrap();
+    let out = hars(&dest, &["import", src.to_str().unwrap(), "--force"]);
+    assert!(!out.status.success());
+    assert!(
+        String::from_utf8_lossy(&out.stderr).contains("the destination's .storage"),
+        "{out:?}"
+    );
+    assert_eq!(
+        std::fs::read(src.join(".storage/http.auth")).unwrap(),
+        before
+    );
+    for d in [src, dest] {
+        let _ = std::fs::remove_dir_all(d);
+    }
+}
+
+/// A directory where the import would put a YAML file is not moved aside
+/// and deleted with the backup, with --force either.
+#[test]
+fn a_directory_in_a_yaml_files_place_is_refused() {
+    let src = temp("yaml-dir-src");
+    let dest = temp("yaml-dir-dest");
+    release("2026.7.4", &src, &[]);
+    std::fs::create_dir_all(dest.join("configuration.yaml")).unwrap();
+    std::fs::write(dest.join("configuration.yaml/old.yaml"), "mine: 1\n").unwrap();
+    for flags in [&["--force"][..], &["--dry-run"], &[]] {
+        let mut args = vec!["import", src.to_str().unwrap()];
+        args.extend(flags);
+        let out = hars(&dest, &args);
+        assert!(!out.status.success(), "{flags:?}");
+        assert!(
+            String::from_utf8_lossy(&out.stderr)
+                .contains("configuration.yaml is not a regular file in the destination"),
+            "{out:?}"
+        );
+        assert_eq!(
+            std::fs::read_to_string(dest.join("configuration.yaml/old.yaml")).unwrap(),
+            "mine: 1\n"
+        );
+        assert!(!dest.join(".storage").exists());
+    }
     for d in [src, dest] {
         let _ = std::fs::remove_dir_all(d);
     }

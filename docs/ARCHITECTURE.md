@@ -341,15 +341,20 @@ How it is kept:
 ### Which Home Assistant releases can be imported
 
 The pin says what hars *behaves like*. What `hars import` *accepts* is
-wider, and follows Home Assistant's own rule for a downgrade: hars imports a
-config directory that Home Assistant 2026.6.1 would itself load.
+wider: the release lines it is tested with are 2026.6 and 2026.7. The rule
+starts from Home Assistant's own for a downgrade (what would 2026.6.1 do
+with these files?) and is stricter where hars could not keep the data
+safe. It is applied to each store, not to the release number.
 
-- A store with a newer **major** storage version stops the import, as it
-  stops Home Assistant (`helpers/storage.py` raises
-  `UnsupportedStorageVersionError` and HA starts in recovery mode). So does
-  a config entry of a newer **version** for an integration hars runs
-  (`ConfigEntry.async_migrate` answers `migration_error`). The whole import
-  is refused, with the store and both versions named; nothing is written.
+- A store with a newer **major** storage version stops the import.
+  Home Assistant refuses such a file too (`helpers/storage.py` raises
+  `UnsupportedStorageVersionError`); for the stores its bootstrap loads
+  (the registries, the config entries, the restore state) it then starts
+  in recovery mode. So does a config entry of a newer **version** for an
+  integration hars runs (`ConfigEntry.async_migrate` answers
+  `migration_error`; hars refuses a disabled one as well). The whole
+  import is refused, with the store and both versions named, and none of
+  the destination's files is changed.
 - A newer **minor** storage version is compatible by HA's rule: HA loads
   the data as it is and saves it at its own minor version. hars takes one
   only where its own reader and writer make that safe, store by store
@@ -361,11 +366,13 @@ config directory that Home Assistant 2026.6.1 would itself load.
   - the entity, device and area registries and `core.config_entries`: only
     the exact minor version hars writes. hars never writes these over a
     file of another minor version, so every later change would be lost at
-    the next restart. A newer one is refused, and an older one too (HA
-    migrates it and saves it when it starts, so a directory 2026.6 or
-    2026.7 has run on is at these versions);
-  - the floor and label registries and `person`: not a newer one
-    (2026.6.1's own `person` migration fails on one).
+    the next restart. A newer one is refused, and an older one too, which
+    is stricter than HA (it migrates an older file and saves it when it
+    starts, so a directory 2026.6 or 2026.7 has run on is at these
+    versions);
+  - the floor, label and category registries, which hars only reads, and
+    `person`: not a newer one (2026.6.1's own `person` migration fails on
+    one).
 - Each store is also decoded with the decoder the server uses at start, so
   a file the server would start without (and then overwrite) stops the
   import. Frontend settings that don't decode are the exception: they are
@@ -376,7 +383,7 @@ config directory that Home Assistant 2026.6.1 would itself load.
 |---|---|---|
 | before 2026.6 | refused: update to 2026.6 or 2026.7 first | older store formats, which hars doesn't migrate |
 | **2026.6.x** | **imports** (tested: 2026.6.1, 2026.6.4) | nothing (2026.6.4 gives Hue's grouped lights a `translation_key`) |
-| **2026.7.x** | **imports** (tested: 2026.7.0, 2026.7.4) | `mobile_app`'s store is 1.2 (Live Activity push tokens); `switchbot_cloud` entries can hold a `cloudhook_url`; `sun` removes its long-gone `solar_rising` sensor's registry row. No store hars reads changes shape |
+| **2026.7.x** | **imports** (tested: 2026.7.0, 2026.7.4) | `mobile_app`'s store is 1.2 (Live Activity push tokens); `switchbot_cloud` entries can hold a `cloudhook_url`; `sun` removes its long-gone `solar_rising` sensor's registry row; the Labs preview for the new triggers and conditions leaves `core.labs`. No other store hars reads changes version or shape |
 | 2026.8.x, 2026.9.x | refused | `core.device_registry` is major version 3: a device belongs to one config entry, and a device two integrations shared is split in two with new ids (3.4 in 2026.9 adds `child_devices`); `core.entity_registry` is 1.23 (`settings`) |
 | 2026.10.x | refused | and: `hue` entries are 1.2 (Zigbee addresses leave the devices' `mac` connections), `lifx` entries are version 2 (`serial` in `data`, the unique id without colons) |
 | 2026.11.x | refused | and: `core.entity_registry` is 1.24 (a user's entity name is stored without the device's name, which is added when shown), `met` entries are version 2 (`location` nested), restore-state rows gain `entity_registry_id` |
@@ -400,9 +407,10 @@ every one. The list of tested releases is `TESTED_HA` in
 
 The decision is made per store, not from `.HA_VERSION`: a directory that
 says it is from a later release and whose stores and entries all pass is
-imported, with `ha_version_tested: false` in the report and a warning. A
-real 2026.8 install doesn't pass, because Home Assistant rewrites the
-device registry the first time 2026.8 starts.
+imported, with `ha_version_tested: false` in the report and a warning
+(`ha_version_tested` is about the release line, not each patch release).
+A 2026.8 install with a device registry file doesn't pass: Home Assistant
+rewrites that file the first time 2026.8 starts.
 
 After an import from 2026.7, hars still behaves like 2026.6.1 and serves
 2026.6's frontend. What the user should expect is in

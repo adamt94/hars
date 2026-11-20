@@ -6,13 +6,15 @@
 //! `jwt_key`s) arrive unchanged, and the browser and phone sessions logged in
 //! to HA keep working. Everything else is listed in `import-report.json`.
 //!
-//! Which releases: the rule is Home Assistant's own for a downgrade. `hars`
+//! Which releases: the rule starts from Home Assistant's own for a
+//! downgrade, and is stricter where `hars` could not keep the data. `hars`
 //! behaves like one pinned release ([`PINNED_HA`]) and imports a directory
-//! that release would itself load: 2026.6 and later, as long as no store
-//! `hars` reads has a newer major storage version (`helpers/storage.py`
-//! raises `UnsupportedStorageVersionError`, and HA starts in recovery mode)
-//! and no integration `hars` runs has a config entry of a newer version
-//! (`ConfigEntry.async_migrate`: `migration_error`). Such a directory is
+//! from 2026.6 or later as long as no store `hars` reads has a newer major
+//! storage version (`helpers/storage.py` raises
+//! `UnsupportedStorageVersionError`; for a store its bootstrap loads, HA
+//! then starts in recovery mode) and no integration `hars` runs has a
+//! config entry of a newer version (`ConfigEntry.async_migrate`:
+//! `migration_error`). Such a directory is
 //! refused whole, with the store and versions named. A newer *minor*
 //! version is compatible by HA's rule and is read where `hars`'s own
 //! reader and writer make that safe ([`Minor`] says which stores); the
@@ -56,8 +58,9 @@ enum Minor {
     /// version, with what `hars`'s writer for that store keeps.
     Any,
     /// Not a newer one: 2026.6.1's own migration fails on it (`person`), or
-    /// `hars` has no writer that would bring it back (the floor and label
-    /// registries). An older one is migrated on load, as in HA.
+    /// `hars` only reads the store and would never bring it back to its
+    /// own version (the floor, label and category registries). An older
+    /// one is migrated on load, as in HA.
     NotNewer,
     /// Only the one `hars` writes. The entity, device and area registries
     /// (`check_minor`) and the config entries (`writable`) are never
@@ -93,7 +96,7 @@ const STORES: &[StoreSpec] = &[
     (ha_registry::LABEL_KEY, false, (1, 2), Minor::NotNewer),
     // The names of the categories the automation list groups by (read
     // only).
-    (ha_registry::CATEGORY_KEY, false, (1, 2), Minor::Any),
+    (ha_registry::CATEGORY_KEY, false, (1, 2), Minor::NotNewer),
     // The webhook ids of removed app registrations, which answer 410.
     (
         ha_integrations::mobile_app::DOMAIN,
@@ -122,8 +125,9 @@ pub struct Report {
     pub importer_version: u32,
     /// The release the files come from (`.HA_VERSION`).
     pub ha_version: String,
-    /// Whether `hars`'s tests cover imports from that release
-    /// ([`TESTED_HA`]). If not, its stores still passed every check here.
+    /// Whether `hars`'s tests cover imports from that release's line (its
+    /// year and month, [`TESTED_HA`]; not each patch release). If not, its
+    /// stores still passed every check here.
     pub ha_version_tested: bool,
     /// The release `hars` behaves like after the import ([`PINNED_HA`]),
     /// whatever `ha_version` is.
@@ -225,6 +229,18 @@ pub fn run(opts: &Options) -> anyhow::Result<Report> {
             source.display()
         );
     }
+    // Through a symlinked `.storage` the two directories could be one
+    // (the roots were compared above): what the import clears or replaces
+    // in the destination would be the source's files.
+    for (dir, whose) in [(&source, "source"), (&dest, "destination")] {
+        let storage = dir.join(".storage");
+        if std::fs::symlink_metadata(&storage).is_ok_and(|m| m.file_type().is_symlink()) {
+            bail!(
+                "the {whose}'s .storage ({}) is a symlink; use the real directory",
+                storage.display()
+            );
+        }
+    }
     // Checked before anything is replaced: the report is written last.
     if std::fs::symlink_metadata(dest.join(REPORT_FILE)).is_ok_and(|m| !m.is_file()) {
         bail!(
@@ -304,6 +320,10 @@ pub fn run(opts: &Options) -> anyhow::Result<Report> {
         .map_err(|e| anyhow::anyhow!("the zones or people don't load ({})", sanitized(&e)))?;
     ha_api::Lovelace::load_strict(&staging.root)
         .map_err(|e| anyhow::anyhow!("the dashboards don't load ({})", sanitized(&e)))?;
+    // `load_strict` reads the categories leniently (hars only lists them).
+    Store::new(&staging.root, ha_registry::CATEGORY_KEY, 1, 2, false)
+        .load::<Map<String, Value>>()
+        .map_err(|e| anyhow::anyhow!("core.category_registry doesn't load ({})", sanitized(&e)))?;
     ha_integrations::mobile_app::MobileApp::check_store(&staging.root)
         .map_err(|e| anyhow::anyhow!("mobile_app's store doesn't load ({})", sanitized(&e)))?;
     ha_core::restore::RestoreState::check(&staging.root)
@@ -371,6 +391,9 @@ pub fn run(opts: &Options) -> anyhow::Result<Report> {
     let read = |dir: &Path, key: &str| std::fs::read(dir.join(".storage").join(key)).ok();
     for key in &in_dest {
         match staged.contains(key) {
+            // Left out because it doesn't load, not because the source
+            // has none: the destination keeps its own.
+            false if report.skipped.iter().any(|s| s.key == *key) => {}
             false => report.removed.push(key.clone()),
             true if read(&dest, key) != read(&staging.root, key) => {
                 report.replaced.push(key.clone())
@@ -428,7 +451,9 @@ pub fn run(opts: &Options) -> anyhow::Result<Report> {
         std::fs::set_permissions(dest.join(rel), std::fs::Permissions::from_mode(0o600))?;
     }
     let json = serde_json::to_vec_pretty(&report)?;
-    std::fs::write(dest.join(REPORT_FILE), json).with_context(|| {
+    // A new file renamed into place: never a half-written report, and
+    // nothing written through an existing file.
+    ha_core::storage::write_atomic(&dest.join(REPORT_FILE), &json, false).with_context(|| {
         format!(
             "everything was imported, but {REPORT_FILE} could not be written in {}",
             dest.display()
@@ -470,11 +495,15 @@ fn release_line(version: &str) -> Option<(u32, u32)> {
     if !digits(year) || !digits(month) {
         return None;
     }
-    // The patch number, then at most a beta tag (`b3`) and `.dev<date>`.
+    // The patch number, then at most a beta tag (`b3`) and one `.dev<date>`.
     let patch = parts.next()?;
     let (number, beta) = patch.split_once('b').unwrap_or((patch, "0"));
-    let dev = parts.all(|p| p.strip_prefix("dev").is_some_and(digits));
-    (digits(number) && digits(beta) && dev).then_some((year.parse().ok()?, month.parse().ok()?))
+    let dev = parts
+        .next()
+        .is_none_or(|p| p.strip_prefix("dev").is_some_and(digits));
+    let (year, month) = (year.parse().ok()?, month.parse().ok()?);
+    let ok = digits(number) && digits(beta) && dev && parts.next().is_none();
+    (ok && (1..=12).contains(&month)).then_some((year, month))
 }
 
 fn line_name((year, month): (u32, u32)) -> String {
@@ -798,8 +827,8 @@ fn normalize(p: &Path) -> Option<PathBuf> {
 }
 
 /// A relative YAML path is usable in `root`: not a path the importer or
-/// HA's storage owns, and no component a symlink. In the source the file
-/// must be a regular file.
+/// HA's storage owns, no component a symlink, and the file itself, where
+/// it exists (in the source it must), a regular file.
 fn check_path(root: &Path, rel: &Path, source: bool) -> anyhow::Result<()> {
     let first = rel
         .components()
@@ -820,8 +849,11 @@ fn check_path(root: &Path, rel: &Path, source: bool) -> anyhow::Result<()> {
                     rel.display()
                 )
             }
-            Ok(m) if source && i + 1 == n && !m.is_file() => {
-                bail!("{} is not a regular file", rel.display())
+            // In the destination too: replacing would move a whole
+            // directory aside and then delete it with the backup.
+            Ok(m) if i + 1 == n && !m.is_file() => {
+                let whose = if source { "" } else { " in the destination" };
+                bail!("{} is not a regular file{whose}", rel.display())
             }
             Ok(_) => {}
             // Not in the destination yet: nothing further to check.
@@ -1122,6 +1154,9 @@ mod tests {
             ("2026.7.4x", None),
             ("2026.7.4.wrong", None),
             ("2026.7.b3", None),
+            ("2026.13.0", None),
+            ("2026.0.1", None),
+            ("2026.8.0.dev1.dev2", None),
             ("x.7.4", None),
             ("", None),
         ] {
