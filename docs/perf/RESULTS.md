@@ -430,9 +430,27 @@ existing delayed save). What stays in memory is one reference per
 SwitchBot entry, from its set-up until it is removed (an empty,
 unallocated list on an install with none), and per SwitchBot entity the
 names its id is made from (two short strings) behind a lock that a state
-write and a rename take. A state write of such an entity copies its id
-and builds its friendly name's JSON value under that lock, as it did
-without one before: the same number of allocations.
+write and a rename take.
+
+A state write of such an entity now reads its id and friendly name under
+that lock. It allocates what it allocated on main: the state's text is
+borrowed where the entity has a literal (a switch's `on`, `off` or
+`unknown`) and an owned string where main had one too (a sensor's
+reading, a button's last press, a climate's mode), and the friendly
+name's JSON value is built per write as before. An earlier revision of
+this change (8277405) made the switch's literal an owned string on every
+report; the final review caught it. The remotes' refresh, which reports
+a climate and a switch unchanged every 600 s, has a bench now
+(`cargo bench -p ha-integrations`, `switchbot_report/remote_unchanged`;
+an Apple-silicon Mac, criterion 0.7, the same bench file run on main):
+
+| | time per report (climate and switch) |
+|---|---|
+| main (49c08fc) | 2.038 µs [2.031, 2.044] |
+| branch, `--baseline main` | 2.005 µs [2.002, 2.009], change −0.43 %: "within noise threshold" |
+
+A polled sensor's and a Bot's writes are not in the bench (each needs an
+API answer first); by reading, they make the same allocations as on main.
 
 Release binary (macOS arm64, stripped, `cargo build --release -p
 ha-server`): main (49c08fc) 9,469,328 bytes, branch 9,535,472

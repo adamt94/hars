@@ -580,6 +580,7 @@ name = "ha-integrations"
 version = "0.1.0"
 dependencies = [
  "base64",
+ "criterion",
  "crypto_secretbox",
  "ha-components",
  "ha-core",

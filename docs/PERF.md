@@ -155,6 +155,12 @@ git switch -   && cargo bench -p ha-core --bench core -- --baseline main
 Criterion prints the change and whether it is significant. Add a bench to
 `core.rs` (or a new `benches/` file) when you add a hot path.
 
+`crates/ha-integrations/benches/switchbot.rs`
+(`cargo bench -p ha-integrations`) has
+`switchbot_report/remote_unchanged`: what a SwitchBot Cloud entry writes
+at a refresh for an infrared remote (its climate and switch, unchanged),
+entity code included.
+
 ### Binary size
 
 `ls -l target/release/hars` after `cargo build --release`, on `main` and on
