@@ -811,6 +811,22 @@ impl Registries {
         Ok(r)
     }
 
+    /// The entity or device store that [`Registries::save_entities`] or
+    /// [`Registries::save_devices`] would refuse to overwrite (a file at
+    /// another minor version than the one `hars` writes), if any. Rows
+    /// changed then live in memory only, so nothing whose effect must
+    /// outlast a restart (adding or removing a config entry) should be
+    /// offered.
+    pub fn unwritable(&self, config_dir: &Path) -> Option<&'static str> {
+        [
+            (ENTITY_KEY, self.entity_file.minor),
+            (DEVICE_KEY, self.device_file.minor),
+        ]
+        .into_iter()
+        .find(|&(key, minor)| check_minor(&store(config_dir, key), minor).is_err())
+        .map(|(key, _)| key)
+    }
+
     /// Write `core.entity_registry` as HA does: each row compact, on its
     /// own line, in HA's field order, inside a 2-space indented envelope.
     /// A file at an older minor version is never overwritten: HA would

@@ -176,7 +176,9 @@ flow remembers between steps. A step returns a `flow::Step`: a form (its
 fields serialised as HA's `voluptuous_serialize` does, and the answer
 checked against them), an abort, or the entry to create. `flow::Manager`
 keeps the flows in progress (an empty, unallocated list while no dialog is
-open; a flow leaves when it is answered or deleted, with no timer), and on
+open; a flow leaves when it is answered or deleted, with no timer; one
+nobody came back to is dropped when another starts an hour later, and 16
+are kept at most), and on
 `CreateEntry` adds the entry (`ConfigEntries::add_tracked`), starts its
 integration and waits for the first setup attempt before answering, as
 HA's `async_add` does. The integration's `run` reports where its setup is

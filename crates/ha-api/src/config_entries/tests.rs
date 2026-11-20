@@ -136,7 +136,8 @@ async fn home() -> Home {
         Endpoints { switchbot: base },
         Vec::new(),
         None,
-    );
+    )
+    .unwrap();
     let config = crate::ApiConfig {
         registry: Some(registry.clone()),
         config_entries: Some(entries.clone()),
@@ -579,4 +580,73 @@ async fn the_dialog_lists_what_can_be_added() {
     for domain in ["switchbot_cloud", "button", "climate", "sensor", "switch"] {
         assert!(components.contains(&json!(domain)), "{domain}");
     }
+}
+
+/// A `HEAD` is checked as the `GET` it would be answered by: a signed-in
+/// user who isn't an admin can't tell a flow in progress from an unknown
+/// id by the status, and nobody gets the form's handler run by a `HEAD`
+/// (HA's view has no `head`: 405).
+#[tokio::test]
+async fn a_head_request_needs_what_a_get_needs() {
+    let home = home().await;
+    let router = crate::router(
+        home.server.hass.clone(),
+        home.server.auth.clone(),
+        &home.config,
+    );
+    let send = |method: &str, path: String, user: Option<&str>| {
+        let mut req = Request::builder().method(method).uri(path);
+        if let Some(user) = user {
+            req = req.header("authorization", format!("Bearer {}", home.tokens[user]));
+        }
+        let mut req = req.body(Body::empty()).unwrap();
+        req.extensions_mut()
+            .insert(ConnectInfo(std::net::SocketAddr::from(([127, 0, 0, 1], 1))));
+        let router = router.clone();
+        async move { router.oneshot(req).await.unwrap().status().as_u16() }
+    };
+    let flows = home.config.flows.clone().unwrap();
+    let ha_integrations::flow::FlowResult::Form { flow_id, .. } = flows
+        .init("switchbot_cloud", ha_integrations::flow::SOURCE_USER)
+        .await
+        .unwrap()
+    else {
+        panic!("no form");
+    };
+    let known = format!("{}/{flow_id}", super::FLOW);
+    let unknown = format!("{}/nope", super::FLOW);
+    // What a `GET` answers, for comparison.
+    assert_eq!(send("GET", known.clone(), Some("admin")).await, 200);
+    assert_eq!(send("GET", unknown.clone(), Some("admin")).await, 404);
+    assert_eq!(send("GET", known.clone(), Some("user")).await, 401);
+    for path in [&known, &unknown] {
+        assert_eq!(
+            send("HEAD", path.clone(), Some("user")).await,
+            401,
+            "{path}"
+        );
+        assert_eq!(send("HEAD", path.clone(), None).await, 401, "{path}");
+        assert_eq!(
+            send("HEAD", path.clone(), Some("admin")).await,
+            405,
+            "{path}"
+        );
+    }
+    // The other new views: nothing a `HEAD` gets that a `GET` wouldn't.
+    assert_eq!(send("HEAD", super::FLOW.into(), Some("user")).await, 405);
+    assert_eq!(
+        send("HEAD", format!("{}_handlers", super::FLOW), Some("user")).await,
+        405
+    );
+    assert_eq!(
+        send("HEAD", format!("{}_handlers", super::FLOW), None).await,
+        401
+    );
+    let entry = "/api/config/config_entries/entry/nope".to_owned();
+    assert_eq!(send("HEAD", entry.clone(), Some("user")).await, 405);
+    assert_eq!(send("HEAD", entry, None).await, 401);
+    // An admin-only view from before this change is covered too.
+    let automation = "/api/config/automation/config/nope".to_owned();
+    assert_eq!(send("HEAD", automation, Some("user")).await, 401);
+    assert_eq!(flows.in_progress(), 1, "a HEAD ran nothing");
 }

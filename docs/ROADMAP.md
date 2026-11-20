@@ -563,8 +563,13 @@ ids, addresses, names and coordinates replaced with fake ones
       removed as HA removes one that can't unload (`require_restart`).
       A second account that lists the same devices adds none of them
       again, as HA's platform refuses a unique id that already runs.
-      Not offered when `core.config_entries` can't be written (another
-      version's file). All 12 scenarios of
+      Not offered when `core.config_entries` or the entity or device
+      registry can't be written (another version's file), so the three
+      never disagree after a restart. A flow nobody answers is dropped
+      when another starts an hour later, and 16 are kept at most (HA
+      keeps them until it restarts). A removal waits for an entry's
+      first set-up attempt, as HA's does. An account that takes over a
+      disabled account's devices enables them, as HA does. All 12 scenarios of
       `scripts/vectors/config_flow.py` match HA's
       own views (forms, each error, duplicates, bad bodies, unknown
       flows and handlers, who may do what, a setup that retries,

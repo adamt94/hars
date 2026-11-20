@@ -20,8 +20,7 @@
 use super::{Conn, Invalid, Subscription, only_keys};
 use crate::ApiConfig;
 use ha_auth::Permission;
-use ha_integrations::config_entries::{Change, Listener};
-use ha_integrations::flow;
+use ha_integrations::config_entries::{Change, Listener, Runtime};
 use serde_json::{Map, Value, json};
 use std::sync::Arc;
 
@@ -58,7 +57,6 @@ pub(super) fn dispatch(
                 .flows
                 .iter()
                 .flat_map(|f| f.progress())
-                .filter(|f| ![flow::SOURCE_USER, flow::SOURCE_RECONFIGURE].contains(&f.source))
                 .map(|f| {
                     json!({"flow_id": f.flow_id, "handler": f.handler,
                            "context": {"source": f.source}, "step_id": f.step_id})
@@ -198,6 +196,21 @@ fn matches_filter(entry: &Map<String, Value>, filter: &[&str]) -> bool {
 
 /// `ConfigEntry.as_json_fragment` for a stored entry.
 pub(crate) fn entry_json(config: &ApiConfig, e: &Map<String, Value>) -> Value {
+    let runtime = config
+        .config_entries
+        .as_ref()
+        .zip(e.get("entry_id").and_then(Value::as_str))
+        .and_then(|(entries, id)| entries.runtime(id));
+    entry_json_at(config, e, runtime)
+}
+
+/// [`entry_json`] with where the entry's setup was at some moment (a
+/// flow's reply says what the first attempt left, whatever came after).
+pub(crate) fn entry_json_at(
+    config: &ApiConfig,
+    e: &Map<String, Value>,
+    runtime: Option<Runtime>,
+) -> Value {
     let str_of = |k: &str| e.get(k).and_then(Value::as_str);
     let domain = str_of("domain").unwrap_or("");
     let disabled = e.get("disabled_by").is_some_and(|d| !d.is_null());
@@ -206,11 +219,6 @@ pub(crate) fn entry_json(config: &ApiConfig, e: &Map<String, Value>) -> Value {
         .find(|(d, ..)| *d == domain)
         .map_or((false, false), |&(_, o, u)| (o, u));
     // Where its setup is, if the setup says; else whether it runs.
-    let runtime = config
-        .config_entries
-        .as_ref()
-        .zip(str_of("entry_id"))
-        .and_then(|(entries, id)| entries.runtime(id));
     let (state, reason, unload) = match runtime {
         // HA learns `supports_unload` when it loads the integration for
         // the entry's setup.

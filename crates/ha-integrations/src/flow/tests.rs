@@ -38,7 +38,8 @@ async fn home() -> Home {
         },
         Vec::new(),
         None,
-    );
+    )
+    .unwrap();
     Home {
         hass,
         registry,
@@ -81,6 +82,11 @@ fn entry_id(result: &FlowResult) -> String {
 
 /// The registries' rows of the entry, as the generator writes HA's.
 fn rows(registry: &Registry, entry_id: &str) -> (Vec<Value>, Vec<Value>) {
+    rows_as(registry, entry_id, "<entry:1>")
+}
+
+/// [`rows`], with `entry_id` written as `name`.
+fn rows_as(registry: &Registry, entry_id: &str, name: &str) -> (Vec<Value>, Vec<Value>) {
     let snap = registry.snapshot();
     let device_names: Vec<(String, String)> = snap
         .devices
@@ -93,7 +99,7 @@ fn rows(registry: &Registry, entry_id: &str) -> (Vec<Value>, Vec<Value>) {
         })
         .collect();
     let plain = |v: Value| -> Value {
-        let mut text = v.to_string().replace(entry_id, "<entry:1>");
+        let mut text = v.to_string().replace(entry_id, name);
         for (id, name) in &device_names {
             text = text.replace(id, name);
         }
@@ -177,7 +183,7 @@ async fn a_flow_adds_switchbot_as_home_assistant_does() {
                {"type": "string", "name": "api_key", "required": true}])
     );
     assert_eq!(flow_id.len(), 26);
-    assert_eq!(home.flows.progress().len(), 1);
+    assert_eq!(home.flows.in_progress(), 1);
     assert!(
         home.api.take().is_empty(),
         "nothing is asked before the form is answered"
@@ -222,7 +228,7 @@ async fn a_flow_adds_switchbot_as_home_assistant_does() {
             .map(|r| (r.state, r.integration_loaded)),
         Some((EntryState::Loaded, true))
     );
-    assert!(home.flows.progress().is_empty());
+    assert_eq!(home.flows.in_progress(), 0);
     assert_eq!(
         *changes.lock(),
         [
@@ -329,7 +335,7 @@ async fn bad_credentials_show_the_form_again() {
     };
     assert!(errors.is_empty());
     assert_eq!(home.entries.list(), Some(Vec::new()));
-    assert_eq!(home.flows.progress().len(), 1);
+    assert_eq!(home.flows.in_progress(), 1);
 }
 
 /// The form's schema refuses what HA's does, with its messages.
@@ -379,7 +385,7 @@ async fn the_form_is_checked_before_the_step() {
         home.api.take().is_empty(),
         "a refused form asks the API nothing"
     );
-    assert_eq!(home.flows.progress().len(), 1);
+    assert_eq!(home.flows.in_progress(), 1);
 }
 
 /// A second flow for the same account aborts; one for another account
@@ -398,7 +404,7 @@ async fn one_entry_per_account() {
     let second = entry_id(&add(&home, "token-two").await);
     assert_ne!(first, second);
     assert_eq!(home.entries.list().unwrap().len(), 2);
-    assert!(home.flows.progress().is_empty());
+    assert_eq!(home.flows.in_progress(), 0);
 
     assert_eq!(
         home.flows.init("nope", SOURCE_USER).await,
@@ -415,7 +421,7 @@ async fn one_entry_per_account() {
         Err(Error::UnknownFlow)
     );
     assert_eq!(home.flows.abort("nope"), Err(Error::UnknownFlow));
-    assert!(home.flows.progress().is_empty());
+    assert_eq!(home.flows.in_progress(), 0);
 }
 
 /// A flow that is left (the dialog closed) is dropped, and an empty list
@@ -436,12 +442,12 @@ async fn an_abandoned_flow_is_dropped() {
         };
         ids.push(flow_id);
     }
-    assert_eq!(home.flows.progress().len(), 3);
+    assert_eq!(home.flows.in_progress(), 3);
     for id in &ids {
         assert_eq!(home.flows.abort(id), Ok(()));
         assert_eq!(home.flows.abort(id), Err(Error::UnknownFlow));
     }
-    assert!(home.flows.progress().is_empty());
+    assert_eq!(home.flows.in_progress(), 0);
     assert_eq!(home.flows.flows.lock().capacity(), 0);
     // An answer that comes after the dialog closed finds no flow.
     assert_eq!(
@@ -616,10 +622,11 @@ async fn a_command_in_flight_writes_nothing_after_removal() {
 }
 
 /// A delete that comes while the entry's first setup is still asking the
-/// API stops it: the flow's reply comes back, nothing of the entry is left
-/// and nothing runs.
+/// API waits for that attempt, as HA's removal waits on the entry's setup
+/// lock: the flow's reply says what the setup made (a loaded entry), and
+/// only then is the entry removed.
 #[tokio::test]
-async fn removing_an_entry_during_its_setup_stops_the_setup() {
+async fn removing_an_entry_during_its_setup_waits_for_the_setup() {
     let home = home().await;
     let FlowResult::Form { flow_id, .. } = home
         .flows
@@ -656,17 +663,46 @@ async fn removing_an_entry_during_its_setup_stops_the_setup() {
         .as_str()
         .unwrap()
         .to_owned();
-    assert_eq!(home.flows.remove_entry(&id).await, Some(false));
+    let removal = {
+        let (flows, id) = (home.flows.clone(), id.clone());
+        tokio::spawn(async move { flows.remove_entry(&id).await })
+    };
+    // The removal has nothing to do but wait: the entry stays, in setup.
+    for _ in 0..50 {
+        tokio::task::yield_now().await;
+    }
+    assert!(
+        !removal.is_finished(),
+        "the removal didn't wait for the setup"
+    );
+    assert_eq!(
+        home.entries.runtime(&id).map(|r| r.state),
+        Some(EntryState::SetupInProgress)
+    );
+    // The API answers from here on, and the setup ends.
+    *home.api.hold.lock() = None;
     hold.notify_one();
-    // The flow's request ends instead of waiting for a setup that is gone.
     let result = tokio::time::timeout(std::time::Duration::from_secs(5), answer)
         .await
         .expect("the flow's reply never came")
+        .unwrap()
         .unwrap();
-    assert!(matches!(result, Ok(FlowResult::CreateEntry { .. })));
+    // The reply is of the entry as its setup left it, though it may be
+    // gone by the time the reply is read.
+    let FlowResult::CreateEntry { runtime, entry, .. } = result else {
+        panic!("no entry");
+    };
+    assert_eq!(entry["entry_id"], json!(id));
+    let runtime = runtime.expect("the setup's state");
+    assert_eq!(
+        (runtime.state, runtime.integration_loaded),
+        (EntryState::Loaded, true)
+    );
+    assert_eq!(removal.await.unwrap(), Some(false));
     assert_eq!(home.entries.list(), Some(Vec::new()));
     assert_eq!(home.entries.runtime(&id), None);
     assert_eq!(home.flows.tasks(), 0);
+    assert_eq!(home.flows.setups.lock().capacity(), 0);
     let snap = home.registry.snapshot();
     assert!(snap.devices.is_empty() && snap.entities.is_empty());
     assert!(home.hass.states().all().is_empty());
@@ -907,7 +943,8 @@ async fn removing_a_disabled_entry_needs_no_restart() {
         },
         started.tasks,
         None,
-    );
+    )
+    .unwrap();
     assert_eq!(flows.remove_entry(&id).await, Some(false));
     assert!(hass.states().all().is_empty());
     assert!(registry.snapshot().entities.is_empty());
@@ -936,7 +973,8 @@ async fn removing_a_companion_app_entry_stops_its_webhook() {
         Endpoints::default(),
         Vec::new(),
         Some(app.clone()),
-    );
+    )
+    .unwrap();
     assert_eq!(flows.remove_entry(&id).await, Some(false));
     assert!(!matches!(app.webhook(WEBHOOK), Webhook::Registered(_)));
     assert!(app.is_empty());
@@ -999,4 +1037,355 @@ async fn a_restart_keeps_the_entity_ids() {
             assert!(!name.ends_with("registry_updated"), "{name}");
         }
     }
+}
+
+/// The three stores on disk, as a restart reads them.
+struct Disk {
+    dir: std::path::PathBuf,
+}
+
+impl Disk {
+    fn new(name: &str) -> Self {
+        let dir = std::env::temp_dir().join(format!("hars-flow-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join(".storage")).unwrap();
+        Self { dir }
+    }
+
+    /// `hars` started on the directory: its entries, registry and flows
+    /// (`None` when they aren't offered), with the entries started.
+    fn start(
+        &self,
+        hass: &Hass,
+        base: &str,
+    ) -> (Arc<ConfigEntries>, Arc<Registry>, Option<Arc<Manager>>) {
+        let entries = ConfigEntries::load(hass, &self.dir);
+        let loaded = ha_registry::Registries::load(&self.dir).unwrap();
+        let registry = Registry::new(hass, &self.dir, loaded);
+        let lookup = entries.clone();
+        registry.set_entry_lookup(Arc::new(move |id: &str| lookup.info(id)));
+        let endpoints = Endpoints {
+            switchbot: base.to_owned(),
+        };
+        let stored = entries.list();
+        let started = crate::start(
+            hass,
+            registry.clone().into(),
+            stored.as_deref(),
+            Profiles::default(),
+            &endpoints,
+        );
+        let flows = Manager::new(
+            hass,
+            entries.clone(),
+            started.components,
+            endpoints,
+            started.tasks,
+            None,
+        );
+        (entries, registry, flows)
+    }
+
+    fn file(&self, key: &str) -> String {
+        std::fs::read_to_string(self.dir.join(".storage").join(key)).unwrap()
+    }
+}
+
+impl Drop for Disk {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.dir);
+    }
+}
+
+/// What a flow adds and what a removal takes away reach all three stores:
+/// after each, the files are flushed and read again as a restart reads
+/// them, and the entry, its devices and its entities agree.
+#[tokio::test]
+async fn a_restart_from_disk_finds_what_a_flow_and_a_removal_left() {
+    let disk = Disk::new("stores");
+    let (base, _api) = fake().await;
+    let hass = Hass::new();
+    let (entries, registry, flows) = disk.start(&hass, &base);
+    let flows = flows.expect("new stores can be written");
+    let FlowResult::Form { flow_id, .. } =
+        flows.init("switchbot_cloud", SOURCE_USER).await.unwrap()
+    else {
+        panic!("no form");
+    };
+    let id = entry_id(&flows.configure(&flow_id, credentials(TOKEN)).await.unwrap());
+    entries.flush().await;
+    registry.flush().await;
+
+    // A restart: the entry starts from the files, with the same entities.
+    let hass = Hass::new();
+    let (entries, registry, flows) = disk.start(&hass, &base);
+    hass.setups_done().await;
+    assert_eq!(entries.list().unwrap().len(), 1);
+    assert_eq!(entries.list().unwrap()[0]["entry_id"], json!(id));
+    let snap = registry.snapshot();
+    assert_eq!((snap.devices.len(), snap.entities.len()), (3, 6));
+    assert!(
+        snap.entities
+            .iter()
+            .all(|e| e.config_entry_id.as_deref() == Some(id.as_str()))
+    );
+    for (entity_id, s) in fresh()["states"].as_object().unwrap() {
+        assert_eq!(state(&hass, entity_id), *s, "{entity_id}");
+    }
+    // Removed, flushed and read again: nothing points at the entry.
+    let flows = flows.expect("its stores can be written");
+    assert_eq!(flows.remove_entry(&id).await, Some(false));
+    entries.flush().await;
+    registry.flush().await;
+    let hass = Hass::new();
+    let (entries, registry, _) = disk.start(&hass, &base);
+    assert_eq!(entries.list(), Some(Vec::new()));
+    let snap = registry.snapshot();
+    assert!(snap.devices.is_empty() && snap.entities.is_empty());
+    assert!(
+        !disk
+            .file("core.entity_registry")
+            .contains(&format!("\"config_entry_id\":\"{id}\""))
+    );
+}
+
+/// A registry file of another minor version is never overwritten, so
+/// what a removal (or a flow) changed in it would be lost at a restart
+/// while the entry's own file was saved: the devices and entities would
+/// come back pointing at an entry that is gone. So neither is offered.
+#[tokio::test]
+async fn flows_and_removal_need_all_three_stores_writable() {
+    for key in ["core.entity_registry", "core.device_registry"] {
+        let disk = Disk::new(key);
+        let (base, _api) = fake().await;
+        let hass = Hass::new();
+        let (entries, registry, flows) = disk.start(&hass, &base);
+        let flows = flows.unwrap();
+        let FlowResult::Form { flow_id, .. } =
+            flows.init("switchbot_cloud", SOURCE_USER).await.unwrap()
+        else {
+            panic!("no form");
+        };
+        let id = entry_id(&flows.configure(&flow_id, credentials(TOKEN)).await.unwrap());
+        entries.flush().await;
+        registry.flush().await;
+        // The same install, its registry file as an older release left it.
+        let text = disk.file(key);
+        let minor = text
+            .lines()
+            .find_map(|l| l.trim().strip_prefix("\"minor_version\": "))
+            .and_then(|v| v.trim_end_matches(',').parse::<u32>().ok())
+            .unwrap();
+        let older = text.replacen(
+            &format!("\"minor_version\": {minor}"),
+            &format!("\"minor_version\": {}", minor - 1),
+            1,
+        );
+        std::fs::write(disk.dir.join(".storage").join(key), &older).unwrap();
+
+        let hass = Hass::new();
+        let (entries, registry, flows) = disk.start(&hass, &base);
+        assert_eq!(registry.read_only(), Some(key));
+        assert!(flows.is_none(), "{key}: flows and removal were offered");
+        // Nothing can have been half removed: the three files still agree.
+        hass.setups_done().await;
+        entries.flush().await;
+        registry.flush().await;
+        let hass = Hass::new();
+        let (entries, registry, _) = disk.start(&hass, &base);
+        assert_eq!(entries.list().unwrap()[0]["entry_id"], json!(id));
+        assert_eq!(registry.snapshot().entities.len(), 6);
+        assert_eq!(disk.file(key), older, "{key} was overwritten");
+    }
+}
+
+/// An account that was disabled, its devices and entities with it
+/// (`disabled_by: config_entry`), then a second account that lists the
+/// same devices: the rows become the second account's and are enabled, as
+/// in HA (`switchbot_cloud/vectors/disabled_account.json`: the stores
+/// before and after).
+#[tokio::test]
+async fn an_enabled_account_takes_over_a_disabled_ones_devices() {
+    let vector: Value = serde_json::from_str(include_str!(
+        "../switchbot_cloud/vectors/disabled_account.json"
+    ))
+    .unwrap();
+    let before = &vector["before"];
+    let stored: Vec<Map<String, Value>> =
+        serde_json::from_value(before["entries"].clone()).unwrap();
+    assert_eq!(stored[0]["disabled_by"], "user");
+    let rows = ha_registry::Registries {
+        devices: serde_json::from_value(before["devices"].clone()).unwrap(),
+        entities: serde_json::from_value(before["entities"].clone()).unwrap(),
+        ..Default::default()
+    };
+    assert!(
+        rows.entities
+            .iter()
+            .all(|e| e.disabled_by.as_deref() == Some("config_entry"))
+    );
+    let hass = Hass::new();
+    let (base, _api) = fake().await;
+    let registry = Registry::in_memory(&hass, rows);
+    let entries = ConfigEntries::in_memory(&hass, stored.clone());
+    let lookup = entries.clone();
+    registry.set_entry_lookup(Arc::new(move |id: &str| lookup.info(id)));
+    let endpoints = Endpoints { switchbot: base };
+    let started = crate::start(
+        &hass,
+        registry.clone().into(),
+        Some(&stored),
+        Profiles::default(),
+        &endpoints,
+    );
+    assert!(started.tasks.is_empty(), "a disabled entry isn't started");
+    let flows = Manager::new(
+        &hass,
+        entries.clone(),
+        started.components,
+        endpoints,
+        started.tasks,
+        None,
+    )
+    .unwrap();
+    let FlowResult::Form { flow_id, .. } =
+        flows.init("switchbot_cloud", SOURCE_USER).await.unwrap()
+    else {
+        panic!("no form");
+    };
+    let second = entry_id(
+        &flows
+            .configure(&flow_id, credentials("token-two"))
+            .await
+            .unwrap(),
+    );
+    let after = &vector["after"];
+    let (devices, entities) = rows_as(&registry, &second, "<entry:2>");
+    assert_eq!(json!(devices), after["devices"]);
+    assert_eq!(json!(entities), after["entities"]);
+    for (entity_id, s) in after["states"].as_object().unwrap() {
+        assert_eq!(state(&hass, entity_id), *s, "{entity_id}");
+    }
+}
+
+/// Start-up's placeholder pass and a removal at the same time: the pass
+/// is writing `unavailable` for every registered entity nothing provides
+/// when a disabled entry is deleted. Whichever comes first, no state is
+/// left for a row that is gone.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_delete_during_the_placeholder_pass_leaves_no_state() {
+    for _ in 0..5 {
+        let hass = Hass::new();
+        // Many rows of an entry that stays, then one of the entry that
+        // goes: the pass is still busy with the first when the removal
+        // has come and gone.
+        let row = |i: usize, entry: &str| {
+            Arc::new(ha_registry::Entity {
+                entity_id: format!("sensor.row_{i}"),
+                platform: "switchbot_cloud".into(),
+                unique_id: Some(json!(format!("row-{i}"))),
+                config_entry_id: Some(entry.to_owned()),
+                ..Default::default()
+            })
+        };
+        let mut entities: Vec<_> = (0..4000).map(|i| row(i, "stays")).collect();
+        entities.push(row(4000, "goes"));
+        let registry = Registry::in_memory(
+            &hass,
+            ha_registry::Registries {
+                entities,
+                ..Default::default()
+            },
+        );
+        let entry = |id: &str| {
+            json!({"entry_id": id, "domain": "switchbot_cloud", "disabled_by": "user",
+                   "data": {}, "title": id})
+            .as_object()
+            .unwrap()
+            .clone()
+        };
+        let entries = ConfigEntries::in_memory(&hass, vec![entry("stays"), entry("goes")]);
+        let flows = Manager::new(
+            &hass,
+            entries,
+            Components::new(&hass, registry.clone(), Profiles::default()),
+            Endpoints::default(),
+            Vec::new(),
+            None,
+        )
+        .unwrap();
+        let pass = {
+            let (hass, registry) = (hass.clone(), registry.clone());
+            tokio::task::spawn_blocking(move || registry.write_unavailable_states(&hass))
+        };
+        // The pass has begun (it has read the rows and written some).
+        while hass.states().all().is_empty() {
+            std::hint::spin_loop();
+        }
+        assert_eq!(flows.remove_entry("goes").await, Some(false));
+        pass.await.unwrap();
+        let gone = EntityId::parse("sensor.row_4000").unwrap();
+        assert!(
+            hass.states().get(&gone).is_none(),
+            "a placeholder was written for a row that was removed"
+        );
+        assert_eq!(hass.states().all().len(), 4000);
+    }
+}
+
+/// Flows nobody answers don't pile up: at most `MAX_FLOWS` are kept (the
+/// longest untouched goes when one more starts), one left alone for
+/// `EXPIRES` goes when the next starts, and the list of flows no user
+/// started is made without copying the others.
+#[tokio::test(start_paused = true)]
+async fn abandoned_flows_are_capped_and_expire() {
+    let home = home().await;
+    let start = || async {
+        let FlowResult::Form { flow_id, .. } = home
+            .flows
+            .init("switchbot_cloud", SOURCE_USER)
+            .await
+            .unwrap()
+        else {
+            panic!("no form");
+        };
+        // Each a moment after the last, so "longest untouched" is clear.
+        tokio::time::advance(Duration::from_secs(1)).await;
+        flow_id
+    };
+    let mut ids = Vec::new();
+    for _ in 0..MAX_FLOWS {
+        ids.push(start().await);
+    }
+    assert_eq!(home.flows.in_progress(), MAX_FLOWS);
+    // The first is shown again: it is no longer the longest untouched.
+    assert!(home.flows.configure(&ids[0], None).await.is_ok());
+    let newest = start().await;
+    assert_eq!(home.flows.in_progress(), MAX_FLOWS);
+    assert!(home.flows.configure(&ids[0], None).await.is_ok());
+    assert_eq!(
+        home.flows.configure(&ids[1], None).await,
+        Err(Error::UnknownFlow),
+        "the longest untouched flow was kept"
+    );
+    assert!(home.flows.configure(&newest, None).await.is_ok());
+    // A user's flows are not what `config_entries/flow/progress` lists.
+    assert!(home.flows.progress().is_empty());
+
+    // An hour on, the next flow to start finds the rest expired.
+    tokio::time::advance(EXPIRES).await;
+    assert_eq!(
+        home.flows.in_progress(),
+        MAX_FLOWS,
+        "nothing wakes to prune"
+    );
+    let fresh = start().await;
+    assert_eq!(home.flows.in_progress(), 1);
+    assert!(home.flows.configure(&fresh, None).await.is_ok());
+    assert_eq!(
+        home.flows.configure(&newest, None).await,
+        Err(Error::UnknownFlow)
+    );
+    home.flows.abort(&fresh).unwrap();
+    assert_eq!(home.flows.flows.lock().capacity(), 0);
 }

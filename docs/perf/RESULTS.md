@@ -423,10 +423,14 @@ the [budgets](../PERF.md#budgets).
 
 Adding an integration from the UI: the flow engine and SwitchBot Cloud's
 flow, HA's flow views and four WebSocket commands, the registry rows a
-set-up makes, removing an entry. Nothing in it runs or holds memory while
-no flow is open: no timer, no task and no cache (the list of flows in
-progress is empty and unallocated; a subscriber's listener exists only
-while its WebSocket subscription does). A fresh install, as CI's gate
+set-up makes, removing an entry. Nothing in it runs or wakes while no flow
+is open: no timer and no task. No memory is held either once every flow
+was answered or its dialog closed (the list of flows in progress is then
+empty and unallocated; a subscriber's listener exists only while its
+WebSocket subscription does). A flow whose client vanished without
+deleting it stays in memory (its id, step and form schema, a few hundred
+bytes) until the next flow starts an hour or more later; at most 16 are
+kept. A fresh install, as CI's gate
 measures it (`scripts/perf-docker.sh 15 60`, Docker on an Apple-silicon
 Mac, linux/aarch64), each row one run:
 

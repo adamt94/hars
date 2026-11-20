@@ -23,14 +23,22 @@
 //!   `mobile_app`) is removed as HA removes one that can't unload: the
 //!   entry and its registry rows go, and its entities stay until a
 //!   restart (`require_restart`).
-//! - A removal that comes while the entry's first setup still runs stops
-//!   that setup and lets the flow's reply go; HA's waits for the setup
-//!   (they share the entry's `setup_lock`).
 //!
-//! Nothing here runs, wakes or holds memory while no flow is open: a flow
-//! lives from its first form until it is answered or deleted (the dialog
-//! closing deletes it), with no timer. As in HA, a flow whose client
-//! vanishes without deleting it stays until the next restart.
+//! - A removal that comes while the entry's first setup still runs waits
+//!   for that attempt, as HA's does (they share the entry's `setup_lock`).
+//! - A flow nobody answers doesn't stay for ever. One left alone for
+//!   [`EXPIRES`] is dropped when the next flow starts, and at most
+//!   [`MAX_FLOWS`] are kept (the one longest untouched goes first). HA
+//!   keeps every abandoned form until it restarts; `hars` bounds what a
+//!   client that vanished (or an admin's script) can leave in memory.
+//! - Flows are offered only when the entries and both registries can be
+//!   saved ([`Manager::new`]).
+//!
+//! Nothing here runs or wakes while no flow is open: a flow lives from its
+//! first form until it is answered or deleted (the dialog closing deletes
+//! it), with no timer. A flow whose client vanished without deleting it
+//! is the one thing left in memory (its id, step and schema), until the
+//! next flow starts after it has expired.
 
 use crate::components::Components;
 use crate::config_entries::{ConfigEntries, EntryState, Status};
@@ -41,7 +49,16 @@ use serde_json::{Map, Value, json};
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::task::JoinHandle;
+use tokio::time::Instant;
+
+/// How many flows are kept in progress. Starting one more drops the one
+/// longest untouched.
+pub const MAX_FLOWS: usize = 16;
+/// How long a flow nobody touches is kept. It is dropped when the next
+/// flow starts, not by a timer.
+pub const EXPIRES: Duration = Duration::from_secs(60 * 60);
 
 /// The flow handlers, by domain (`HANDLERS` in `config_entries.py`).
 pub const HANDLERS: &[&Handler] = &[&switchbot_cloud::config_flow::HANDLER];
@@ -250,6 +267,9 @@ pub enum FlowResult {
         minor_version: u32,
         /// The entry as stored, after its first setup attempt.
         entry: Map<String, Value>,
+        /// Where that attempt left it: read before anything else (a
+        /// removal that waited for the attempt) could change it.
+        runtime: Option<crate::config_entries::Runtime>,
     },
     Abort {
         flow_id: String,
@@ -289,6 +309,10 @@ struct Progress {
     /// `cur_step`: the form being shown.
     step_id: &'static str,
     schema: Option<Vec<Field>>,
+    /// The context's `source`.
+    source: &'static str,
+    /// When a request last reached it.
+    touched: Instant,
     /// Held while one of its steps runs.
     flow: Arc<tokio::sync::Mutex<Box<dyn Flow>>>,
 }
@@ -308,10 +332,31 @@ pub struct Manager {
     tasks: Mutex<Vec<(String, JoinHandle<()>)>>,
     /// The companion apps' registrations, whose entries can be stopped.
     mobile_app: Option<Arc<crate::mobile_app::MobileApp>>,
-    /// HA's `entry.setup_lock`, for all entries: an entry is added with
-    /// its task, or removed, one at a time, so a removal never misses a
-    /// task that is about to start.
+    /// An entry is added with its task, or removed, one at a time, so a
+    /// removal never misses a task that is about to start.
     lifecycle: tokio::sync::Mutex<()>,
+    /// HA's `entry.setup_lock`, for the entries whose first setup attempt
+    /// is running: a removal waits for it. Empty otherwise.
+    setups: Mutex<Vec<(String, Arc<tokio::sync::Mutex<()>>)>>,
+}
+
+/// A first setup attempt in flight: its lock is held, and leaves the
+/// manager's list when this is dropped (the attempt ended, or the flow's
+/// request went away).
+struct Attempt<'a> {
+    manager: &'a Manager,
+    entry_id: String,
+    _held: tokio::sync::OwnedMutexGuard<()>,
+}
+
+impl Drop for Attempt<'_> {
+    fn drop(&mut self) {
+        let mut setups = self.manager.setups.lock();
+        setups.retain(|(id, _)| *id != self.entry_id);
+        if setups.is_empty() {
+            *setups = Vec::new();
+        }
+    }
 }
 
 /// What a request does to a flow.
@@ -331,6 +376,13 @@ impl std::fmt::Debug for Manager {
 impl Manager {
     /// `components` are the entity components start-up made, and `tasks`
     /// the entries it started that can be stopped ([`crate::Started`]).
+    ///
+    /// `None`, with a warning, when what a flow or a removal changes
+    /// couldn't all be saved: `core.config_entries`, `core.entity_registry`
+    /// or `core.device_registry` is another version's file, which `hars`
+    /// never overwrites. An entry added then would be gone at a restart,
+    /// and one removed would leave its devices and entities behind,
+    /// pointing at an entry that no longer exists.
     pub fn new(
         hass: &Hass,
         entries: Arc<ConfigEntries>,
@@ -338,8 +390,19 @@ impl Manager {
         endpoints: Endpoints,
         tasks: Vec<(String, JoinHandle<()>)>,
         mobile_app: Option<Arc<crate::mobile_app::MobileApp>>,
-    ) -> Arc<Self> {
-        Arc::new(Self {
+    ) -> Option<Arc<Self>> {
+        let unwritable = match components.registry().and_then(|r| r.read_only()) {
+            Some(key) => Some(key),
+            None if entries.read_only() => Some(crate::config_entries::KEY),
+            None => None,
+        };
+        if let Some(key) = unwritable {
+            tracing::warn!(
+                "{key} can't be written (it is another version's file): integrations can't be added or removed from the UI"
+            );
+            return None;
+        }
+        Some(Arc::new(Self {
             hass: hass.clone(),
             entries,
             components,
@@ -349,7 +412,8 @@ impl Manager {
             tasks: Mutex::new(tasks),
             mobile_app,
             lifecycle: tokio::sync::Mutex::new(()),
-        })
+            setups: Mutex::new(Vec::new()),
+        }))
     }
 
     /// The domains whose entries were started here.
@@ -357,18 +421,26 @@ impl Manager {
         self.started.lock().clone()
     }
 
-    /// `async_progress`.
+    /// What `config_entries/flow/progress` lists: the flows in progress
+    /// that no user started. A user's own flows (all there are today) are
+    /// passed over where they are, without being copied.
     pub fn progress(&self) -> Vec<InProgress> {
         self.flows
             .lock()
             .iter()
+            .filter(|p| ![SOURCE_USER, SOURCE_RECONFIGURE].contains(&p.source))
             .map(|p| InProgress {
                 flow_id: p.flow_id.clone(),
                 handler: p.handler.domain,
-                source: SOURCE_USER,
+                source: p.source,
                 step_id: p.step_id,
             })
             .collect()
+    }
+
+    /// How many flows are in progress, whoever started them.
+    pub fn in_progress(&self) -> usize {
+        self.flows.lock().len()
     }
 
     /// `async_init`: a new flow for `handler`, at its source's step.
@@ -386,14 +458,28 @@ impl Manager {
         };
         // `ulid_now()`.
         let flow_id = ha_core::ContextId::at(self.hass.clock().now()).to_string();
-        self.flows.lock().push(Progress {
-            flow_id: flow_id.clone(),
-            handler,
-            unique_id: None,
-            step_id,
-            schema: None,
-            flow: Arc::new(tokio::sync::Mutex::new((handler.new)())),
-        });
+        {
+            let mut flows = self.flows.lock();
+            // Forms nobody came back to, and the longest untouched if
+            // there are still too many: checked here, when a flow starts,
+            // so nothing has to wake for it.
+            let now = Instant::now();
+            flows.retain(|p| now.duration_since(p.touched) < EXPIRES);
+            while flows.len() >= MAX_FLOWS {
+                let oldest = (0..flows.len()).min_by_key(|&i| flows[i].touched);
+                flows.remove(oldest.unwrap_or(0));
+            }
+            flows.push(Progress {
+                flow_id: flow_id.clone(),
+                handler,
+                unique_id: None,
+                step_id,
+                schema: None,
+                source,
+                touched: now,
+                flow: Arc::new(tokio::sync::Mutex::new((handler.new)())),
+            });
+        }
         self.step(&flow_id, Input::Show).await
     }
 
@@ -433,8 +519,10 @@ impl Manager {
         // ended the flow finds none, and asks its device or service nothing.
         let mut flow = flow.lock().await;
         let (handler, step_id, schema, mut unique_id) = {
-            let flows = self.flows.lock();
-            let p = &flows[find(&flows).ok_or(Error::UnknownFlow)?];
+            let mut flows = self.flows.lock();
+            let i = find(&flows).ok_or(Error::UnknownFlow)?;
+            let p = &mut flows[i];
+            p.touched = Instant::now();
             (p.handler, p.step_id, p.schema.clone(), p.unique_id.clone())
         };
         let input = match (input, schema) {
@@ -467,7 +555,7 @@ impl Manager {
             Step::CreateEntry { .. } => Some(self.lifecycle.lock().await),
             _ => None,
         };
-        let (title, entry) = {
+        let (title, entry, attempt) = {
             let mut flows = self.flows.lock();
             let Some(i) = find(&flows) else {
                 // Deleted while the step ran: `UnknownFlow`, unless the
@@ -523,8 +611,24 @@ impl Manager {
                     .new_entry(domain, SOURCE_USER, &title, unique_id.as_deref(), data);
             entry.insert("version".into(), json!(handler.version));
             entry.insert("minor_version".into(), json!(handler.minor_version));
+            // The entry's setup lock, taken before anyone can know the
+            // entry: a removal waits for the first attempt, as HA's does.
+            let entry_id = entry
+                .get("entry_id")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .to_owned();
+            let lock = Arc::new(tokio::sync::Mutex::new(()));
+            let attempt = lock.clone().try_lock_owned().ok().map(|held| {
+                self.setups.lock().push((entry_id.clone(), lock));
+                Attempt {
+                    manager: self,
+                    entry_id,
+                    _held: held,
+                }
+            });
             self.entries.add_tracked(entry.clone());
-            (title, entry)
+            (title, entry, attempt)
         };
         let entry_id = entry
             .get("entry_id")
@@ -539,22 +643,26 @@ impl Manager {
         // that out now, not when the entry's setup ends.
         drop(flow);
         // `async_add` awaits `async_setup`: the reply waits for the first
-        // setup attempt (or the entry's removal), so the entry's devices
-        // are there when it comes.
+        // setup attempt, so the entry's devices are there when it comes.
         if started {
             self.entries.setup_attempted(&entry_id).await;
         } else {
             self.entries
                 .set_state(&entry_id, EntryState::NotLoaded, None);
         }
-        Ok(FlowResult::CreateEntry {
+        // The reply is what the attempt left, read while its lock is still
+        // held: a removal waiting for it changes nothing before this.
+        let result = FlowResult::CreateEntry {
             flow_id: flow_id.to_owned(),
             handler: domain,
             title,
             version: handler.version,
             minor_version: handler.minor_version,
+            runtime: self.entries.runtime(&entry_id),
             entry: self.entries.get(&entry_id).unwrap_or(entry),
-        })
+        };
+        drop(attempt);
+        Ok(result)
     }
 
     /// `async_setup` for an entry made while running: start its
@@ -599,6 +707,19 @@ impl Manager {
     }
 
     async fn remove(&self, entry_id: &str) -> Option<bool> {
+        // `_async_remove` takes the entry's setup lock: an entry whose
+        // first setup attempt is running is removed once it has ended, and
+        // whoever added it has its answer.
+        let setup = {
+            let setups = self.setups.lock();
+            setups
+                .iter()
+                .find(|(id, _)| id == entry_id)
+                .map(|(_, lock)| lock.clone())
+        };
+        if let Some(setup) = setup {
+            drop(setup.lock().await);
+        }
         let _removing = self.lifecycle.lock().await;
         let entry = self.entries.get(entry_id)?;
         let task = {

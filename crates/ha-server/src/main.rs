@@ -197,18 +197,15 @@ async fn run(thp_disabled: std::io::Result<bool>) -> anyhow::Result<()> {
     );
     api_config.mobile_app = Some(std::sync::Arc::new(mobile_app));
     // The config flows a user starts from the UI, and the entries they add.
-    // Not offered when the entries can't be saved (the file is unreadable,
-    // or another version's): what a flow added would be gone at a restart.
-    api_config.flows = (!config_entries.read_only()).then(|| {
-        ha_integrations::flow::Manager::new(
-            &hass,
-            config_entries.clone(),
-            started.components,
-            endpoints,
-            started.tasks,
-            api_config.mobile_app.clone(),
-        )
-    });
+    // Not offered (`None`) when the entries or a registry can't be saved.
+    api_config.flows = ha_integrations::flow::Manager::new(
+        &hass,
+        config_entries.clone(),
+        started.components,
+        endpoints,
+        started.tasks,
+        api_config.mobile_app.clone(),
+    );
     // `configuration.yaml`'s automations (written now; triggers attach at
     // `homeassistant_started`).
     let automations = match config_yaml.as_ref() {
@@ -340,7 +337,7 @@ async fn run(thp_disabled: std::io::Result<bool>) -> anyhow::Result<()> {
         Some(signal) => tracing::info!("{signal} received during startup, stopping"),
         None => {
             hass.begin_start();
-            registry.snapshot().write_unavailable_states(&hass);
+            registry.write_unavailable_states(&hass);
             api_config.components.start(&hass);
             hass.finish_start();
             if let Some(a) = &automations {

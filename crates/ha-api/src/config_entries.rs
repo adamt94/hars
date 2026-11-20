@@ -50,11 +50,17 @@ pub(crate) fn routes(shared: Shared) -> Router {
         .route(
             FLOW_ID,
             get(show)
+                // HA's view has no `head`, and axum would answer one with
+                // `get`'s handler.
+                .head(|| async { not_allowed("DELETE,GET,OPTIONS,POST") })
                 .post(answer)
                 .delete(abort)
                 .fallback(|| async { not_allowed("DELETE,GET,OPTIONS,POST") }),
         )
-        .route(HANDLERS, get(handlers))
+        .route(
+            HANDLERS,
+            get(handlers).head(|| async { not_allowed("GET,OPTIONS") }),
+        )
         .route(ENTRY_ID, delete(remove_entry))
         .with_state(Views { shared, flows })
 }
@@ -114,6 +120,7 @@ fn result_json(views: &Views, result: FlowResult) -> Value {
             version,
             minor_version,
             entry,
+            runtime,
         } => json!({
             "type": "create_entry",
             "flow_id": flow_id,
@@ -125,7 +132,11 @@ fn result_json(views: &Views, result: FlowResult) -> Value {
             "options": {},
             "subentries": [],
             "version": version,
-            "result": crate::ws::config_entries::entry_json(&views.shared.config, &entry),
+            "result": crate::ws::config_entries::entry_json_at(
+                &views.shared.config,
+                &entry,
+                runtime,
+            ),
         }),
         FlowResult::Abort {
             flow_id,

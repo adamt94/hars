@@ -27,7 +27,9 @@ sends its steps over real HTTP and a real WebSocket. It writes
   two_accounts.json: the same after the `duplicate` scenario, where a
   second account lists the same devices; retry.json: the entry's changes
   (`config_entries/subscribe`) in the `retry_recovers` scenario, which
-  waits 6.5 s of real time for HA's retry;
+  waits 6.5 s of real time for HA's retry; disabled_account.json: the
+  entries and registry rows as stored after an account is disabled, and
+  after a second account that lists the same devices is added;
 - crates/ha-api/src/ws/vectors/integration_descriptions.json:
   `integration/descriptions`' entries for the integrations in `KNOWN`
   (looked up inside their brand), and the reply's other keys.
@@ -88,6 +90,11 @@ def api(mode):
 
 def handlers(query=""):
     return {"handlers": query}
+
+
+def snapshot(name):
+    """Keep the entries and the registries as stored now, under `name`."""
+    return {"snapshot": name}
 
 
 def wait(seconds):
@@ -256,6 +263,19 @@ SCENARIOS = [
         SUBSCRIBE,
         [START, api("status_down"), http("POST", FLOW + "/<flow:1>", GOOD), api("ok"),
          wait(6.5), ENTRIES],
+    ),
+    (
+        "disabled_account",
+        "An account that was disabled (its devices and entities with it), then a "
+        "second account that lists the same devices: they become the second "
+        "account's, enabled. Written to switchbot_cloud/vectors/disabled_account.json "
+        "as the stores before and after, not to flow.json (hars has no "
+        "`config_entries/disable` yet).",
+        [],
+        [START, http("POST", FLOW + "/<flow:1>", GOOD),
+         ws({"type": "config_entries/disable", "entry_id": "<entry:1>",
+             "disabled_by": "user"}),
+         snapshot("before"), START, http("POST", FLOW + "/<flow:2>", OTHER)],
     ),
     (
         "remove",
@@ -443,6 +463,7 @@ async def run(subscriptions, steps):
             refresh = await hass.auth.async_create_refresh_token(user, CLIENT)
             tokens[name] = hass.auth.async_create_access_token(refresh)
         out = []
+        snapshots = {}
         async with aiohttp.ClientSession() as session:
 
             async def connect(who):
@@ -496,7 +517,26 @@ async def run(subscriptions, steps):
                         got.append({"sub": name, "event": m["event"]})
                 return got
 
+            from homeassistant.helpers.json import json_dumps as dumps
+
+            def stores():
+                def stored(registry):
+                    return json.loads(dumps(registry._data_to_save()))  # noqa: SLF001
+
+                return {
+                    "entries": stored(hass.config_entries)["entries"],
+                    "devices": sorted(stored(dr.async_get(hass))["devices"],
+                                      key=lambda d: json.dumps(d["identifiers"])),
+                    "entities": sorted(stored(er.async_get(hass))["entities"],
+                                       key=lambda e: e["entity_id"]),
+                }
+
             for step in steps:
+                if "snapshot" in step:
+                    for _ in range(3):
+                        await hass.async_block_till_done()
+                    snapshots[step["snapshot"]] = stores()
+                    continue
                 if "api" in step:
                     fake.mode = step["api"]
                     switchbot_api._API_HOST = fake.host()  # noqa: SLF001
@@ -518,7 +558,7 @@ async def run(subscriptions, steps):
                     continue
                 if "ws" in step:
                     who, msg = step["ws"]["user"], step["ws"]["msg"]
-                    replies = await call(who, msg)
+                    replies = await call(who, json.loads(ids.real(json.dumps(msg))))
                     ids.learn(replies)
                     for reply in replies:
                         reply.pop("id")
@@ -585,6 +625,7 @@ async def run(subscriptions, steps):
             if entities.async_get(s.entity_id)
         }
         result = {
+            "snapshots": snapshots,
             "subscriptions": opened,
             "steps": out,
             "entries": stored(hass.config_entries)["entries"],
@@ -648,6 +689,12 @@ async def main():
         if name == "duplicate":
             # Two accounts that list the same devices.
             write(SWITCHBOT / "two_accounts.json", rows)
+        if name == "disabled_account":
+            write(SWITCHBOT / "disabled_account.json",
+                  {"doc": doc, "before": result["snapshots"]["before"],
+                   "after": {"entries": result["entries"], **rows}})
+            continue
+        result.pop("snapshots")
         if name == "retry_recovers":
             changes = [
                 {"type": change["type"], "state": change["entry"]["state"],
