@@ -588,8 +588,10 @@ and to the diagram above in the same pull request.
 
 - **Feature-gating integrations.** All integrations are compiled in today
   and there are no Cargo features. [PERF.md](PERF.md#rules) says when that
-  changes. Third-party integrations (WASM or out-of-process) are not
-  planned before the MVP.
+  changes. Third-party integrations run out-of-process over NDJSON JSON-RPC
+  (`ha_integrations::plugin`, [ADR 0011](adr/0011-plugin-system.md)): static
+  binaries over `stdio` or sidecar containers over Unix sockets, managed via
+  the built-in `hars_plugins` config flow or `hars plugin` CLI.
 - **State map.** One `RwLock` today. Sharded or lock-free maps (`papaya`,
   `scc`) are worth a benchmark once a realistic many-writer workload exists.
 - **Attribute storage.** `serde_json::Map` today; a compact typed
