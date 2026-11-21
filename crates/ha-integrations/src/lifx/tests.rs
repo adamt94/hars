@@ -567,6 +567,99 @@ async fn a_command_ends_when_its_entry_is_removed() {
     // A press of a button it still holds reaches nothing either.
     LifxButton(b.clone(), 0).press().await.unwrap();
     assert_eq!(f.got.lock().len(), sent);
+    // And its socket is closed, though the bulb is still held: its port
+    // is free again.
+    tokio::time::sleep(Duration::from_millis(50)).await;
+    assert!(std::net::UdpSocket::bind(("0.0.0.0", b.conn.local().port())).is_ok());
+}
+
+/// A bulb's address may be IPv6, as aiolifx's endpoint takes it.
+#[tokio::test]
+async fn a_bulb_at_an_ipv6_address_is_reached() {
+    let Ok(bulb) = tokio::net::UdpSocket::bind("[::1]:0").await else {
+        return; // No IPv6 loopback here.
+    };
+    let port = bulb.local_addr().unwrap().port();
+    let conn = Conn::open("::1", port).await.unwrap();
+    conn.fire_and_forget(ty::SET_REBOOT).await;
+    let mut buf = [0u8; 64];
+    let got = tokio::time::timeout(Duration::from_secs(2), bulb.recv(&mut buf)).await;
+    let n = got.unwrap().unwrap();
+    assert_eq!(proto::decode(&buf[..n]).unwrap().0.ty, ty::SET_REBOOT);
+}
+
+/// A message that a reply of another kind ended (aiolifx drops it from
+/// what it waits for) isn't sent again by aiolifx; HA's next try sends a
+/// new one.
+#[tokio::test]
+async fn a_message_a_wrong_reply_ended_is_not_sent_again() {
+    let bulb = tokio::net::UdpSocket::bind("127.0.0.1:0").await.unwrap();
+    let port = bulb.local_addr().unwrap().port();
+    let got: Arc<Mutex<Vec<u8>>> = Arc::default();
+    let seqs = got.clone();
+    tokio::spawn(async move {
+        let mut buf = [0u8; 512];
+        while let Ok((n, from)) = bulb.recv_from(&mut buf).await {
+            let (h, _) = proto::decode(&buf[..n]).unwrap();
+            seqs.lock().push(h.seq);
+            // A `StateGroup` on the same sequence: not what was asked.
+            let wrong = Out {
+                source: h.source,
+                target: SERIAL,
+                seq: h.seq,
+                ack: false,
+                res: true,
+                ty: ty::STATE_GROUP,
+                payload: &[0; 56],
+            }
+            .encode();
+            let _ = bulb.send_to(&wrong, from).await;
+        }
+    });
+    let resend = conn::Resend {
+        every: Duration::from_millis(40),
+        sends: 3,
+    };
+    let conn = Conn::open_with("127.0.0.1", port, resend).await.unwrap();
+    let op = Op::get(ty::GET_HOST_FIRMWARE, ty::STATE_HOST_FIRMWARE);
+    let r = conn.execute(&[op], 2, Duration::from_millis(240)).await;
+    assert!(r.is_err());
+    // One send for each of HA's two tries, each its own sequence.
+    assert_eq!(*got.lock(), [1, 2]);
+}
+
+/// HA's coordinator refreshes on its interval only while an entity listens:
+/// a bulb whose entities are all disabled isn't polled after its set-up.
+#[tokio::test]
+async fn a_bulb_with_no_enabled_entity_is_not_polled() {
+    for disabled in [false, true] {
+        let f = fake_bulb(65535, [0, 0, 39321, 2700]).await;
+        let hass = Hass::new();
+        let mut registries = registries();
+        if disabled {
+            for row in &mut registries.entities {
+                let mut off = (**row).clone();
+                off.disabled_by = Some("user".into());
+                *row = Arc::new(off);
+            }
+        }
+        let components = Components::new(&hass, Arc::new(registries), Profiles::default());
+        let t = Timing {
+            poll: Duration::from_millis(50),
+            ..timing(false)
+        };
+        let found = connect("127.0.0.1", ("127.0.0.1", f.port), UID, t)
+            .await
+            .unwrap();
+        let (_b, coordinator) = bulb(&components, "Kitchen Light", "127.0.0.1", found, true, t);
+        tokio::time::sleep(Duration::from_millis(1000)).await;
+        coordinator.abort();
+        let polls = f.got.lock().iter().filter(|g| g.0 == ty::LIGHT_GET).count();
+        match disabled {
+            true => assert_eq!(polls, 1, "only set-up's"),
+            false => assert!(polls > 3, "{polls}"),
+        }
+    }
 }
 
 /// The broadcast's socket and a flow's socket to a bulb are gone when the
@@ -578,7 +671,7 @@ async fn a_flows_sockets_are_gone_when_its_step_answers() {
         broadcast: broadcast.local_addr().unwrap(),
         ..Where::default()
     };
-    let scan = tokio::spawn(async move { scan(&at, Duration::from_millis(100)).await });
+    let scan = tokio::spawn(async move { scan(&at, Duration::from_millis(100), None).await });
     let mut buf = [0u8; 64];
     let (n, from) = broadcast.recv_from(&mut buf).await.unwrap();
     let (h, _) = proto::decode(&buf[..n]).unwrap();

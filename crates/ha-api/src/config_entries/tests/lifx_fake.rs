@@ -239,6 +239,8 @@ impl LifxFake {
                 timing: lifx::Timing {
                     command_try: Duration::from_millis(40),
                     poll_try: Duration::from_millis(40),
+                    // As `lifx_flow.py` puts HA's own search off.
+                    rediscover_after: Duration::from_secs(3600),
                     ..lifx::Timing::HA
                 },
             },
@@ -294,6 +296,11 @@ impl LifxFake {
     pub fn set_product(&self, ip: &str, product: u32) {
         let bulb = self.bulbs.iter().find(|b| b.ip == ip).unwrap();
         bulb.state.lock().product = product;
+    }
+
+    /// What [`LifxFake::take`] would give, left there.
+    pub fn take_peek(&self) -> Vec<Value> {
+        self.frames.lock().clone()
     }
 
     pub fn take(&self) -> Vec<Value> {

@@ -87,7 +87,11 @@ struct Pending {
 }
 
 pub struct Conn {
-    sock: Arc<UdpSocket>,
+    /// Where datagrams are sent from: gone once stopped, so nothing is
+    /// sent after (a send and a stop take turns on it).
+    send: Mutex<Option<std::net::UdpSocket>>,
+    /// The socket's own address.
+    local: std::net::SocketAddr,
     source: u32,
     pub(super) seq: Mutex<u8>,
     /// The bulb's serial once known; all zeros (tagged) before.
@@ -106,23 +110,36 @@ impl Drop for Conn {
 }
 
 impl Conn {
-    /// A socket bound to an ephemeral port and connected to the bulb, as
-    /// HA's coordinator uses it.
+    /// A socket bound to an ephemeral port and connected to the bulb (an
+    /// IPv4 or IPv6 address, or a name, looked up as aiolifx's
+    /// `create_datagram_endpoint` looks it up), as HA's coordinator uses it.
     pub async fn open(host: &str, port: u16) -> std::io::Result<Self> {
         Self::open_with(host, port, Resend::COORDINATOR).await
     }
 
     /// [`Conn::open`], with aiolifx sending each message as `resend` says.
     pub async fn open_with(host: &str, port: u16, resend: Resend) -> std::io::Result<Self> {
-        let sock = UdpSocket::bind("0.0.0.0:0").await?;
-        sock.connect((host, port)).await?;
-        let sock = Arc::new(sock);
+        let peer = tokio::net::lookup_host((host, port))
+            .await?
+            .next()
+            .ok_or_else(|| std::io::Error::other("no address"))?;
+        let local: std::net::SocketAddr = match peer {
+            std::net::SocketAddr::V4(_) => ([0, 0, 0, 0], 0).into(),
+            std::net::SocketAddr::V6(_) => (std::net::Ipv6Addr::UNSPECIFIED, 0).into(),
+        };
+        let std_sock = std::net::UdpSocket::bind(local)?;
+        std_sock.connect(peer)?;
+        std_sock.set_nonblocking(true)?;
+        let send = std_sock.try_clone()?;
+        let local = std_sock.local_addr()?;
+        let sock = Arc::new(UdpSocket::from_std(std_sock)?);
         // A random source, never 0 (aiolifx's may be; unobservable).
         let source = rand::random_range(1..=u32::MAX);
         let pending: Arc<Mutex<HashMap<u8, Pending>>> = Arc::default();
         let reader = tokio::spawn(read(sock.clone(), source, pending.clone()));
         Ok(Self {
-            sock,
+            send: Mutex::new(Some(send)),
+            local,
             source,
             seq: Mutex::new(0),
             target: Mutex::new([0; 6]),
@@ -143,15 +160,30 @@ impl Conn {
     /// nothing is sent from here on.
     pub fn stop(&self) {
         self.stopped.send_replace(true);
+        // The socket closes: the reader ends, and nothing is sent after.
+        self.send.lock().take();
+        self.reader.abort();
+    }
+
+    /// Send a datagram, unless stopped. A send error is a lost datagram.
+    fn send(&self, frame: &[u8]) {
+        if let Some(sock) = self.send.lock().as_ref() {
+            let _ = sock.send(frame);
+        }
     }
 
     fn is_stopped(&self) -> bool {
         *self.stopped.borrow()
     }
 
+    /// The socket's own address.
+    pub fn local(&self) -> std::net::SocketAddr {
+        self.local
+    }
+
     /// The address the socket is connected to.
     pub fn peer(&self) -> Option<std::net::SocketAddr> {
-        self.sock.peer_addr().ok()
+        self.send.lock().as_ref()?.peer_addr().ok()
     }
 
     pub fn set_target(&self, serial: [u8; 6]) {
@@ -254,10 +286,16 @@ impl Conn {
             // aiolifx's sends of each, `every` apart, while unanswered.
             let mut finished = false;
             for k in 0..self.resend.sends {
-                for (i, _, frame) in &sent {
-                    if !done(*i) {
-                        // A send error is a lost datagram: the try times out.
-                        let _ = self.sock.send(frame).await;
+                for (i, seq, frame) in &sent {
+                    // Only a message aiolifx still waits for: one a reply
+                    // of another kind ended isn't sent again.
+                    let waiting = self
+                        .pending
+                        .lock()
+                        .get(seq)
+                        .is_some_and(|p| Arc::ptr_eq(&p.notify, &notify));
+                    if !done(*i) && waiting {
+                        self.send(frame);
                     }
                 }
                 let next = start + self.resend.every * (k + 1);
@@ -317,7 +355,7 @@ impl Conn {
             payload: &[],
         }
         .encode();
-        let _ = self.sock.send(&frame).await;
+        self.send(&frame);
     }
 }
 

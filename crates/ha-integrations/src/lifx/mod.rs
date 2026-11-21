@@ -104,6 +104,8 @@ pub struct Timing {
     /// The coordinator's request-refresh debounce.
     pub debounce: Duration,
     pub identify: Duration,
+    /// When rediscovery first searches (`DISCOVERY_COOLDOWN`).
+    pub rediscover_after: Duration,
 }
 
 impl Timing {
@@ -114,10 +116,10 @@ impl Timing {
         settle: Duration::from_millis(300),
         debounce: Duration::from_millis(350),
         identify: Duration::from_secs(3),
+        rediscover_after: Duration::from_secs(5),
     };
 }
 const DISCOVERY_INTERVAL: Duration = Duration::from_secs(15 * 60);
-const DISCOVERY_WINDOW: Duration = Duration::from_millis(8500);
 
 /// What the last `LightGet` (or an ack) left.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -647,7 +649,10 @@ pub fn bulb(
         alive: Mutex::new(true),
         components: components.clone(),
     });
-    let coordinator = tokio::spawn(coordinate(b.clone(), rx, polling));
+    // HA's coordinator refreshes on its interval only while an entity
+    // listens: an entry whose entities are all disabled isn't polled.
+    let listened = b.light.is_some() || !b.buttons.is_empty();
+    let coordinator = tokio::spawn(coordinate(b.clone(), rx, polling && listened));
     if b.light.is_some() {
         components.lights().add(Arc::new(LifxLight(b.clone())));
     }
@@ -747,22 +752,52 @@ pub async fn run(
         status.set(EntryState::Loaded, None);
         return;
     };
-    // Two entries for one bulb would both run it: the second isn't started.
-    if let Some((entries, entry_id)) = status.entry()
-        && !entries.claim_unique_id(DOMAIN, entry_id, &unique_id)
-    {
-        tracing::error!(
-            "lifx: another entry is already set up for {unique_id}; this one isn't started"
-        );
-        status.set(EntryState::SetupError, None);
-        return;
-    }
     let title = s("title").unwrap_or_default();
+    let entry_id = s("entry_id").unwrap_or_default();
     let polling = entry.get("pref_disable_polling").and_then(Value::as_bool) != Some(true);
     let disable_new = entry
         .get("pref_disable_new_entities")
         .and_then(Value::as_bool)
         == Some(true);
+    // `async_migrate_entities_devices`: while HA's old shared entry is
+    // there, this bulb's device and its entities move from it to this
+    // entry, before anything else (so removing the old entry doesn't take
+    // them).
+    if let (Some((entries, _)), Some(registry)) = (status.entry(), components.registry())
+        && registry.read_only().is_none()
+    {
+        let legacy = entries.list().unwrap_or_default().into_iter().find(|e| {
+            e.get("domain").and_then(Value::as_str) == Some(DOMAIN)
+                && e.get("unique_id")
+                    .and_then(Value::as_str)
+                    .is_none_or(|u| u == DOMAIN)
+        });
+        if let Some(legacy) = legacy.and_then(|e| e.get("entry_id")?.as_str().map(str::to_owned)) {
+            let _one = crate::switchbot_cloud::SETUP.lock();
+            registry.move_devices_to_entry(&json!([DOMAIN, unique_id]), &legacy, &entry_id);
+        }
+    }
+    // The host as the entry has it now: a flow may have changed it while
+    // the set-up waited for a retry.
+    let current_host = |fallback: &str| {
+        status
+            .entry()
+            .and_then(|(entries, id)| entries.get(id))
+            .and_then(|e| e.get("data")?.get("host")?.as_str().map(str::to_owned))
+            .unwrap_or_else(|| fallback.to_owned())
+    };
+    // A bulb found at a new address: the entry has it from now on, as HA's
+    // discovery flow writes it.
+    let save_host = |host: &str| {
+        if let Some((entries, id)) = status.entry()
+            && let Some(mut data) = entries
+                .get(id)
+                .and_then(|e| e.get("data")?.as_object().cloned())
+        {
+            data.insert("host".into(), json!(host));
+            entries.update_data(id, data);
+        }
+    };
     let (found_tx, mut found_rx) = mpsc::unbounded_channel::<String>();
     // Rediscovery ends with this task.
     let _discovery = Owned(tokio::spawn(discover(
@@ -770,15 +805,28 @@ pub async fn run(
         at.clone(),
         found_tx,
     )));
+    // The bulb this entry runs: let go when the task ends.
+    struct Runs<'a>(&'a Components, &'a str, &'a str, bool);
+    impl Drop for Runs<'_> {
+        fn drop(&mut self) {
+            if self.3 {
+                self.0.let_go(self.1, self.2);
+            }
+        }
+    }
+    let mut runs_it = Runs(&components, &unique_id, &entry_id, false);
     let mut tries = 0u32;
+    // Whether the entry was last told `loaded`: told again after a retry.
     let mut loaded = false;
     loop {
         let found = loop {
+            host = current_host(&host);
             let (ip, port) = at.addr(&host);
             match connect(&host, (&ip, port), &unique_id, at.timing).await {
                 Ok(f) => break f,
                 Err(SetupError::Retry { reason, log }) => {
                     status.set(EntryState::SetupRetry, reason);
+                    loaded = false;
                     if let Some(r) = ready.take() {
                         r.done();
                     }
@@ -791,12 +839,26 @@ pub async fn run(
                     // Discovery of the bulb retries at once.
                     tokio::select! {
                         () = components.hass().setup_retry_wait(Duration::from_secs(wait) + jitter) => {}
-                        Some(found) = found_rx.recv() => host = found,
+                        Some(found) = found_rx.recv() => save_host(&found),
                     }
                     status.set(EntryState::SetupInProgress, None);
                 }
             }
         };
+        // Two entries for one bulb (an imported install can have that):
+        // the first that reaches it runs it, as only the first's entities
+        // are added in HA.
+        if !runs_it.3 {
+            if !components.run_device(&unique_id, &entry_id) {
+                tracing::error!(
+                    "lifx: another entry already runs {unique_id}; this one isn't started"
+                );
+                status.set(EntryState::SetupError, None);
+                drop(ready.take());
+                return;
+            }
+            runs_it.3 = true;
+        }
         let stopped = {
             // No other entry is set up or removed, and no registry edit
             // made, while this one's rows and entities are.
@@ -818,6 +880,7 @@ pub async fn run(
         };
         if !loaded {
             loaded = true;
+            tries = 0;
             status.set(EntryState::Loaded, None);
         }
         drop(ready.take());
@@ -826,6 +889,7 @@ pub async fn run(
             match found_rx.recv().await {
                 Some(found) if found != host => {
                     tracing::info!("lifx: {title} moved from {host} to {found}; reconnecting");
+                    save_host(&found);
                     host = found;
                     break;
                 }
@@ -842,9 +906,9 @@ pub async fn run(
 /// 255.255.255.255: what HA sends with its default network settings (only
 /// the default interface enabled), which is how the imported install runs.
 async fn discover(unique_id: String, at: Where, found: mpsc::UnboundedSender<String>) {
-    tokio::time::sleep(Duration::from_secs(5)).await;
+    tokio::time::sleep(at.timing.rediscover_after).await;
     loop {
-        let bulbs = scan(&at, DISCOVERY_WINDOW).await;
+        let bulbs = scan(&at, at.flow.discovery, Some(&unique_id)).await;
         if let Some((_, ip)) = bulbs.into_iter().find(|(serial, _)| *serial == unique_id)
             && found.send(ip).is_err()
         {
@@ -856,9 +920,14 @@ async fn discover(unique_id: String, at: Where, found: mpsc::UnboundedSender<Str
 
 /// aiolifx's `LifxDiscovery` for `window`: one `GetService` broadcast, then
 /// every bulb that answers (as UDP, or with a `LightState`), by serial, in
-/// the order they first answered, with the address each answered from.
-/// Its socket is gone when this returns.
-pub(crate) async fn scan(at: &Where, window: Duration) -> Vec<(String, String)> {
+/// the order they first answered, with the address each answered from;
+/// only the bulb `only` names, if it names one. Its socket is gone when
+/// this returns.
+pub(crate) async fn scan(
+    at: &Where,
+    window: Duration,
+    only: Option<&str>,
+) -> Vec<(String, String)> {
     let mut bulbs: Vec<(String, String)> = Vec::new();
     let Ok(sock) = tokio::net::UdpSocket::bind("0.0.0.0:0").await else {
         return bulbs;
@@ -889,7 +958,7 @@ pub(crate) async fn scan(at: &Where, window: Duration) -> Vec<(String, String)> 
         let udp = h.ty == ty::STATE_SERVICE && proto::service(p).is_some_and(|s| s.0 == 1);
         if (udp || h.ty == ty::LIGHT_STATE) && h.target != [0; 6] {
             let serial = proto::mac(&h.target);
-            if !bulbs.iter().any(|(s, _)| *s == serial) {
+            if only.is_none_or(|only| only == serial) && !bulbs.iter().any(|(s, _)| *s == serial) {
                 bulbs.push((serial, at.host_of(from)));
             }
         }

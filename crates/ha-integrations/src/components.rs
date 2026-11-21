@@ -47,9 +47,34 @@ pub struct Components {
     /// can still move its entities for the removal to find). Empty, and
     /// unallocated, on an install with none.
     followers: Mutex<Vec<(String, Arc<dyn Follower>)>>,
+    /// The devices an entry runs, as (unique id, entry id): one entry each.
+    /// Empty, and unallocated, on an install with none.
+    running: Mutex<Vec<(String, String)>>,
 }
 
 impl Components {
+    /// Entry `entry_id` runs the device `unique_id`, unless another entry
+    /// runs it already: false then. Released with [`Components::let_go`].
+    pub(crate) fn run_device(&self, unique_id: &str, entry_id: &str) -> bool {
+        let mut running = self.running.lock();
+        match running.iter().find(|(u, _)| u == unique_id) {
+            Some((_, owner)) => owner == entry_id,
+            None => {
+                running.push((unique_id.to_owned(), entry_id.to_owned()));
+                true
+            }
+        }
+    }
+
+    /// Entry `entry_id` no longer runs `unique_id`.
+    pub(crate) fn let_go(&self, unique_id: &str, entry_id: &str) {
+        let mut running = self.running.lock();
+        running.retain(|(u, e)| !(u == unique_id && e == entry_id));
+        if running.is_empty() {
+            *running = Vec::new();
+        }
+    }
+
     pub fn new(hass: &Hass, registries: impl Into<Lookup>, profiles: Profiles) -> Arc<Self> {
         Arc::new(Self {
             hass: hass.clone(),
@@ -62,6 +87,7 @@ impl Components {
             climates: OnceLock::new(),
             hue: OnceLock::new(),
             followers: Mutex::default(),
+            running: Mutex::default(),
         })
     }
 

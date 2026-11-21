@@ -484,6 +484,9 @@ struct Progress {
     busy: u32,
     /// Held while one of its steps runs.
     flow: Arc<tokio::sync::Mutex<Box<dyn Flow>>>,
+    /// True once deleted: a step that is running then ends where it is,
+    /// so what it holds (a socket, a timer) goes with the flow.
+    deleted: Arc<tokio::sync::watch::Sender<bool>>,
 }
 
 /// HA's `hass.config_entries.flow`, and what starts and stops the entries
@@ -652,6 +655,7 @@ impl Manager {
                 touched: now,
                 busy: 0,
                 flow: Arc::new(tokio::sync::Mutex::new((handler.new)())),
+                deleted: Arc::new(tokio::sync::watch::Sender::new(false)),
             });
         }
         self.step(&flow_id, Input::Show).await
@@ -675,6 +679,7 @@ impl Manager {
             .iter()
             .position(|p| p.flow_id == flow_id)
             .ok_or(Error::UnknownFlow)?;
+        flows[i].deleted.send_replace(true);
         remove(&mut flows, i);
         Ok(())
     }
@@ -687,8 +692,9 @@ impl Manager {
             let mut flows = self.flows.lock();
             let i = find(&flows).ok_or(Error::UnknownFlow)?;
             flows[i].busy += 1;
-            flows[i].flow.clone()
+            (flows[i].flow.clone(), flows[i].deleted.subscribe())
         };
+        let (flow, mut deleted) = flow;
         // Counted from here until the request is done with the flow.
         let _working = Working {
             manager: self,
@@ -723,7 +729,14 @@ impl Manager {
                 unique_id: &mut unique_id,
                 reload: &mut reload,
             };
-            flow.step(&mut cx, step_id, input).await
+            // A flow deleted while its step runs: the step ends there, as
+            // its reply would be `UnknownFlow` anyway. (HA lets the step run
+            // to its end.)
+            tokio::select! {
+                biased;
+                _ = deleted.wait_for(|d| *d) => return Err(Error::UnknownFlow),
+                step = flow.step(&mut cx, step_id, input) => step,
+            }
         };
         if let Some(entry_id) = reload {
             let this = self.clone();

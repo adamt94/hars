@@ -822,6 +822,77 @@ impl Registry {
         find_unique(&self.snapshot(), domain, platform, unique_id).cloned()
     }
 
+    /// LIFX's `async_migrate_entities_devices`: each device of config entry
+    /// `from` that has `identifier` moves to entry `to`
+    /// (`async_update_device(add_config_entry_id=to,
+    /// remove_config_entry_id=from)`), and then each entity of `from` on such
+    /// a device (`async_update_entity(config_entry_id=to)`). Each change
+    /// fires its `update`, as HA's do.
+    pub fn move_devices_to_entry(&self, identifier: &Value, from: &str, to: &str) {
+        let now = now_iso(&self.hass);
+        let to_disabled = self.entry_disabled(Some(to));
+        let moved: Vec<String> = self.write(|tx| {
+            let mut moved = Vec::new();
+            for i in 0..tx.r.devices.len() {
+                let old = &tx.r.devices[i];
+                if !old.config_entries.iter().any(|e| e == from)
+                    || !old.identifiers.contains(identifier)
+                {
+                    continue;
+                }
+                let mut d = (**old).clone();
+                let mut changes = Map::new();
+                if !d.config_entries.iter().any(|e| e == to) {
+                    changes.insert("config_entries".into(), json!(old.config_entries));
+                    changes.insert(
+                        "config_entries_subentries".into(),
+                        Value::Object(old.config_entries_subentries.clone()),
+                    );
+                    d.config_entries.push(to.to_owned());
+                    d.config_entries_subentries
+                        .insert(to.to_owned(), json!([null]));
+                    if d.disabled_by.as_deref() == Some("config_entry") && !to_disabled {
+                        changes.insert("disabled_by".into(), json!(d.disabled_by));
+                        d.disabled_by = None;
+                    }
+                }
+                changes
+                    .entry("config_entries")
+                    .or_insert_with(|| json!(old.config_entries));
+                changes
+                    .entry("config_entries_subentries")
+                    .or_insert_with(|| Value::Object(old.config_entries_subentries.clone()));
+                d.config_entries_subentries.remove(from);
+                d.config_entries.retain(|e| e != from);
+                if d.primary_config_entry.as_deref() == Some(from) {
+                    changes.insert("primary_config_entry".into(), json!(d.primary_config_entry));
+                    d.primary_config_entry = None;
+                }
+                d.modified_at = Some(now.clone());
+                let id = d.id.clone();
+                tx.r.devices[i] = Arc::new(d);
+                tx.device_event(json!({"action": "update", "device_id": id, "changes": changes}));
+                moved.push(id);
+            }
+            moved
+        });
+        let rows: Vec<String> = self
+            .snapshot()
+            .entities
+            .iter()
+            .filter(|e| e.config_entry_id.as_deref() == Some(from))
+            .filter(|e| e.device_id.as_ref().is_some_and(|d| moved.contains(d)))
+            .map(|e| e.entity_id.clone())
+            .collect();
+        for entity_id in rows {
+            let patch = EntityPatch {
+                config_entry_id: Some(Some(to.to_owned())),
+                ..Default::default()
+            };
+            self.update_entity(&entity_id, patch);
+        }
+    }
+
     /// `async_get_or_create`: the existing row, updated with `patch`, or a
     /// new one. `disabled_by` applies only to a new row; a deleted row
     /// that comes back brings its own; then, in HA's order, the entry's

@@ -181,7 +181,8 @@ impl LifxFlow {
                 hosts.extend(host);
             }
         }
-        self.discovered = super::scan(&cx.endpoints.lifx, cx.endpoints.lifx.flow.discovery).await;
+        self.discovered =
+            super::scan(&cx.endpoints.lifx, cx.endpoints.lifx.flow.discovery, None).await;
         let options: Vec<(String, String)> = self
             .discovered
             .iter()
