@@ -311,6 +311,15 @@ impl HueEntity {
         }
     }
 
+    /// Whether this is `other`, maybe under another id: a scene that
+    /// shares its activation with it ([`HueEntity::moved`]).
+    pub(super) fn same_activation(&self, other: &HueEntity) -> bool {
+        match (&self.activated, &other.activated) {
+            (Some(a), Some(b)) => std::sync::Arc::ptr_eq(a, b),
+            _ => false,
+        }
+    }
+
     /// A scene's last activation by HA, now.
     pub(super) fn set_activated(&self, at: String) {
         if let Some(activated) = &self.activated {

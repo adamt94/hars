@@ -970,3 +970,38 @@ async fn a_device_named_as_it_was_has_its_entities_write() {
     );
     assert!(reported() > before, "the light did not write");
 }
+
+/// A press while a rename moves the button to an id under which `unknown`
+/// was kept: the move comes first, whole (its restore doesn't take the
+/// press away), and the press is written under the new id with the
+/// caller's context.
+#[tokio::test]
+async fn a_press_while_its_button_moves_is_written_whole_under_the_new_id() {
+    let f = fake_bulb(65535, [0, 0, 39321, 2700]).await;
+    let (hass, b, _) = setup(&f, timing(false)).await;
+    let old = EntityId::parse("button.kitchen_kitchen_light_restart").unwrap();
+    let new = EntityId::parse("button.desk_restart").unwrap();
+    hass.set_state(new.clone(), "unknown", Default::default());
+    hass.restore().register(new.as_str(), None);
+    hass.restore().unregister(&hass, new.as_str());
+    hass.remove_state(&new);
+    let moved = edited(&hass, |r| {
+        for e in &mut r.entities {
+            if e.entity_id == old.as_str() {
+                let mut row = (**e).clone();
+                row.entity_id = new.to_string();
+                *e = Arc::new(row);
+            }
+        }
+    });
+    let bulb = b.clone();
+    crate::components::hooks::set("lifx_pressed", move || bulb.follow(&moved));
+    let context = ha_core::Context::new();
+    let at = "2026-01-01T00:00:00+00:00".to_owned();
+    LifxButton(b.clone(), 0, old.clone()).pressed(at.clone(), &context);
+    assert!(!crate::components::hooks::pending("lifx_pressed"));
+    assert!(hass.states().get(&old).is_none());
+    let state = hass.states().get(&new).unwrap();
+    assert_eq!(state.state.as_str(), at);
+    assert_eq!(state.context.id, context.id);
+}

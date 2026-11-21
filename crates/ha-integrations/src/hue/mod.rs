@@ -168,13 +168,14 @@ impl Bridge {
         let user = row.and_then(|e| e.name.clone());
         let friendly = user.or_else(|| {
             // `_async_get_full_entity_name`: the parts that aren't empty.
-            let device = device.and_then(|d| device_name(&r, d));
-            let parts: Vec<&str> = [device, name]
-                .into_iter()
-                .flatten()
-                .filter(|part| !part.is_empty())
-                .collect();
-            Some(parts.join(" "))
+            let device = device
+                .and_then(|d| device_name(&r, d))
+                .filter(|d| !d.is_empty());
+            match (device, name.filter(|n| !n.is_empty())) {
+                (Some(d), Some(n)) => Some(format!("{d} {n}")),
+                (Some(d), None) => Some(d.to_owned()),
+                (None, n) => n.map(str::to_owned),
+            }
         });
         if let Some(f) = friendly.filter(|f| !f.is_empty()) {
             a.insert("friendly_name".into(), json!(f));
@@ -342,6 +343,8 @@ impl Bridge {
             }
         }
         drop(store);
+        #[cfg(test)]
+        crate::components::hooks::at("hue_added");
         for l in new {
             self.platforms.lights.add(l);
         }
@@ -447,11 +450,14 @@ impl Bridge {
         if !*alive {
             return;
         }
+        // The same entity, maybe under another id (it shares its
+        // activation with what it was): not one made since for a resource
+        // of the same id.
         let current = self
             .others
             .read()
             .iter()
-            .find(|o| o.rid == e.rid && o.kind == e.kind)
+            .find(|o| o.same_activation(e))
             .cloned();
         let Some(e) = current else {
             return;
@@ -609,6 +615,9 @@ impl Bridge {
         let Some(change) = change else {
             return;
         };
+        // An addition chooses ids: under the set-up lock, through its
+        // first writes, as [`Bridge::apply_snapshot`].
+        let _one = matches!(change, Change::Added).then(|| crate::switchbot_cloud::SETUP.lock());
         self.after(change, &ty, &id, gone);
     }
 
@@ -654,6 +663,8 @@ impl Bridge {
                     // group goes from where it is now (a rename may have
                     // given it another id), and nothing writes it after.
                     let _writes = self.alive.lock();
+                    #[cfg(test)]
+                    crate::components::hooks::at("group_deleted");
                     let mut groups = Vec::new();
                     self.groups.write().retain(|g| {
                         let dropped = g.rid == id;
@@ -791,6 +802,13 @@ impl Bridge {
             })
             .collect();
         let changes = self.store.write().reconcile(fresh);
+        // Entities made now take ids no registry edit is changing: the
+        // set-up lock, which every such edit holds until the running
+        // entities have followed it ([`crate::components::Components::registry_edit`]), is
+        // held from choosing their ids through their first writes. Taken
+        // after the store is let go, and before the write guard.
+        let added = changes.iter().any(|(c, _)| matches!(c, Change::Added));
+        let _one = added.then(|| crate::switchbot_cloud::SETUP.lock());
         for (change, id) in changes {
             let ty = match change {
                 Change::Deleted => types

@@ -217,7 +217,9 @@ sees rows the entities have not caught up with, and an entity writes its
 state under the lock its id is changed under, so no write lands on an id
 it has just left. (A Hue state is made before the lock is taken, so it is
 made again under the lock if the bridge took the registries again in
-between, and an entity moved to another id writes nothing more.)
+between, and an entity moved to another id writes nothing more. Entities
+the bridge reports later choose their ids under the same set-up lock,
+through their first writes, so none takes an id a rename is giving.)
 `components::follows` lists the integrations that do this (today
 `switchbot_cloud`, `hue` and `lifx`); the registry refuses a change the others'
 entities would not follow (`ha_registry::DeviceRefusal`,

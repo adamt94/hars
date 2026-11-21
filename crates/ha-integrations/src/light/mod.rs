@@ -673,6 +673,16 @@ impl Lights {
         self.lights.write().push(light);
     }
 
+    /// The ids a call reaches the lights under (one per light served).
+    #[cfg(test)]
+    pub(crate) fn ids(&self) -> Vec<EntityId> {
+        self.lights
+            .read()
+            .iter()
+            .map(|l| l.entity_id().clone())
+            .collect()
+    }
+
     /// Stop serving a light that's gone.
     pub fn remove(&self, entity_id: &EntityId) {
         self.lights.write().retain(|l| l.entity_id() != entity_id);

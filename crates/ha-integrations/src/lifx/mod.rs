@@ -256,6 +256,8 @@ impl Bulb {
     /// (it neither restores over the press nor writes it without its
     /// context).
     fn pressed(&self, i: usize, at: String, context: &ha_core::Context) {
+        #[cfg(test)]
+        crate::components::hooks::at("lifx_pressed");
         let now = self.now.lock();
         *self.buttons[i].last.lock() = Some(at);
         if now.alive {

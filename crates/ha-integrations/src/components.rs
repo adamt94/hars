@@ -122,6 +122,8 @@ impl Components {
     pub fn registry_edit<T>(&self, edit: impl FnOnce() -> T) -> T {
         let _one = crate::switchbot_cloud::SETUP.lock();
         let out = edit();
+        #[cfg(test)]
+        hooks::at("edited");
         let followers: Vec<Arc<dyn Follower>> = self
             .followers
             .lock()
@@ -210,6 +212,41 @@ impl Components {
                 c
             })
             .clone()
+    }
+}
+
+/// Points in the code where a test runs something of its own, once, on
+/// the thread that gets there: to put a change between two steps.
+#[cfg(test)]
+pub(crate) mod hooks {
+    use std::cell::RefCell;
+
+    type Hook = Box<dyn FnOnce()>;
+
+    thread_local! {
+        static HOOKS: RefCell<Vec<(&'static str, Hook)>> = const { RefCell::new(Vec::new()) };
+    }
+
+    /// Run `f` the next time this thread gets to `point`.
+    pub(crate) fn set(point: &'static str, f: impl FnOnce() + 'static) {
+        HOOKS.with(|h| h.borrow_mut().push((point, Box::new(f))));
+    }
+
+    /// `point` is reached: its hook, if one was set, runs.
+    pub(crate) fn at(point: &'static str) {
+        let hook = HOOKS.with(|h| {
+            let mut h = h.borrow_mut();
+            let i = h.iter().position(|(p, _)| *p == point)?;
+            Some(h.remove(i).1)
+        });
+        if let Some(hook) = hook {
+            hook();
+        }
+    }
+
+    /// Whether `point`'s hook is still waiting.
+    pub(crate) fn pending(point: &'static str) -> bool {
+        HOOKS.with(|h| h.borrow().iter().any(|(p, _)| *p == point))
     }
 }
 
