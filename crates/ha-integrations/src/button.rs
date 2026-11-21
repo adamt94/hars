@@ -24,11 +24,20 @@ pub trait Button: Send + Sync {
 /// unless it was `unavailable` (`unknown` is kept: it means never). The
 /// entity is registered for restore from now on.
 pub fn restore(hass: &Hass, entity_id: &EntityId) -> Option<String> {
+    restored(hass, entity_id).flatten()
+}
+
+/// What [`restore`] takes, as an entity added again under another id
+/// needs it: `None` if nothing was kept under the id (the entity keeps
+/// its last press), else the press kept (`None` for `unknown`, which HA
+/// takes as it is, and so as no press).
+pub fn restored(hass: &Hass, entity_id: &EntityId) -> Option<Option<String>> {
     let restore = hass.restore();
     let last = restore
         .last_state(entity_id.as_str())
         .and_then(|s| s["state"].as_str().map(str::to_owned))
-        .filter(|s| s != "unavailable" && s != "unknown");
+        .filter(|s| s != "unavailable")
+        .map(|s| Some(s).filter(|s| s != "unknown"));
     restore.register(entity_id.as_str(), None);
     last
 }

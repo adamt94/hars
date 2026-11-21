@@ -720,7 +720,13 @@ impl Registry {
                     })
                     .collect(),
             };
-            if !stale.is_empty() && self.unwritable(crate::ENTITY_KEY) {
+            // Rows the new name touches (their unprefixed names change).
+            let touched = renamed.as_ref().is_some_and(|old_name| {
+                tx.r.entities
+                    .iter()
+                    .any(|e| renames(e, device_id, old_name.as_deref(), d.display_name()))
+            });
+            if (touched || !stale.is_empty()) && self.unwritable(crate::ENTITY_KEY) {
                 return Err(DeviceRefusal::Unwritable(crate::ENTITY_KEY));
             }
             d.modified_at = Some(now.clone());
@@ -1592,14 +1598,9 @@ fn update_row(
 /// `modified_at` is bumped and `update` fires with empty `changes`.
 fn device_renamed(tx: &mut Tx, device: &Device, old_name: Option<&str>, now: &str) {
     let new_name = device.display_name();
-    let unprefixed = |name: Option<&str>, device: Option<&str>| strip_prefix(name?, device?);
     let mut touched = Vec::new();
     for e in tx.r.entities.iter_mut() {
-        if e.device_id.as_deref() != Some(device.id.as_str()) || e.has_entity_name {
-            continue;
-        }
-        let name = e.original_name.as_deref();
-        if unprefixed(name, old_name) == unprefixed(name, new_name) {
+        if !renames(e, &device.id, old_name, new_name) {
             continue;
         }
         let mut row = (**e).clone();
@@ -1610,6 +1611,16 @@ fn device_renamed(tx: &mut Tx, device: &Device, old_name: Option<&str>, now: &st
     for entity_id in touched {
         tx.entity_event(json!({"action": "update", "entity_id": entity_id, "changes": {}}));
     }
+}
+
+/// Whether a device named `new_name` (from `old_name`) changes the
+/// unprefixed name of entity `e`, one of the old way's on it.
+fn renames(e: &Entity, device_id: &str, old_name: Option<&str>, new_name: Option<&str>) -> bool {
+    let unprefixed = |name: Option<&str>, device: Option<&str>| strip_prefix(name?, device?);
+    let name = e.original_name.as_deref();
+    e.device_id.as_deref() == Some(device_id)
+        && !e.has_entity_name
+        && unprefixed(name, old_name) != unprefixed(name, new_name)
 }
 
 fn find_unique<'a>(

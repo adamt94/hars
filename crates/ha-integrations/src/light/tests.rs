@@ -524,3 +524,56 @@ fn quoted_profile_fields_load_as_in_python_csv() {
     preprocess(&mut p, &profiles);
     assert_eq!(p.brightness, Some(60));
 }
+
+/// A light that, asked whether it's available, changes the component's
+/// list: as a Hue light does when its bridge waits on the list to move a
+/// light to another id while this call waits on the bridge.
+struct Busy {
+    id: EntityId,
+    lights: std::sync::OnceLock<std::sync::Weak<Lights>>,
+}
+
+impl Light for Busy {
+    fn entity_id(&self) -> &EntityId {
+        &self.id
+    }
+    fn capabilities(&self) -> Capabilities {
+        ct_light()
+    }
+    fn state(&self) -> LightState {
+        LightState::default()
+    }
+    fn available(&self) -> bool {
+        if let Some(lights) = self.lights.get().and_then(std::sync::Weak::upgrade) {
+            lights.remove(&EntityId::parse("light.other").unwrap());
+        }
+        true
+    }
+    fn turn_on(&self, _: Params) -> BoxFuture<'_> {
+        Box::pin(async { Ok(()) })
+    }
+    fn turn_off(&self, _: TurnOff) -> BoxFuture<'_> {
+        Box::pin(async { Ok(()) })
+    }
+}
+
+/// A call's targets are picked, and then asked whether they're available
+/// with the list let go: the list can change meanwhile, and nothing waits
+/// on the call for it.
+#[test]
+fn availability_is_asked_with_the_list_let_go() {
+    let lights = Arc::new(Lights::new(Profiles::default()));
+    let busy = Arc::new(Busy {
+        id: EntityId::parse("light.busy").unwrap(),
+        lights: std::sync::OnceLock::new(),
+    });
+    let _ = busy.lights.set(Arc::downgrade(&lights));
+    lights.add(busy);
+    let (tx, rx) = std::sync::mpsc::channel();
+    let picker = lights.clone();
+    std::thread::spawn(move || {
+        let _ = tx.send(picker.targets(&EntityTarget::All, &[]).len());
+    });
+    let picked = rx.recv_timeout(std::time::Duration::from_secs(5));
+    assert_eq!(picked, Ok(1), "the call waited on itself");
+}

@@ -800,6 +800,62 @@ async fn an_entity_moved_while_its_state_is_made_writes_only_under_its_new_id() 
     assert_eq!(state_json(&b.hass, old), None);
 }
 
+/// A device deleted on the bridge while one of its lights is given another
+/// id (the delete found the light under its old id): the light goes from
+/// where it is now, its new id, with nothing left under either.
+#[tokio::test]
+async fn a_device_deleted_while_its_light_moves_leaves_nothing() {
+    let b = bridge(offline());
+    let light = b.lights.read()[0].clone();
+    let (old, new) = (light.entity_id.to_string(), "light.moved_away");
+    let device = {
+        let store = b.store.read();
+        let device = store.device_of(&light.rid).unwrap();
+        device["id"].as_str().unwrap().to_owned()
+    };
+    let gone = b.on_device(&device);
+    assert!(gone.lights.iter().any(|l| Arc::ptr_eq(l, &light)));
+    let moved = changed(
+        &b,
+        |_| {},
+        |e| {
+            if e.entity_id == old {
+                e.entity_id = new.into();
+            }
+        },
+    );
+    b.follow(moved);
+    assert!(state_json(&b.hass, new).is_some());
+    b.remove(&gone);
+    assert_eq!(state_json(&b.hass, &old), None);
+    assert_eq!(state_json(&b.hass, new), None);
+    assert!(b.lights.read().iter().all(|l| l.rid != light.rid));
+}
+
+/// A scene a service call picked under its old id, activated once it has
+/// another: the activation is the entity's, written under its new id.
+#[tokio::test]
+async fn a_scene_activated_under_its_old_id_shows_it_under_the_new() {
+    let b = bridge(offline());
+    let (old, new) = ("scene.bedroom_bedroom_dimmed", "scene.bedroom_dimmed");
+    let (scene, _) = scene_and_room(&b, old);
+    assert_eq!(state_json(&b.hass, old).unwrap().0, "unknown");
+    let moved = changed(
+        &b,
+        |_| {},
+        |e| {
+            if e.entity_id == old {
+                e.entity_id = new.into();
+            }
+        },
+    );
+    b.follow(moved);
+    let _ = scene.activate(None, false, None, None).await;
+    assert_eq!(state_json(&b.hass, old), None);
+    let (state, _) = state_json(&b.hass, new).unwrap();
+    assert_ne!(state, "unknown", "the activation was lost");
+}
+
 /// A second bridge, sharing the first's hass and services.
 fn second_bridge(first: &Arc<Bridge>, api: Api) -> Arc<Bridge> {
     let resources = fixture("resource")["data"].as_array().unwrap().clone();

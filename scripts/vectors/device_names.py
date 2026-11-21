@@ -67,7 +67,8 @@ SCENARIOS = [
      " lamp is named and put in it, then the bedroom (a room: its light group,"
      " scenes and sensors) and the bridge are named, and each named device's"
      " entities take the ids that follow. Then the motion sensor is named on"
-     " its device page (its entities keep their ids), and named back.",
+     " its device page (its entities keep their ids), named back, named again"
+     " and given an empty name (its own counts again).",
      hf.Hue,
      [*hf.ADD,
       area(name="Study", **ds.BLANK),
@@ -94,12 +95,13 @@ SCENARIOS = [
       device(SENSOR, name_by_user="Bed sensor"),
       device(SENSOR, name_by_user=None),
       device(SENSOR, name_by_user="Bed sensor"),
+      device(SENSOR, name_by_user=""),
       *LISTS]),
     ("lifx",
      "The dialog's last step after a LIFX bulb is added: an area is made, the"
      " bulb is named and put in it, and its enabled entities take the ids that"
      " follow. Then it is named again on its device page (its entities keep"
-     " their ids), and the name is taken away.",
+     " their ids), the name is taken away, made empty, and made the bulb's own.",
      lf.Lifx,
      [*lf.ADD,
       area(name="Study", **ds.BLANK),
@@ -113,6 +115,8 @@ SCENARIOS = [
       entity("light.office_desk_lamp", new_entity_id="light.study_reading_lamp"),
       device(LIFX_BULB, name_by_user="Desk"),
       device(LIFX_BULB, name_by_user=None),
+      device(LIFX_BULB, name_by_user=""),
+      device(LIFX_BULB, name_by_user="Desk Lamp"),
       *LISTS]),
 ]
 

@@ -330,8 +330,8 @@ impl crate::components::Follower for Entry {
                 // `async_internal_added_to_hass` again: a last press kept
                 // under the new id (it was this entity's id before) is
                 // taken; else what it had stays.
-                if let Some(last) = crate::button::restore(hass, new) {
-                    *b.last.lock() = Some(last);
+                if let Some(last) = crate::button::restored(hass, new) {
+                    *b.last.lock() = last;
                 }
                 true
             };

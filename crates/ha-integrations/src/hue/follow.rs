@@ -54,49 +54,87 @@ impl Bridge {
             old: &old,
             new: &fresh,
         };
+        // What became of each entity, found with the store read and no
+        // other lock taken meanwhile: a service call reads the store while
+        // it holds its component's list, which the moves below change.
+        let lights = self.lights.read().clone();
+        let groups = self.groups.read().clone();
+        let others = self.others.read().clone();
         let store = self.store.read();
+        let lights: Vec<_> = lights
+            .into_iter()
+            .map(|l| {
+                let device = store.device_of(&l.rid);
+                let change = changes.of("light", &l.rid, device, &l.entity_id);
+                (l, change)
+            })
+            .collect();
+        let groups: Vec<_> = groups
+            .into_iter()
+            .map(|g| {
+                let change = changes.of("light", &g.rid, store.get(&g.group), &g.entity_id);
+                (g, change)
+            })
+            .collect();
+        let others: Vec<_> = others
+            .into_iter()
+            .map(|e| {
+                let device = store
+                    .get(&e.rid)
+                    .and_then(|r| HueEntity::device(e.kind, &e.rid, r, &store));
+                let change = changes.of(e.kind.domain(), &e.rid, device, &e.entity_id);
+                (e, change)
+            })
+            .collect();
+        drop(store);
+        // The moves. An entity removed meanwhile can't be: removal takes
+        // the write guard, held here.
         let mut writes = Vec::new();
-        for l in self.lights.write().iter_mut() {
-            let device = store.device_of(&l.rid);
-            match changes.of("light", &l.rid, device, &l.entity_id) {
+        for (l, change) in lights {
+            let l = match change {
                 Change::Same => continue,
-                Change::Write => {}
+                Change::Write => l,
                 Change::Move(id) => {
                     let moved = Arc::new(l.moved(id));
+                    if !swap(&self.lights, &l, &moved) {
+                        continue;
+                    }
                     l.gone.store(true, Ordering::Relaxed);
                     self.platforms.lights.remove(&l.entity_id);
                     self.hass.remove_state(&l.entity_id);
-                    *l = moved;
-                    self.platforms.lights.add(l.clone());
+                    self.platforms.lights.add(moved.clone());
+                    moved
                 }
-            }
-            writes.push(Write::Light(l.clone()));
+            };
+            writes.push(Write::Light(l));
         }
-        for g in self.groups.write().iter_mut() {
-            let device = store.get(&g.group);
-            match changes.of("light", &g.rid, device, &g.entity_id) {
+        for (g, change) in groups {
+            let g = match change {
                 Change::Same => continue,
-                Change::Write => {}
+                Change::Write => g,
                 Change::Move(id) => {
                     let moved = Arc::new(g.moved(id));
+                    if !swap(&self.groups, &g, &moved) {
+                        continue;
+                    }
                     g.gone.store(true, Ordering::Relaxed);
                     self.platforms.lights.remove(&g.entity_id);
                     self.hass.remove_state(&g.entity_id);
-                    *g = moved;
-                    self.platforms.lights.add(g.clone());
+                    self.platforms.lights.add(moved.clone());
+                    moved
                 }
-            }
-            writes.push(Write::Group(g.clone()));
+            };
+            writes.push(Write::Group(g));
         }
-        for e in self.others.write().iter_mut() {
-            let device = store
-                .get(&e.rid)
-                .and_then(|r| HueEntity::device(e.kind, &e.rid, r, &store));
-            match changes.of(e.kind.domain(), &e.rid, device, &e.entity_id) {
+        for (e, change) in others {
+            let e = match change {
                 Change::Same => continue,
-                Change::Write => {}
+                Change::Write => e,
                 Change::Move(id) => {
                     let moved = Arc::new(e.moved(id));
+                    if !swap(&self.others, &e, &moved) {
+                        continue;
+                    }
                     e.gone.store(true, Ordering::Relaxed);
                     // `async_remove`: a scene's last activation is kept
                     // for a restore, then its state goes.
@@ -108,16 +146,17 @@ impl Bridge {
                     self.hass.remove_state(&e.entity_id);
                     // `async_added_to_hass` again, for the new id.
                     moved.restore(&self.hass);
-                    *e = moved;
-                    match e.kind.domain() {
-                        "switch" => self.platforms.switches.add(e.clone()),
-                        "scene" => self.platforms.scenes.add(e.clone()),
+                    match moved.kind.domain() {
+                        "switch" => self.platforms.switches.add(moved.clone()),
+                        "scene" => self.platforms.scenes.add(moved.clone()),
                         _ => {}
                     }
+                    moved
                 }
-            }
-            writes.push(Write::Other(e.clone()));
+            };
+            writes.push(Write::Other(e));
         }
+        let store = self.store.read();
         // The guard is held: the states are made and written here.
         for write in writes {
             let (id, rendered) = match &write {
@@ -132,6 +171,18 @@ impl Bridge {
                 self.hass.set_state(id.clone(), state, attrs);
             }
         }
+    }
+}
+
+/// Put `new` in `list` where `old` is: false if `old` isn't there.
+fn swap<T>(list: &parking_lot::RwLock<Vec<Arc<T>>>, old: &Arc<T>, new: &Arc<T>) -> bool {
+    let mut list = list.write();
+    match list.iter_mut().find(|x| Arc::ptr_eq(x, old)) {
+        Some(slot) => {
+            *slot = new.clone();
+            true
+        }
+        None => false,
     }
 }
 

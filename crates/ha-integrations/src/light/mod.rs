@@ -679,9 +679,13 @@ impl Lights {
     }
 
     /// The targeted, available lights, as HA's entity services pick them.
+    /// The list's lock is let go before a light is asked whether it's
+    /// available: that asks its integration, which may be waiting for the
+    /// list (a Hue bridge moving a light to another id).
     fn targets(&self, target: &EntityTarget, indirect: &[String]) -> Vec<Arc<dyn Light>> {
-        let lights = self.lights.read();
-        lights
+        let targeted: Vec<Arc<dyn Light>> = self
+            .lights
+            .read()
             .iter()
             .filter(|l| match target {
                 EntityTarget::All => true,
@@ -690,9 +694,9 @@ impl Lights {
                         || indirect.iter().any(|i| i == l.entity_id().as_str())
                 }
             })
-            .filter(|l| l.available())
             .cloned()
-            .collect()
+            .collect();
+        targeted.into_iter().filter(|l| l.available()).collect()
     }
 
     /// One light's part of a call.

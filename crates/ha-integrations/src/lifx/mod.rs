@@ -163,6 +163,9 @@ struct Now {
     light: Option<Ident>,
     /// The buttons', in [`Bulb::buttons`]' order.
     buttons: Vec<Ident>,
+    /// The device's own name and the user's, when the entities last
+    /// took them.
+    device: (Option<String>, Option<String>),
 }
 
 /// One bulb: its connection, cached state and entities.
@@ -640,6 +643,7 @@ pub fn bulb(
             idents.push(ident);
         }
     }
+    let device = device_names(&registries, &serial);
     let (tx, rx) = mpsc::unbounded_channel();
     let b = Arc::new(Bulb {
         hass: hass.clone(),
@@ -657,6 +661,7 @@ pub fn bulb(
             alive: true,
             light,
             buttons: idents,
+            device,
         }),
         components: components.clone(),
     });
@@ -704,15 +709,7 @@ fn ident(
     };
     let (entity_id, friendly) = names.entity(domain, &unique_id, serial, label, name)?;
     // The icon the user gave an entity is in its state.
-    let icon = registries
-        .entities
-        .iter()
-        .find(|e| {
-            e.platform == DOMAIN
-                && e.entity_id.split('.').next() == Some(domain)
-                && e.unique_id.as_ref().and_then(Value::as_str) == Some(unique_id.as_str())
-        })
-        .and_then(|e| e.icon.clone());
+    let icon = row(registries, domain, &unique_id).and_then(|e| e.icon.clone());
     Some(Ident {
         entity_id,
         friendly,
@@ -749,45 +746,65 @@ impl Bulb {
         if !now.alive {
             return;
         }
+        // `_async_device_registry_updated`: a new name for the device has
+        // each entity write, its friendly name changed or not.
+        let device = device_names(&registries, &self.serial);
+        let named = device != now.device;
+        now.device = device;
+        // Only an entity with a row takes what it says: one that runs with
+        // none keeps the id it was given.
+        let fresh = |button: Option<(&str, &str)>| {
+            let unique_id = match button {
+                None => self.serial.clone(),
+                Some((class, _)) => format!("{}_{class}", self.serial),
+            };
+            let domain = if button.is_some() { "button" } else { "light" };
+            row(&registries, domain, &unique_id)?;
+            ident(&names, &registries, &self.serial, &self.label, button)
+        };
         let mut writes = Vec::new();
-        if let Some(l) = &now.light
-            && let Some(fresh) = ident(&names, &registries, &self.serial, &self.label, None)
-            && fresh != *l
-        {
-            if fresh.entity_id != l.entity_id {
-                components.lights().remove(&l.entity_id);
-                self.hass.remove_state(&l.entity_id);
-                let light = LifxLight(self.clone(), fresh.entity_id.clone());
-                components.lights().add(Arc::new(light));
+        if let Some(l) = &now.light {
+            let mut changed = false;
+            if let Some(fresh) = fresh(None)
+                && fresh != *l
+            {
+                if fresh.entity_id != l.entity_id {
+                    components.lights().remove(&l.entity_id);
+                    self.hass.remove_state(&l.entity_id);
+                    let light = LifxLight(self.clone(), fresh.entity_id.clone());
+                    components.lights().add(Arc::new(light));
+                }
+                now.light = Some(fresh);
+                changed = true;
             }
-            now.light = Some(fresh);
-            writes.push(None);
+            if changed || named {
+                writes.push(None);
+            }
         }
         for (i, b) in self.buttons.iter().enumerate() {
             let button = BUTTONS.into_iter().find(|(class, _)| *class == b.class);
-            let Some(fresh) = ident(&names, &registries, &self.serial, &self.label, button) else {
-                continue;
-            };
             let old = &now.buttons[i];
-            if fresh == *old {
+            let fresh = fresh(button).filter(|fresh| fresh != old);
+            if let Some(fresh) = fresh {
+                if fresh.entity_id != old.entity_id {
+                    components.buttons().remove(&old.entity_id);
+                    // `async_remove`: its last press is kept for a restore,
+                    // then its state goes.
+                    self.hass
+                        .restore()
+                        .unregister(&self.hass, old.entity_id.as_str());
+                    self.hass.remove_state(&old.entity_id);
+                    // `async_internal_added_to_hass` again, for the new id.
+                    if let Some(last) = crate::button::restored(&self.hass, &fresh.entity_id) {
+                        *b.last.lock() = last;
+                    }
+                    let button = LifxButton(self.clone(), i, fresh.entity_id.clone());
+                    components.buttons().add(Arc::new(button));
+                }
+                now.buttons[i] = fresh;
+            } else if !named {
                 continue;
             }
-            if fresh.entity_id != old.entity_id {
-                components.buttons().remove(&old.entity_id);
-                // `async_remove`: its last press is kept for a restore,
-                // then its state goes.
-                self.hass
-                    .restore()
-                    .unregister(&self.hass, old.entity_id.as_str());
-                self.hass.remove_state(&old.entity_id);
-                // `async_internal_added_to_hass` again, for the new id.
-                if let Some(last) = crate::button::restore(&self.hass, &fresh.entity_id) {
-                    *b.last.lock() = Some(last);
-                }
-                let button = LifxButton(self.clone(), i, fresh.entity_id.clone());
-                components.buttons().add(Arc::new(button));
-            }
-            now.buttons[i] = fresh;
             writes.push(Some(i));
         }
         for write in writes {
@@ -797,6 +814,32 @@ impl Bulb {
             }
         }
     }
+}
+
+/// The bulb's device's own name and the user's, as the registry has them.
+fn device_names(
+    registries: &ha_registry::Registries,
+    serial: &str,
+) -> (Option<String>, Option<String>) {
+    let device = registries.devices.iter().find(|d| {
+        d.identifiers
+            .iter()
+            .any(|i| i[0] == DOMAIN && i[1] == serial)
+    });
+    device.map_or((None, None), |d| (d.name.clone(), d.name_by_user.clone()))
+}
+
+/// The row of the bulb's entity in `domain` with `unique_id`.
+fn row<'a>(
+    registries: &'a ha_registry::Registries,
+    domain: &str,
+    unique_id: &str,
+) -> Option<&'a Arc<ha_registry::Entity>> {
+    registries.entities.iter().find(|e| {
+        e.platform == DOMAIN
+            && e.entity_id.split('.').next() == Some(domain)
+            && e.unique_id.as_ref().and_then(Value::as_str) == Some(unique_id)
+    })
 }
 
 /// Where bulbs are reached: at their own address, or at stand-ins on

@@ -112,8 +112,10 @@ fn registry_device<'a>(r: &'a Registries, hue_id: &str) -> Option<&'a Arc<ha_reg
 /// the bridge's.
 fn device_name<'a>(r: &'a Registries, device: &'a Value) -> Option<&'a str> {
     let id = device["id"].as_str()?;
+    // `name_by_user or name`: an empty name of the user's doesn't count.
     registry_device(r, id)
         .and_then(|d| d.name_by_user.as_deref())
+        .filter(|name| !name.is_empty())
         .or_else(|| device["metadata"]["name"].as_str())
 }
 
@@ -187,8 +189,9 @@ impl Bridge {
         device: Option<&Value>,
         name: Option<&str>,
     ) {
-        let device_name = device.and_then(|d| device_name(&self.rows(), d).map(str::to_owned));
-        let unprefixed = match (name, device_name.as_deref()) {
+        let rows = self.rows();
+        let device_name = device.and_then(|d| device_name(&rows, d));
+        let unprefixed = match (name, device_name) {
             (Some(n), Some(d)) => ha_registry::strip_prefix(n, d),
             _ => None,
         };
@@ -403,7 +406,23 @@ impl Bridge {
         }
     }
 
+    /// Write an entity's state. One moved to another id since it was
+    /// picked (a service call that activated a scene) writes where the
+    /// entity is now.
     fn write_entity(&self, e: &HueEntity) {
+        let current;
+        let e = match e.gone.load(std::sync::atomic::Ordering::Relaxed) {
+            false => e,
+            true => {
+                let others = self.others.read();
+                let found = others.iter().find(|o| o.rid == e.rid && o.kind == e.kind);
+                match found {
+                    Some(found) => current = found.clone(),
+                    None => return,
+                }
+                &*current
+            }
+        };
         self.publish(&e.entity_id, &e.gone, || e.render(self, &self.store.read()));
     }
 
@@ -455,26 +474,39 @@ impl Bridge {
     }
 
     /// Drop entities: their states, and their place as service targets.
+    ///
+    /// All under the write guard: a write that is being made ends first,
+    /// none comes after, and an entity given another id since `gone` was
+    /// found ([`follow`]) is dropped where it is now.
     fn remove(&self, gone: &Gone) {
-        {
-            // A write that is being made ends first; none comes after.
-            let _writes = self.alive.lock();
-            for l in &gone.lights {
-                l.gone.store(true, std::sync::atomic::Ordering::Relaxed);
+        let _writes = self.alive.lock();
+        let mut lights = Vec::new();
+        self.lights.write().retain(|l| {
+            let dropped = gone.lights.iter().any(|g| g.rid == l.rid);
+            if dropped {
+                lights.push(l.clone());
             }
-            for e in &gone.others {
-                e.gone.store(true, std::sync::atomic::Ordering::Relaxed);
-            }
-        }
-        self.lights
-            .write()
-            .retain(|l| !gone.lights.iter().any(|g| g.rid == l.rid));
+            !dropped
+        });
+        let mut others = Vec::new();
         self.others.write().retain(|e| {
-            !gone
+            let dropped = gone
                 .others
                 .iter()
-                .any(|g| g.rid == e.rid && g.kind == e.kind)
+                .any(|g| g.rid == e.rid && g.kind == e.kind);
+            if dropped {
+                others.push(e.clone());
+            }
+            !dropped
         });
+        // What still holds one under an id it has left writes nothing.
+        for l in gone.lights.iter().chain(&lights) {
+            l.gone.store(true, std::sync::atomic::Ordering::Relaxed);
+        }
+        for e in gone.others.iter().chain(&others) {
+            e.gone.store(true, std::sync::atomic::Ordering::Relaxed);
+        }
+        let gone = Gone { lights, others };
         for l in &gone.lights {
             self.platforms.lights.remove(&l.entity_id);
             self.hass.remove_state(&l.entity_id);

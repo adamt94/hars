@@ -1357,6 +1357,62 @@ fn a_device_with_legacy_named_entities_is_named_where_ha_writes_no_name() {
     assert_eq!(reg.snapshot().devices[0].name_by_user, None);
 }
 
+/// A name that would touch a legacy-named row (its unprefixed name
+/// changes) is refused when the entities' store can't be written: the
+/// device and the row stay as they were and nothing fires. A name that
+/// touches no row is taken.
+#[tokio::test]
+async fn a_name_that_touches_an_unsaved_row_is_refused() {
+    let dir = std::env::temp_dir().join(format!("hars-touch-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let hass = Hass::new();
+    let legacy = |id: &str, original: &str| {
+        Arc::new(Entity {
+            entity_id: id.to_owned(),
+            platform: "hue".into(),
+            unique_id: Some(json!(id)),
+            device_id: Some("dev".into()),
+            original_name: Some(original.to_owned()),
+            name: Some("Mine".into()),
+            ..Default::default()
+        })
+    };
+    let device = |id: &str| {
+        Arc::new(Device {
+            id: id.into(),
+            name: Some("Hue Bridge".into()),
+            ..Default::default()
+        })
+    };
+    let mut registries = Registries {
+        devices: vec![device("dev"), device("other")],
+        entities: vec![legacy("switch.wake", "Hue Bridge Wake up")],
+        ..Default::default()
+    };
+    // An entity store at an older minor version: not written.
+    registries.entity_file.minor = crate::STORES[0].2 - 1;
+    let reg = Registry::new(&hass, &dir, registries);
+    assert!(reg.unwritable(ENTITY_KEY) && !reg.unwritable(DEVICE_KEY));
+    let named = DevicePatch {
+        name_by_user: Some(Some("Hub".into())),
+        ..Default::default()
+    };
+    let before = reg.snapshot();
+    let mut rx = hass.bus().subscribe();
+    assert_eq!(
+        reg.update_device("dev", &named, &|_| true).err(),
+        Some(DeviceRefusal::Unwritable(ENTITY_KEY))
+    );
+    assert!(events(&mut rx).is_empty());
+    let after = reg.snapshot();
+    assert!(Arc::ptr_eq(&before.devices[0], &after.devices[0]));
+    assert!(Arc::ptr_eq(&before.entities[0], &after.entities[0]));
+    // A device with no such row takes the name.
+    let other = reg.update_device("other", &named, &|_| true).unwrap();
+    assert_eq!(other.name_by_user.as_deref(), Some("Hub"));
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
 /// `async_get_device`: a device is found by its identifier before any
 /// device that only shares an address with it (another integration's row
 /// for the same hardware, listed first, is not taken over); with no

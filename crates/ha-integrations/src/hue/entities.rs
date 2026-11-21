@@ -273,7 +273,9 @@ pub struct HueEntity {
     pub(super) rid: String,
     pub(super) entity_id: EntityId,
     /// A scene's last activation by HA (its state).
-    activated: Mutex<Option<String>>,
+    /// Shared with the same entity under another id ([`HueEntity::moved`]):
+    /// an activation that began under the old id lands on it there.
+    activated: std::sync::Arc<Mutex<Option<String>>>,
     /// The bridge no longer has this entity (its resource was deleted):
     /// set and read under the bridge's write guard ([`Bridge::remove`]),
     /// so a state rendered before the removal isn't written after it.
@@ -288,7 +290,7 @@ impl HueEntity {
             order: kind.order(ty),
             rid: rid.to_owned(),
             entity_id,
-            activated: Mutex::new(None),
+            activated: Default::default(),
             gone: std::sync::atomic::AtomicBool::new(false),
         }
     }
@@ -303,7 +305,7 @@ impl HueEntity {
             order: self.order,
             rid: self.rid.clone(),
             entity_id,
-            activated: Mutex::new(self.activated.lock().clone()),
+            activated: self.activated.clone(),
             gone: Default::default(),
         }
     }

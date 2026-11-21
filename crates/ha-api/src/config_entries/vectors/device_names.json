@@ -2,7 +2,7 @@
  "scenarios": [
   {
    "name": "hue",
-   "doc": "The dialog's last step after a Hue bridge is added: an area is made, the lamp is named and put in it, then the bedroom (a room: its light group, scenes and sensors) and the bridge are named, and each named device's entities take the ids that follow. Then the motion sensor is named on its device page (its entities keep their ids), and named back.",
+   "doc": "The dialog's last step after a Hue bridge is added: an area is made, the lamp is named and put in it, then the bedroom (a room: its light group, scenes and sensors) and the bridge are named, and each named device's entities take the ids that follow. Then the motion sensor is named on its device page (its entities keep their ids), named back, named again and given an empty name (its own counts again).",
    "subscriptions": [
     {
      "sub": "devices",
@@ -3518,6 +3518,231 @@
      "ws": {
       "user": "admin",
       "msg": {
+       "type": "config/device_registry/update",
+       "device_id": "<device:df9083a4-75b9-46a1-9575-133f738d893d>",
+       "name_by_user": ""
+      }
+     },
+     "replies": [
+      {
+       "type": "result",
+       "success": true,
+       "result": {
+        "area_id": "bedroom",
+        "configuration_url": null,
+        "config_entries": [
+         "<entry:1>"
+        ],
+        "config_entries_subentries": {
+         "<entry:1>": [
+          null
+         ]
+        },
+        "connections": [
+         [
+          "mac",
+          "00:17:88:01:00:00:00:07"
+         ]
+        ],
+        "created_at": "<ts>",
+        "disabled_by": null,
+        "entry_type": null,
+        "hw_version": null,
+        "id": "<device:df9083a4-75b9-46a1-9575-133f738d893d>",
+        "identifiers": [
+         [
+          "hue",
+          "df9083a4-75b9-46a1-9575-133f738d893d"
+         ]
+        ],
+        "labels": [],
+        "manufacturer": "Signify Netherlands B.V.",
+        "model": "Hue motion sensor",
+        "model_id": "SML003",
+        "modified_at": "<ts>",
+        "name_by_user": "",
+        "name": "Bedroom",
+        "primary_config_entry": "<entry:1>",
+        "serial_number": null,
+        "sw_version": "2.85.1",
+        "via_device_id": "<device:375f4b1e-5632-44d2-bafd-7bf40e2571d3>"
+       }
+      }
+     ],
+     "events": [
+      {
+       "sub": "devices",
+       "event": {
+        "event_type": "device_registry_updated",
+        "data": {
+         "action": "update",
+         "device_id": "<device:df9083a4-75b9-46a1-9575-133f738d893d>",
+         "changes": {
+          "name_by_user": "Bed sensor"
+         }
+        }
+       }
+      },
+      {
+       "sub": "states",
+       "event": {
+        "event_type": "state_changed",
+        "data": {
+         "entity_id": "binary_sensor.bedroom_bedroom_motion",
+         "old_state": {
+          "state": "off",
+          "attributes": {
+           "device_class": "motion",
+           "friendly_name": "Bed sensor Motion"
+          }
+         },
+         "new_state": {
+          "state": "off",
+          "attributes": {
+           "device_class": "motion",
+           "friendly_name": "Bedroom Motion"
+          }
+         }
+        }
+       }
+      },
+      {
+       "sub": "states",
+       "event": {
+        "event_type": "state_changed",
+        "data": {
+         "entity_id": "sensor.bedroom_bedroom_battery",
+         "old_state": {
+          "state": "100",
+          "attributes": {
+           "state_class": "measurement",
+           "battery_state": "normal",
+           "unit_of_measurement": "%",
+           "device_class": "battery",
+           "friendly_name": "Bed sensor Battery"
+          }
+         },
+         "new_state": {
+          "state": "100",
+          "attributes": {
+           "state_class": "measurement",
+           "battery_state": "normal",
+           "unit_of_measurement": "%",
+           "device_class": "battery",
+           "friendly_name": "Bedroom Battery"
+          }
+         }
+        }
+       }
+      },
+      {
+       "sub": "states",
+       "event": {
+        "event_type": "state_changed",
+        "data": {
+         "entity_id": "sensor.bedroom_bedroom_illuminance",
+         "old_state": {
+          "state": "14",
+          "attributes": {
+           "state_class": "measurement",
+           "light_level": 11640,
+           "unit_of_measurement": "lx",
+           "device_class": "illuminance",
+           "friendly_name": "Bed sensor Illuminance"
+          }
+         },
+         "new_state": {
+          "state": "14",
+          "attributes": {
+           "state_class": "measurement",
+           "light_level": 11640,
+           "unit_of_measurement": "lx",
+           "device_class": "illuminance",
+           "friendly_name": "Bedroom Illuminance"
+          }
+         }
+        }
+       }
+      },
+      {
+       "sub": "states",
+       "event": {
+        "event_type": "state_changed",
+        "data": {
+         "entity_id": "sensor.bedroom_bedroom_temperature",
+         "old_state": {
+          "state": "20.8",
+          "attributes": {
+           "state_class": "measurement",
+           "unit_of_measurement": "°C",
+           "device_class": "temperature",
+           "friendly_name": "Bed sensor Temperature"
+          }
+         },
+         "new_state": {
+          "state": "20.8",
+          "attributes": {
+           "state_class": "measurement",
+           "unit_of_measurement": "°C",
+           "device_class": "temperature",
+           "friendly_name": "Bedroom Temperature"
+          }
+         }
+        }
+       }
+      },
+      {
+       "sub": "states",
+       "event": {
+        "event_type": "state_changed",
+        "data": {
+         "entity_id": "switch.bedroom_bedroom_light_sensor_enabled",
+         "old_state": {
+          "state": "on",
+          "attributes": {
+           "device_class": "switch",
+           "friendly_name": "Bed sensor Light sensor enabled"
+          }
+         },
+         "new_state": {
+          "state": "on",
+          "attributes": {
+           "device_class": "switch",
+           "friendly_name": "Bedroom Light sensor enabled"
+          }
+         }
+        }
+       }
+      },
+      {
+       "sub": "states",
+       "event": {
+        "event_type": "state_changed",
+        "data": {
+         "entity_id": "switch.bedroom_bedroom_motion_sensor_enabled",
+         "old_state": {
+          "state": "on",
+          "attributes": {
+           "device_class": "switch",
+           "friendly_name": "Bed sensor Motion sensor enabled"
+          }
+         },
+         "new_state": {
+          "state": "on",
+          "attributes": {
+           "device_class": "switch",
+           "friendly_name": "Bedroom Motion sensor enabled"
+          }
+         }
+        }
+       }
+      }
+     ]
+    },
+    {
+     "ws": {
+      "user": "admin",
+      "msg": {
        "type": "config/device_registry/list"
       }
      },
@@ -3912,7 +4137,7 @@
          "model": "Hue motion sensor",
          "model_id": "SML003",
          "modified_at": "<ts>",
-         "name_by_user": "Bed sensor",
+         "name_by_user": "",
          "name": "Bedroom",
          "primary_config_entry": "<entry:1>",
          "serial_number": null,
@@ -5070,7 +5295,7 @@
      "model": "Hue motion sensor",
      "model_id": "SML003",
      "modified_at": "<time>",
-     "name_by_user": "Bed sensor",
+     "name_by_user": "",
      "name": "Bedroom",
      "primary_config_entry": "<entry:1>",
      "serial_number": null,
@@ -6260,7 +6485,7 @@
      "state": "off",
      "attributes": {
       "device_class": "motion",
-      "friendly_name": "Bed sensor Motion"
+      "friendly_name": "Bedroom Motion"
      }
     },
     "binary_sensor.bedroom_main_bedroom_motion": {
@@ -6622,7 +6847,7 @@
       "battery_state": "normal",
       "unit_of_measurement": "%",
       "device_class": "battery",
-      "friendly_name": "Bed sensor Battery"
+      "friendly_name": "Bedroom Battery"
      }
     },
     "sensor.bedroom_bedroom_illuminance": {
@@ -6632,7 +6857,7 @@
       "light_level": 11640,
       "unit_of_measurement": "lx",
       "device_class": "illuminance",
-      "friendly_name": "Bed sensor Illuminance"
+      "friendly_name": "Bedroom Illuminance"
      }
     },
     "sensor.bedroom_bedroom_temperature": {
@@ -6641,7 +6866,7 @@
       "state_class": "measurement",
       "unit_of_measurement": "°C",
       "device_class": "temperature",
-      "friendly_name": "Bed sensor Temperature"
+      "friendly_name": "Bedroom Temperature"
      }
     },
     "sensor.bedroom_main_bedroom_illuminance": {
@@ -6658,14 +6883,14 @@
      "state": "on",
      "attributes": {
       "device_class": "switch",
-      "friendly_name": "Bed sensor Light sensor enabled"
+      "friendly_name": "Bedroom Light sensor enabled"
      }
     },
     "switch.bedroom_bedroom_motion_sensor_enabled": {
      "state": "on",
      "attributes": {
       "device_class": "switch",
-      "friendly_name": "Bed sensor Motion sensor enabled"
+      "friendly_name": "Bedroom Motion sensor enabled"
      }
     },
     "switch.hub_automation_go_to_sleep": {
@@ -6737,7 +6962,7 @@
      "state": "off",
      "attributes": {
       "device_class": "motion",
-      "friendly_name": "Bed sensor Motion"
+      "friendly_name": "Bedroom Motion"
      }
     },
     "binary_sensor.bedroom_main_bedroom_motion": {
@@ -7099,7 +7324,7 @@
       "battery_state": "normal",
       "unit_of_measurement": "%",
       "device_class": "battery",
-      "friendly_name": "Bed sensor Battery"
+      "friendly_name": "Bedroom Battery"
      }
     },
     "sensor.bedroom_bedroom_illuminance": {
@@ -7109,7 +7334,7 @@
       "light_level": 11640,
       "unit_of_measurement": "lx",
       "device_class": "illuminance",
-      "friendly_name": "Bed sensor Illuminance"
+      "friendly_name": "Bedroom Illuminance"
      }
     },
     "sensor.bedroom_bedroom_temperature": {
@@ -7118,7 +7343,7 @@
       "state_class": "measurement",
       "unit_of_measurement": "°C",
       "device_class": "temperature",
-      "friendly_name": "Bed sensor Temperature"
+      "friendly_name": "Bedroom Temperature"
      }
     },
     "sensor.bedroom_main_bedroom_illuminance": {
@@ -7135,14 +7360,14 @@
      "state": "on",
      "attributes": {
       "device_class": "switch",
-      "friendly_name": "Bed sensor Light sensor enabled"
+      "friendly_name": "Bedroom Light sensor enabled"
      }
     },
     "switch.bedroom_bedroom_motion_sensor_enabled": {
      "state": "on",
      "attributes": {
       "device_class": "switch",
-      "friendly_name": "Bed sensor Motion sensor enabled"
+      "friendly_name": "Bedroom Motion sensor enabled"
      }
     },
     "switch.hub_automation_go_to_sleep": {
@@ -7156,7 +7381,7 @@
   },
   {
    "name": "lifx",
-   "doc": "The dialog's last step after a LIFX bulb is added: an area is made, the bulb is named and put in it, and its enabled entities take the ids that follow. Then it is named again on its device page (its entities keep their ids), and the name is taken away.",
+   "doc": "The dialog's last step after a LIFX bulb is added: an area is made, the bulb is named and put in it, and its enabled entities take the ids that follow. Then it is named again on its device page (its entities keep their ids), the name is taken away, made empty, and made the bulb's own.",
    "subscriptions": [
     {
      "sub": "devices",
@@ -8461,6 +8686,148 @@
      "ws": {
       "user": "admin",
       "msg": {
+       "type": "config/device_registry/update",
+       "device_id": "<device:d0:73:d5:00:00:20>",
+       "name_by_user": ""
+      }
+     },
+     "replies": [
+      {
+       "type": "result",
+       "success": true,
+       "result": {
+        "area_id": "study",
+        "configuration_url": null,
+        "config_entries": [
+         "<entry:1>"
+        ],
+        "config_entries_subentries": {
+         "<entry:1>": [
+          null
+         ]
+        },
+        "connections": [
+         [
+          "mac",
+          "d0:73:d5:00:00:21"
+         ]
+        ],
+        "created_at": "<ts>",
+        "disabled_by": null,
+        "entry_type": null,
+        "hw_version": null,
+        "id": "<device:d0:73:d5:00:00:20>",
+        "identifiers": [
+         [
+          "lifx",
+          "d0:73:d5:00:00:20"
+         ]
+        ],
+        "labels": [],
+        "manufacturer": "LIFX",
+        "model": "LIFX Color",
+        "model_id": null,
+        "modified_at": "<ts>",
+        "name_by_user": "",
+        "name": "Desk Lamp",
+        "primary_config_entry": "<entry:1>",
+        "serial_number": null,
+        "sw_version": "3.70",
+        "via_device_id": null
+       }
+      }
+     ],
+     "events": [
+      {
+       "sub": "devices",
+       "event": {
+        "event_type": "device_registry_updated",
+        "data": {
+         "action": "update",
+         "device_id": "<device:d0:73:d5:00:00:20>",
+         "changes": {
+          "name_by_user": null
+         }
+        }
+       }
+      }
+     ]
+    },
+    {
+     "ws": {
+      "user": "admin",
+      "msg": {
+       "type": "config/device_registry/update",
+       "device_id": "<device:d0:73:d5:00:00:20>",
+       "name_by_user": "Desk Lamp"
+      }
+     },
+     "replies": [
+      {
+       "type": "result",
+       "success": true,
+       "result": {
+        "area_id": "study",
+        "configuration_url": null,
+        "config_entries": [
+         "<entry:1>"
+        ],
+        "config_entries_subentries": {
+         "<entry:1>": [
+          null
+         ]
+        },
+        "connections": [
+         [
+          "mac",
+          "d0:73:d5:00:00:21"
+         ]
+        ],
+        "created_at": "<ts>",
+        "disabled_by": null,
+        "entry_type": null,
+        "hw_version": null,
+        "id": "<device:d0:73:d5:00:00:20>",
+        "identifiers": [
+         [
+          "lifx",
+          "d0:73:d5:00:00:20"
+         ]
+        ],
+        "labels": [],
+        "manufacturer": "LIFX",
+        "model": "LIFX Color",
+        "model_id": null,
+        "modified_at": "<ts>",
+        "name_by_user": "Desk Lamp",
+        "name": "Desk Lamp",
+        "primary_config_entry": "<entry:1>",
+        "serial_number": null,
+        "sw_version": "3.70",
+        "via_device_id": null
+       }
+      }
+     ],
+     "events": [
+      {
+       "sub": "devices",
+       "event": {
+        "event_type": "device_registry_updated",
+        "data": {
+         "action": "update",
+         "device_id": "<device:d0:73:d5:00:00:20>",
+         "changes": {
+          "name_by_user": ""
+         }
+        }
+       }
+      }
+     ]
+    },
+    {
+     "ws": {
+      "user": "admin",
+      "msg": {
        "type": "config/device_registry/list"
       }
      },
@@ -8502,7 +8869,7 @@
          "model": "LIFX Color",
          "model_id": null,
          "modified_at": "<ts>",
-         "name_by_user": null,
+         "name_by_user": "Desk Lamp",
          "name": "Desk Lamp",
          "primary_config_entry": "<entry:1>",
          "serial_number": null,
@@ -8723,7 +9090,7 @@
      "model": "LIFX Color",
      "model_id": null,
      "modified_at": "<time>",
-     "name_by_user": null,
+     "name_by_user": "Desk Lamp",
      "name": "Desk Lamp",
      "primary_config_entry": "<entry:1>",
      "serial_number": null,
