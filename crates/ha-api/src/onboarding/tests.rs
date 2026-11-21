@@ -187,6 +187,7 @@ async fn start(dir: &Path, whoami_up: bool) -> Install {
         entries.list().as_deref(),
         ha_integrations::light::Profiles::load(dir),
         &Default::default(),
+        None,
     );
     let weather = started.weather.clone();
     let onboarding = ha_integrations::onboarding::Onboarding::new(

@@ -433,6 +433,7 @@ async fn device_updates_as_ha() {
         model: Some(model.into()),
         name: Some(name.into()),
         sw_version: Some(sw.into()),
+        ..Default::default()
     };
     let v = vector("update_registration");
     let frames = |step: usize| -> Vec<(String, Value)> {
@@ -777,6 +778,7 @@ async fn re_adding_restores_the_tracker_and_device() {
         model: Some("iPhone17,1".into()),
         name: Some(" Phone".into()),
         sw_version: Some("27.0".into()),
+        ..Default::default()
     });
     assert_eq!(device.id, PHONE);
     assert!(reg.snapshot().device_file.deleted.is_empty());
@@ -1282,4 +1284,151 @@ fn a_device_change_enables_what_its_disable_disabled() {
     );
     let ids = reg.automatic_entity_ids(&["sensor.stale".to_owned()]);
     assert_eq!(ids[0].1.as_deref(), Some("sensor.switchbot_cloud_u1"));
+}
+
+/// `async_get_device`: a device is found by its identifier before any
+/// device that only shares an address with it (another integration's row
+/// for the same hardware, listed first, is not taken over); with no
+/// identifier in common it is the one with the address, spelled as HA
+/// spells MAC addresses. A deleted device comes back by its address too,
+/// with the id and the user's settings it had.
+#[test]
+fn devices_are_matched_by_identifier_then_by_address() {
+    let hass = Hass::new();
+    let device = |id: &str, identifier: Value, mac: &str| {
+        Arc::new(Device {
+            id: id.to_owned(),
+            identifiers: vec![identifier],
+            connections: vec![json!(["mac", mac])],
+            config_entries: vec!["other".into()],
+            name: Some(id.to_owned()),
+            ..Default::default()
+        })
+    };
+    let deleted = serde_json::value::RawValue::from_string(
+        json!({"id": "old", "identifiers": [["hue", "gone-uuid"]],
+               "connections": [["mac", "aa:bb:cc:00:00:09"]], "config_entries": ["e"],
+               "config_entries_subentries": {"e": [null]}, "name_by_user": "Mine",
+               "area_id": "den", "created_at": "2026-01-01T00:00:00+00:00",
+               "modified_at": "2026-01-01T00:00:00+00:00", "orphaned_timestamp": null,
+               "labels": [], "disabled_by": null})
+        .to_string(),
+    )
+    .unwrap();
+    let reg = Registry::in_memory(
+        &hass,
+        Registries {
+            devices: vec![
+                device("theirs", json!(["zha", "x"]), "aa:bb:cc:00:00:01"),
+                device("ours", json!(["hue", "uuid-1"]), "aa:bb:cc:00:00:01"),
+                device("lone", json!(["zha", "y"]), "aa:bb:cc:00:00:02"),
+            ],
+            device_file: crate::FileRest {
+                deleted: Arc::new(vec![deleted]),
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+    );
+    let info = |identifier: &str, mac: &str| DeviceInfo {
+        config_entry_id: "e".into(),
+        identifiers: vec![json!(["hue", identifier])],
+        connections: vec![json!(["mac", mac])],
+        ..Default::default()
+    };
+    // Its own row, though another with the address comes first.
+    assert_eq!(
+        reg.get_or_create_device(info("uuid-1", "AA-BB-CC-00-00-01"))
+            .id,
+        "ours"
+    );
+    let theirs = reg.snapshot().devices[0].clone();
+    assert_eq!(theirs.config_entries, ["other"]);
+    assert_eq!(theirs.identifiers, [json!(["zha", "x"])]);
+    // No identifier in common: the device with the address.
+    let merged = reg.get_or_create_device(info("uuid-2", "AABBCC000002"));
+    assert_eq!(merged.id, "lone");
+    assert!(merged.identifiers.contains(&json!(["hue", "uuid-2"])));
+    // A deleted one, by its address: back with what it had.
+    let back = reg.get_or_create_device(DeviceInfo {
+        suggested_area: Some("Bath".into()),
+        ..info("new-uuid", "aa:bb:cc:00:00:09")
+    });
+    assert_eq!(
+        (
+            back.id.as_str(),
+            back.name_by_user.as_deref(),
+            back.area_id.as_deref()
+        ),
+        ("old", Some("Mine"), Some("den"))
+    );
+    assert!(
+        reg.snapshot().areas.is_empty(),
+        "an area was suggested to a device that came back"
+    );
+}
+
+/// A new device's suggested area is not made when the areas' file can't
+/// be written: the device's row (which is saved) would point at an area
+/// gone after a restart. An area of that name that exists is used.
+#[tokio::test]
+async fn an_area_that_cant_be_saved_is_not_suggested() {
+    let older = crate::STORES
+        .iter()
+        .find(|s| s.0 == crate::AREA_KEY)
+        .unwrap()
+        .2
+        - 1;
+    let dir = std::env::temp_dir().join(format!("hars-no-area-{}", std::process::id()));
+    let hass = Hass::new();
+    let registries = Registries {
+        areas: vec![crate::Area {
+            id: "hall".into(),
+            name: "Hall".into(),
+            ..Default::default()
+        }],
+        area_minor: older,
+        ..Default::default()
+    };
+    let reg = Registry::new(&hass, &dir, registries);
+    let add = |identifier: &str, area: &str| {
+        reg.get_or_create_device(DeviceInfo {
+            config_entry_id: "e".into(),
+            identifiers: vec![json!(["hue", identifier])],
+            suggested_area: Some(area.into()),
+            ..Default::default()
+        })
+    };
+    assert_eq!(add("a", "Bath").area_id, None);
+    assert_eq!(add("b", "hall").area_id.as_deref(), Some("hall"));
+    assert_eq!(reg.snapshot().areas.len(), 1);
+}
+
+/// `_async_get_full_entity_name`: only an entity named the old way loses
+/// its device's name from the front of its own when its id is made. One
+/// with `has_entity_name` keeps it: a scene "Bedroom Wake" of the room
+/// "Bedroom" is `scene.bedroom_bedroom_wake`.
+#[test]
+fn only_old_names_lose_the_device_prefix_in_a_new_id() {
+    let hass = Hass::new();
+    let reg = Registry::in_memory(&hass, Registries::default());
+    let device = reg.get_or_create_device(DeviceInfo {
+        config_entry_id: "e".into(),
+        identifiers: vec![json!(["hue", "room"])],
+        name: Some("Bedroom".into()),
+        ..Default::default()
+    });
+    let make = |unique: &str, has_entity_name: bool| {
+        let patch = EntityPatch {
+            device_id: Some(Some(device.id.clone())),
+            has_entity_name: Some(has_entity_name),
+            object_id_base: Some(Some("Bedroom Wake".into())),
+            ..Default::default()
+        };
+        reg.get_or_create_entity("scene", "hue", unique, None, patch)
+            .entity_id
+            .clone()
+    };
+    assert_eq!(make("new", true), "scene.bedroom_bedroom_wake");
+    assert_eq!(make("old", false), "scene.bedroom_wake");
 }

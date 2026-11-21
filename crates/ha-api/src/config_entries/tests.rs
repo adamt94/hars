@@ -29,12 +29,174 @@ const BOT: &str = "AABBCC000001";
 const HUB: &str = "AABBCC000002";
 
 /// The SwitchBot API of `scripts/vectors/config_flow.py` (`FakeApi`): the
-/// recorded responses, or what `mode` says.
+/// recorded responses, or what `mode` says. And the Hue bridge and its
+/// discovery service of `scripts/vectors/hue_flow.py` (`Hue`), which get
+/// their requests as `/<scheme>/<host>/<path>` and `/discovery`, and keep
+/// them as that script records what aiohue asked.
 struct FakeApi {
     mode: parking_lot::Mutex<String>,
+    hue: parking_lot::Mutex<HueMode>,
+    requests: parking_lot::Mutex<Vec<Value>>,
+    /// What the bridge says on its event stream, to whoever listens.
+    events: tokio::sync::broadcast::Sender<String>,
+}
+
+/// `Hue.set` in `hue_flow.py`.
+struct HueMode {
+    pressed: bool,
+    bridge: String,
+    discovery: String,
+}
+
+const HUE_HOST: &str = "192.0.2.10";
+/// Another address of the same bridge.
+const HUE_ALIAS: &str = "192.0.2.12";
+const HUE_KEY: &str = "fake-hue-application-key-0000000000000001";
+
+/// What the fake answers: a status, content type and body; the event
+/// stream, which is opened and left silent; or nothing (the connection is
+/// closed, as where nothing listens).
+enum Answer {
+    Reply(u16, &'static str, String),
+    Stream,
+    Hang,
+    Refuse,
 }
 
 impl FakeApi {
+    /// An `api` step: how SwitchBot's API, the bridge or the discovery
+    /// answers from here on.
+    fn set(&self, mode: &str) {
+        let mut hue = self.hue.lock();
+        match mode {
+            "pressed" | "not_pressed" => hue.pressed = mode == "pressed",
+            m if m.starts_with("discovery_") => hue.discovery = m["discovery_".len()..].into(),
+            m if m.starts_with("bridge_") => hue.bridge = m["bridge_".len()..].into(),
+            _ => *self.mode.lock() = mode.to_owned(),
+        }
+    }
+
+    /// The requests the bridge and discovery got since the last call.
+    fn take(&self) -> Vec<Value> {
+        std::mem::take(&mut *self.requests.lock())
+    }
+
+    fn hue(&self, method: &str, path: &str, key: Option<&str>, body: &[u8]) -> Answer {
+        let json =
+            |status, body: Value| Answer::Reply(status, "application/json", body.to_string());
+        let hue = self.hue.lock();
+        let note = |url: String| {
+            let mut request = json!({"method": method.to_uppercase(), "url": url});
+            if let Ok(sent) = serde_json::from_slice::<Value>(body) {
+                request["json"] = sent;
+            }
+            if key.is_some() {
+                request["key"] = json!(true);
+            }
+            self.requests.lock().push(request);
+        };
+        if path == "/discovery" {
+            note("https://discovery.meethue.com/".into());
+            let bridge =
+                |id: &str, host: &str| json!({"id": id, "internalipaddress": host, "port": 443});
+            return match hue.discovery.as_str() {
+                "down" => Answer::Refuse,
+                "slow" => Answer::Hang,
+                "none" => json(200, json!([])),
+                "two" => json(
+                    200,
+                    json!([
+                        bridge("c42996fffe000001", HUE_HOST),
+                        bridge("c42996fffe000002", "192.0.2.11")
+                    ]),
+                ),
+                _ => json(200, json!([bridge("c42996fffe000001", HUE_HOST)])),
+            };
+        }
+        // `/<scheme>/<host>/<path>`.
+        let mut parts = path.splitn(4, '/').skip(1);
+        let (scheme, host, rest) = (
+            parts.next().unwrap_or_default(),
+            parts.next().unwrap_or_default(),
+            parts.next().unwrap_or_default(),
+        );
+        if rest.starts_with("eventstream") {
+            return Answer::Stream;
+        }
+        note(format!("{scheme}://{host}/{rest}"));
+        if ![HUE_HOST, HUE_ALIAS].contains(&host) || hue.bridge == "down" {
+            return Answer::Refuse;
+        }
+        match (method, rest) {
+            ("GET", "api/config") => {
+                let mut config = json!({"name": "Hue Bridge", "datastoreversion": "172",
+                    "swversion": "1971060010", "apiversion": "1.71.0",
+                    "mac": "c4:29:96:00:00:01", "bridgeid": "C42996FFFE000001",
+                    "factorynew": false, "replacesbridgeid": null, "modelid": "BSB003",
+                    "starterkitid": ""});
+                if hue.bridge == "not_hue" {
+                    config.as_object_mut().unwrap().remove("bridgeid");
+                }
+                json(200, config)
+            }
+            ("POST", "api") if hue.bridge == "broken" => {
+                Answer::Reply(500, "text/plain", "broken".into())
+            }
+            ("POST", "api") if !hue.pressed => json(
+                200,
+                json!([{"error": {"type": 101, "address": "",
+                                  "description": "link button not pressed"}}]),
+            ),
+            ("POST", "api") => json(
+                200,
+                json!([{"success": {"username": HUE_KEY, "clientkey": "FAKECLIENTKEY"}}]),
+            ),
+            ("GET", "clip/v2/resource") => {
+                if hue.bridge == "v1" {
+                    return Answer::Reply(404, "text/plain", "Not found".into());
+                }
+                if key != Some(HUE_KEY) || hue.bridge == "key_refused" {
+                    return json(
+                        403,
+                        json!({"errors": [{"description": "unauthorized user"}], "data": []}),
+                    );
+                }
+                if hue.bridge == "resources_down" {
+                    return Answer::Refuse;
+                }
+                if hue.bridge == "empty" {
+                    return json(200, json!({"errors": [], "data": []}));
+                }
+                let resources =
+                    include_str!("../../../ha-integrations/src/hue/vectors/resource.json");
+                match hue.bridge.as_str() {
+                    // Not said to be JSON; said to be and isn't.
+                    "html" => Answer::Reply(200, "text/html", resources.to_owned()),
+                    "garbled" => Answer::Reply(200, "application/json", "<html>".into()),
+                    // A device has a `bridge` service, but of some other
+                    // bridge resource than the one there is.
+                    "other_bridge" => {
+                        let mut all: Value = serde_json::from_str(resources).unwrap();
+                        for r in all["data"].as_array_mut().unwrap() {
+                            for service in r["services"].as_array_mut().into_iter().flatten() {
+                                if service["rtype"] == "bridge" {
+                                    service["rid"] = json!("00000000-0000-4000-8000-00000000bbbb");
+                                }
+                            }
+                        }
+                        Answer::Reply(200, "application/json", all.to_string())
+                    }
+                    _ => Answer::Reply(200, "application/json", resources.to_owned()),
+                }
+            }
+            ("PUT", _) => json(200, json!({"errors": [], "data": []})),
+            _ => json(
+                404,
+                json!({"errors": [{"description": "not found"}], "data": []}),
+            ),
+        }
+    }
+
     /// (status, content type, body); `None` closes the connection unanswered.
     fn reply(&self, path: &str) -> Option<(u16, &'static str, String)> {
         let json = |status, body: &str| Some((status, "application/json", body.to_owned()));
@@ -81,6 +243,13 @@ impl FakeApi {
         let base = format!("http://{}", listener.local_addr().unwrap());
         let api = Arc::new(Self {
             mode: parking_lot::Mutex::new("ok".into()),
+            hue: parking_lot::Mutex::new(HueMode {
+                pressed: false,
+                bridge: "ok".into(),
+                discovery: "one".into(),
+            }),
+            requests: parking_lot::Mutex::default(),
+            events: tokio::sync::broadcast::channel(16).0,
         });
         let served = api.clone();
         tokio::spawn(async move {
@@ -89,17 +258,75 @@ impl FakeApi {
                 let api = served.clone();
                 tokio::spawn(async move {
                     let mut buf = Vec::new();
-                    while !buf.windows(4).any(|w| w == b"\r\n\r\n") {
+                    let end = loop {
+                        if let Some(at) = buf.windows(4).position(|w| w == b"\r\n\r\n") {
+                            break at + 4;
+                        }
+                        let mut chunk = [0u8; 4096];
+                        match s.read(&mut chunk).await {
+                            Ok(n) if n > 0 => buf.extend_from_slice(&chunk[..n]),
+                            _ => return,
+                        }
+                    };
+                    let head = String::from_utf8_lossy(&buf[..end]).into_owned();
+                    let mut first = head.split(' ');
+                    let method = first.next().unwrap_or_default();
+                    let path = first.next().unwrap_or_default();
+                    let header = |name: &str| {
+                        head.lines().find_map(|l| {
+                            let (k, v) = l.split_once(':')?;
+                            k.eq_ignore_ascii_case(name).then(|| v.trim().to_owned())
+                        })
+                    };
+                    let length: usize = header("content-length")
+                        .and_then(|l| l.parse().ok())
+                        .unwrap_or(0);
+                    while buf.len() < end + length {
                         let mut chunk = [0u8; 4096];
                         match s.read(&mut chunk).await {
                             Ok(n) if n > 0 => buf.extend_from_slice(&chunk[..n]),
                             _ => return,
                         }
                     }
-                    let head = String::from_utf8_lossy(&buf).into_owned();
-                    let path = head.split(' ').nth(1).unwrap_or_default();
-                    let Some((status, content_type, body)) = api.reply(path) else {
-                        return;
+                    let answer = if path.starts_with("/v1.1/") {
+                        match api.reply(path) {
+                            Some((status, kind, body)) => Answer::Reply(status, kind, body),
+                            None => Answer::Refuse,
+                        }
+                    } else {
+                        let key = header("hue-application-key");
+                        api.hue(method, path, key.as_deref(), &buf[end..])
+                    };
+                    let (status, content_type, body) = match answer {
+                        Answer::Reply(status, kind, body) => (status, kind, body),
+                        Answer::Refuse => return,
+                        Answer::Hang => {
+                            tokio::time::sleep(std::time::Duration::from_secs(30)).await;
+                            return;
+                        }
+                        Answer::Stream => {
+                            let mut events = api.events.subscribe();
+                            let head = "HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\n\r\n: hi\n\n";
+                            let _ = s.write_all(head.as_bytes()).await;
+                            // Until the other side goes.
+                            let mut rest = [0u8; 64];
+                            loop {
+                                tokio::select! {
+                                    event = events.recv() => {
+                                        let Ok(event) = event else { return };
+                                        let line = format!("id: 1:0\ndata: {event}\n\n");
+                                        if s.write_all(line.as_bytes()).await.is_err() {
+                                            return;
+                                        }
+                                    }
+                                    read = s.read(&mut rest) => {
+                                        if !matches!(read, Ok(n) if n > 0) {
+                                            return;
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     };
                     let res = format!(
                         "HTTP/1.1 {status} X\r\ncontent-type: {content_type}\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}",
@@ -138,7 +365,13 @@ async fn home_on(hass: Hass, registry: Arc<ha_registry::Registry>) -> Home {
         &hass,
         entries.clone(),
         components.clone(),
-        Endpoints { switchbot: base },
+        Endpoints {
+            switchbot: base.clone(),
+            hue_discovery: format!("{base}/discovery"),
+            // HA gives the discovery 5 s; a replay doesn't wait that long.
+            hue_discovery_timeout: std::time::Duration::from_millis(400),
+            hue_bridge: Some(base),
+        },
         Vec::new(),
         None,
     );
@@ -218,11 +451,19 @@ impl Ids {
     /// The devices there are now, for the steps that name one.
     fn learn_devices(&mut self, registries: &ha_registry::Registries) {
         for d in &registries.devices {
-            for i in &d.identifiers {
-                let name = format!("<device:{}>", i[1].as_str().unwrap());
-                if i[0] == "switchbot_cloud" && !self.devices.iter().any(|(id, _)| *id == d.id) {
-                    self.devices.push((d.id.clone(), name));
-                }
+            // The first of its identifiers, sorted (a set in HA).
+            let mut idents: Vec<&str> = d
+                .identifiers
+                .iter()
+                .filter(|i| i[0] == "switchbot_cloud" || i[0] == "hue")
+                .filter_map(|i| i[1].as_str())
+                .collect();
+            idents.sort_unstable();
+            if let Some(first) = idents.first()
+                && !self.devices.iter().any(|(id, _)| *id == d.id)
+            {
+                self.devices
+                    .push((d.id.clone(), format!("<device:{first}>")));
             }
         }
     }
@@ -413,7 +654,7 @@ async fn replay_slowly(scenario: &Value, pause: std::time::Duration) {
             socket.at.clone_from(&at);
         }
         if let Some(mode) = step["api"].as_str() {
-            *home.api.mode.lock() = mode.to_owned();
+            home.api.set(mode);
             continue;
         }
         let request = |method: &str, path: &str, user: Option<&str>, body: Option<&str>| {
@@ -459,7 +700,7 @@ async fn replay_slowly(scenario: &Value, pause: std::time::Duration) {
                 let listed: Vec<String> = serde_json::from_str(&body).unwrap();
                 let want: &[&str] = match query {
                     "?type=helper" => &[],
-                    _ => &["switchbot_cloud"],
+                    _ => &["hue", "switchbot_cloud"],
                 };
                 assert_eq!(listed, want, "{at}");
                 let known = step["known"].as_array().unwrap();
@@ -488,6 +729,10 @@ async fn replay_slowly(scenario: &Value, pause: std::time::Duration) {
                 list.sort_by_key(key);
             }
             let got = ids.plain(&json!(replies), None);
+            assert!(
+                !got.to_string().contains(HUE_KEY),
+                "{at}: the key is in a reply"
+            );
             assert_eq!(got, step["replies"], "{at}");
             // The generator closes a subscription a step opened.
             let subscribed = sent["msg"]["type"].as_str().unwrap().ends_with("subscribe")
@@ -508,12 +753,13 @@ async fn replay_slowly(scenario: &Value, pause: std::time::Duration) {
                 http["sent"].as_str(),
             )
             .await;
+            assert!(!body.contains(HUE_KEY), "{at}: the key is in a reply");
             assert_eq!(status, step["status"], "{at}\n{body}");
             assert_eq!(content_type, step["content_type"], "{at}");
             assert_eq!(allow, step["allow"], "{at}");
             if let Some(known) = step.get("known") {
                 let listed: Vec<String> = serde_json::from_str(&body).unwrap();
-                assert_eq!(listed, ["switchbot_cloud"], "{at}");
+                assert_eq!(listed, ["hue", "switchbot_cloud"], "{at}");
                 assert!(
                     known
                         .as_array()
@@ -527,6 +773,41 @@ async fn replay_slowly(scenario: &Value, pause: std::time::Duration) {
             } else {
                 assert_eq!(json!(body), step["text"], "{at}");
             }
+        }
+        // What the bridge and the discovery service were asked, as aiohue
+        // asked them. After a set-up `hars` reads the resources once more
+        // (its event stream's reconnect rule), at a moment of its own:
+        // those requests are only counted on.
+        if let Some(want) = step.get("requests") {
+            let shape = |all: &[Value]| -> Vec<Value> {
+                all.iter()
+                    .map(|r| {
+                        json!({"method": r["method"].as_str().unwrap().to_uppercase(),
+                               "url": r["url"], "json": r.get("json"),
+                               "key": r["key"] == true})
+                    })
+                    .collect()
+            };
+            let want = shape(want.as_array().unwrap());
+            // `hars` reads the resources again whenever its event stream
+            // connects, at a moment of its own (often in a later step):
+            // only as many reads with the key as HA made count, where HA
+            // made them. Any other request with the key (a command) is
+            // compared like the rest.
+            let read = |r: &Value| {
+                r["key"] == true
+                    && r["method"] == "GET"
+                    && r["url"].as_str().unwrap().ends_with("/clip/v2/resource")
+            };
+            let mut reads = want.iter().filter(|r| read(r)).count();
+            let mut got = shape(&home.api.take());
+            got.retain(|r| {
+                let read = read(r);
+                let kept = !read || reads > 0;
+                reads -= usize::from(read && reads > 0);
+                kept
+            });
+            assert_eq!(got, want, "{at}: requests");
         }
         ids.learn_devices(&home.registry.snapshot());
         let want: Vec<&Value> = step["events"]
@@ -557,6 +838,10 @@ async fn replay_slowly(scenario: &Value, pause: std::time::Duration) {
                 events.push(json!({"sub": sub, "event": event}));
             }
         }
+        assert!(
+            !json!(events).to_string().contains(HUE_KEY),
+            "{at}: the key is in a push"
+        );
         if rows {
             // Each subscription's events by row, a row's own in order.
             let order = |e: &Value| subs.iter().position(|(sub, _)| e["sub"] == *sub);
@@ -588,18 +873,25 @@ async fn replay_slowly(scenario: &Value, pause: std::time::Duration) {
     // The registries as stored, and the registered entities' states.
     ids.learn_devices(&registries);
     let mut devices: Vec<Value> = registries.devices.iter().map(|d| json!(d)).collect();
+    for device in &mut devices {
+        // Sets in HA, written sorted by the generator.
+        for key in ["identifiers", "connections"] {
+            let set = device[key].as_array_mut().unwrap();
+            set.sort_by_key(Value::to_string);
+        }
+    }
     devices.sort_by_key(|d| d["identifiers"].to_string());
-    assert_eq!(
-        ids.plain(&json!(devices), None),
-        scenario["devices"],
-        "{name}: devices"
+    same_rows(
+        &ids.plain(&json!(devices), None),
+        &scenario["devices"],
+        &format!("{name}: devices"),
     );
     let mut entities: Vec<Value> = registries.entities.iter().map(|e| json!(e)).collect();
     entities.sort_by_key(|e| e["entity_id"].to_string());
-    assert_eq!(
-        ids.plain(&json!(entities), None),
-        scenario["entities"],
-        "{name}: entities"
+    same_rows(
+        &ids.plain(&json!(entities), None),
+        &scenario["entities"],
+        &format!("{name}: entities"),
     );
     assert_eq!(
         ids.plain(&json!(registries.areas), None),
@@ -611,11 +903,25 @@ async fn replay_slowly(scenario: &Value, pause: std::time::Duration) {
         .filter_map(|e| {
             let id = ha_core::EntityId::parse(e["entity_id"].as_str()?).ok()?;
             let state = home.server.hass.states().get(&id)?;
-            let state = json!({"state": state.state, "attributes": state.attributes});
+            let mut attributes = json!(state.attributes);
+            // Sets in HA, written sorted by `hue_flow.py`.
+            for key in ["hue_scenes", "lights", "entity_id"] {
+                if let Some(set) = attributes.get_mut(key).and_then(Value::as_array_mut) {
+                    set.sort_by_key(Value::to_string);
+                }
+            }
+            let state = json!({"state": state.state, "attributes": attributes});
             Some((id.to_string(), state))
         })
         .collect();
-    assert_eq!(json!(states), scenario["states"], "{name}: states");
+    for (id, want) in scenario["states"].as_object().unwrap() {
+        assert_eq!(states.get(id), Some(want), "{name}: the state of {id}");
+    }
+    assert_eq!(
+        states.len(),
+        scenario["states"].as_object().unwrap().len(),
+        "{name}: states"
+    );
     // And no state is left under an id that has no row (an old id).
     let all = home.server.hass.states().all();
     let orphans: Vec<&str> = all
@@ -627,6 +933,42 @@ async fn replay_slowly(scenario: &Value, pause: std::time::Duration) {
         orphans.is_empty(),
         "{name}: states with no row: {orphans:?}"
     );
+}
+
+/// Two lists of registry rows are the same; if not, the first row that
+/// differs is shown by the fields that do.
+fn same_rows(got: &Value, want: &Value, what: &str) {
+    let (got, want) = (got.as_array().unwrap(), want.as_array().unwrap());
+    for (n, (g, w)) in got.iter().zip(want).enumerate() {
+        if g == w {
+            continue;
+        }
+        let keys: Vec<&String> = g
+            .as_object()
+            .into_iter()
+            .flat_map(|o| o.keys())
+            .chain(w.as_object().into_iter().flat_map(|o| o.keys()))
+            .filter(|k| g.get(k.as_str()) != w.get(k.as_str()))
+            .collect();
+        let field = |row: &Value| -> Vec<String> {
+            let mut seen = Vec::new();
+            for k in &keys {
+                let line = format!("{k}: {}", row.get(k.as_str()).unwrap_or(&Value::Null));
+                if !seen.contains(&line) {
+                    seen.push(line);
+                }
+            }
+            seen
+        };
+        panic!(
+            "{what}: row {n} ({} / {}) differs\n  hars: {:?}\n  HA:   {:?}",
+            g.get("entity_id").or(g.get("name")).unwrap_or(&Value::Null),
+            w.get("entity_id").or(w.get("name")).unwrap_or(&Value::Null),
+            field(g),
+            field(w)
+        );
+    }
+    assert_eq!(got.len(), want.len(), "{what}: how many");
 }
 
 fn scenarios() -> Vec<Value> {
@@ -643,6 +985,23 @@ async fn flows_answer_as_home_assistant() {
     let scenarios = scenarios();
     assert_eq!(scenarios.len(), 13);
     for scenario in &scenarios {
+        replay(scenario).await;
+    }
+}
+
+/// Adding a Hue bridge, as HA 2026.6.1 with aiohue 4.8.1 answered
+/// (`vectors/hue_flow.json`): discovery, a host typed in, the link button,
+/// each failure, a bridge that is set up already, two flows at once, a
+/// bridge that can't be reached once it has given its key, and removal.
+/// Every request the flow makes of the bridge and of the discovery service
+/// is HA's, in HA's order; the first scenario's registry rows and states
+/// are HA's too.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_hue_bridge_is_added_as_in_home_assistant() {
+    let all: Value = serde_json::from_str(include_str!("vectors/hue_flow.json")).unwrap();
+    let scenarios = all["scenarios"].as_array().unwrap();
+    assert_eq!(scenarios.len(), 9);
+    for scenario in scenarios {
         replay(scenario).await;
     }
 }
@@ -713,7 +1072,8 @@ async fn the_dialog_lists_what_can_be_added() {
     assert_eq!(result["custom"], ha["custom"]);
     assert_eq!(
         result["core"]["integration"],
-        json!({"switchbot_cloud": ha["known"]["switchbot_cloud"]["description"]})
+        json!({"hue": ha["known"]["hue"]["description"],
+               "switchbot_cloud": ha["known"]["switchbot_cloud"]["description"]})
     );
     assert_eq!(result["core"]["helper"], json!({}));
     assert_eq!(result["core"]["translated_name"], json!([]));
@@ -733,7 +1093,8 @@ async fn the_dialog_lists_what_can_be_added() {
     let reply = admin.call(&titles).await;
     assert_eq!(
         reply[0]["result"]["resources"],
-        json!({"component.switchbot_cloud.title": "SwitchBot Cloud"})
+        json!({"component.hue.title": "Philips Hue",
+               "component.switchbot_cloud.title": "SwitchBot Cloud"})
     );
     // The form's labels and errors, as the dialog asks for them.
     let reply = admin
@@ -770,7 +1131,22 @@ async fn the_dialog_lists_what_can_be_added() {
     ];
     flows.configure(&flow_id, Some(input)).await.unwrap();
     let reply = admin.call(&titles).await;
-    assert_eq!(reply[0]["result"]["resources"], json!({}));
+    assert_eq!(
+        reply[0]["result"]["resources"],
+        json!({"component.hue.title": "Philips Hue"})
+    );
+    // Hue's dialog: HA's words, and `hars`'s own for a bridge it can't run.
+    let hue = json!({"type": "frontend/get_translations", "language": "en",
+                     "category": "config", "integration": ["hue"]});
+    let reply = admin.call(&hue).await;
+    let config = &reply[0]["result"]["resources"];
+    assert_eq!(
+        config["component.hue.config.error.register_failed"],
+        "Failed to register, please try again"
+    );
+    assert_eq!(config["component.hue.config.step.link.title"], "Link Hub");
+    let own = config["component.hue.config.abort.not_v2_bridge"].as_str();
+    assert!(own.is_some_and(|text| text.contains("first version of the Hue API")));
     let reply = admin.call(&json!({"type": "get_config"})).await;
     let components = reply[0]["result"]["components"].as_array().unwrap();
     for domain in ["switchbot_cloud", "button", "climate", "sensor", "switch"] {
@@ -913,7 +1289,7 @@ async fn an_unwritable_store_is_said_where_the_user_tries() {
         send("GET", &format!("{}_handlers", super::FLOW), "")
             .await
             .2,
-        r#"["switchbot_cloud"]"#
+        r#"["hue","switchbot_cloud"]"#
     );
     let mut ws = Client::authed(&server, &admin).await;
     ws.send(json!({"id": 1, "type": "integration/descriptions"}))
@@ -1119,4 +1495,320 @@ async fn a_store_that_cant_be_written_is_not_changed_in_memory() {
         json!({"button.towel_switch": "button.towel_switch"})
     );
     assert!(!dir.exists(), "something was written");
+}
+
+/// Hue's flow, by the manager's own calls: the result of each.
+async fn hue_flow(
+    flows: &Arc<Manager>,
+    answers: &[Option<Value>],
+) -> ha_integrations::flow::FlowResult {
+    use ha_integrations::flow::{FlowResult, SOURCE_USER};
+    let mut result = flows.init("hue", SOURCE_USER).await.unwrap();
+    for answer in answers {
+        let FlowResult::Form { flow_id, .. } = &result else {
+            panic!("no form to answer: {result:?}");
+        };
+        let input = answer.as_ref().map(|a| {
+            let fields = a.as_object().unwrap();
+            fields.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
+        });
+        result = flows.configure(flow_id, input).await.unwrap();
+    }
+    result
+}
+
+/// A bridge that only has the first version of the Hue API ends the flow,
+/// found by discovery or typed in, where HA goes on to make a v1 entry:
+/// `hars` has no v1 client, so that entry could never be set up. No entry
+/// is made and the bridge is asked for no key.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_bridge_without_the_v2_api_makes_no_entry() {
+    use ha_integrations::flow::FlowResult;
+    let home = home().await;
+    let flows = home.config.flows.clone().unwrap();
+    home.api.set("bridge_v1");
+    for answers in [
+        vec![Some(json!({"id": "c42996000001"}))],
+        vec![
+            Some(json!({"id": "manual"})),
+            Some(json!({"host": HUE_HOST})),
+        ],
+    ] {
+        let result = hue_flow(&flows, &answers).await;
+        let FlowResult::Abort { reason, .. } = result else {
+            panic!("{result:?}");
+        };
+        assert_eq!(reason, "not_v2_bridge");
+    }
+    assert_eq!(home.entries.list(), Some(Vec::new()));
+    let asked = home.api.take();
+    assert!(
+        asked.iter().all(|r| r["method"] == "GET"),
+        "the bridge was asked for a key: {asked:?}"
+    );
+    assert_eq!(flows.in_progress(), 0);
+}
+
+/// A bridge's whole life on one config directory, each start of `hars` in
+/// a runtime of its own (so the one before has really stopped), against
+/// a bridge that outlives them.
+///
+/// Added from the UI, it is there after a restart: the entry starts from
+/// the files, its devices and entities have the rows and ids the flow's
+/// set-up gave them (none is made or changed), its lights have their
+/// states. A scene the bridge reports later has no registry row, and
+/// still goes when the entry is removed: with no restart needed, no row,
+/// no state and nothing that reaches the bridge is left.
+///
+/// A start-up says how each entry's set-up went: a bridge that can't be
+/// reached is retried, one that refuses its key or whose resources name
+/// no bridge has failed. An entry that never had a unique id takes its
+/// bridge's; a second entry for the same bridge (another address of it)
+/// is not started, and the first keeps every row. An ignored entry is
+/// never set up.
+#[test]
+fn a_hue_bridge_from_adding_to_removing_across_restarts() {
+    use ha_integrations::config_entries::EntryState;
+    use ha_integrations::flow::FlowResult;
+    let dir = std::env::temp_dir().join(format!("hars-hue-restart-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(dir.join(".storage")).unwrap();
+    let outer = tokio::runtime::Runtime::new().unwrap();
+    let (base, api) = outer.block_on(FakeApi::start());
+    let endpoints = Endpoints {
+        hue_discovery: format!("{base}/discovery"),
+        hue_bridge: Some(base.clone()),
+        ..Default::default()
+    };
+    // `hars` started on the directory.
+    let start = |hass: &Hass| {
+        let entries = ConfigEntries::load(hass, &dir);
+        let loaded = ha_registry::Registries::load(&dir).unwrap();
+        let registry = ha_registry::Registry::new(hass, &dir, loaded);
+        let lookup = entries.clone();
+        registry.set_entry_lookup(Arc::new(move |id: &str| lookup.info(id)));
+        let stored = entries.list();
+        let started = ha_integrations::start(
+            hass,
+            registry.clone().into(),
+            stored.as_deref(),
+            Default::default(),
+            &endpoints,
+            Some(&entries),
+        );
+        let flows = Manager::new(
+            hass,
+            entries.clone(),
+            started.components,
+            endpoints.clone(),
+            started.tasks,
+            None,
+        )
+        .unwrap();
+        (entries, registry, flows)
+    };
+    // One run of `hars`: everything it started ends with it.
+    fn run<T>(life: impl Future<Output = T>) -> T {
+        tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(2)
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(life)
+    }
+    let rows = |registry: &ha_registry::Registry| {
+        let r = registry.snapshot();
+        json!([r.devices, r.entities, r.areas])
+    };
+    let state = |hass: &Hass, id: &str| {
+        let id = ha_core::EntityId::parse(id).unwrap();
+        hass.states()
+            .get(&id)
+            .map(|s| json!({"state": s.state, "name": s.attributes["friendly_name"]}))
+    };
+    let lamp = Some(json!({"state": "off", "name": "Lamp"}));
+    let entry_of = |entries: &ConfigEntries, source: &str, host: &str, unique: Option<&str>| {
+        let data = json!({"host": host, "api_key": HUE_KEY, "api_version": 2});
+        let data = data.as_object().unwrap().clone();
+        let entry = entries.new_entry("hue", source, "Hue Bridge", unique, data);
+        let id = entry["entry_id"].as_str().unwrap().to_owned();
+        entries.add(entry);
+        id
+    };
+
+    // Added from the UI.
+    api.set("pressed");
+    let (entry_id, before) = run(async {
+        let hass = Hass::new();
+        let (entries, registry, flows) = start(&hass);
+        let answers = [Some(json!({"id": "c42996000001"})), Some(json!({}))];
+        let added = hue_flow(&flows, &answers).await;
+        let FlowResult::CreateEntry { entry, .. } = added else {
+            panic!("{added:?}");
+        };
+        assert_eq!(state(&hass, "light.living_room_lamp"), lamp);
+        entries.flush().await;
+        registry.flush().await;
+        let before = rows(&registry);
+        assert_eq!(before[0].as_array().unwrap().len(), 10);
+        assert_eq!(before[1].as_array().unwrap().len(), 28);
+        (entry["entry_id"].as_str().unwrap().to_owned(), before)
+    });
+
+    // A restart: the same rows and states. Then a scene the bridge only
+    // now reports, and the entry's removal.
+    run(async {
+        let hass = Hass::new();
+        let (entries, registry, flows) = start(&hass);
+        hass.setups_done().await;
+        assert_eq!(entries.list().unwrap().len(), 1);
+        let loaded = entries.runtime(&entry_id).map(|r| r.state);
+        assert_eq!(loaded, Some(EntryState::Loaded));
+        assert_eq!(rows(&registry), before, "a restart changed a row");
+        assert_eq!(state(&hass, "light.living_room_lamp"), lamp);
+        assert!(state(&hass, "sensor.bedroom_bedroom_temperature").is_some());
+
+        let resources: Value = serde_json::from_str(include_str!(
+            "../../../ha-integrations/src/hue/vectors/resource.json"
+        ))
+        .unwrap();
+        // A scene made in the Hue app after `hars` set the bridge up.
+        let mut late = resources["data"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|r| r["type"] == "scene")
+            .unwrap()
+            .clone();
+        late["id"] = json!("00000000-0000-4000-8000-00000000aaaa");
+        late["metadata"]["name"] = json!("Late");
+        let event = json!([{"creationtime": "2026-01-01T00:00:00Z", "id": "late",
+                            "type": "add", "data": [late]}]);
+        let before_late = hass.states().len();
+        let mut waited = 0;
+        while hass.states().len() == before_late {
+            // Until the stream is up and the event has been read.
+            let _ = api.events.send(event.to_string());
+            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+            waited += 1;
+            assert!(waited < 250, "the late scene never got a state");
+        }
+        assert_eq!(rows(&registry), before, "a late resource changed a row");
+        // `hue.hue_activate_scene` reaches the bridge while it is set up.
+        let scene = json!({"group_name": "bedroom", "scene_name": "dimmed"});
+        let scene = scene.as_object().unwrap().clone();
+        api.take();
+        let activated = hass
+            .call_service(
+                "hue",
+                "hue_activate_scene",
+                scene.clone(),
+                None,
+                false,
+                None,
+            )
+            .await;
+        assert!(activated.is_ok(), "{activated:?}");
+        assert!(api.take().iter().any(|r| r["method"] == "PUT"));
+
+        assert_eq!(flows.remove_entry(&entry_id).await, Some(false));
+        let left = registry.snapshot();
+        assert!(left.devices.is_empty() && left.entities.is_empty());
+        let states: Vec<String> = hass
+            .states()
+            .all()
+            .iter()
+            .map(|s| s.entity_id.to_string())
+            .collect();
+        assert!(states.is_empty(), "states were left: {states:?}");
+        api.take();
+        let on = json!({"entity_id": "all"});
+        let on = on.as_object().unwrap().clone();
+        let _ = hass
+            .call_service("light", "turn_on", on, None, false, None)
+            .await;
+        let _ = hass
+            .call_service("hue", "hue_activate_scene", scene, None, false, None)
+            .await;
+        assert!(
+            api.take().is_empty(),
+            "a removed light or scene still reached the bridge"
+        );
+        // An entry as an old import left it, with no unique id.
+        entry_of(&entries, "user", HUE_HOST, None);
+        entries.flush().await;
+        registry.flush().await;
+    });
+
+    // How a start-up's set-up went is known, and the entry takes its
+    // bridge's id.
+    let first = run(async {
+        let hass = Hass::new();
+        let (entries, registry, _flows) = start(&hass);
+        hass.setups_done().await;
+        let first = entries.list().unwrap()[0].clone();
+        let id = first["entry_id"].as_str().unwrap().to_owned();
+        assert_eq!(first["unique_id"], "c42996000001");
+        assert_eq!(
+            entries.runtime(&id).map(|r| r.state),
+            Some(EntryState::Loaded)
+        );
+        // And a second entry for the same bridge, at its other address,
+        // that came with the bridge's id too. And one the user ignored,
+        // as an import can bring it: with what it takes to be set up.
+        entry_of(&entries, "user", HUE_ALIAS, Some("c42996000001"));
+        let ignored = entry_of(&entries, "ignore", HUE_HOST, None);
+        entries.flush().await;
+        registry.flush().await;
+        (id, ignored)
+    });
+    let (first, ignored) = first;
+    let unreachable = "Error connecting to the Hue bridge at 192.0.2.10";
+    for (mode, expected, reason) in [
+        ("bridge_down", EntryState::SetupRetry, Some(unreachable)),
+        // An answer that doesn't say it is JSON is tried again, as in HA.
+        ("bridge_html", EntryState::SetupRetry, Some(unreachable)),
+        ("bridge_key_refused", EntryState::SetupError, None),
+        ("bridge_garbled", EntryState::SetupError, None),
+        ("bridge_empty", EntryState::SetupError, None),
+        ("bridge_other_bridge", EntryState::SetupError, None),
+        ("bridge_ok", EntryState::Loaded, None),
+    ] {
+        api.set(mode);
+        run(async {
+            let hass = Hass::new();
+            let (entries, registry, _flows) = start(&hass);
+            hass.setups_done().await;
+            let runtime = entries.runtime(&first).unwrap();
+            assert_eq!(runtime.state, expected, "{mode}");
+            assert_eq!(runtime.reason.as_deref(), reason, "{mode}");
+            if mode != "bridge_ok" {
+                return;
+            }
+            // An ignored entry is never set up.
+            assert_eq!(entries.runtime(&ignored), None);
+            // The other entry for this bridge was not started, and every
+            // row is the first one's.
+            let listed = entries.list().unwrap();
+            let other = listed[1]["entry_id"].as_str().unwrap();
+            assert_eq!(
+                entries.runtime(other).map(|r| r.state),
+                Some(EntryState::SetupError)
+            );
+            let r = registry.snapshot();
+            assert_eq!(r.entities.len(), 28);
+            assert!(
+                r.entities
+                    .iter()
+                    .all(|e| e.config_entry_id.as_deref() == Some(first.as_str())),
+                "the second entry took rows"
+            );
+            assert!(
+                r.devices
+                    .iter()
+                    .all(|d| d.config_entries == [first.clone()])
+            );
+        });
+    }
+    let _ = std::fs::remove_dir_all(&dir);
 }

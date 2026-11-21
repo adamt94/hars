@@ -176,10 +176,12 @@ impl Store {
         self.order.iter().filter_map(|id| self.by_id.get(id))
     }
 
-    /// The bridge's own device (the one with a `bridge` service).
+    /// The bridge's own device: the one with the first `bridge`
+    /// resource among its services (aiohue's `bridge_device`). A device
+    /// with a `bridge` service that is some other resource is not it.
     pub fn bridge_device(&self) -> Option<&Value> {
-        self.of_type("device")
-            .find(|d| services(d).any(|s| s["rtype"] == "bridge"))
+        let bridge = self.of_type("bridge").next()?["id"].as_str()?;
+        self.device_of(bridge)
     }
 
     /// The device whose services include `id` (aiohue's `get_device`).

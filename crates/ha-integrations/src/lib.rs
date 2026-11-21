@@ -64,12 +64,24 @@ pub const USER_AGENT: &str = concat!(
 pub struct Endpoints {
     /// The SwitchBot API's base URL ([`switchbot_cloud::api::HOST`]).
     pub switchbot: String,
+    /// Where Hue bridges announce themselves
+    /// ([`hue::config_flow::DISCOVERY`]).
+    pub hue_discovery: String,
+    /// How long that service is given to answer (HA's 5 s).
+    pub hue_discovery_timeout: std::time::Duration,
+    /// `None`: a bridge is at its host (`http://<host>` and
+    /// `https://<host>`). A base URL: every bridge is there instead, for
+    /// tests and a debug build's browser run.
+    pub hue_bridge: Option<String>,
 }
 
 impl Default for Endpoints {
     fn default() -> Self {
         Self {
             switchbot: switchbot_cloud::api::HOST.to_owned(),
+            hue_discovery: hue::config_flow::DISCOVERY.to_owned(),
+            hue_discovery_timeout: std::time::Duration::from_secs(5),
+            hue_bridge: None,
         }
     }
 }
@@ -82,8 +94,8 @@ pub struct Started {
     pub weather: Arc<weather::Weather>,
     /// The entity components, which entries added later feed too.
     pub components: Arc<components::Components>,
-    /// The entries that can be stopped (`switchbot_cloud`'s), for
-    /// [`flow::Manager`].
+    /// The entries that can be stopped (`switchbot_cloud`'s and `hue`'s),
+    /// for [`flow::Manager`].
     pub tasks: Vec<Running>,
 }
 
@@ -128,6 +140,22 @@ impl Running {
             setup,
         }
     }
+}
+
+/// Start a `hue` entry: at start-up, or when a config flow has made it.
+pub(crate) fn spawn_hue(
+    components: &Arc<components::Components>,
+    entry: Map<String, Value>,
+    endpoints: &Endpoints,
+    status: config_entries::Status,
+) -> tokio::task::JoinHandle<()> {
+    tokio::spawn(hue::run(
+        components.clone(),
+        entry,
+        endpoints.hue_bridge.clone(),
+        components.hass().setup_guard(),
+        status,
+    ))
 }
 
 /// Start a `switchbot_cloud` entry: at start-up, or when a config flow
@@ -178,6 +206,7 @@ pub fn start(
     entries: Option<&[Map<String, Value>]>,
     profiles: light::Profiles,
     endpoints: &Endpoints,
+    store: Option<&Arc<config_entries::ConfigEntries>>,
 ) -> Started {
     let registries: Arc<Registries> = lookup.get();
     let field =
@@ -188,6 +217,8 @@ pub fn start(
             .iter()
             .filter(move |e| field(e, "domain").as_deref() == Some(domain))
             .filter(|e| e.get("disabled_by").is_none_or(Value::is_null))
+            // `ConfigEntry.async_setup`: an ignored entry is never set up.
+            .filter(|e| !config_entries::ignored(e))
             .filter(|e| !entry_too_new(e))
     };
     // `ConfigEntry.async_migrate`'s error for an entry no migration reaches.
@@ -239,16 +270,21 @@ pub fn start(
         running.extend(["met", "weather"]);
     }
     let components = components::Components::new(hass, lookup, profiles);
-    let hue: Vec<Map<String, Value>> = enabled(hue::DOMAIN).cloned().collect();
-    if !hue.is_empty() {
-        let platforms = hue::Platforms::new(&components);
-        for entry in hue {
-            tokio::spawn(hue::run(platforms.clone(), entry, hass.setup_guard()));
-        }
-        running.extend(["hue", "light", "sensor", "binary_sensor", "switch", "scene"]);
+    let mut tasks = Vec::new();
+    for entry in enabled(hue::DOMAIN).cloned().collect::<Vec<_>>() {
+        let entry_id = field(&entry, "entry_id").unwrap_or_default();
+        // Where its set-up is goes to the entries (a bridge that can't
+        // be reached waits for a retry, one that refuses its key failed).
+        let status = match store {
+            Some(store) => config_entries::Status::new(store.clone(), &entry_id),
+            None => config_entries::Status::none(),
+        };
+        tasks.push(Running::start(&entry_id, status, |status| {
+            spawn_hue(&components, entry, endpoints, status)
+        }));
+        running.extend(hue::COMPONENTS);
     }
     let switchbot: Vec<Map<String, Value>> = enabled(switchbot_cloud::DOMAIN).cloned().collect();
-    let mut tasks = Vec::new();
     for entry in switchbot {
         let entry_id = field(&entry, "entry_id").unwrap_or_default();
         tasks.push(Running::start(
@@ -319,6 +355,7 @@ mod tests {
             Some(&entries),
             light::Profiles::default(),
             &Endpoints::default(),
+            None,
         );
         assert!(started.running.is_empty(), "{:?}", started.running);
     }

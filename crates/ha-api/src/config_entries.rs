@@ -141,10 +141,13 @@ fn result_json(views: &Views, result: FlowResult) -> Value {
             errors,
             description_placeholders,
         } => {
-            let errors: Map<String, Value> = errors
-                .into_iter()
-                .map(|(field, error)| (field.to_owned(), json!(error)))
-                .collect();
+            // `errors=None` is `null`.
+            let errors: Option<Map<String, Value>> = errors.map(|errors| {
+                errors
+                    .into_iter()
+                    .map(|(field, error)| (field.to_owned(), json!(error)))
+                    .collect()
+            });
             json!({
                 "type": "form",
                 "flow_id": flow_id,

@@ -138,23 +138,30 @@ Without a flow, an integration only reaches hars through an imported
 entry. To let a user add it from **Settings > Devices & services > Add
 integration**, port HA's `components/<domain>/config_flow.py` as
 `crates/ha-integrations/src/<domain>/config_flow.rs`.
-`switchbot_cloud/config_flow.rs` is the example (one step); the engine is
-`crates/ha-integrations/src/flow.rs`.
+`switchbot_cloud/config_flow.rs` is the example with one step,
+`hue/config_flow.rs` the one with several (a choice, a typed host, a form
+with only a button); the engine is `crates/ha-integrations/src/flow.rs`.
 
 1. **The handler.** A `flow::Handler` const: the domain, HA's class name
    (its errors quote it), `VERSION`/`MINOR_VERSION`, the step ids, and `new`,
    which makes a `Box<dyn flow::Flow>`. Add it to `flow::HANDLERS`.
 2. **The steps.** `Flow::step(cx, step_id, input)` is HA's
    `async_step_<step_id>`: `input` is `None` when the step is shown and the
-   checked answer when the form is sent. Return `Step::form(…)` (fields as
-   `flow::Field`s; add a `flow::Kind` for a field type that isn't there
-   yet), `Step::abort(reason)` or `Step::CreateEntry { title, data }`. Use
+   checked answer when the form is sent. Return a `Step::Form` (fields as
+   `flow::Field`s: `Kind::Str`, or `Kind::Select` for a `vol.In` choice;
+   add a `flow::Kind` for a field type that isn't there yet; `schema: None`
+   for a form with only a button; `errors: None` where HA passes no
+   `errors` and the reply says `null`, `Some(vec![])` where it passes `{}`),
+   `Step::abort(reason)` or `Step::CreateEntry { title, data }`. Use
    HA's step ids, field names, error keys and abort reasons: the frontend
    translates them from the `config` category that `gen-i18n.py` already
    generates. A flow with several steps keeps what it has learnt (a host, a
    bridge id) in its struct's fields, and returns the next step's form.
 3. **The unique id.** `cx.set_unique_id(…)`, then
    `cx.abort_if_unique_id_configured()` before `CreateEntry`.
+   `cx.current_unique_ids()` is HA's `_async_current_ids` (to leave out
+   what is set up already) and `cx.entry_with_data(key, value)` its
+   `_async_abort_entries_match`.
 4. **Starting the entry.** Add the domain to `flow::Manager::setup_entry`,
    which spawns the same `run` as start-up does with a
    `config_entries::Status`; `run` must report `Loaded`, `SetupRetry(reason)`
@@ -165,12 +172,16 @@ integration**, port HA's `components/<domain>/config_flow.py` as
    (`Registry::get_or_create_device`, `get_or_create_entity`; see
    `switchbot_cloud::register`), before reading ids and names.
 6. **Outside addresses** go in `ha_integrations::Endpoints`, so tests point
-   the flow at a listener on 127.0.0.1.
+   the flow at a listener on 127.0.0.1. A device that is reached at an
+   address the user gives (a Hue bridge) gets a stand-in base URL there
+   instead, under which the scheme and host are kept in the path
+   (`hue::base`), so a test's fake sees which request it got.
 7. **Description.** Add the domain to `FLOW_DOMAINS` in
    `scripts/gen-manifests.py` and regenerate: the dialog lists what
    `integration/descriptions` returns.
 8. **Vectors.** Extend `scripts/vectors/config_flow.py` (or add a script
-   beside it) so HA's own flow manager and views answer the same requests
+   beside it that passes its own fake to that script's `run`, as
+   `hue_flow.py` does) so HA's own flow manager and views answer the same requests
    with the device or service faked, and replay them in
    `crates/ha-api/src/config_entries/tests.rs`.
 

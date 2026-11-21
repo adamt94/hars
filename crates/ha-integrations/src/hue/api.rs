@@ -27,9 +27,13 @@ pub enum ApiError {
         reason: String,
         url: String,
     },
-    /// Connecting or reading failed, or the body wasn't JSON.
+    /// Connecting or reading failed.
     #[error("{0}")]
     Connection(String),
+    /// The body wasn't JSON (a decoding error in aiohue, which HA's set-up
+    /// does not retry).
+    #[error("{0}")]
+    Decode(String),
 }
 
 impl ApiError {
@@ -41,7 +45,7 @@ impl ApiError {
             Self::Unauthorized | Self::Busy | Self::Bridge(_) => {
                 Some(format!("Request failed: {self}"))
             }
-            Self::Status { .. } | Self::Connection(_) => {
+            Self::Status { .. } | Self::Connection(_) | Self::Decode(_) => {
                 Some(format!("Request failed due connection error: {self}"))
             }
         }
@@ -56,15 +60,18 @@ pub struct Api {
 }
 
 impl Api {
-    pub fn new(host: &str, key: &str) -> Result<Self, ha_http::Error> {
+    /// The bridge at `base` (`https://<host>`: [`super::base`]).
+    pub fn new(base: &str, key: &str) -> Result<Self, ha_http::Error> {
         let client = ha_http::Client::builder(crate::USER_AGENT)
             .danger_accept_any_certificate()
+            // The key goes to the bridge and nowhere a redirect points.
+            .credential_header(HeaderName::from_static("hue-application-key"))
             .max_connections(3)
             .tcp_keepalive()
             .build()?;
         Ok(Self {
             client,
-            base: format!("https://{host}"),
+            base: base.to_owned(),
             key: key.to_owned(),
         })
     }
@@ -79,6 +86,15 @@ impl Api {
                 .unwrap(),
             base: base.to_owned(),
             key: key.to_owned(),
+        }
+    }
+
+    /// Text that came from the bridge or names a URL, without the key:
+    /// such text ends up in a log line or a service's error.
+    pub(super) fn scrub(&self, text: String) -> String {
+        match self.key.is_empty() || !text.contains(&self.key) {
+            true => text,
+            false => text.replace(&self.key, "***"),
         }
     }
 
@@ -105,7 +121,7 @@ impl Api {
                 Some(b) => self.client.put_json(&url, &self.headers(), b).await,
                 None => self.client.get(&url, &self.headers()).await,
             }
-            .map_err(|e| ApiError::Connection(e.to_string()))?;
+            .map_err(|e| ApiError::Connection(self.scrub(e.to_string())))?;
             match res.status {
                 StatusCode::SERVICE_UNAVAILABLE | StatusCode::TOO_MANY_REQUESTS => continue,
                 StatusCode::FORBIDDEN => return Err(ApiError::Unauthorized),
@@ -118,11 +134,18 @@ impl Api {
                 }
                 _ => {}
             }
+            // `resp.json()`: anything but JSON by its content type is
+            // aiohttp's `ContentTypeError`, which HA's set-up retries.
+            if !super::config_flow::is_json(&res) {
+                return Err(ApiError::Connection(
+                    "the bridge's answer is not of type application/json".into(),
+                ));
+            }
             let mut json: Value = serde_json::from_slice(&res.body)
-                .map_err(|e| ApiError::Connection(format!("invalid JSON from the bridge: {e}")))?;
+                .map_err(|e| ApiError::Decode(format!("invalid JSON from the bridge: {e}")))?;
             if let Some(first) = json["errors"].as_array().and_then(|e| e.first()) {
                 let d = first["description"].as_str().unwrap_or_default();
-                return Err(ApiError::Bridge(d.to_owned()));
+                return Err(ApiError::Bridge(self.scrub(d.to_owned())));
             }
             // Any JSON may come back; only an object's `data` counts.
             return Ok(json.get_mut("data").map(Value::take).unwrap_or_default());
@@ -146,8 +169,9 @@ impl Api {
     }
 
     /// The event stream, resuming after `last_event_id` if there is one.
-    /// As aiohue, its status isn't checked.
-    pub async fn events(&self, last_event_id: Option<&str>) -> Result<EventStream, ha_http::Error> {
+    /// As aiohue, its status isn't checked. An error's text is without
+    /// the key (a redirect the client refuses names where it led).
+    pub async fn events(&self, last_event_id: Option<&str>) -> Result<EventStream, ApiError> {
         let mut headers = self.headers();
         headers.push((ha_http::header::ACCEPT, "text/event-stream".into()));
         headers.push((ha_http::header::CACHE_CONTROL, "no-cache".into()));
@@ -160,5 +184,6 @@ impl Api {
         self.client
             .stream(&self.url("eventstream/clip/v2"), &headers)
             .await
+            .map_err(|e| ApiError::Connection(self.scrub(e.to_string())))
     }
 }

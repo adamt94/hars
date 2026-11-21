@@ -141,6 +141,13 @@ impl Status {
         self
     }
 
+    /// The entries and this entry's id, if it reports to them.
+    pub(crate) fn entry(&self) -> Option<(&Arc<ConfigEntries>, &str)> {
+        self.entry
+            .as_ref()
+            .map(|(entries, id)| (entries, id.as_str()))
+    }
+
     pub fn set(&self, state: EntryState, reason: Option<String>) {
         if let Some((entries, entry_id)) = &self.entry {
             entries.set_state(entry_id, state, reason);
@@ -200,6 +207,12 @@ struct File {
 }
 
 /// Tell the listeners a change, dropping those that have gone.
+/// An entry the user chose to ignore (`SOURCE_IGNORE`): it is set up
+/// never, and stands in nobody's way.
+pub(crate) fn ignored(entry: &Map<String, Value>) -> bool {
+    entry.get("source").and_then(Value::as_str) == Some("ignore")
+}
+
 fn tell(listeners: &mut Vec<(Live, Listener)>, change: Change, entry: &Map<String, Value>) {
     if listeners.is_empty() {
         return;
@@ -339,6 +352,37 @@ impl ConfigEntries {
         Some(removed)
     }
 
+    /// `_async_remove` for an entry that a new one replaces: it leaves the
+    /// list and the file now, and nobody is told yet. HA cleans up what
+    /// belonged to it, and tells, once the new entry is added and set up:
+    /// [`Self::tell_removed`] then.
+    pub fn take(&self, entry_id: &str) -> Option<Map<String, Value>> {
+        let _listeners = self.listeners.lock();
+        let removed = {
+            let mut guard = self.entries.write();
+            let list = guard.as_mut()?;
+            let i = list
+                .iter()
+                .position(|e| e.get("entry_id").and_then(Value::as_str) == Some(entry_id))?;
+            list.remove(i)
+        };
+        self.schedule();
+        Some(removed)
+    }
+
+    /// The end of a removal begun with [`Self::take`]: subscribers hear
+    /// `removed`, and the entry's state is forgotten.
+    pub fn tell_removed(&self, entry: &Map<String, Value>) {
+        let mut listeners = self.listeners.lock();
+        tell(&mut listeners, Change::Removed, entry);
+        let id = entry.get("entry_id").and_then(Value::as_str);
+        let mut runtime = self.runtime.lock();
+        runtime.retain(|(e, _)| Some(e.as_str()) != id);
+        if runtime.is_empty() {
+            *runtime = Vec::new();
+        }
+    }
+
     /// Hear every change from now on, while `live` is true. `first` runs
     /// before any of them: it reads the entries as they are (its first
     /// list), and no change can come between that and the listening.
@@ -405,17 +449,96 @@ impl ConfigEntries {
         tell(&mut listeners, Change::Updated, &entry);
     }
 
-    /// The entry of `domain` with this `unique_id`.
+    /// The entry of `domain` with this `unique_id`: one that is set up
+    /// before an ignored one, so an ignored entry never hides it.
     pub fn find_unique(&self, domain: &str, unique_id: &str) -> Option<Map<String, Value>> {
+        let guard = self.entries.read();
+        let has = |e: &&Map<String, Value>| {
+            e.get("domain").and_then(Value::as_str) == Some(domain)
+                && e.get("unique_id").and_then(Value::as_str) == Some(unique_id)
+        };
+        let all = || guard.iter().flatten().filter(has);
+        all()
+            .find(|e| !ignored(e))
+            .or_else(|| all().next())
+            .cloned()
+    }
+
+    /// `_async_current_ids(include_ignore=False)`: the unique ids of
+    /// `domain`'s entries, but for the ignored ones.
+    pub fn unique_ids(&self, domain: &str) -> Vec<String> {
         let guard = self.entries.read();
         guard
             .iter()
             .flatten()
-            .find(|e| {
+            .filter(|e| e.get("domain").and_then(Value::as_str) == Some(domain))
+            .filter(|e| !ignored(e))
+            .filter_map(|e| e.get("unique_id")?.as_str().map(str::to_owned))
+            .collect()
+    }
+
+    /// Whether an entry of `domain` has `value` under `key`
+    /// (`_async_abort_entries_match`): in its options, else in its data
+    /// (`ChainMap(entry.options, entry.data)`), ignored entries left out.
+    pub fn has_data(&self, domain: &str, key: &str, value: &str) -> bool {
+        let guard = self.entries.read();
+        guard.iter().flatten().any(|e| {
+            let of = |part: &str| e.get(part).and_then(|d| d.get(key));
+            e.get("domain").and_then(Value::as_str) == Some(domain)
+                && !ignored(e)
+                && of("options").or_else(|| of("data")).and_then(Value::as_str) == Some(value)
+        })
+    }
+
+    /// An entry becomes the one entry of `domain` for `unique_id`
+    /// (`async_update_entry(entry, unique_id=…)` for an imported entry
+    /// that never had a unique id, or has a stale one), looked up and
+    /// taken in one step: of two entries that find out at the same moment
+    /// that they are for the same thing, one gets it.
+    ///
+    /// False if another entry that isn't ignored is the one: it has the
+    /// unique id and this entry doesn't, or both have it and the other is
+    /// listed first. The caller then doesn't start this entry.
+    pub fn claim_unique_id(&self, domain: &str, entry_id: &str, unique_id: &str) -> bool {
+        let mut listeners = self.listeners.lock();
+        {
+            let mut guard = self.entries.write();
+            let Some(list) = guard.as_mut() else {
+                return true;
+            };
+            let has = |e: &Map<String, Value>| {
                 e.get("domain").and_then(Value::as_str) == Some(domain)
                     && e.get("unique_id").and_then(Value::as_str) == Some(unique_id)
-            })
-            .cloned()
+            };
+            let Some(me) = list
+                .iter()
+                .position(|e| e.get("entry_id").and_then(Value::as_str) == Some(entry_id))
+            else {
+                return true;
+            };
+            let mine = has(&list[me]);
+            let taken = list
+                .iter()
+                .enumerate()
+                .any(|(i, e)| i != me && has(e) && !ignored(e) && (!mine || i < me));
+            if taken {
+                return false;
+            }
+            if mine {
+                return true;
+            }
+            let entry = &mut list[me];
+            entry.insert("unique_id".into(), Value::String(unique_id.to_owned()));
+            entry.insert(
+                "modified_at".into(),
+                Value::String(ha_core::isoformat(self.hass.clock().now())),
+            );
+        }
+        self.schedule();
+        if let Some(entry) = self.get(entry_id) {
+            tell(&mut listeners, Change::Updated, &entry);
+        }
+        true
     }
 
     /// A new entry as `ConfigEntry(…)` and `as_dict` make it (a ULID id).
@@ -655,6 +778,91 @@ mod tests {
 
     /// A file of another version is never written, so nothing should be
     /// added to it from the UI.
+    /// `_async_abort_entries_match` and `_async_current_ids(False)`: a
+    /// value is looked for in an entry's options before its data, and an
+    /// ignored entry counts for neither. An entry learns its unique id,
+    /// unless another entry is already the one for it: of two that learn
+    /// the same id, the first to ask; of two that have it, the first
+    /// listed. An ignored entry is in nobody's way and hides nobody.
+    #[tokio::test]
+    async fn entries_are_matched_as_ha_matches_them() {
+        use serde_json::json;
+        let hass = Hass::new();
+        let entry = |id: &str, source: &str, unique: Value, data: Value, options: Value| {
+            json!({"entry_id": id, "domain": "hue", "source": source, "unique_id": unique,
+                   "data": data, "options": options, "title": id})
+            .as_object()
+            .unwrap()
+            .clone()
+        };
+        let entries = ConfigEntries::in_memory(
+            &hass,
+            vec![
+                entry(
+                    "a",
+                    "user",
+                    json!("one"),
+                    json!({"host": "10.0.0.1"}),
+                    json!({}),
+                ),
+                entry(
+                    "b",
+                    "user",
+                    json!(null),
+                    json!({"host": "10.0.0.2"}),
+                    json!({"host": "10.0.0.3"}),
+                ),
+                entry(
+                    "c",
+                    "ignore",
+                    json!("three"),
+                    json!({"host": "10.0.0.4"}),
+                    json!({}),
+                ),
+            ],
+        );
+        assert!(entries.has_data("hue", "host", "10.0.0.1"));
+        assert!(entries.has_data("hue", "host", "10.0.0.3"));
+        assert!(
+            !entries.has_data("hue", "host", "10.0.0.2"),
+            "the options come first"
+        );
+        assert!(
+            !entries.has_data("hue", "host", "10.0.0.4"),
+            "an ignored entry matched"
+        );
+        assert!(!entries.has_data("lifx", "host", "10.0.0.1"));
+        assert_eq!(entries.unique_ids("hue"), ["one"]);
+        assert!(entries.claim_unique_id("hue", "b", "two"));
+        assert!(entries.claim_unique_id("hue", "b", "two"), "it is b's");
+        assert_eq!(entries.unique_ids("hue"), ["one", "two"]);
+        // `d` and `e` find out together that they are for one thing.
+        for id in ["d", "e"] {
+            entries.add(entry(id, "user", json!(null), json!({}), json!({})));
+        }
+        assert!(entries.claim_unique_id("hue", "e", "four"));
+        assert!(!entries.claim_unique_id("hue", "d", "four"));
+        assert_eq!(entries.get("d").unwrap()["unique_id"], json!(null));
+        // A stale id does not take what another entry is.
+        assert!(!entries.claim_unique_id("hue", "a", "two"));
+        assert_eq!(entries.get("a").unwrap()["unique_id"], "one");
+        // Two entries that both came with the id: the first listed.
+        entries.add(entry("f", "user", json!("one"), json!({}), json!({})));
+        assert!(entries.claim_unique_id("hue", "a", "one"));
+        assert!(!entries.claim_unique_id("hue", "f", "one"));
+        // The ignored entry `c` is first with "three": `g` may have it,
+        // and `h` then may not, though the first match is ignored.
+        for id in ["g", "h"] {
+            entries.add(entry(id, "user", json!(null), json!({}), json!({})));
+        }
+        assert!(entries.claim_unique_id("hue", "g", "three"));
+        assert!(!entries.claim_unique_id("hue", "h", "three"));
+        assert_eq!(
+            entries.find_unique("hue", "three").unwrap()["entry_id"],
+            "g"
+        );
+    }
+
     #[tokio::test]
     async fn a_file_of_another_version_is_read_only() {
         let dir = std::env::temp_dir().join(format!("hars-entries-ro-{}", std::process::id()));

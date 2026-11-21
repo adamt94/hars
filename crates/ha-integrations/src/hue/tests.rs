@@ -58,6 +58,7 @@ fn bridge(api: Api) -> Arc<Bridge> {
         groups: RwLock::default(),
         others: RwLock::default(),
         platforms: platforms.clone(),
+        alive: parking_lot::Mutex::new(true),
     });
     platforms.bridges.write().push(Arc::downgrade(&bridge));
     bridge.add_entities();
@@ -216,7 +217,7 @@ async fn fake_bridge() -> (
                         buf.drain(..end + 4 + len);
                         let reply = r#"{"data":[],"errors":[]}"#;
                         let res = format!(
-                            "HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n{reply}",
+                            "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{reply}",
                             reply.len()
                         );
                         if s.write_all(res.as_bytes()).await.is_err() {
@@ -343,7 +344,7 @@ async fn follows_the_stream_reconciles_and_resumes() {
             let req = String::from_utf8_lossy(&buf[..n]).to_lowercase();
             if req.starts_with("get /clip/v2/resource") {
                 let head = format!(
-                    "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                    "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
                     resources.len()
                 );
                 s.write_all(head.as_bytes()).await.unwrap();
@@ -467,9 +468,8 @@ async fn new_resources_get_their_own_ids_and_late_rooms_their_groups() {
     assert_eq!(attrs["lights"], json!(["Desk"]));
 }
 
-/// Valid JSON of the wrong shape is no data, not a panic.
-#[tokio::test]
-async fn odd_bridge_answers_are_not_a_crash() {
+/// A server that answers every request with `reply`.
+async fn answering(reply: String) -> String {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let base = format!("http://{}", listener.local_addr().unwrap());
     tokio::spawn(async move {
@@ -477,13 +477,117 @@ async fn odd_bridge_answers_are_not_a_crash() {
             let (mut s, _) = listener.accept().await.unwrap();
             let mut buf = vec![0u8; 4096];
             let _ = s.read(&mut buf).await;
-            let _ = s
-                .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\n[]")
-                .await;
+            let _ = s.write_all(reply.as_bytes()).await;
         }
     });
-    let api = Api::at(&base, "key");
+    base
+}
+
+/// Valid JSON of the wrong shape is no data, not a panic. An answer that
+/// doesn't say it is JSON is aiohttp's `ContentTypeError`, which HA's
+/// set-up tries again; one that says so and isn't is a failure it
+/// doesn't.
+#[tokio::test]
+async fn odd_bridge_answers_are_not_a_crash() {
+    let answer = |kind: &str, body: &str| {
+        let len = body.len();
+        format!("HTTP/1.1 200 OK\r\n{kind}Content-Length: {len}\r\nConnection: close\r\n\r\n{body}")
+    };
+    let json = "Content-Type: application/json; charset=utf-8\r\n";
+    let api = Api::at(&answering(answer(json, "[]")).await, "key");
     assert!(api.fetch_all().await.unwrap().is_empty());
+    for kind in ["", "Content-Type: text/html\r\n"] {
+        let api = Api::at(&answering(answer(kind, r#"{"data":[]}"#)).await, "key");
+        let err = api.fetch_all().await.unwrap_err();
+        assert!(matches!(err, ApiError::Connection(_)), "{kind}: {err:?}");
+    }
+    let api = Api::at(&answering(answer(json, "<html>")).await, "key");
+    let err = api.fetch_all().await.unwrap_err();
+    assert!(matches!(err, ApiError::Decode(_)), "{err:?}");
+}
+
+/// A redirect the client refuses names where it led. If that names the
+/// key, the error of a request, and of the event stream (which is
+/// logged), has it replaced.
+#[tokio::test]
+async fn an_error_that_names_the_key_has_it_replaced() {
+    const KEY: &str = "fake-application-key-0001";
+    let reply = format!(
+        "HTTP/1.1 302 Found\r\nLocation: http://[bad/{KEY}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+    );
+    let api = Api::at(&answering(reply).await, KEY);
+    let request = api.fetch_all().await.unwrap_err().to_string();
+    let stream = api.events(None).await.err().unwrap().to_string();
+    for text in [request, stream] {
+        assert!(text.contains("http://[bad/***"), "{text}");
+        assert!(!text.contains(KEY), "{text}");
+    }
+}
+
+/// The bridge's device is the one with the `bridge` resource itself among
+/// its services (aiohue's `bridge_device`), not any device with a service
+/// of that type.
+#[test]
+fn the_bridges_device_has_the_bridge_resource() {
+    let device = |rid: &str| {
+        json!({"id": "d1", "type": "device",
+               "services": [{"rid": rid, "rtype": "bridge"}]})
+    };
+    let bridge = json!({"id": "b1", "type": "bridge", "bridge_id": "001788fffe000001"});
+    let store = Store::new(vec![bridge.clone(), device("b1")]);
+    assert_eq!(store.bridge_device().unwrap()["id"], "d1");
+    let store = Store::new(vec![bridge, device("another")]);
+    assert!(store.bridge_device().is_none());
+    assert!(Store::new(vec![device("b1")]).bridge_device().is_none());
+}
+
+/// A stopped bridge writes nothing, whoever still holds one of its
+/// entities: a scene that is activated while its entry is removed (the
+/// service call got the scene before) can't put back the state the
+/// removal took, and `hue.hue_activate_scene` no longer finds the bridge.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_stopped_bridge_writes_nothing() {
+    let (base, seen) = fake_bridge().await;
+    let b = bridge(Api::at(&base, "key"));
+    let scenes: Vec<Arc<HueEntity>> = b
+        .others
+        .read()
+        .iter()
+        .filter(|e| e.entity_id.domain() == "scene")
+        .cloned()
+        .collect();
+    assert!(!scenes.is_empty() && !b.hass.states().all().is_empty());
+    // Writes at every moment of the stop.
+    let stop = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let writer = {
+        let (b, scenes, stop) = (b.clone(), scenes.clone(), stop.clone());
+        std::thread::spawn(move || {
+            while !stop.load(std::sync::atomic::Ordering::Relaxed) {
+                for scene in &scenes {
+                    b.write_entity(scene);
+                }
+            }
+        })
+    };
+    b.stop();
+    stop.store(true, std::sync::atomic::Ordering::Relaxed);
+    writer.join().unwrap();
+    let left = |b: &Bridge| -> Vec<String> {
+        let all = b.hass.states().all();
+        all.iter().map(|s| s.entity_id.to_string()).collect()
+    };
+    assert_eq!(left(&b), Vec::<String>::new());
+    // After: an activation writes no time, and the service finds nothing.
+    scenes[0].activate(None, false, None, None).await.unwrap();
+    assert_eq!(left(&b), Vec::<String>::new());
+    seen.lock().clear();
+    let data = json!({"group_name": "bedroom", "scene_name": "dimmed"});
+    let Value::Object(data) = data else { panic!() };
+    let _ = b
+        .hass
+        .call_service("hue", "hue_activate_scene", data, None, false, None)
+        .await;
+    assert!(seen.lock().is_empty(), "{:?}", seen.lock());
 }
 
 /// A second bridge, sharing the first's hass and services.
@@ -499,6 +603,7 @@ fn second_bridge(first: &Arc<Bridge>, api: Api) -> Arc<Bridge> {
         groups: RwLock::default(),
         others: RwLock::default(),
         platforms: first.platforms.clone(),
+        alive: parking_lot::Mutex::new(true),
     });
     first.platforms.bridges.write().push(Arc::downgrade(&b));
     b
@@ -668,6 +773,7 @@ async fn scenes_restore_their_last_activation() {
         groups: RwLock::default(),
         others: RwLock::default(),
         platforms,
+        alive: parking_lot::Mutex::new(true),
     });
     b.add_entities();
     b.write_all();
@@ -686,4 +792,167 @@ async fn scenes_restore_their_last_activation() {
             .any(|i| i["state"]["entity_id"] == "scene.hallway_hallway_nightlight")
     );
     let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// A set-up over the rows HA itself made for this bridge (an imported
+/// install: the user's areas, names and disabled entities, HA's own ids
+/// and times) changes none of them, makes none, and fires nothing: what
+/// `hars` registers is what HA registered.
+#[test]
+fn registering_leaves_has_rows_alone() {
+    let hass = Hass::new();
+    let imported = registries();
+    let entry_id = imported.devices[0].config_entries[0].clone();
+    let registry = ha_registry::Registry::in_memory(&hass, imported);
+    let before = registry.snapshot();
+    let mut events = hass.bus().subscribe();
+    let resources = fixture("resource")["data"].as_array().unwrap().clone();
+    register::register(&registry, &entry_id, &Store::new(resources), false);
+    let after = registry.snapshot();
+    let rows = |r: &Registries| json!([r.devices, r.entities, r.areas]);
+    for (n, (was, is)) in before.devices.iter().zip(&after.devices).enumerate() {
+        assert_eq!(json!(is), json!(was), "device {n}");
+    }
+    for (was, is) in before.entities.iter().zip(&after.entities) {
+        assert_eq!(json!(is), json!(was), "{}", was.entity_id);
+    }
+    assert_eq!(rows(&after), rows(&before));
+    assert!(events.try_recv().is_err(), "a registry event was fired");
+}
+
+/// On an install with no rows, the bridge's set-up makes the devices,
+/// areas and entities HA 2026.6.1 made (`vectors/fresh_setup.json`), with
+/// HA's entity ids.
+#[test]
+fn registering_makes_has_rows() {
+    let ha: Value = serde_json::from_str(include_str!("vectors/fresh_setup.json")).unwrap();
+    let hass = Hass::new();
+    let registry = ha_registry::Registry::in_memory(&hass, Registries::default());
+    let resources = fixture("resource")["data"].as_array().unwrap().clone();
+    register::register(&registry, "entry", &Store::new(resources), false);
+    let made = registry.snapshot();
+    let mut ids: Vec<&str> = made.entities.iter().map(|e| e.entity_id.as_str()).collect();
+    ids.sort_unstable();
+    let want: Vec<&str> = ha["entities"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|e| e["entity_id"].as_str().unwrap())
+        .collect();
+    assert_eq!(ids, want);
+    let areas: Vec<&str> = made.areas.iter().map(|a| a.id.as_str()).collect();
+    let want: Vec<&str> = ha["areas"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|a| a["id"].as_str().unwrap())
+        .collect();
+    assert_eq!(areas, want);
+    assert_eq!(made.devices.len(), ha["devices"].as_array().unwrap().len());
+    // A second set-up is the first again.
+    let mut events = hass.bus().subscribe();
+    let resources = fixture("resource")["data"].as_array().unwrap().clone();
+    register::register(&registry, "entry", &Store::new(resources), false);
+    assert!(events.try_recv().is_err(), "a second set-up changed a row");
+}
+
+/// What HA derived from the install it ran on stays in a row it made: a
+/// unit of another unit system, a name in another language. A name that
+/// is the resource's own (a scene's) follows the resource. A row made
+/// now starts disabled if the entry says so; an enabled row, made now or
+/// not, on a disabled device is disabled with it (HA's order: the
+/// entry's preference in the registry, then the device).
+#[test]
+fn registering_keeps_what_ha_derived_and_obeys_the_disabling() {
+    const TEMPERATURE: &str = "0cfa6b7f-fdc8-490a-9261-6e721a4afc58";
+    const SCENE: &str = "f2d28599-c0cb-4335-9522-4f278b438ac9";
+    const BULB: &str = "c60ee3d8-e55f-4fc9-8d31-9e3dc6aa077d";
+    const ROOM_LIGHT: &str = "df1e030d-f506-4bfb-bf5e-548706002545";
+    let unique = |e: &ha_registry::Entity, id: &str| e.unique_id == Some(json!(id));
+    let hass = Hass::new();
+    let entry_id = registries().devices[0].config_entries[0].clone();
+    let install = || {
+        let mut imported = registries();
+        for row in &mut imported.entities {
+            let mut changed = (**row).clone();
+            if unique(row, TEMPERATURE) {
+                changed.unit_of_measurement = Some("°F".into());
+                changed.original_name = Some("Temperatur".into());
+            } else if unique(row, SCENE) {
+                changed.original_name = Some("Old name".into());
+            }
+            *row = Arc::new(changed);
+        }
+        // Two lights the import never saw, one on a device the user disabled,
+        // and a room's light that is enabled though its device is disabled.
+        let room = imported
+            .entities
+            .iter()
+            .find(|e| unique(e, ROOM_LIGHT))
+            .and_then(|e| e.device_id.clone())
+            .unwrap();
+        for device in &mut imported.devices {
+            if device.identifiers.iter().any(|i| i[1] == LAMP_DEVICE) || device.id == room {
+                let mut disabled = (**device).clone();
+                disabled.disabled_by = Some("user".into());
+                *device = Arc::new(disabled);
+            }
+        }
+        imported
+            .entities
+            .retain(|e| !unique(e, LAMP) && !unique(e, BULB));
+        imported
+    };
+    let registry = ha_registry::Registry::in_memory(&hass, install());
+    let resources = fixture("resource")["data"].as_array().unwrap().clone();
+    let store = Store::new(resources);
+    register::register(&registry, &entry_id, &store, true);
+    let after = registry.snapshot();
+    let row = |id: &str| after.entities.iter().find(|e| unique(e, id)).unwrap();
+    assert_eq!(row(TEMPERATURE).unit_of_measurement.as_deref(), Some("°F"));
+    assert_eq!(
+        row(TEMPERATURE).original_name.as_deref(),
+        Some("Temperatur")
+    );
+    assert_eq!(row(SCENE).original_name.as_deref(), Some("Bright"));
+    // New: by the entry's preference, on a disabled device too.
+    assert_eq!(row(LAMP).disabled_by.as_deref(), Some("integration"));
+    assert_eq!(row(BULB).disabled_by.as_deref(), Some("integration"));
+    // Enabled on a disabled device: disabled with it.
+    assert_eq!(row(ROOM_LIGHT).disabled_by.as_deref(), Some("device"));
+    // And without the preference a new row on a disabled device is too.
+    let registry = ha_registry::Registry::in_memory(&hass, install());
+    register::register(&registry, &entry_id, &store, false);
+    let after = registry.snapshot();
+    let row = |id: &str| after.entities.iter().find(|e| unique(e, id)).unwrap();
+    assert_eq!(row(LAMP).disabled_by.as_deref(), Some("device"));
+    assert_eq!(row(BULB).disabled_by, None);
+}
+
+/// With a device or entity store that can't be written (an install from
+/// an older Home Assistant), no row is made or changed: rows made now
+/// would be gone after a restart while rows that point at them were
+/// saved.
+#[tokio::test]
+async fn nothing_is_registered_in_a_store_that_cant_be_written() {
+    let hass = Hass::new();
+    let older = ha_registry::STORES
+        .iter()
+        .find(|s| s.0 == ha_registry::DEVICE_KEY)
+        .unwrap()
+        .2
+        - 1;
+    let registries = Registries {
+        device_file: ha_registry::FileRest {
+            minor: older,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let dir = std::env::temp_dir().join(format!("hars-hue-read-only-{}", std::process::id()));
+    let registry = ha_registry::Registry::new(&hass, &dir, registries);
+    let resources = fixture("resource")["data"].as_array().unwrap().clone();
+    register::register(&registry, "entry", &Store::new(resources), false);
+    let after = registry.snapshot();
+    assert!(after.devices.is_empty() && after.entities.is_empty() && after.areas.is_empty());
 }

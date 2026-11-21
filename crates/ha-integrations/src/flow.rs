@@ -63,7 +63,10 @@ pub const MAX_FLOWS: usize = 16;
 pub const EXPIRES: Duration = Duration::from_secs(60 * 60);
 
 /// The flow handlers, by domain (`HANDLERS` in `config_entries.py`).
-pub const HANDLERS: &[&Handler] = &[&switchbot_cloud::config_flow::HANDLER];
+pub const HANDLERS: &[&Handler] = &[
+    &crate::hue::config_flow::HANDLER,
+    &switchbot_cloud::config_flow::HANDLER,
+];
 
 /// `SOURCE_USER`.
 pub const SOURCE_USER: &str = "user";
@@ -115,12 +118,31 @@ impl Cx<'_> {
         *self.unique_id = Some(unique_id.to_owned());
     }
 
+    /// Whether the flow has a unique id yet.
+    pub fn has_unique_id(&self) -> bool {
+        self.unique_id.is_some()
+    }
+
+    /// `_async_current_ids(include_ignore=False)`: the unique ids of this
+    /// integration's entries.
+    pub fn current_unique_ids(&self) -> Vec<String> {
+        self.entries.unique_ids(self.domain)
+    }
+
+    /// `_async_abort_entries_match({key: value})`: whether an entry of
+    /// this integration has that value in its data.
+    pub fn entry_with_data(&self, key: &str, value: &str) -> bool {
+        self.entries.has_data(self.domain, key, value)
+    }
+
     /// `_abort_if_unique_id_configured`: the abort, if an entry of this
-    /// integration has the flow's unique id.
+    /// integration has the flow's unique id. An ignored entry is not in
+    /// the way of a flow the user started.
     pub fn abort_if_unique_id_configured(&self) -> Option<Step> {
         let unique_id = self.unique_id.as_deref()?;
         self.entries
             .find_unique(self.domain, unique_id)
+            .filter(|entry| !crate::config_entries::ignored(entry))
             .map(|_| Step::abort("already_configured"))
     }
 }
@@ -140,6 +162,8 @@ pub struct Field {
 pub enum Kind {
     /// `str`.
     Str,
+    /// `vol.In({value: label, ...})`: one of the values, shown by label.
+    Select(Vec<(String, String)>),
 }
 
 impl Field {
@@ -154,16 +178,40 @@ impl Field {
 
     /// `voluptuous_serialize.convert` of the field.
     fn json(&self) -> Value {
-        match self.kind {
+        match &self.kind {
             Kind::Str => json!({"type": "string", "name": self.name, "required": self.required}),
+            Kind::Select(options) => {
+                let options: Vec<Value> = options.iter().map(|(v, l)| json!([v, l])).collect();
+                json!({"type": "select", "options": options, "name": self.name,
+                       "required": self.required})
+            }
         }
     }
 
     /// The field's check of a value: its error message.
-    fn check(&self, value: &Value) -> Result<(), &'static str> {
-        match self.kind {
+    fn check(&self, value: &Value) -> Result<(), String> {
+        match &self.kind {
             Kind::Str if value.is_string() => Ok(()),
-            Kind::Str => Err("expected str"),
+            Kind::Str => Err("expected str".into()),
+            Kind::Select(options) => {
+                if let Some(v) = value.as_str()
+                    && options.iter().any(|(option, _)| option == v)
+                {
+                    return Ok(());
+                }
+                // `vol.In`'s message: the values sorted, as Python
+                // writes a list of strings.
+                let mut values: Vec<&str> = options.iter().map(|(v, _)| v.as_str()).collect();
+                values.sort_unstable();
+                let mut list = String::new();
+                for (n, value) in values.iter().enumerate() {
+                    if n > 0 {
+                        list.push_str(", ");
+                    }
+                    ha_core::py::repr_str(&mut list, value);
+                }
+                Err(format!("value must be one of [{list}]"))
+            }
         }
     }
 }
@@ -220,7 +268,9 @@ pub enum Step {
         /// `None`: a form with nothing to fill in (a button to press).
         schema: Option<Vec<Field>>,
         /// By field name, or `base` for the whole form: translation keys.
-        errors: Vec<(&'static str, &'static str)>,
+        /// `None` is `errors=None` (a form shown with no word on errors),
+        /// which the views send as `null`; an empty list is `{}`.
+        errors: Option<Vec<(&'static str, &'static str)>>,
         description_placeholders: Option<Map<String, Value>>,
     },
     /// The entry to make, with the flow's unique id.
@@ -240,7 +290,7 @@ impl Step {
         Self::Form {
             step_id,
             schema: Some(schema),
-            errors: error.map(|e| ("base", e)).into_iter().collect(),
+            errors: Some(error.map(|e| ("base", e)).into_iter().collect()),
             description_placeholders: None,
         }
     }
@@ -258,7 +308,7 @@ pub enum FlowResult {
         handler: &'static str,
         step_id: &'static str,
         schema: Option<Vec<Field>>,
-        errors: Vec<(&'static str, &'static str)>,
+        errors: Option<Vec<(&'static str, &'static str)>>,
         description_placeholders: Option<Map<String, Value>>,
     },
     CreateEntry {
@@ -596,7 +646,7 @@ impl Manager {
             Step::CreateEntry { .. } => Some(self.lifecycle.lock().await),
             _ => None,
         };
-        let (title, entry) = {
+        let (title, entry, replaced) = {
             let mut flows = self.flows.lock();
             let Some(i) = find(&flows) else {
                 // Deleted while the step ran: `UnknownFlow`, unless the
@@ -635,9 +685,21 @@ impl Manager {
             // `async_finish_flow`, as far as adding the entry, in one go so
             // two flows can't both add the same account.
             remove(&mut flows, i);
+            let mut replaced = None;
             if let Some(unique_id) = &unique_id {
-                if self.entries.find_unique(domain, unique_id).is_some() {
-                    return Ok(abort("already_configured"));
+                // An entry that is set up is found before an ignored one.
+                match self.entries.find_unique(domain, unique_id) {
+                    // An ignored entry for the same thing makes way, as
+                    // in HA (`async_finish_flow`): it leaves the list
+                    // now; what the registries hold for it goes, and its
+                    // removal is told, once the new entry is set up.
+                    Some(old) if crate::config_entries::ignored(&old) => {
+                        if let Some(id) = old.get("entry_id").and_then(Value::as_str) {
+                            replaced = self.entries.take(id);
+                        }
+                    }
+                    Some(_) => return Ok(abort("already_configured")),
+                    None => {}
                 }
                 // The handler's other flows for the same thing end.
                 flows.retain(|p| {
@@ -653,7 +715,7 @@ impl Manager {
             entry.insert("version".into(), json!(handler.version));
             entry.insert("minor_version".into(), json!(handler.minor_version));
             self.entries.add_tracked(entry.clone());
-            (title, entry)
+            (title, entry, replaced)
         };
         let entry_id = entry
             .get("entry_id")
@@ -683,6 +745,18 @@ impl Manager {
                 self.entries.runtime(&entry_id)
             }
         };
+        // `_async_clean_up` of the entry this one replaced: the rows the
+        // new entry didn't take over, then the news.
+        if let Some(old) = replaced {
+            if let (Some(registry), Some(id)) = (
+                self.components.registry(),
+                old.get("entry_id").and_then(Value::as_str),
+            ) {
+                let _one = switchbot_cloud::SETUP.lock();
+                registry.clear_config_entry(id);
+            }
+            self.entries.tell_removed(&old);
+        }
         self.save(true).await;
         Ok(FlowResult::CreateEntry {
             flow_id: flow_id.to_owned(),
@@ -715,6 +789,12 @@ impl Manager {
                     crate::spawn_switchbot(&self.components, entry.clone(), &self.endpoints, status)
                 }),
                 switchbot_cloud::COMPONENTS,
+            ),
+            Some(crate::hue::DOMAIN) => (
+                Running::start_told(entry_id, status, attempted, |status| {
+                    crate::spawn_hue(&self.components, entry.clone(), &self.endpoints, status)
+                }),
+                crate::hue::COMPONENTS,
             ),
             _ => return false,
         };
@@ -818,6 +898,8 @@ impl Manager {
                     match id.domain() {
                         "button" => self.components.buttons().remove(id),
                         "climate" => self.components.climates().remove(id),
+                        "light" => self.components.lights().remove(id),
+                        "scene" => self.components.scenes().remove(id),
                         "switch" => self.components.switches().remove(id),
                         _ => {}
                     }

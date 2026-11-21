@@ -188,6 +188,51 @@ pub struct NewArea {
     pub temperature_entity_id: Option<String>,
 }
 
+/// An area of this name and nothing else: its id is the name slugified,
+/// with `_2`, `_3`, ... when taken (`generate_id_from_name`).
+fn new_area(areas: &[crate::Area], name: &str, now: &str) -> crate::Area {
+    let base = ha_core::slugify(name);
+    let mut id = base.clone();
+    let mut tries = 1;
+    while areas.iter().any(|a| a.id == id) {
+        tries += 1;
+        id = format!("{base}_{tries}");
+    }
+    crate::Area {
+        id,
+        name: name.to_owned(),
+        created_at: Some(now.to_owned()),
+        modified_at: Some(now.to_owned()),
+        ..Default::default()
+    }
+}
+
+/// `format_mac`: a MAC address as HA keeps it (lower case, colons). One
+/// in a spelling HA doesn't know is left as it is.
+fn format_mac(mac: &str) -> String {
+    let hex = |s: &str| s.len() == 12 && s.bytes().all(|b| b.is_ascii_hexdigit());
+    let colons = |s: &str| {
+        let pairs: Vec<&str> = (0..6).map(|i| &s[i * 2..i * 2 + 2]).collect();
+        pairs.join(":").to_lowercase()
+    };
+    if mac.len() == 17 && mac.matches(':').count() == 5 {
+        return mac.to_lowercase();
+    }
+    if mac.len() == 17 && mac.matches('-').count() == 5 {
+        return mac.replace('-', ":").to_lowercase();
+    }
+    if mac.len() == 14 && mac.matches('.').count() == 2 {
+        let bare = mac.replace('.', "");
+        if hex(&bare) {
+            return colons(&bare);
+        }
+    }
+    if hex(mac) {
+        return colons(mac);
+    }
+    mac.to_owned()
+}
+
 /// A set as HA is given one: each value once, in the order given.
 fn as_set(values: &[String]) -> Vec<String> {
     let mut set: Vec<String> = Vec::with_capacity(values.len());
@@ -205,10 +250,21 @@ fn as_set(values: &[String]) -> Vec<String> {
 pub struct DeviceInfo {
     pub config_entry_id: String,
     pub identifiers: Vec<Value>,
+    /// `connections`: `[type, value]` pairs, added to those it has.
+    pub connections: Vec<Value>,
+    /// `entry_type` (`service`), when given.
+    pub entry_type: Option<String>,
     pub manufacturer: Option<String>,
     pub model: Option<String>,
+    pub model_id: Option<String>,
     pub name: Option<String>,
     pub sw_version: Option<String>,
+    /// `via_device`: an identifier of the device this one is reached
+    /// through. `Some` sets the link, to nothing if no device has it.
+    pub via_device: Option<Value>,
+    /// `suggested_area`: a new device goes in the area of this name,
+    /// which is made if there is none.
+    pub suggested_area: Option<String>,
 }
 
 fn now_iso(hass: &Hass) -> String {
@@ -499,16 +555,9 @@ impl Registry {
                     )));
                 }
             }
-            let base = ha_core::slugify(name);
-            let mut id = base.clone();
-            let mut tries = 1;
-            while tx.r.areas.iter().any(|a| a.id == id) {
-                tries += 1;
-                id = format!("{base}_{tries}");
-            }
+            let area = new_area(&tx.r.areas, name, &now);
+            let id = area.id.clone();
             let area = crate::Area {
-                id: id.clone(),
-                name: name.clone(),
                 aliases: as_set(&new.aliases),
                 floor_id: new.floor_id.clone(),
                 humidity_entity_id: new.humidity_entity_id.clone(),
@@ -516,9 +565,7 @@ impl Registry {
                 labels: as_set(&new.labels),
                 picture: new.picture.clone(),
                 temperature_entity_id: new.temperature_entity_id.clone(),
-                created_at: Some(now.clone()),
-                modified_at: Some(now),
-                ..Default::default()
+                ..area
             };
             tx.r.areas.push(area.clone());
             tx.events.push((
@@ -792,11 +839,16 @@ impl Registry {
                     (domain, platform, unique_id),
                     device_id.as_deref(),
                     deleted.as_ref().and_then(|d| d.area_id.as_deref()),
-                    // The user's name has priority.
-                    deleted
-                        .as_ref()
-                        .and_then(|d| d.name.as_deref())
-                        .or(object_id_base.as_deref()),
+                    // The user's name has priority, and always loses the
+                    // device's name from its front; the integration's
+                    // only if it is named the old way.
+                    match deleted.as_ref().and_then(|d| d.name.as_deref()) {
+                        Some(name) => (Some(name), true),
+                        None => (
+                            object_id_base.as_deref(),
+                            patch.has_entity_name != Some(true),
+                        ),
+                    },
                 ),
             };
             let row = Arc::new(Entity {
@@ -1046,30 +1098,63 @@ impl Registry {
     /// none, or its primary entry is gone or a low-priority integration's;
     /// changed fields fire one `update` with the old values. A name change
     /// ripples into the device's legacy-named entities (`changes: {}`).
-    pub fn get_or_create_device(&self, info: DeviceInfo) -> Arc<Device> {
+    pub fn get_or_create_device(&self, mut info: DeviceInfo) -> Arc<Device> {
         let now = now_iso(&self.hass);
         let domains = self.entries.read().clone();
+        // `_normalize_connections`: a MAC address in HA's one spelling.
+        for connection in &mut info.connections {
+            if connection[0] == "mac"
+                && let Some(mac) = connection[1].as_str()
+            {
+                *connection = json!(["mac", format_mac(mac)]);
+            }
+        }
+        let areas_unwritable = self.unwritable(crate::AREA_KEY);
+        let (identifiers, connections) = (info.identifiers.clone(), info.connections.clone());
         self.write(|tx| {
             let r = &mut tx.r;
+            // `async_get_device`: by an identifier first; only if no device
+            // has one of them, by a connection (so a device of another
+            // integration that shares an address never wins over the row
+            // that has this device's own identifier).
+            let by_identifier = |ids: &[Value]| ids.iter().any(|i| identifiers.contains(i));
+            let by_connection = |cs: &[Value]| cs.iter().any(|c| connections.contains(c));
             let found = r
                 .devices
                 .iter()
-                .position(|d| d.identifiers.iter().any(|i| info.identifiers.contains(i)));
-            // A deleted device with one of the identifiers comes back
-            // (`to_device_entry`): its id, creation time and the user's
-            // settings, with this entry.
+                .position(|d| by_identifier(&d.identifiers))
+                .or_else(|| r.devices.iter().position(|d| by_connection(&d.connections)));
+            // A deleted device with one of the identifiers, or else one of
+            // the connections, comes back (`to_device_entry`): its id,
+            // creation time and the user's settings, with this entry.
             let restored = found.is_none().then(|| {
                 let rows = &r.device_file.deleted;
-                let i = rows.iter().position(|raw| {
-                    DeletedDevice::parse(raw)
-                        .is_some_and(|d| d.identifiers.iter().any(|x| info.identifiers.contains(x)))
-                })?;
+                // One pass: a row with an identifier ends it; else the
+                // first row with a connection.
+                let mut by_address = None;
+                let mut by_id = None;
+                for (i, row) in rows.iter().enumerate() {
+                    let Some(d) = DeletedDevice::parse(row) else {
+                        continue;
+                    };
+                    if by_identifier(&d.identifiers) {
+                        by_id = Some((i, d));
+                        break;
+                    }
+                    if by_address.is_none() && by_connection(&d.connections) {
+                        by_address = Some((i, d));
+                    }
+                }
+                let (i, d) = by_id.or(by_address)?;
                 let mut rows = (**rows).clone();
-                let d = DeletedDevice::parse(&rows.remove(i))?;
+                rows.remove(i);
                 r.device_file.deleted = Arc::new(rows);
                 Some(d)
             });
-            let (i, mut d, is_new) = match (found, restored.flatten()) {
+            let restored = restored.flatten();
+            // Never seen before: neither registered nor deleted.
+            let fresh = found.is_none() && restored.is_none();
+            let (i, mut d, is_new) = match (found, restored) {
                 (Some(i), _) => (Some(i), (*r.devices[i]).clone(), false),
                 (None, Some(old)) => {
                     let mut subentries = Map::new();
@@ -1163,12 +1248,57 @@ impl Registry {
                     field.clone_from(value);
                 }
             };
+            set("entry_type", &mut d.entry_type, &info.entry_type);
             set("manufacturer", &mut d.manufacturer, &info.manufacturer);
             set("model", &mut d.model, &info.model);
+            set("model_id", &mut d.model_id, &info.model_id);
             set("name", &mut d.name, &info.name);
             set("sw_version", &mut d.sw_version, &info.sw_version);
+            let new_connections: Vec<Value> = info
+                .connections
+                .iter()
+                .filter(|c| !d.connections.contains(c))
+                .cloned()
+                .collect();
+            if !new_connections.is_empty() {
+                changes.insert("connections".into(), json!(d.connections));
+                d.connections.extend(new_connections);
+            }
+            if let Some(via) = &info.via_device {
+                let via = r
+                    .devices
+                    .iter()
+                    .find(|x| x.identifiers.contains(via))
+                    .map(|x| x.id.clone());
+                if d.via_device_id != via {
+                    changes.insert("via_device_id".into(), json!(d.via_device_id));
+                    d.via_device_id = via;
+                }
+            }
             if !is_new && changes.is_empty() {
                 return r.devices[i.expect("found")].clone();
+            }
+            // `suggested_area`, for a device that is new (one that came
+            // back keeps the area it had, or none).
+            if fresh && let Some(name) = info.suggested_area.as_deref().filter(|n| !n.is_empty()) {
+                d.area_id = match r.area_by_name(name) {
+                    Some(area) => Some(area.id.clone()),
+                    // An area that could not be saved is not made: the
+                    // device's row, which may be saved, would point at an
+                    // area gone after a restart.
+                    None if areas_unwritable => None,
+                    None => {
+                        let area = new_area(&r.areas, name, &now);
+                        let id = area.id.clone();
+                        r.areas.push(area);
+                        tx.events.push((
+                            "area_registry_updated",
+                            json!({"action": "create", "area_id": id}),
+                        ));
+                        tx.save_areas = true;
+                        Some(id)
+                    }
+                };
             }
             d.modified_at = Some(now.clone());
             let renamed = !is_new && changes.contains_key("name");
@@ -1483,7 +1613,7 @@ fn generate_entity_id(
     (domain, platform, unique_id): (&str, &str, &str),
     device_id: Option<&str>,
     area_id: Option<&str>,
-    object_id_base: Option<&str>,
+    (object_id_base, unprefix): (Option<&str>, bool),
 ) -> String {
     let device = device_id.and_then(|id| r.devices.iter().find(|d| d.id == id));
     let device_name = device.and_then(|d| d.display_name());
@@ -1493,7 +1623,9 @@ fn generate_entity_id(
         .and_then(|a| r.areas.iter().find(|x| x.id == a))
         .map(|a| a.name.as_str());
     let entity_name = match (object_id_base, device_name) {
-        (Some(name), Some(device)) => strip_prefix(name, device).or_else(|| Some(name.to_owned())),
+        (Some(name), Some(device)) if unprefix => {
+            strip_prefix(name, device).or_else(|| Some(name.to_owned()))
+        }
         (name, _) => name.map(str::to_owned),
     };
     let full: Vec<&str> = [area_name, device_name, entity_name.as_deref()]

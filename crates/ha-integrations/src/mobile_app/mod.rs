@@ -478,6 +478,7 @@ impl MobileApp {
             model: field("model"),
             name: Some(device_name.to_owned()),
             sw_version: field("os_version"),
+            ..Default::default()
         });
         // The tracker platform attaches the row.
         ctx.registry.get_or_create_entity(

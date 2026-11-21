@@ -1,0 +1,5579 @@
+{
+ "scenarios": [
+  {
+   "name": "add",
+   "doc": "Discovery finds the bridge, it is picked, the link button isn't pressed the first time and is the second: the entry is made and set up.",
+   "subscriptions": [
+    {
+     "sub": "entries",
+     "msg": {
+      "type": "config_entries/subscribe"
+     },
+     "first": [
+      {
+       "id": 1,
+       "type": "result",
+       "success": true,
+       "result": null
+      },
+      {
+       "id": 1,
+       "type": "event",
+       "event": []
+      }
+     ]
+    },
+    {
+     "sub": "flows",
+     "msg": {
+      "type": "config_entries/flow/subscribe"
+     },
+     "first": [
+      {
+       "id": 1,
+       "type": "event",
+       "event": []
+      },
+      {
+       "id": 1,
+       "type": "result",
+       "success": true,
+       "result": null
+      }
+     ]
+    }
+   ],
+   "steps": [
+    {
+     "ws": {
+      "user": "admin",
+      "msg": {
+       "type": "config_entries/get"
+      }
+     },
+     "replies": [
+      {
+       "type": "result",
+       "success": true,
+       "result": []
+      }
+     ],
+     "events": [],
+     "requests": []
+    },
+    {
+     "ws": {
+      "user": "admin",
+      "msg": {
+       "type": "config_entries/flow/progress"
+      }
+     },
+     "replies": [
+      {
+       "type": "result",
+       "success": true,
+       "result": []
+      }
+     ],
+     "events": [],
+     "requests": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow",
+      "user": "admin",
+      "sent": "{\"handler\": \"hue\", \"show_advanced_options\": false}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:1>",
+      "handler": "hue",
+      "data_schema": [
+       {
+        "type": "select",
+        "options": [
+         [
+          "c42996000001",
+          "192.0.2.10"
+         ],
+         [
+          "manual",
+          "Manually add a Hue Bridge"
+         ]
+        ],
+        "name": "id",
+        "required": true
+       }
+      ],
+      "errors": null,
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "init"
+     },
+     "events": [],
+     "requests": [
+      {
+       "method": "GET",
+       "url": "https://discovery.meethue.com/"
+      },
+      {
+       "method": "GET",
+       "url": "http://192.0.2.10/api/config"
+      },
+      {
+       "method": "GET",
+       "url": "https://192.0.2.10/clip/v2/resource"
+      }
+     ]
+    },
+    {
+     "http": {
+      "method": "GET",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:1>",
+      "handler": "hue",
+      "data_schema": [
+       {
+        "type": "select",
+        "options": [
+         [
+          "c42996000001",
+          "192.0.2.10"
+         ],
+         [
+          "manual",
+          "Manually add a Hue Bridge"
+         ]
+        ],
+        "name": "id",
+        "required": true
+       }
+      ],
+      "errors": null,
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "init"
+     },
+     "events": [],
+     "requests": [
+      {
+       "method": "GET",
+       "url": "https://discovery.meethue.com/"
+      },
+      {
+       "method": "GET",
+       "url": "http://192.0.2.10/api/config"
+      },
+      {
+       "method": "GET",
+       "url": "https://192.0.2.10/clip/v2/resource"
+      }
+     ]
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin",
+      "sent": "{\"id\": \"c42996000001\"}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:1>",
+      "handler": "hue",
+      "data_schema": [],
+      "errors": null,
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "link"
+     },
+     "events": [],
+     "requests": []
+    },
+    {
+     "http": {
+      "method": "GET",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:1>",
+      "handler": "hue",
+      "data_schema": [],
+      "errors": null,
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "link"
+     },
+     "events": [],
+     "requests": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin",
+      "sent": "{}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:1>",
+      "handler": "hue",
+      "data_schema": [],
+      "errors": {
+       "base": "register_failed"
+      },
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "link"
+     },
+     "events": [],
+     "requests": [
+      {
+       "method": "POST",
+       "url": "https://192.0.2.10/api",
+       "json": {
+        "devicetype": "home-assistant#home"
+       }
+      },
+      {
+       "method": "POST",
+       "url": "http://192.0.2.10/api",
+       "json": {
+        "devicetype": "home-assistant#home"
+       }
+      }
+     ]
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin",
+      "sent": "{}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:1>",
+      "handler": "hue",
+      "data_schema": [],
+      "errors": {
+       "base": "register_failed"
+      },
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "link"
+     },
+     "events": [],
+     "requests": [
+      {
+       "method": "POST",
+       "url": "https://192.0.2.10/api",
+       "json": {
+        "devicetype": "home-assistant#home"
+       }
+      },
+      {
+       "method": "POST",
+       "url": "http://192.0.2.10/api",
+       "json": {
+        "devicetype": "home-assistant#home"
+       }
+      }
+     ]
+    },
+    {
+     "api": "pressed"
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin",
+      "sent": "{}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "create_entry",
+      "flow_id": "<flow:1>",
+      "handler": "hue",
+      "description": null,
+      "description_placeholders": null,
+      "title": "Hue Bridge c42996000001",
+      "minor_version": 1,
+      "options": {},
+      "subentries": [],
+      "version": 1,
+      "result": {
+       "created_at": "<ts>",
+       "entry_id": "<entry:1>",
+       "domain": "hue",
+       "modified_at": "<ts>",
+       "title": "Hue Bridge c42996000001",
+       "source": "user",
+       "state": "loaded",
+       "supports_options": true,
+       "supports_remove_device": false,
+       "supports_unload": true,
+       "supports_reconfigure": false,
+       "supported_subentry_types": {},
+       "pref_disable_new_entities": false,
+       "pref_disable_polling": false,
+       "disabled_by": null,
+       "reason": null,
+       "error_reason_translation_key": null,
+       "error_reason_translation_placeholders": null,
+       "num_subentries": 0
+      }
+     },
+     "events": [
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "added",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "hue",
+          "modified_at": "<ts>",
+          "title": "Hue Bridge c42996000001",
+          "source": "user",
+          "state": "not_loaded",
+          "supports_options": true,
+          "supports_remove_device": false,
+          "supports_unload": false,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "hue",
+          "modified_at": "<ts>",
+          "title": "Hue Bridge c42996000001",
+          "source": "user",
+          "state": "setup_in_progress",
+          "supports_options": true,
+          "supports_remove_device": false,
+          "supports_unload": false,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "hue",
+          "modified_at": "<ts>",
+          "title": "Hue Bridge c42996000001",
+          "source": "user",
+          "state": "loaded",
+          "supports_options": true,
+          "supports_remove_device": false,
+          "supports_unload": true,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      }
+     ],
+     "requests": [
+      {
+       "method": "POST",
+       "url": "https://192.0.2.10/api",
+       "json": {
+        "devicetype": "home-assistant#home"
+       }
+      },
+      {
+       "method": "get",
+       "url": "https://192.0.2.10/clip/v2/resource",
+       "key": true
+      }
+     ]
+    },
+    {
+     "ws": {
+      "user": "admin",
+      "msg": {
+       "type": "config_entries/get"
+      }
+     },
+     "replies": [
+      {
+       "type": "result",
+       "success": true,
+       "result": [
+        {
+         "created_at": "<ts>",
+         "entry_id": "<entry:1>",
+         "domain": "hue",
+         "modified_at": "<ts>",
+         "title": "Hue Bridge c42996000001",
+         "source": "user",
+         "state": "loaded",
+         "supports_options": true,
+         "supports_remove_device": false,
+         "supports_unload": true,
+         "supports_reconfigure": false,
+         "supported_subentry_types": {},
+         "pref_disable_new_entities": false,
+         "pref_disable_polling": false,
+         "disabled_by": null,
+         "reason": null,
+         "error_reason_translation_key": null,
+         "error_reason_translation_placeholders": null,
+         "num_subentries": 0
+        }
+       ]
+      }
+     ],
+     "events": [],
+     "requests": []
+    },
+    {
+     "ws": {
+      "user": "admin",
+      "msg": {
+       "type": "config_entries/flow/progress"
+      }
+     },
+     "replies": [
+      {
+       "type": "result",
+       "success": true,
+       "result": []
+      }
+     ],
+     "events": [],
+     "requests": []
+    },
+    {
+     "http": {
+      "method": "GET",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin"
+     },
+     "status": 404,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "message": "Invalid flow specified"
+     },
+     "events": [],
+     "requests": []
+    }
+   ],
+   "entries": [
+    {
+     "created_at": "<time>",
+     "data": {
+      "api_key": "fake-hue-application-key-0000000000000001",
+      "api_version": 2,
+      "host": "192.0.2.10"
+     },
+     "disabled_by": null,
+     "discovery_keys": {},
+     "domain": "hue",
+     "entry_id": "<entry:1>",
+     "minor_version": 1,
+     "modified_at": "<time>",
+     "options": {},
+     "pref_disable_new_entities": false,
+     "pref_disable_polling": false,
+     "source": "user",
+     "subentries": [],
+     "title": "Hue Bridge c42996000001",
+     "unique_id": "c42996000001",
+     "version": 1
+    }
+   ],
+   "deleted_devices": 0,
+   "deleted_entities": 0,
+   "devices": [
+    {
+     "area_id": "living_room",
+     "config_entries": [
+      "<entry:1>"
+     ],
+     "config_entries_subentries": {
+      "<entry:1>": [
+       null
+      ]
+     },
+     "configuration_url": null,
+     "connections": [
+      [
+       "mac",
+       "00:17:88:01:00:00:00:06"
+      ]
+     ],
+     "created_at": "<time>",
+     "disabled_by": null,
+     "entry_type": null,
+     "hw_version": null,
+     "id": "<device:13592c33-2ede-42f1-8e4a-c0e241bf29c4>",
+     "identifiers": [
+      [
+       "hue",
+       "13592c33-2ede-42f1-8e4a-c0e241bf29c4"
+      ]
+     ],
+     "labels": [],
+     "manufacturer": "Signify Netherlands B.V.",
+     "model": "Hue Go",
+     "model_id": "915005822001",
+     "modified_at": "<time>",
+     "name_by_user": null,
+     "name": "Lamp",
+     "primary_config_entry": "<entry:1>",
+     "serial_number": null,
+     "sw_version": "1.163.1",
+     "via_device_id": "<device:375f4b1e-5632-44d2-bafd-7bf40e2571d3>"
+    },
+    {
+     "area_id": "bedroom",
+     "config_entries": [
+      "<entry:1>"
+     ],
+     "config_entries_subentries": {
+      "<entry:1>": [
+       null
+      ]
+     },
+     "configuration_url": null,
+     "connections": [
+      [
+       "mac",
+       "00:17:88:01:00:00:00:01"
+      ]
+     ],
+     "created_at": "<time>",
+     "disabled_by": null,
+     "entry_type": null,
+     "hw_version": null,
+     "id": "<device:19f631d2-af86-4307-a089-f5a46a2e4b55>",
+     "identifiers": [
+      [
+       "hue",
+       "19f631d2-af86-4307-a089-f5a46a2e4b55"
+      ]
+     ],
+     "labels": [],
+     "manufacturer": "Signify Netherlands B.V.",
+     "model": "Hue color lamp",
+     "model_id": "LCA001",
+     "modified_at": "<time>",
+     "name_by_user": null,
+     "name": "Light bulb",
+     "primary_config_entry": "<entry:1>",
+     "serial_number": null,
+     "sw_version": "1.163.1",
+     "via_device_id": "<device:375f4b1e-5632-44d2-bafd-7bf40e2571d3>"
+    },
+    {
+     "area_id": "living_room",
+     "config_entries": [
+      "<entry:1>"
+     ],
+     "config_entries_subentries": {
+      "<entry:1>": [
+       null
+      ]
+     },
+     "configuration_url": null,
+     "connections": [],
+     "created_at": "<time>",
+     "disabled_by": null,
+     "entry_type": "service",
+     "hw_version": null,
+     "id": "<device:1f373bdc-4859-49dc-9a40-8b22fc63715c>",
+     "identifiers": [
+      [
+       "hue",
+       "1f373bdc-4859-49dc-9a40-8b22fc63715c"
+      ]
+     ],
+     "labels": [],
+     "manufacturer": "Signify Netherlands B.V.",
+     "model": "Room",
+     "model_id": null,
+     "modified_at": "<time>",
+     "name_by_user": null,
+     "name": "Living room",
+     "primary_config_entry": "<entry:1>",
+     "serial_number": null,
+     "sw_version": null,
+     "via_device_id": "<device:375f4b1e-5632-44d2-bafd-7bf40e2571d3>"
+    },
+    {
+     "area_id": null,
+     "config_entries": [
+      "<entry:1>"
+     ],
+     "config_entries_subentries": {
+      "<entry:1>": [
+       null
+      ]
+     },
+     "configuration_url": null,
+     "connections": [
+      [
+       "mac",
+       "00:17:88:01:00:00:00:05"
+      ],
+      [
+       "mac",
+       "c4:29:96:00:00:01"
+      ]
+     ],
+     "created_at": "<time>",
+     "disabled_by": null,
+     "entry_type": null,
+     "hw_version": null,
+     "id": "<device:375f4b1e-5632-44d2-bafd-7bf40e2571d3>",
+     "identifiers": [
+      [
+       "hue",
+       "375f4b1e-5632-44d2-bafd-7bf40e2571d3"
+      ],
+      [
+       "hue",
+       "c42996fffe000001"
+      ]
+     ],
+     "labels": [],
+     "manufacturer": "Signify Netherlands B.V.",
+     "model": "Hue Bridge",
+     "model_id": "BSB003",
+     "modified_at": "<time>",
+     "name_by_user": null,
+     "name": "Hue Bridge",
+     "primary_config_entry": "<entry:1>",
+     "serial_number": null,
+     "sw_version": "6.3.2071556020",
+     "via_device_id": null
+    },
+    {
+     "area_id": "hallway",
+     "config_entries": [
+      "<entry:1>"
+     ],
+     "config_entries_subentries": {
+      "<entry:1>": [
+       null
+      ]
+     },
+     "configuration_url": null,
+     "connections": [
+      [
+       "mac",
+       "00:17:88:01:00:00:00:03"
+      ]
+     ],
+     "created_at": "<time>",
+     "disabled_by": null,
+     "entry_type": null,
+     "hw_version": null,
+     "id": "<device:3d3751a8-aff0-4d9d-815f-e52bf7e8efde>",
+     "identifiers": [
+      [
+       "hue",
+       "3d3751a8-aff0-4d9d-815f-e52bf7e8efde"
+      ]
+     ],
+     "labels": [],
+     "manufacturer": "Signify Netherlands B.V.",
+     "model": "Hue filament bulb",
+     "model_id": "LTO003",
+     "modified_at": "<time>",
+     "name_by_user": null,
+     "name": "Hue filament bulb 3",
+     "primary_config_entry": "<entry:1>",
+     "serial_number": null,
+     "sw_version": "1.163.1",
+     "via_device_id": "<device:375f4b1e-5632-44d2-bafd-7bf40e2571d3>"
+    },
+    {
+     "area_id": "hallway",
+     "config_entries": [
+      "<entry:1>"
+     ],
+     "config_entries_subentries": {
+      "<entry:1>": [
+       null
+      ]
+     },
+     "configuration_url": null,
+     "connections": [
+      [
+       "mac",
+       "00:17:88:01:00:00:00:02"
+      ]
+     ],
+     "created_at": "<time>",
+     "disabled_by": null,
+     "entry_type": null,
+     "hw_version": null,
+     "id": "<device:ba10f1f5-48d5-46f7-b795-3594af125d94>",
+     "identifiers": [
+      [
+       "hue",
+       "ba10f1f5-48d5-46f7-b795-3594af125d94"
+      ]
+     ],
+     "labels": [],
+     "manufacturer": "Signify Netherlands B.V.",
+     "model": "Hue filament bulb",
+     "model_id": "LTO003",
+     "modified_at": "<time>",
+     "name_by_user": null,
+     "name": "Hue filament bulb 1",
+     "primary_config_entry": "<entry:1>",
+     "serial_number": null,
+     "sw_version": "1.163.1",
+     "via_device_id": "<device:375f4b1e-5632-44d2-bafd-7bf40e2571d3>"
+    },
+    {
+     "area_id": "hallway",
+     "config_entries": [
+      "<entry:1>"
+     ],
+     "config_entries_subentries": {
+      "<entry:1>": [
+       null
+      ]
+     },
+     "configuration_url": null,
+     "connections": [],
+     "created_at": "<time>",
+     "disabled_by": null,
+     "entry_type": "service",
+     "hw_version": null,
+     "id": "<device:c6c99b57-5dbb-4d92-8db0-1f454e2d925c>",
+     "identifiers": [
+      [
+       "hue",
+       "c6c99b57-5dbb-4d92-8db0-1f454e2d925c"
+      ]
+     ],
+     "labels": [],
+     "manufacturer": "Signify Netherlands B.V.",
+     "model": "Room",
+     "model_id": null,
+     "modified_at": "<time>",
+     "name_by_user": null,
+     "name": "Hallway",
+     "primary_config_entry": "<entry:1>",
+     "serial_number": null,
+     "sw_version": null,
+     "via_device_id": "<device:375f4b1e-5632-44d2-bafd-7bf40e2571d3>"
+    },
+    {
+     "area_id": "bedroom",
+     "config_entries": [
+      "<entry:1>"
+     ],
+     "config_entries_subentries": {
+      "<entry:1>": [
+       null
+      ]
+     },
+     "configuration_url": null,
+     "connections": [],
+     "created_at": "<time>",
+     "disabled_by": null,
+     "entry_type": "service",
+     "hw_version": null,
+     "id": "<device:cb21f2c5-e722-494b-9d90-6bd3b26dcf10>",
+     "identifiers": [
+      [
+       "hue",
+       "cb21f2c5-e722-494b-9d90-6bd3b26dcf10"
+      ]
+     ],
+     "labels": [],
+     "manufacturer": "Signify Netherlands B.V.",
+     "model": "Room",
+     "model_id": null,
+     "modified_at": "<time>",
+     "name_by_user": null,
+     "name": "Bedroom",
+     "primary_config_entry": "<entry:1>",
+     "serial_number": null,
+     "sw_version": null,
+     "via_device_id": "<device:375f4b1e-5632-44d2-bafd-7bf40e2571d3>"
+    },
+    {
+     "area_id": "hallway",
+     "config_entries": [
+      "<entry:1>"
+     ],
+     "config_entries_subentries": {
+      "<entry:1>": [
+       null
+      ]
+     },
+     "configuration_url": null,
+     "connections": [
+      [
+       "mac",
+       "00:17:88:01:00:00:00:04"
+      ]
+     ],
+     "created_at": "<time>",
+     "disabled_by": null,
+     "entry_type": null,
+     "hw_version": null,
+     "id": "<device:dac0d5e2-8c2a-4912-8a4d-c863b6e00716>",
+     "identifiers": [
+      [
+       "hue",
+       "dac0d5e2-8c2a-4912-8a4d-c863b6e00716"
+      ]
+     ],
+     "labels": [],
+     "manufacturer": "Signify Netherlands B.V.",
+     "model": "Hue filament bulb",
+     "model_id": "LTO003",
+     "modified_at": "<time>",
+     "name_by_user": null,
+     "name": "Hue filament bulb 2",
+     "primary_config_entry": "<entry:1>",
+     "serial_number": null,
+     "sw_version": "1.163.1",
+     "via_device_id": "<device:375f4b1e-5632-44d2-bafd-7bf40e2571d3>"
+    },
+    {
+     "area_id": "bedroom",
+     "config_entries": [
+      "<entry:1>"
+     ],
+     "config_entries_subentries": {
+      "<entry:1>": [
+       null
+      ]
+     },
+     "configuration_url": null,
+     "connections": [
+      [
+       "mac",
+       "00:17:88:01:00:00:00:07"
+      ]
+     ],
+     "created_at": "<time>",
+     "disabled_by": null,
+     "entry_type": null,
+     "hw_version": null,
+     "id": "<device:df9083a4-75b9-46a1-9575-133f738d893d>",
+     "identifiers": [
+      [
+       "hue",
+       "df9083a4-75b9-46a1-9575-133f738d893d"
+      ]
+     ],
+     "labels": [],
+     "manufacturer": "Signify Netherlands B.V.",
+     "model": "Hue motion sensor",
+     "model_id": "SML003",
+     "modified_at": "<time>",
+     "name_by_user": null,
+     "name": "Bedroom",
+     "primary_config_entry": "<entry:1>",
+     "serial_number": null,
+     "sw_version": "2.85.1",
+     "via_device_id": "<device:375f4b1e-5632-44d2-bafd-7bf40e2571d3>"
+    }
+   ],
+   "entities": [
+    {
+     "aliases": [],
+     "aliases_v2": [
+      null
+     ],
+     "area_id": null,
+     "categories": {},
+     "capabilities": null,
+     "config_entry_id": "<entry:1>",
+     "config_subentry_id": null,
+     "created_at": "<time>",
+     "device_class": null,
+     "device_id": "<device:df9083a4-75b9-46a1-9575-133f738d893d>",
+     "disabled_by": null,
+     "entity_category": null,
+     "entity_id": "binary_sensor.bedroom_bedroom_motion",
+     "hidden_by": null,
+     "icon": null,
+     "id": "<id>",
+     "has_entity_name": true,
+     "labels": [],
+     "modified_at": "<time>",
+     "name": null,
+     "object_id_base": "Motion",
+     "options": {},
+     "original_device_class": "motion",
+     "original_icon": null,
+     "original_name": "Motion",
+     "platform": "hue",
+     "suggested_object_id": null,
+     "supported_features": 0,
+     "translation_key": null,
+     "unique_id": "c866df7d-21b5-4d5e-9e16-04f6005677b5",
+     "previous_unique_id": null,
+     "unit_of_measurement": null
+    },
+    {
+     "aliases": [],
+     "aliases_v2": [
+      null
+     ],
+     "area_id": null,
+     "categories": {},
+     "capabilities": null,
+     "config_entry_id": "<entry:1>",
+     "config_subentry_id": null,
+     "created_at": "<time>",
+     "device_class": null,
+     "device_id": "<device:cb21f2c5-e722-494b-9d90-6bd3b26dcf10>",
+     "disabled_by": null,
+     "entity_category": null,
+     "entity_id": "binary_sensor.bedroom_bedroom_motion_2",
+     "hidden_by": null,
+     "icon": null,
+     "id": "<id>",
+     "has_entity_name": true,
+     "labels": [],
+     "modified_at": "<time>",
+     "name": null,
+     "object_id_base": "Motion",
+     "options": {},
+     "original_device_class": "motion",
+     "original_icon": null,
+     "original_name": "Motion",
+     "platform": "hue",
+     "suggested_object_id": null,
+     "supported_features": 0,
+     "translation_key": null,
+     "unique_id": "e76de930-87a5-4327-902d-87c2e8c78439",
+     "previous_unique_id": null,
+     "unit_of_measurement": null
+    },
+    {
+     "aliases": [],
+     "aliases_v2": [
+      null
+     ],
+     "area_id": null,
+     "categories": {},
+     "capabilities": {
+      "min_color_temp_kelvin": 2000,
+      "max_color_temp_kelvin": 6535,
+      "supported_color_modes": [
+       "color_temp",
+       "xy"
+      ]
+     },
+     "config_entry_id": "<entry:1>",
+     "config_subentry_id": null,
+     "created_at": "<time>",
+     "device_class": null,
+     "device_id": "<device:cb21f2c5-e722-494b-9d90-6bd3b26dcf10>",
+     "disabled_by": null,
+     "entity_category": null,
+     "entity_id": "light.bedroom_bedroom",
+     "hidden_by": null,
+     "icon": null,
+     "id": "<id>",
+     "has_entity_name": true,
+     "labels": [],
+     "modified_at": "<time>",
+     "name": null,
+     "object_id_base": null,
+     "options": {},
+     "original_device_class": null,
+     "original_icon": null,
+     "original_name": null,
+     "platform": "hue",
+     "suggested_object_id": null,
+     "supported_features": 40,
+     "translation_key": null,
+     "unique_id": "ad2abd7a-84e2-4070-9365-186a01ea0192",
+     "previous_unique_id": null,
+     "unit_of_measurement": null
+    },
+    {
+     "aliases": [],
+     "aliases_v2": [
+      null
+     ],
+     "area_id": null,
+     "categories": {},
+     "capabilities": {
+      "min_color_temp_kelvin": 2000,
+      "max_color_temp_kelvin": 6535,
+      "effect_list": [
+       "off",
+       "candle",
+       "fire",
+       "prism",
+       "sparkle",
+       "opal",
+       "glisten",
+       "underwater",
+       "cosmos",
+       "sunbeam",
+       "enchant",
+       "sunrise",
+       "sunset"
+      ],
+      "supported_color_modes": [
+       "color_temp",
+       "xy"
+      ]
+     },
+     "config_entry_id": "<entry:1>",
+     "config_subentry_id": null,
+     "created_at": "<time>",
+     "device_class": null,
+     "device_id": "<device:19f631d2-af86-4307-a089-f5a46a2e4b55>",
+     "disabled_by": null,
+     "entity_category": null,
+     "entity_id": "light.bedroom_light_bulb",
+     "hidden_by": null,
+     "icon": null,
+     "id": "<id>",
+     "has_entity_name": true,
+     "labels": [],
+     "modified_at": "<time>",
+     "name": null,
+     "object_id_base": null,
+     "options": {},
+     "original_device_class": null,
+     "original_icon": null,
+     "original_name": null,
+     "platform": "hue",
+     "suggested_object_id": null,
+     "supported_features": 44,
+     "translation_key": "hue_light",
+     "unique_id": "c60ee3d8-e55f-4fc9-8d31-9e3dc6aa077d",
+     "previous_unique_id": null,
+     "unit_of_measurement": null
+    },
+    {
+     "aliases": [],
+     "aliases_v2": [
+      null
+     ],
+     "area_id": null,
+     "categories": {},
+     "capabilities": {
+      "min_color_temp_kelvin": 2202,
+      "max_color_temp_kelvin": 4504,
+      "supported_color_modes": [
+       "color_temp"
+      ]
+     },
+     "config_entry_id": "<entry:1>",
+     "config_subentry_id": null,
+     "created_at": "<time>",
+     "device_class": null,
+     "device_id": "<device:c6c99b57-5dbb-4d92-8db0-1f454e2d925c>",
+     "disabled_by": null,
+     "entity_category": null,
+     "entity_id": "light.hallway_hallway",
+     "hidden_by": null,
+     "icon": null,
+     "id": "<id>",
+     "has_entity_name": true,
+     "labels": [],
+     "modified_at": "<time>",
+     "name": null,
+     "object_id_base": null,
+     "options": {},
+     "original_device_class": null,
+     "original_icon": null,
+     "original_name": null,
+     "platform": "hue",
+     "suggested_object_id": null,
+     "supported_features": 40,
+     "translation_key": null,
+     "unique_id": "df1e030d-f506-4bfb-bf5e-548706002545",
+     "previous_unique_id": null,
+     "unit_of_measurement": null
+    },
+    {
+     "aliases": [],
+     "aliases_v2": [
+      null
+     ],
+     "area_id": null,
+     "categories": {},
+     "capabilities": {
+      "min_color_temp_kelvin": 2202,
+      "max_color_temp_kelvin": 4504,
+      "effect_list": [
+       "off",
+       "candle",
+       "sparkle",
+       "glisten",
+       "sunrise",
+       "sunset"
+      ],
+      "supported_color_modes": [
+       "color_temp"
+      ]
+     },
+     "config_entry_id": "<entry:1>",
+     "config_subentry_id": null,
+     "created_at": "<time>",
+     "device_class": null,
+     "device_id": "<device:ba10f1f5-48d5-46f7-b795-3594af125d94>",
+     "disabled_by": null,
+     "entity_category": null,
+     "entity_id": "light.hallway_hue_filament_bulb_1",
+     "hidden_by": null,
+     "icon": null,
+     "id": "<id>",
+     "has_entity_name": true,
+     "labels": [],
+     "modified_at": "<time>",
+     "name": null,
+     "object_id_base": null,
+     "options": {},
+     "original_device_class": null,
+     "original_icon": null,
+     "original_name": null,
+     "platform": "hue",
+     "suggested_object_id": null,
+     "supported_features": 44,
+     "translation_key": "hue_light",
+     "unique_id": "8d3138ee-1c09-4003-800d-33d7789e7d1e",
+     "previous_unique_id": null,
+     "unit_of_measurement": null
+    },
+    {
+     "aliases": [],
+     "aliases_v2": [
+      null
+     ],
+     "area_id": null,
+     "categories": {},
+     "capabilities": {
+      "min_color_temp_kelvin": 2202,
+      "max_color_temp_kelvin": 4504,
+      "effect_list": [
+       "off",
+       "candle",
+       "sparkle",
+       "glisten",
+       "sunrise",
+       "sunset"
+      ],
+      "supported_color_modes": [
+       "color_temp"
+      ]
+     },
+     "config_entry_id": "<entry:1>",
+     "config_subentry_id": null,
+     "created_at": "<time>",
+     "device_class": null,
+     "device_id": "<device:dac0d5e2-8c2a-4912-8a4d-c863b6e00716>",
+     "disabled_by": null,
+     "entity_category": null,
+     "entity_id": "light.hallway_hue_filament_bulb_2",
+     "hidden_by": null,
+     "icon": null,
+     "id": "<id>",
+     "has_entity_name": true,
+     "labels": [],
+     "modified_at": "<time>",
+     "name": null,
+     "object_id_base": null,
+     "options": {},
+     "original_device_class": null,
+     "original_icon": null,
+     "original_name": null,
+     "platform": "hue",
+     "suggested_object_id": null,
+     "supported_features": 44,
+     "translation_key": "hue_light",
+     "unique_id": "15ed3889-cc16-439b-99f7-5308d0a2eeda",
+     "previous_unique_id": null,
+     "unit_of_measurement": null
+    },
+    {
+     "aliases": [],
+     "aliases_v2": [
+      null
+     ],
+     "area_id": null,
+     "categories": {},
+     "capabilities": {
+      "min_color_temp_kelvin": 2202,
+      "max_color_temp_kelvin": 4504,
+      "effect_list": [
+       "off",
+       "candle",
+       "sparkle",
+       "glisten",
+       "sunrise",
+       "sunset"
+      ],
+      "supported_color_modes": [
+       "color_temp"
+      ]
+     },
+     "config_entry_id": "<entry:1>",
+     "config_subentry_id": null,
+     "created_at": "<time>",
+     "device_class": null,
+     "device_id": "<device:3d3751a8-aff0-4d9d-815f-e52bf7e8efde>",
+     "disabled_by": null,
+     "entity_category": null,
+     "entity_id": "light.hallway_hue_filament_bulb_3",
+     "hidden_by": null,
+     "icon": null,
+     "id": "<id>",
+     "has_entity_name": true,
+     "labels": [],
+     "modified_at": "<time>",
+     "name": null,
+     "object_id_base": null,
+     "options": {},
+     "original_device_class": null,
+     "original_icon": null,
+     "original_name": null,
+     "platform": "hue",
+     "suggested_object_id": null,
+     "supported_features": 44,
+     "translation_key": "hue_light",
+     "unique_id": "a5ffb575-8a37-4333-9811-a4b054130e4b",
+     "previous_unique_id": null,
+     "unit_of_measurement": null
+    },
+    {
+     "aliases": [],
+     "aliases_v2": [
+      null
+     ],
+     "area_id": null,
+     "categories": {},
+     "capabilities": {
+      "min_color_temp_kelvin": 2000,
+      "max_color_temp_kelvin": 6535,
+      "effect_list": [
+       "off",
+       "candle",
+       "fire",
+       "prism",
+       "sparkle",
+       "opal",
+       "glisten",
+       "underwater",
+       "cosmos",
+       "sunbeam",
+       "enchant",
+       "sunrise",
+       "sunset"
+      ],
+      "supported_color_modes": [
+       "color_temp",
+       "xy"
+      ]
+     },
+     "config_entry_id": "<entry:1>",
+     "config_subentry_id": null,
+     "created_at": "<time>",
+     "device_class": null,
+     "device_id": "<device:13592c33-2ede-42f1-8e4a-c0e241bf29c4>",
+     "disabled_by": null,
+     "entity_category": null,
+     "entity_id": "light.living_room_lamp",
+     "hidden_by": null,
+     "icon": null,
+     "id": "<id>",
+     "has_entity_name": true,
+     "labels": [],
+     "modified_at": "<time>",
+     "name": null,
+     "object_id_base": null,
+     "options": {},
+     "original_device_class": null,
+     "original_icon": null,
+     "original_name": null,
+     "platform": "hue",
+     "suggested_object_id": null,
+     "supported_features": 44,
+     "translation_key": "hue_light",
+     "unique_id": "81c174c4-7664-4c0e-9604-d453834a8688",
+     "previous_unique_id": null,
+     "unit_of_measurement": null
+    },
+    {
+     "aliases": [],
+     "aliases_v2": [
+      null
+     ],
+     "area_id": null,
+     "categories": {},
+     "capabilities": {
+      "min_color_temp_kelvin": 2000,
+      "max_color_temp_kelvin": 6535,
+      "supported_color_modes": [
+       "color_temp",
+       "xy"
+      ]
+     },
+     "config_entry_id": "<entry:1>",
+     "config_subentry_id": null,
+     "created_at": "<time>",
+     "device_class": null,
+     "device_id": "<device:1f373bdc-4859-49dc-9a40-8b22fc63715c>",
+     "disabled_by": null,
+     "entity_category": null,
+     "entity_id": "light.living_room_living_room",
+     "hidden_by": null,
+     "icon": null,
+     "id": "<id>",
+     "has_entity_name": true,
+     "labels": [],
+     "modified_at": "<time>",
+     "name": null,
+     "object_id_base": null,
+     "options": {},
+     "original_device_class": null,
+     "original_icon": null,
+     "original_name": null,
+     "platform": "hue",
+     "suggested_object_id": null,
+     "supported_features": 40,
+     "translation_key": null,
+     "unique_id": "5f918504-9dbe-407e-8bc1-3b71127590cf",
+     "previous_unique_id": null,
+     "unit_of_measurement": null
+    },
+    {
+     "aliases": [],
+     "aliases_v2": [
+      null
+     ],
+     "area_id": null,
+     "categories": {},
+     "capabilities": null,
+     "config_entry_id": "<entry:1>",
+     "config_subentry_id": null,
+     "created_at": "<time>",
+     "device_class": null,
+     "device_id": "<device:cb21f2c5-e722-494b-9d90-6bd3b26dcf10>",
+     "disabled_by": null,
+     "entity_category": null,
+     "entity_id": "scene.bedroom_bedroom_bright",
+     "hidden_by": null,
+     "icon": null,
+     "id": "<id>",
+     "has_entity_name": true,
+     "labels": [],
+     "modified_at": "<time>",
+     "name": null,
+     "object_id_base": "Bright",
+     "options": {},
+     "original_device_class": null,
+     "original_icon": null,
+     "original_name": "Bright",
+     "platform": "hue",
+     "suggested_object_id": null,
+     "supported_features": 0,
+     "translation_key": null,
+     "unique_id": "f2d28599-c0cb-4335-9522-4f278b438ac9",
+     "previous_unique_id": null,
+     "unit_of_measurement": null
+    },
+    {
+     "aliases": [],
+     "aliases_v2": [
+      null
+     ],
+     "area_id": null,
+     "categories": {},
+     "capabilities": null,
+     "config_entry_id": "<entry:1>",
+     "config_subentry_id": null,
+     "created_at": "<time>",
+     "device_class": null,
+     "device_id": "<device:cb21f2c5-e722-494b-9d90-6bd3b26dcf10>",
+     "disabled_by": null,
+     "entity_category": null,
+     "entity_id": "scene.bedroom_bedroom_dimmed",
+     "hidden_by": null,
+     "icon": null,
+     "id": "<id>",
+     "has_entity_name": true,
+     "labels": [],
+     "modified_at": "<time>",
+     "name": null,
+     "object_id_base": "Dimmed",
+     "options": {},
+     "original_device_class": null,
+     "original_icon": null,
+     "original_name": "Dimmed",
+     "platform": "hue",
+     "suggested_object_id": null,
+     "supported_features": 0,
+     "translation_key": null,
+     "unique_id": "7bbe449e-043c-4fb7-80f9-7fc26388738b",
+     "previous_unique_id": null,
+     "unit_of_measurement": null
+    },
+    {
+     "aliases": [],
+     "aliases_v2": [
+      null
+     ],
+     "area_id": null,
+     "categories": {},
+     "capabilities": null,
+     "config_entry_id": "<entry:1>",
+     "config_subentry_id": null,
+     "created_at": "<time>",
+     "device_class": null,
+     "device_id": "<device:cb21f2c5-e722-494b-9d90-6bd3b26dcf10>",
+     "disabled_by": null,
+     "entity_category": null,
+     "entity_id": "scene.bedroom_bedroom_honolulu",
+     "hidden_by": null,
+     "icon": null,
+     "id": "<id>",
+     "has_entity_name": true,
+     "labels": [],
+     "modified_at": "<time>",
+     "name": null,
+     "object_id_base": "Honolulu",
+     "options": {},
+     "original_device_class": null,
+     "original_icon": null,
+     "original_name": "Honolulu",
+     "platform": "hue",
+     "suggested_object_id": null,
+     "supported_features": 0,
+     "translation_key": null,
+     "unique_id": "e137be82-100e-453f-8337-874483419e53",
+     "previous_unique_id": null,
+     "unit_of_measurement": null
+    },
+    {
+     "aliases": [],
+     "aliases_v2": [
+      null
+     ],
+     "area_id": null,
+     "categories": {},
+     "capabilities": null,
+     "config_entry_id": "<entry:1>",
+     "config_subentry_id": null,
+     "created_at": "<time>",
+     "device_class": null,
+     "device_id": "<device:c6c99b57-5dbb-4d92-8db0-1f454e2d925c>",
+     "disabled_by": null,
+     "entity_category": null,
+     "entity_id": "scene.hallway_hallway_nightlight",
+     "hidden_by": null,
+     "icon": null,
+     "id": "<id>",
+     "has_entity_name": true,
+     "labels": [],
+     "modified_at": "<time>",
+     "name": null,
+     "object_id_base": "Nightlight",
+     "options": {},
+     "original_device_class": null,
+     "original_icon": null,
+     "original_name": "Nightlight",
+     "platform": "hue",
+     "suggested_object_id": null,
+     "supported_features": 0,
+     "translation_key": null,
+     "unique_id": "567612c9-5527-4865-b40f-ce3c409819b8",
+     "previous_unique_id": null,
+     "unit_of_measurement": null
+    },
+    {
+     "aliases": [],
+     "aliases_v2": [
+      null
+     ],
+     "area_id": null,
+     "categories": {},
+     "capabilities": {
+      "state_class": "measurement"
+     },
+     "config_entry_id": "<entry:1>",
+     "config_subentry_id": null,
+     "created_at": "<time>",
+     "device_class": null,
+     "device_id": "<device:df9083a4-75b9-46a1-9575-133f738d893d>",
+     "disabled_by": null,
+     "entity_category": "diagnostic",
+     "entity_id": "sensor.bedroom_bedroom_battery",
+     "hidden_by": null,
+     "icon": null,
+     "id": "<id>",
+     "has_entity_name": true,
+     "labels": [],
+     "modified_at": "<time>",
+     "name": null,
+     "object_id_base": "Battery",
+     "options": {},
+     "original_device_class": "battery",
+     "original_icon": null,
+     "original_name": "Battery",
+     "platform": "hue",
+     "suggested_object_id": null,
+     "supported_features": 0,
+     "translation_key": null,
+     "unique_id": "53720b51-8b79-4fda-aae9-dc929426d6b1",
+     "previous_unique_id": null,
+     "unit_of_measurement": "%"
+    },
+    {
+     "aliases": [],
+     "aliases_v2": [
+      null
+     ],
+     "area_id": null,
+     "categories": {},
+     "capabilities": {
+      "state_class": "measurement"
+     },
+     "config_entry_id": "<entry:1>",
+     "config_subentry_id": null,
+     "created_at": "<time>",
+     "device_class": null,
+     "device_id": "<device:df9083a4-75b9-46a1-9575-133f738d893d>",
+     "disabled_by": null,
+     "entity_category": null,
+     "entity_id": "sensor.bedroom_bedroom_illuminance",
+     "hidden_by": null,
+     "icon": null,
+     "id": "<id>",
+     "has_entity_name": true,
+     "labels": [],
+     "modified_at": "<time>",
+     "name": null,
+     "object_id_base": "Illuminance",
+     "options": {},
+     "original_device_class": "illuminance",
+     "original_icon": null,
+     "original_name": "Illuminance",
+     "platform": "hue",
+     "suggested_object_id": null,
+     "supported_features": 0,
+     "translation_key": null,
+     "unique_id": "6c54c53d-e571-4c40-a27f-dad2e763ae40",
+     "previous_unique_id": null,
+     "unit_of_measurement": "lx"
+    },
+    {
+     "aliases": [],
+     "aliases_v2": [
+      null
+     ],
+     "area_id": null,
+     "categories": {},
+     "capabilities": {
+      "state_class": "measurement"
+     },
+     "config_entry_id": "<entry:1>",
+     "config_subentry_id": null,
+     "created_at": "<time>",
+     "device_class": null,
+     "device_id": "<device:cb21f2c5-e722-494b-9d90-6bd3b26dcf10>",
+     "disabled_by": null,
+     "entity_category": null,
+     "entity_id": "sensor.bedroom_bedroom_illuminance_2",
+     "hidden_by": null,
+     "icon": null,
+     "id": "<id>",
+     "has_entity_name": true,
+     "labels": [],
+     "modified_at": "<time>",
+     "name": null,
+     "object_id_base": "Illuminance",
+     "options": {},
+     "original_device_class": "illuminance",
+     "original_icon": null,
+     "original_name": "Illuminance",
+     "platform": "hue",
+     "suggested_object_id": null,
+     "supported_features": 0,
+     "translation_key": null,
+     "unique_id": "b2ed1e39-c18f-419e-b56d-bdd20dcb10e7",
+     "previous_unique_id": null,
+     "unit_of_measurement": "lx"
+    },
+    {
+     "aliases": [],
+     "aliases_v2": [
+      null
+     ],
+     "area_id": null,
+     "categories": {},
+     "capabilities": {
+      "state_class": "measurement"
+     },
+     "config_entry_id": "<entry:1>",
+     "config_subentry_id": null,
+     "created_at": "<time>",
+     "device_class": null,
+     "device_id": "<device:df9083a4-75b9-46a1-9575-133f738d893d>",
+     "disabled_by": null,
+     "entity_category": null,
+     "entity_id": "sensor.bedroom_bedroom_temperature",
+     "hidden_by": null,
+     "icon": null,
+     "id": "<id>",
+     "has_entity_name": true,
+     "labels": [],
+     "modified_at": "<time>",
+     "name": null,
+     "object_id_base": "Temperature",
+     "options": {
+      "sensor": {
+       "suggested_display_precision": 1
+      }
+     },
+     "original_device_class": "temperature",
+     "original_icon": null,
+     "original_name": "Temperature",
+     "platform": "hue",
+     "suggested_object_id": null,
+     "supported_features": 0,
+     "translation_key": null,
+     "unique_id": "0cfa6b7f-fdc8-490a-9261-6e721a4afc58",
+     "previous_unique_id": null,
+     "unit_of_measurement": "°C"
+    },
+    {
+     "aliases": [],
+     "aliases_v2": [
+      null
+     ],
+     "area_id": null,
+     "categories": {},
+     "capabilities": {
+      "options": [
+       "connected",
+       "disconnected",
+       "connectivity_issue",
+       "unidirectional_incoming"
+      ]
+     },
+     "config_entry_id": "<entry:1>",
+     "config_subentry_id": null,
+     "created_at": "<time>",
+     "device_class": null,
+     "device_id": "<device:df9083a4-75b9-46a1-9575-133f738d893d>",
+     "disabled_by": "integration",
+     "entity_category": "diagnostic",
+     "entity_id": "sensor.bedroom_bedroom_zigbee_connectivity",
+     "hidden_by": null,
+     "icon": null,
+     "id": "<id>",
+     "has_entity_name": true,
+     "labels": [],
+     "modified_at": "<time>",
+     "name": null,
+     "object_id_base": "Zigbee connectivity",
+     "options": {},
+     "original_device_class": "enum",
+     "original_icon": null,
+     "original_name": "Zigbee connectivity",
+     "platform": "hue",
+     "suggested_object_id": null,
+     "supported_features": 0,
+     "translation_key": "zigbee_connectivity",
+     "unique_id": "0a8892fe-e99f-4e3c-aad8-1db9a952ff97",
+     "previous_unique_id": null,
+     "unit_of_measurement": null
+    },
+    {
+     "aliases": [],
+     "aliases_v2": [
+      null
+     ],
+     "area_id": null,
+     "categories": {},
+     "capabilities": {
+      "options": [
+       "connected",
+       "disconnected",
+       "connectivity_issue",
+       "unidirectional_incoming"
+      ]
+     },
+     "config_entry_id": "<entry:1>",
+     "config_subentry_id": null,
+     "created_at": "<time>",
+     "device_class": null,
+     "device_id": "<device:19f631d2-af86-4307-a089-f5a46a2e4b55>",
+     "disabled_by": "integration",
+     "entity_category": "diagnostic",
+     "entity_id": "sensor.bedroom_light_bulb_zigbee_connectivity",
+     "hidden_by": null,
+     "icon": null,
+     "id": "<id>",
+     "has_entity_name": true,
+     "labels": [],
+     "modified_at": "<time>",
+     "name": null,
+     "object_id_base": "Zigbee connectivity",
+     "options": {},
+     "original_device_class": "enum",
+     "original_icon": null,
+     "original_name": "Zigbee connectivity",
+     "platform": "hue",
+     "suggested_object_id": null,
+     "supported_features": 0,
+     "translation_key": "zigbee_connectivity",
+     "unique_id": "4ecb1a35-e484-424f-8453-6e21c51cc146",
+     "previous_unique_id": null,
+     "unit_of_measurement": null
+    },
+    {
+     "aliases": [],
+     "aliases_v2": [
+      null
+     ],
+     "area_id": null,
+     "categories": {},
+     "capabilities": {
+      "options": [
+       "connected",
+       "disconnected",
+       "connectivity_issue",
+       "unidirectional_incoming"
+      ]
+     },
+     "config_entry_id": "<entry:1>",
+     "config_subentry_id": null,
+     "created_at": "<time>",
+     "device_class": null,
+     "device_id": "<device:ba10f1f5-48d5-46f7-b795-3594af125d94>",
+     "disabled_by": "integration",
+     "entity_category": "diagnostic",
+     "entity_id": "sensor.hallway_hue_filament_bulb_1_zigbee_connectivity",
+     "hidden_by": null,
+     "icon": null,
+     "id": "<id>",
+     "has_entity_name": true,
+     "labels": [],
+     "modified_at": "<time>",
+     "name": null,
+     "object_id_base": "Zigbee connectivity",
+     "options": {},
+     "original_device_class": "enum",
+     "original_icon": null,
+     "original_name": "Zigbee connectivity",
+     "platform": "hue",
+     "suggested_object_id": null,
+     "supported_features": 0,
+     "translation_key": "zigbee_connectivity",
+     "unique_id": "3d2bb09c-493d-4c70-9fec-200fcd6387f2",
+     "previous_unique_id": null,
+     "unit_of_measurement": null
+    },
+    {
+     "aliases": [],
+     "aliases_v2": [
+      null
+     ],
+     "area_id": null,
+     "categories": {},
+     "capabilities": {
+      "options": [
+       "connected",
+       "disconnected",
+       "connectivity_issue",
+       "unidirectional_incoming"
+      ]
+     },
+     "config_entry_id": "<entry:1>",
+     "config_subentry_id": null,
+     "created_at": "<time>",
+     "device_class": null,
+     "device_id": "<device:dac0d5e2-8c2a-4912-8a4d-c863b6e00716>",
+     "disabled_by": "integration",
+     "entity_category": "diagnostic",
+     "entity_id": "sensor.hallway_hue_filament_bulb_2_zigbee_connectivity",
+     "hidden_by": null,
+     "icon": null,
+     "id": "<id>",
+     "has_entity_name": true,
+     "labels": [],
+     "modified_at": "<time>",
+     "name": null,
+     "object_id_base": "Zigbee connectivity",
+     "options": {},
+     "original_device_class": "enum",
+     "original_icon": null,
+     "original_name": "Zigbee connectivity",
+     "platform": "hue",
+     "suggested_object_id": null,
+     "supported_features": 0,
+     "translation_key": "zigbee_connectivity",
+     "unique_id": "fb064991-0c0f-448f-a2b0-cceec4bfa90a",
+     "previous_unique_id": null,
+     "unit_of_measurement": null
+    },
+    {
+     "aliases": [],
+     "aliases_v2": [
+      null
+     ],
+     "area_id": null,
+     "categories": {},
+     "capabilities": {
+      "options": [
+       "connected",
+       "disconnected",
+       "connectivity_issue",
+       "unidirectional_incoming"
+      ]
+     },
+     "config_entry_id": "<entry:1>",
+     "config_subentry_id": null,
+     "created_at": "<time>",
+     "device_class": null,
+     "device_id": "<device:3d3751a8-aff0-4d9d-815f-e52bf7e8efde>",
+     "disabled_by": "integration",
+     "entity_category": "diagnostic",
+     "entity_id": "sensor.hallway_hue_filament_bulb_3_zigbee_connectivity",
+     "hidden_by": null,
+     "icon": null,
+     "id": "<id>",
+     "has_entity_name": true,
+     "labels": [],
+     "modified_at": "<time>",
+     "name": null,
+     "object_id_base": "Zigbee connectivity",
+     "options": {},
+     "original_device_class": "enum",
+     "original_icon": null,
+     "original_name": "Zigbee connectivity",
+     "platform": "hue",
+     "suggested_object_id": null,
+     "supported_features": 0,
+     "translation_key": "zigbee_connectivity",
+     "unique_id": "e71377f6-d67c-4bd9-8953-8d032b3cc845",
+     "previous_unique_id": null,
+     "unit_of_measurement": null
+    },
+    {
+     "aliases": [],
+     "aliases_v2": [
+      null
+     ],
+     "area_id": null,
+     "categories": {},
+     "capabilities": {
+      "options": [
+       "connected",
+       "disconnected",
+       "connectivity_issue",
+       "unidirectional_incoming"
+      ]
+     },
+     "config_entry_id": "<entry:1>",
+     "config_subentry_id": null,
+     "created_at": "<time>",
+     "device_class": null,
+     "device_id": "<device:375f4b1e-5632-44d2-bafd-7bf40e2571d3>",
+     "disabled_by": "integration",
+     "entity_category": "diagnostic",
+     "entity_id": "sensor.hue_bridge_zigbee_connectivity",
+     "hidden_by": null,
+     "icon": null,
+     "id": "<id>",
+     "has_entity_name": true,
+     "labels": [],
+     "modified_at": "<time>",
+     "name": null,
+     "object_id_base": "Zigbee connectivity",
+     "options": {},
+     "original_device_class": "enum",
+     "original_icon": null,
+     "original_name": "Zigbee connectivity",
+     "platform": "hue",
+     "suggested_object_id": null,
+     "supported_features": 0,
+     "translation_key": "zigbee_connectivity",
+     "unique_id": "4f8826ef-0ff5-46ed-81bb-ef285c72dbe2",
+     "previous_unique_id": null,
+     "unit_of_measurement": null
+    },
+    {
+     "aliases": [],
+     "aliases_v2": [
+      null
+     ],
+     "area_id": null,
+     "categories": {},
+     "capabilities": {
+      "options": [
+       "connected",
+       "disconnected",
+       "connectivity_issue",
+       "unidirectional_incoming"
+      ]
+     },
+     "config_entry_id": "<entry:1>",
+     "config_subentry_id": null,
+     "created_at": "<time>",
+     "device_class": null,
+     "device_id": "<device:13592c33-2ede-42f1-8e4a-c0e241bf29c4>",
+     "disabled_by": "integration",
+     "entity_category": "diagnostic",
+     "entity_id": "sensor.living_room_lamp_zigbee_connectivity",
+     "hidden_by": null,
+     "icon": null,
+     "id": "<id>",
+     "has_entity_name": true,
+     "labels": [],
+     "modified_at": "<time>",
+     "name": null,
+     "object_id_base": "Zigbee connectivity",
+     "options": {},
+     "original_device_class": "enum",
+     "original_icon": null,
+     "original_name": "Zigbee connectivity",
+     "platform": "hue",
+     "suggested_object_id": null,
+     "supported_features": 0,
+     "translation_key": "zigbee_connectivity",
+     "unique_id": "37abe652-fb57-4d4d-aac0-3fb28d2f01f0",
+     "previous_unique_id": null,
+     "unit_of_measurement": null
+    },
+    {
+     "aliases": [],
+     "aliases_v2": [
+      null
+     ],
+     "area_id": null,
+     "categories": {},
+     "capabilities": null,
+     "config_entry_id": "<entry:1>",
+     "config_subentry_id": null,
+     "created_at": "<time>",
+     "device_class": null,
+     "device_id": "<device:df9083a4-75b9-46a1-9575-133f738d893d>",
+     "disabled_by": null,
+     "entity_category": "config",
+     "entity_id": "switch.bedroom_bedroom_light_sensor_enabled",
+     "hidden_by": null,
+     "icon": null,
+     "id": "<id>",
+     "has_entity_name": true,
+     "labels": [],
+     "modified_at": "<time>",
+     "name": null,
+     "object_id_base": "Light sensor enabled",
+     "options": {},
+     "original_device_class": "switch",
+     "original_icon": null,
+     "original_name": "Light sensor enabled",
+     "platform": "hue",
+     "suggested_object_id": null,
+     "supported_features": 0,
+     "translation_key": "light_sensor_enabled",
+     "unique_id": "6c54c53d-e571-4c40-a27f-dad2e763ae40",
+     "previous_unique_id": null,
+     "unit_of_measurement": null
+    },
+    {
+     "aliases": [],
+     "aliases_v2": [
+      null
+     ],
+     "area_id": null,
+     "categories": {},
+     "capabilities": null,
+     "config_entry_id": "<entry:1>",
+     "config_subentry_id": null,
+     "created_at": "<time>",
+     "device_class": null,
+     "device_id": "<device:df9083a4-75b9-46a1-9575-133f738d893d>",
+     "disabled_by": null,
+     "entity_category": "config",
+     "entity_id": "switch.bedroom_bedroom_motion_sensor_enabled",
+     "hidden_by": null,
+     "icon": null,
+     "id": "<id>",
+     "has_entity_name": true,
+     "labels": [],
+     "modified_at": "<time>",
+     "name": null,
+     "object_id_base": "Motion sensor enabled",
+     "options": {},
+     "original_device_class": "switch",
+     "original_icon": null,
+     "original_name": "Motion sensor enabled",
+     "platform": "hue",
+     "suggested_object_id": null,
+     "supported_features": 0,
+     "translation_key": "motion_sensor_enabled",
+     "unique_id": "c866df7d-21b5-4d5e-9e16-04f6005677b5",
+     "previous_unique_id": null,
+     "unit_of_measurement": null
+    },
+    {
+     "aliases": [],
+     "aliases_v2": [
+      null
+     ],
+     "area_id": null,
+     "categories": {},
+     "capabilities": null,
+     "config_entry_id": "<entry:1>",
+     "config_subentry_id": null,
+     "created_at": "<time>",
+     "device_class": null,
+     "device_id": "<device:375f4b1e-5632-44d2-bafd-7bf40e2571d3>",
+     "disabled_by": null,
+     "entity_category": "config",
+     "entity_id": "switch.hue_bridge_automation_go_to_sleep",
+     "hidden_by": null,
+     "icon": null,
+     "id": "<id>",
+     "has_entity_name": false,
+     "labels": [],
+     "modified_at": "<time>",
+     "name": null,
+     "object_id_base": "Automation: Go to sleep",
+     "options": {},
+     "original_device_class": "switch",
+     "original_icon": null,
+     "original_name": "Automation: Go to sleep",
+     "platform": "hue",
+     "suggested_object_id": null,
+     "supported_features": 0,
+     "translation_key": null,
+     "unique_id": "eb9a4b7a-240f-4143-8d71-08b91593e58d",
+     "previous_unique_id": null,
+     "unit_of_measurement": null
+    }
+   ],
+   "states": {
+    "binary_sensor.bedroom_bedroom_motion": {
+     "state": "off",
+     "attributes": {
+      "device_class": "motion",
+      "friendly_name": "Bedroom Motion"
+     }
+    },
+    "binary_sensor.bedroom_bedroom_motion_2": {
+     "state": "off",
+     "attributes": {
+      "device_class": "motion",
+      "friendly_name": "Bedroom Motion"
+     }
+    },
+    "light.bedroom_bedroom": {
+     "state": "off",
+     "attributes": {
+      "min_color_temp_kelvin": 2000,
+      "max_color_temp_kelvin": 6535,
+      "supported_color_modes": [
+       "color_temp",
+       "xy"
+      ],
+      "color_mode": null,
+      "brightness": null,
+      "color_temp_kelvin": null,
+      "hs_color": null,
+      "rgb_color": null,
+      "xy_color": null,
+      "is_hue_group": true,
+      "hue_scenes": [
+       "Bright",
+       "Dimmed",
+       "Honolulu"
+      ],
+      "hue_type": "room",
+      "lights": [
+       "Light bulb"
+      ],
+      "entity_id": [
+       "light.bedroom_light_bulb"
+      ],
+      "dynamics": false,
+      "friendly_name": "Bedroom",
+      "supported_features": 40
+     }
+    },
+    "light.bedroom_light_bulb": {
+     "state": "off",
+     "attributes": {
+      "min_color_temp_kelvin": 2000,
+      "max_color_temp_kelvin": 6535,
+      "effect_list": [
+       "off",
+       "candle",
+       "fire",
+       "prism",
+       "sparkle",
+       "opal",
+       "glisten",
+       "underwater",
+       "cosmos",
+       "sunbeam",
+       "enchant",
+       "sunrise",
+       "sunset"
+      ],
+      "supported_color_modes": [
+       "color_temp",
+       "xy"
+      ],
+      "effect": null,
+      "color_mode": null,
+      "brightness": null,
+      "color_temp_kelvin": null,
+      "hs_color": null,
+      "rgb_color": null,
+      "xy_color": null,
+      "mode": "normal",
+      "dynamics": "none",
+      "friendly_name": "Light bulb",
+      "supported_features": 44
+     }
+    },
+    "light.hallway_hallway": {
+     "state": "on",
+     "attributes": {
+      "min_color_temp_kelvin": 2202,
+      "max_color_temp_kelvin": 4504,
+      "supported_color_modes": [
+       "color_temp"
+      ],
+      "color_mode": "color_temp",
+      "brightness": 89,
+      "color_temp_kelvin": 2702,
+      "hs_color": [
+       28.391,
+       65.659
+      ],
+      "rgb_color": [
+       255,
+       167,
+       88
+      ],
+      "xy_color": [
+       0.524,
+       0.388
+      ],
+      "is_hue_group": true,
+      "hue_scenes": [
+       "Nightlight"
+      ],
+      "hue_type": "room",
+      "lights": [
+       "Hue filament bulb 1",
+       "Hue filament bulb 2",
+       "Hue filament bulb 3"
+      ],
+      "entity_id": [
+       "light.hallway_hue_filament_bulb_1",
+       "light.hallway_hue_filament_bulb_2",
+       "light.hallway_hue_filament_bulb_3"
+      ],
+      "dynamics": false,
+      "friendly_name": "Hallway",
+      "supported_features": 40
+     }
+    },
+    "light.hallway_hue_filament_bulb_1": {
+     "state": "on",
+     "attributes": {
+      "min_color_temp_kelvin": 2202,
+      "max_color_temp_kelvin": 4504,
+      "effect_list": [
+       "off",
+       "candle",
+       "sparkle",
+       "glisten",
+       "sunrise",
+       "sunset"
+      ],
+      "supported_color_modes": [
+       "color_temp"
+      ],
+      "effect": "off",
+      "color_mode": "color_temp",
+      "brightness": 89,
+      "color_temp_kelvin": 2702,
+      "hs_color": [
+       28.391,
+       65.659
+      ],
+      "rgb_color": [
+       255,
+       167,
+       88
+      ],
+      "xy_color": [
+       0.524,
+       0.388
+      ],
+      "mode": "normal",
+      "dynamics": "none",
+      "friendly_name": "Hue filament bulb 1",
+      "supported_features": 44
+     }
+    },
+    "light.hallway_hue_filament_bulb_2": {
+     "state": "on",
+     "attributes": {
+      "min_color_temp_kelvin": 2202,
+      "max_color_temp_kelvin": 4504,
+      "effect_list": [
+       "off",
+       "candle",
+       "sparkle",
+       "glisten",
+       "sunrise",
+       "sunset"
+      ],
+      "supported_color_modes": [
+       "color_temp"
+      ],
+      "effect": "off",
+      "color_mode": "color_temp",
+      "brightness": 89,
+      "color_temp_kelvin": 2702,
+      "hs_color": [
+       28.391,
+       65.659
+      ],
+      "rgb_color": [
+       255,
+       167,
+       88
+      ],
+      "xy_color": [
+       0.524,
+       0.388
+      ],
+      "mode": "normal",
+      "dynamics": "none",
+      "friendly_name": "Hue filament bulb 2",
+      "supported_features": 44
+     }
+    },
+    "light.hallway_hue_filament_bulb_3": {
+     "state": "on",
+     "attributes": {
+      "min_color_temp_kelvin": 2202,
+      "max_color_temp_kelvin": 4504,
+      "effect_list": [
+       "off",
+       "candle",
+       "sparkle",
+       "glisten",
+       "sunrise",
+       "sunset"
+      ],
+      "supported_color_modes": [
+       "color_temp"
+      ],
+      "effect": "off",
+      "color_mode": "color_temp",
+      "brightness": 89,
+      "color_temp_kelvin": 2702,
+      "hs_color": [
+       28.391,
+       65.659
+      ],
+      "rgb_color": [
+       255,
+       167,
+       88
+      ],
+      "xy_color": [
+       0.524,
+       0.388
+      ],
+      "mode": "normal",
+      "dynamics": "none",
+      "friendly_name": "Hue filament bulb 3",
+      "supported_features": 44
+     }
+    },
+    "light.living_room_lamp": {
+     "state": "off",
+     "attributes": {
+      "min_color_temp_kelvin": 2000,
+      "max_color_temp_kelvin": 6535,
+      "effect_list": [
+       "off",
+       "candle",
+       "fire",
+       "prism",
+       "sparkle",
+       "opal",
+       "glisten",
+       "underwater",
+       "cosmos",
+       "sunbeam",
+       "enchant",
+       "sunrise",
+       "sunset"
+      ],
+      "supported_color_modes": [
+       "color_temp",
+       "xy"
+      ],
+      "effect": null,
+      "color_mode": null,
+      "brightness": null,
+      "color_temp_kelvin": null,
+      "hs_color": null,
+      "rgb_color": null,
+      "xy_color": null,
+      "mode": "normal",
+      "dynamics": "none",
+      "friendly_name": "Lamp",
+      "supported_features": 44
+     }
+    },
+    "light.living_room_living_room": {
+     "state": "off",
+     "attributes": {
+      "min_color_temp_kelvin": 2000,
+      "max_color_temp_kelvin": 6535,
+      "supported_color_modes": [
+       "color_temp",
+       "xy"
+      ],
+      "color_mode": null,
+      "brightness": null,
+      "color_temp_kelvin": null,
+      "hs_color": null,
+      "rgb_color": null,
+      "xy_color": null,
+      "is_hue_group": true,
+      "hue_scenes": [],
+      "hue_type": "room",
+      "lights": [
+       "Lamp"
+      ],
+      "entity_id": [
+       "light.living_room_lamp"
+      ],
+      "dynamics": false,
+      "friendly_name": "Living room",
+      "supported_features": 40
+     }
+    },
+    "scene.bedroom_bedroom_bright": {
+     "state": "unknown",
+     "attributes": {
+      "group_name": "Bedroom",
+      "group_type": "room",
+      "name": "Bright",
+      "speed": 0.603,
+      "brightness": 255,
+      "is_dynamic": false,
+      "friendly_name": "Bedroom Bright"
+     }
+    },
+    "scene.bedroom_bedroom_dimmed": {
+     "state": "unknown",
+     "attributes": {
+      "group_name": "Bedroom",
+      "group_type": "room",
+      "name": "Dimmed",
+      "speed": 0.603,
+      "brightness": 76,
+      "is_dynamic": false,
+      "friendly_name": "Bedroom Dimmed"
+     }
+    },
+    "scene.bedroom_bedroom_honolulu": {
+     "state": "unknown",
+     "attributes": {
+      "group_name": "Bedroom",
+      "group_type": "room",
+      "name": "Honolulu",
+      "speed": 0.6031746,
+      "brightness": 99,
+      "is_dynamic": true,
+      "friendly_name": "Bedroom Honolulu"
+     }
+    },
+    "scene.hallway_hallway_nightlight": {
+     "state": "unknown",
+     "attributes": {
+      "group_name": "Hallway",
+      "group_type": "room",
+      "name": "Nightlight",
+      "speed": 0.603,
+      "brightness": 0,
+      "is_dynamic": false,
+      "friendly_name": "Hallway Nightlight"
+     }
+    },
+    "sensor.bedroom_bedroom_battery": {
+     "state": "100",
+     "attributes": {
+      "state_class": "measurement",
+      "battery_state": "normal",
+      "unit_of_measurement": "%",
+      "device_class": "battery",
+      "friendly_name": "Bedroom Battery"
+     }
+    },
+    "sensor.bedroom_bedroom_illuminance": {
+     "state": "14",
+     "attributes": {
+      "state_class": "measurement",
+      "light_level": 11640,
+      "unit_of_measurement": "lx",
+      "device_class": "illuminance",
+      "friendly_name": "Bedroom Illuminance"
+     }
+    },
+    "sensor.bedroom_bedroom_illuminance_2": {
+     "state": "14",
+     "attributes": {
+      "state_class": "measurement",
+      "light_level": 11640,
+      "unit_of_measurement": "lx",
+      "device_class": "illuminance",
+      "friendly_name": "Bedroom Illuminance"
+     }
+    },
+    "sensor.bedroom_bedroom_temperature": {
+     "state": "20.8",
+     "attributes": {
+      "state_class": "measurement",
+      "unit_of_measurement": "°C",
+      "device_class": "temperature",
+      "friendly_name": "Bedroom Temperature"
+     }
+    },
+    "switch.bedroom_bedroom_light_sensor_enabled": {
+     "state": "on",
+     "attributes": {
+      "device_class": "switch",
+      "friendly_name": "Bedroom Light sensor enabled"
+     }
+    },
+    "switch.bedroom_bedroom_motion_sensor_enabled": {
+     "state": "on",
+     "attributes": {
+      "device_class": "switch",
+      "friendly_name": "Bedroom Motion sensor enabled"
+     }
+    },
+    "switch.hue_bridge_automation_go_to_sleep": {
+     "state": "off",
+     "attributes": {
+      "device_class": "switch",
+      "friendly_name": "Hue Bridge Automation: Go to sleep"
+     }
+    }
+   },
+   "areas": [
+    {
+     "aliases": [],
+     "floor_id": null,
+     "humidity_entity_id": null,
+     "icon": null,
+     "id": "living_room",
+     "labels": [],
+     "name": "Living room",
+     "picture": null,
+     "temperature_entity_id": null,
+     "created_at": "<time>",
+     "modified_at": "<time>"
+    },
+    {
+     "aliases": [],
+     "floor_id": null,
+     "humidity_entity_id": null,
+     "icon": null,
+     "id": "bedroom",
+     "labels": [],
+     "name": "Bedroom",
+     "picture": null,
+     "temperature_entity_id": null,
+     "created_at": "<time>",
+     "modified_at": "<time>"
+    },
+    {
+     "aliases": [],
+     "floor_id": null,
+     "humidity_entity_id": null,
+     "icon": null,
+     "id": "hallway",
+     "labels": [],
+     "name": "Hallway",
+     "picture": null,
+     "temperature_entity_id": null,
+     "created_at": "<time>",
+     "modified_at": "<time>"
+    }
+   ]
+  },
+  {
+   "name": "manual",
+   "doc": "Discovery finds nothing, so the host is asked for: one where nothing listens, one that isn't a Hue bridge, then the bridge.",
+   "subscriptions": [
+    {
+     "sub": "entries",
+     "msg": {
+      "type": "config_entries/subscribe"
+     },
+     "first": [
+      {
+       "id": 1,
+       "type": "result",
+       "success": true,
+       "result": null
+      },
+      {
+       "id": 1,
+       "type": "event",
+       "event": []
+      }
+     ]
+    },
+    {
+     "sub": "flows",
+     "msg": {
+      "type": "config_entries/flow/subscribe"
+     },
+     "first": [
+      {
+       "id": 1,
+       "type": "event",
+       "event": []
+      },
+      {
+       "id": 1,
+       "type": "result",
+       "success": true,
+       "result": null
+      }
+     ]
+    }
+   ],
+   "steps": [
+    {
+     "api": "discovery_none"
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow",
+      "user": "admin",
+      "sent": "{\"handler\": \"hue\", \"show_advanced_options\": false}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:1>",
+      "handler": "hue",
+      "data_schema": [
+       {
+        "type": "string",
+        "name": "host",
+        "required": true
+       }
+      ],
+      "errors": null,
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "manual"
+     },
+     "events": [],
+     "requests": [
+      {
+       "method": "GET",
+       "url": "https://discovery.meethue.com/"
+      }
+     ]
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin",
+      "sent": "{\"host\": \"192.0.2.11\"}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "abort",
+      "flow_id": "<flow:1>",
+      "handler": "hue",
+      "reason": "cannot_connect",
+      "description_placeholders": null
+     },
+     "events": [],
+     "requests": [
+      {
+       "method": "GET",
+       "url": "http://192.0.2.11/api/config"
+      }
+     ]
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow",
+      "user": "admin",
+      "sent": "{\"handler\": \"hue\", \"show_advanced_options\": false}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:2>",
+      "handler": "hue",
+      "data_schema": [
+       {
+        "type": "string",
+        "name": "host",
+        "required": true
+       }
+      ],
+      "errors": null,
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "manual"
+     },
+     "events": [],
+     "requests": [
+      {
+       "method": "GET",
+       "url": "https://discovery.meethue.com/"
+      }
+     ]
+    },
+    {
+     "api": "bridge_not_hue"
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:2>",
+      "user": "admin",
+      "sent": "{\"host\": \"192.0.2.10\"}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "abort",
+      "flow_id": "<flow:2>",
+      "handler": "hue",
+      "reason": "cannot_connect",
+      "description_placeholders": null
+     },
+     "events": [],
+     "requests": [
+      {
+       "method": "GET",
+       "url": "http://192.0.2.10/api/config"
+      }
+     ]
+    },
+    {
+     "api": "bridge_ok"
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow",
+      "user": "admin",
+      "sent": "{\"handler\": \"hue\", \"show_advanced_options\": false}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:3>",
+      "handler": "hue",
+      "data_schema": [
+       {
+        "type": "string",
+        "name": "host",
+        "required": true
+       }
+      ],
+      "errors": null,
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "manual"
+     },
+     "events": [],
+     "requests": [
+      {
+       "method": "GET",
+       "url": "https://discovery.meethue.com/"
+      }
+     ]
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:3>",
+      "user": "admin",
+      "sent": "{\"host\": \"192.0.2.10\"}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:3>",
+      "handler": "hue",
+      "data_schema": [],
+      "errors": null,
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "link"
+     },
+     "events": [],
+     "requests": [
+      {
+       "method": "GET",
+       "url": "http://192.0.2.10/api/config"
+      },
+      {
+       "method": "GET",
+       "url": "https://192.0.2.10/clip/v2/resource"
+      }
+     ]
+    },
+    {
+     "api": "pressed"
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:3>",
+      "user": "admin",
+      "sent": "{}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "create_entry",
+      "flow_id": "<flow:3>",
+      "handler": "hue",
+      "description": null,
+      "description_placeholders": null,
+      "title": "Hue Bridge c42996000001",
+      "minor_version": 1,
+      "options": {},
+      "subentries": [],
+      "version": 1,
+      "result": {
+       "created_at": "<ts>",
+       "entry_id": "<entry:1>",
+       "domain": "hue",
+       "modified_at": "<ts>",
+       "title": "Hue Bridge c42996000001",
+       "source": "user",
+       "state": "loaded",
+       "supports_options": true,
+       "supports_remove_device": false,
+       "supports_unload": true,
+       "supports_reconfigure": false,
+       "supported_subentry_types": {},
+       "pref_disable_new_entities": false,
+       "pref_disable_polling": false,
+       "disabled_by": null,
+       "reason": null,
+       "error_reason_translation_key": null,
+       "error_reason_translation_placeholders": null,
+       "num_subentries": 0
+      }
+     },
+     "events": [
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "added",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "hue",
+          "modified_at": "<ts>",
+          "title": "Hue Bridge c42996000001",
+          "source": "user",
+          "state": "not_loaded",
+          "supports_options": true,
+          "supports_remove_device": false,
+          "supports_unload": false,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "hue",
+          "modified_at": "<ts>",
+          "title": "Hue Bridge c42996000001",
+          "source": "user",
+          "state": "setup_in_progress",
+          "supports_options": true,
+          "supports_remove_device": false,
+          "supports_unload": false,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "hue",
+          "modified_at": "<ts>",
+          "title": "Hue Bridge c42996000001",
+          "source": "user",
+          "state": "loaded",
+          "supports_options": true,
+          "supports_remove_device": false,
+          "supports_unload": true,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      }
+     ],
+     "requests": [
+      {
+       "method": "POST",
+       "url": "https://192.0.2.10/api",
+       "json": {
+        "devicetype": "home-assistant#home"
+       }
+      },
+      {
+       "method": "get",
+       "url": "https://192.0.2.10/clip/v2/resource",
+       "key": true
+      }
+     ]
+    },
+    {
+     "ws": {
+      "user": "admin",
+      "msg": {
+       "type": "config_entries/get"
+      }
+     },
+     "replies": [
+      {
+       "type": "result",
+       "success": true,
+       "result": [
+        {
+         "created_at": "<ts>",
+         "entry_id": "<entry:1>",
+         "domain": "hue",
+         "modified_at": "<ts>",
+         "title": "Hue Bridge c42996000001",
+         "source": "user",
+         "state": "loaded",
+         "supports_options": true,
+         "supports_remove_device": false,
+         "supports_unload": true,
+         "supports_reconfigure": false,
+         "supported_subentry_types": {},
+         "pref_disable_new_entities": false,
+         "pref_disable_polling": false,
+         "disabled_by": null,
+         "reason": null,
+         "error_reason_translation_key": null,
+         "error_reason_translation_placeholders": null,
+         "num_subentries": 0
+        }
+       ]
+      }
+     ],
+     "events": [],
+     "requests": []
+    }
+   ],
+   "entries": [
+    {
+     "created_at": "<time>",
+     "data": {
+      "api_key": "fake-hue-application-key-0000000000000001",
+      "api_version": 2,
+      "host": "192.0.2.10"
+     },
+     "disabled_by": null,
+     "discovery_keys": {},
+     "domain": "hue",
+     "entry_id": "<entry:1>",
+     "minor_version": 1,
+     "modified_at": "<time>",
+     "options": {},
+     "pref_disable_new_entities": false,
+     "pref_disable_polling": false,
+     "source": "user",
+     "subentries": [],
+     "title": "Hue Bridge c42996000001",
+     "unique_id": "c42996000001",
+     "version": 1
+    }
+   ],
+   "deleted_devices": 0,
+   "deleted_entities": 0
+  },
+  {
+   "name": "pick_manual",
+   "doc": "Discovery lists the bridge and one that isn't there (left out); manual entry is picked instead, and what a form refuses.",
+   "subscriptions": [
+    {
+     "sub": "entries",
+     "msg": {
+      "type": "config_entries/subscribe"
+     },
+     "first": [
+      {
+       "id": 1,
+       "type": "result",
+       "success": true,
+       "result": null
+      },
+      {
+       "id": 1,
+       "type": "event",
+       "event": []
+      }
+     ]
+    },
+    {
+     "sub": "flows",
+     "msg": {
+      "type": "config_entries/flow/subscribe"
+     },
+     "first": [
+      {
+       "id": 1,
+       "type": "event",
+       "event": []
+      },
+      {
+       "id": 1,
+       "type": "result",
+       "success": true,
+       "result": null
+      }
+     ]
+    }
+   ],
+   "steps": [
+    {
+     "api": "discovery_two"
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow",
+      "user": "admin",
+      "sent": "{\"handler\": \"hue\", \"show_advanced_options\": false}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:1>",
+      "handler": "hue",
+      "data_schema": [
+       {
+        "type": "select",
+        "options": [
+         [
+          "c42996000001",
+          "192.0.2.10"
+         ],
+         [
+          "manual",
+          "Manually add a Hue Bridge"
+         ]
+        ],
+        "name": "id",
+        "required": true
+       }
+      ],
+      "errors": null,
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "init"
+     },
+     "events": [],
+     "requests": [
+      {
+       "method": "GET",
+       "url": "https://discovery.meethue.com/"
+      },
+      {
+       "method": "GET",
+       "url": "http://192.0.2.10/api/config"
+      },
+      {
+       "method": "GET",
+       "url": "https://192.0.2.10/clip/v2/resource"
+      },
+      {
+       "method": "GET",
+       "url": "http://192.0.2.11/api/config"
+      }
+     ]
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin",
+      "sent": "{\"id\": \"nobody\"}"
+     },
+     "status": 400,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "errors": {
+       "id": "value must be one of ['c42996000001', 'manual']"
+      }
+     },
+     "events": [],
+     "requests": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin",
+      "sent": "{}"
+     },
+     "status": 400,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "errors": {
+       "id": "required key not provided"
+      }
+     },
+     "events": [],
+     "requests": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin",
+      "sent": "{\"id\": 5}"
+     },
+     "status": 400,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "errors": {
+       "id": "value must be one of ['c42996000001', 'manual']"
+      }
+     },
+     "events": [],
+     "requests": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin",
+      "sent": "{\"id\": \"c42996000001\", \"host\": \"192.0.2.10\"}"
+     },
+     "status": 400,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "errors": {
+       "base": [
+        "extra keys not allowed @ data['host']"
+       ]
+      }
+     },
+     "events": [],
+     "requests": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin",
+      "sent": "{\"id\": \"manual\"}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:1>",
+      "handler": "hue",
+      "data_schema": [
+       {
+        "type": "string",
+        "name": "host",
+        "required": true
+       }
+      ],
+      "errors": null,
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "manual"
+     },
+     "events": [],
+     "requests": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin",
+      "sent": "{}"
+     },
+     "status": 400,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "errors": {
+       "host": "required key not provided"
+      }
+     },
+     "events": [],
+     "requests": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin",
+      "sent": "{\"host\": 5}"
+     },
+     "status": 400,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "errors": {
+       "host": "expected str"
+      }
+     },
+     "events": [],
+     "requests": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin",
+      "sent": "{\"host\": \"192.0.2.10\", \"id\": \"c42996000001\"}"
+     },
+     "status": 400,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "errors": {
+       "base": [
+        "extra keys not allowed @ data['id']"
+       ]
+      }
+     },
+     "events": [],
+     "requests": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin",
+      "sent": "{\"host\": \"192.0.2.10\"}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:1>",
+      "handler": "hue",
+      "data_schema": [],
+      "errors": null,
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "link"
+     },
+     "events": [],
+     "requests": [
+      {
+       "method": "GET",
+       "url": "http://192.0.2.10/api/config"
+      },
+      {
+       "method": "GET",
+       "url": "https://192.0.2.10/clip/v2/resource"
+      }
+     ]
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin",
+      "sent": "{\"anything\": \"goes\"}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:1>",
+      "handler": "hue",
+      "data_schema": [],
+      "errors": {
+       "base": "register_failed"
+      },
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "link"
+     },
+     "events": [],
+     "requests": [
+      {
+       "method": "POST",
+       "url": "https://192.0.2.10/api",
+       "json": {
+        "devicetype": "home-assistant#home"
+       }
+      },
+      {
+       "method": "POST",
+       "url": "http://192.0.2.10/api",
+       "json": {
+        "devicetype": "home-assistant#home"
+       }
+      }
+     ]
+    },
+    {
+     "http": {
+      "method": "DELETE",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "message": "Flow aborted"
+     },
+     "events": [],
+     "requests": []
+    }
+   ],
+   "entries": [],
+   "deleted_devices": 0,
+   "deleted_entities": 0
+  },
+  {
+   "name": "discovery_fails",
+   "doc": "Discovery can't be reached, then answers too late (HA gives it 5 s): the host is asked for.",
+   "subscriptions": [
+    {
+     "sub": "entries",
+     "msg": {
+      "type": "config_entries/subscribe"
+     },
+     "first": [
+      {
+       "id": 1,
+       "type": "result",
+       "success": true,
+       "result": null
+      },
+      {
+       "id": 1,
+       "type": "event",
+       "event": []
+      }
+     ]
+    },
+    {
+     "sub": "flows",
+     "msg": {
+      "type": "config_entries/flow/subscribe"
+     },
+     "first": [
+      {
+       "id": 1,
+       "type": "event",
+       "event": []
+      },
+      {
+       "id": 1,
+       "type": "result",
+       "success": true,
+       "result": null
+      }
+     ]
+    }
+   ],
+   "steps": [
+    {
+     "api": "discovery_down"
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow",
+      "user": "admin",
+      "sent": "{\"handler\": \"hue\", \"show_advanced_options\": false}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:1>",
+      "handler": "hue",
+      "data_schema": [
+       {
+        "type": "string",
+        "name": "host",
+        "required": true
+       }
+      ],
+      "errors": null,
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "manual"
+     },
+     "events": [],
+     "requests": [
+      {
+       "method": "GET",
+       "url": "https://discovery.meethue.com/"
+      }
+     ]
+    },
+    {
+     "http": {
+      "method": "DELETE",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "message": "Flow aborted"
+     },
+     "events": [],
+     "requests": []
+    },
+    {
+     "api": "discovery_slow"
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow",
+      "user": "admin",
+      "sent": "{\"handler\": \"hue\", \"show_advanced_options\": false}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:2>",
+      "handler": "hue",
+      "data_schema": [
+       {
+        "type": "string",
+        "name": "host",
+        "required": true
+       }
+      ],
+      "errors": null,
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "manual"
+     },
+     "events": [],
+     "requests": [
+      {
+       "method": "GET",
+       "url": "https://discovery.meethue.com/"
+      }
+     ]
+    }
+   ],
+   "entries": [],
+   "deleted_devices": 0,
+   "deleted_entities": 0
+  },
+  {
+   "name": "configured",
+   "doc": "A bridge that is set up is not offered again, and its host is refused.",
+   "subscriptions": [
+    {
+     "sub": "entries",
+     "msg": {
+      "type": "config_entries/subscribe"
+     },
+     "first": [
+      {
+       "id": 1,
+       "type": "result",
+       "success": true,
+       "result": null
+      },
+      {
+       "id": 1,
+       "type": "event",
+       "event": []
+      }
+     ]
+    },
+    {
+     "sub": "flows",
+     "msg": {
+      "type": "config_entries/flow/subscribe"
+     },
+     "first": [
+      {
+       "id": 1,
+       "type": "event",
+       "event": []
+      },
+      {
+       "id": 1,
+       "type": "result",
+       "success": true,
+       "result": null
+      }
+     ]
+    }
+   ],
+   "steps": [
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow",
+      "user": "admin",
+      "sent": "{\"handler\": \"hue\", \"show_advanced_options\": false}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:1>",
+      "handler": "hue",
+      "data_schema": [
+       {
+        "type": "select",
+        "options": [
+         [
+          "c42996000001",
+          "192.0.2.10"
+         ],
+         [
+          "manual",
+          "Manually add a Hue Bridge"
+         ]
+        ],
+        "name": "id",
+        "required": true
+       }
+      ],
+      "errors": null,
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "init"
+     },
+     "events": [],
+     "requests": [
+      {
+       "method": "GET",
+       "url": "https://discovery.meethue.com/"
+      },
+      {
+       "method": "GET",
+       "url": "http://192.0.2.10/api/config"
+      },
+      {
+       "method": "GET",
+       "url": "https://192.0.2.10/clip/v2/resource"
+      }
+     ]
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin",
+      "sent": "{\"id\": \"c42996000001\"}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:1>",
+      "handler": "hue",
+      "data_schema": [],
+      "errors": null,
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "link"
+     },
+     "events": [],
+     "requests": []
+    },
+    {
+     "api": "pressed"
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin",
+      "sent": "{}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "create_entry",
+      "flow_id": "<flow:1>",
+      "handler": "hue",
+      "description": null,
+      "description_placeholders": null,
+      "title": "Hue Bridge c42996000001",
+      "minor_version": 1,
+      "options": {},
+      "subentries": [],
+      "version": 1,
+      "result": {
+       "created_at": "<ts>",
+       "entry_id": "<entry:1>",
+       "domain": "hue",
+       "modified_at": "<ts>",
+       "title": "Hue Bridge c42996000001",
+       "source": "user",
+       "state": "loaded",
+       "supports_options": true,
+       "supports_remove_device": false,
+       "supports_unload": true,
+       "supports_reconfigure": false,
+       "supported_subentry_types": {},
+       "pref_disable_new_entities": false,
+       "pref_disable_polling": false,
+       "disabled_by": null,
+       "reason": null,
+       "error_reason_translation_key": null,
+       "error_reason_translation_placeholders": null,
+       "num_subentries": 0
+      }
+     },
+     "events": [
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "added",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "hue",
+          "modified_at": "<ts>",
+          "title": "Hue Bridge c42996000001",
+          "source": "user",
+          "state": "not_loaded",
+          "supports_options": true,
+          "supports_remove_device": false,
+          "supports_unload": false,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "hue",
+          "modified_at": "<ts>",
+          "title": "Hue Bridge c42996000001",
+          "source": "user",
+          "state": "setup_in_progress",
+          "supports_options": true,
+          "supports_remove_device": false,
+          "supports_unload": false,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "hue",
+          "modified_at": "<ts>",
+          "title": "Hue Bridge c42996000001",
+          "source": "user",
+          "state": "loaded",
+          "supports_options": true,
+          "supports_remove_device": false,
+          "supports_unload": true,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      }
+     ],
+     "requests": [
+      {
+       "method": "POST",
+       "url": "https://192.0.2.10/api",
+       "json": {
+        "devicetype": "home-assistant#home"
+       }
+      },
+      {
+       "method": "get",
+       "url": "https://192.0.2.10/clip/v2/resource",
+       "key": true
+      }
+     ]
+    },
+    {
+     "api": "not_pressed"
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow",
+      "user": "admin",
+      "sent": "{\"handler\": \"hue\", \"show_advanced_options\": false}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:2>",
+      "handler": "hue",
+      "data_schema": [
+       {
+        "type": "string",
+        "name": "host",
+        "required": true
+       }
+      ],
+      "errors": null,
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "manual"
+     },
+     "events": [],
+     "requests": [
+      {
+       "method": "GET",
+       "url": "https://discovery.meethue.com/"
+      },
+      {
+       "method": "GET",
+       "url": "http://192.0.2.10/api/config"
+      },
+      {
+       "method": "GET",
+       "url": "https://192.0.2.10/clip/v2/resource"
+      }
+     ]
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:2>",
+      "user": "admin",
+      "sent": "{\"host\": \"192.0.2.10\"}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "abort",
+      "flow_id": "<flow:2>",
+      "handler": "hue",
+      "reason": "already_configured",
+      "description_placeholders": null
+     },
+     "events": [],
+     "requests": []
+    }
+   ],
+   "entries": [
+    {
+     "created_at": "<time>",
+     "data": {
+      "api_key": "fake-hue-application-key-0000000000000001",
+      "api_version": 2,
+      "host": "192.0.2.10"
+     },
+     "disabled_by": null,
+     "discovery_keys": {},
+     "domain": "hue",
+     "entry_id": "<entry:1>",
+     "minor_version": 1,
+     "modified_at": "<time>",
+     "options": {},
+     "pref_disable_new_entities": false,
+     "pref_disable_polling": false,
+     "source": "user",
+     "subentries": [],
+     "title": "Hue Bridge c42996000001",
+     "unique_id": "c42996000001",
+     "version": 1
+    }
+   ],
+   "deleted_devices": 0,
+   "deleted_entities": 0
+  },
+  {
+   "name": "link_errors",
+   "doc": "The bridge answers the key request with an error status, then stops answering at all.",
+   "subscriptions": [
+    {
+     "sub": "entries",
+     "msg": {
+      "type": "config_entries/subscribe"
+     },
+     "first": [
+      {
+       "id": 1,
+       "type": "result",
+       "success": true,
+       "result": null
+      },
+      {
+       "id": 1,
+       "type": "event",
+       "event": []
+      }
+     ]
+    },
+    {
+     "sub": "flows",
+     "msg": {
+      "type": "config_entries/flow/subscribe"
+     },
+     "first": [
+      {
+       "id": 1,
+       "type": "event",
+       "event": []
+      },
+      {
+       "id": 1,
+       "type": "result",
+       "success": true,
+       "result": null
+      }
+     ]
+    }
+   ],
+   "steps": [
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow",
+      "user": "admin",
+      "sent": "{\"handler\": \"hue\", \"show_advanced_options\": false}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:1>",
+      "handler": "hue",
+      "data_schema": [
+       {
+        "type": "select",
+        "options": [
+         [
+          "c42996000001",
+          "192.0.2.10"
+         ],
+         [
+          "manual",
+          "Manually add a Hue Bridge"
+         ]
+        ],
+        "name": "id",
+        "required": true
+       }
+      ],
+      "errors": null,
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "init"
+     },
+     "events": [],
+     "requests": [
+      {
+       "method": "GET",
+       "url": "https://discovery.meethue.com/"
+      },
+      {
+       "method": "GET",
+       "url": "http://192.0.2.10/api/config"
+      },
+      {
+       "method": "GET",
+       "url": "https://192.0.2.10/clip/v2/resource"
+      }
+     ]
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin",
+      "sent": "{\"id\": \"c42996000001\"}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:1>",
+      "handler": "hue",
+      "data_schema": [],
+      "errors": null,
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "link"
+     },
+     "events": [],
+     "requests": []
+    },
+    {
+     "api": "bridge_broken"
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin",
+      "sent": "{}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:1>",
+      "handler": "hue",
+      "data_schema": [],
+      "errors": {
+       "base": "linking"
+      },
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "link"
+     },
+     "events": [],
+     "requests": [
+      {
+       "method": "POST",
+       "url": "https://192.0.2.10/api",
+       "json": {
+        "devicetype": "home-assistant#home"
+       }
+      },
+      {
+       "method": "POST",
+       "url": "http://192.0.2.10/api",
+       "json": {
+        "devicetype": "home-assistant#home"
+       }
+      }
+     ]
+    },
+    {
+     "api": "bridge_down"
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin",
+      "sent": "{}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:1>",
+      "handler": "hue",
+      "data_schema": [],
+      "errors": {
+       "base": "linking"
+      },
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "link"
+     },
+     "events": [],
+     "requests": [
+      {
+       "method": "POST",
+       "url": "https://192.0.2.10/api",
+       "json": {
+        "devicetype": "home-assistant#home"
+       }
+      },
+      {
+       "method": "POST",
+       "url": "http://192.0.2.10/api",
+       "json": {
+        "devicetype": "home-assistant#home"
+       }
+      }
+     ]
+    },
+    {
+     "api": "bridge_ok"
+    },
+    {
+     "api": "pressed"
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin",
+      "sent": "{}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "create_entry",
+      "flow_id": "<flow:1>",
+      "handler": "hue",
+      "description": null,
+      "description_placeholders": null,
+      "title": "Hue Bridge c42996000001",
+      "minor_version": 1,
+      "options": {},
+      "subentries": [],
+      "version": 1,
+      "result": {
+       "created_at": "<ts>",
+       "entry_id": "<entry:1>",
+       "domain": "hue",
+       "modified_at": "<ts>",
+       "title": "Hue Bridge c42996000001",
+       "source": "user",
+       "state": "loaded",
+       "supports_options": true,
+       "supports_remove_device": false,
+       "supports_unload": true,
+       "supports_reconfigure": false,
+       "supported_subentry_types": {},
+       "pref_disable_new_entities": false,
+       "pref_disable_polling": false,
+       "disabled_by": null,
+       "reason": null,
+       "error_reason_translation_key": null,
+       "error_reason_translation_placeholders": null,
+       "num_subentries": 0
+      }
+     },
+     "events": [
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "added",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "hue",
+          "modified_at": "<ts>",
+          "title": "Hue Bridge c42996000001",
+          "source": "user",
+          "state": "not_loaded",
+          "supports_options": true,
+          "supports_remove_device": false,
+          "supports_unload": false,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "hue",
+          "modified_at": "<ts>",
+          "title": "Hue Bridge c42996000001",
+          "source": "user",
+          "state": "setup_in_progress",
+          "supports_options": true,
+          "supports_remove_device": false,
+          "supports_unload": false,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "hue",
+          "modified_at": "<ts>",
+          "title": "Hue Bridge c42996000001",
+          "source": "user",
+          "state": "loaded",
+          "supports_options": true,
+          "supports_remove_device": false,
+          "supports_unload": true,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      }
+     ],
+     "requests": [
+      {
+       "method": "POST",
+       "url": "https://192.0.2.10/api",
+       "json": {
+        "devicetype": "home-assistant#home"
+       }
+      },
+      {
+       "method": "get",
+       "url": "https://192.0.2.10/clip/v2/resource",
+       "key": true
+      }
+     ]
+    }
+   ],
+   "entries": [
+    {
+     "created_at": "<time>",
+     "data": {
+      "api_key": "fake-hue-application-key-0000000000000001",
+      "api_version": 2,
+      "host": "192.0.2.10"
+     },
+     "disabled_by": null,
+     "discovery_keys": {},
+     "domain": "hue",
+     "entry_id": "<entry:1>",
+     "minor_version": 1,
+     "modified_at": "<time>",
+     "options": {},
+     "pref_disable_new_entities": false,
+     "pref_disable_polling": false,
+     "source": "user",
+     "subentries": [],
+     "title": "Hue Bridge c42996000001",
+     "unique_id": "c42996000001",
+     "version": 1
+    }
+   ],
+   "deleted_devices": 0,
+   "deleted_entities": 0
+  },
+  {
+   "name": "two_flows",
+   "doc": "Two flows for one bridge: both get to the link step, and the one that isn't finished goes when the other makes the entry.",
+   "subscriptions": [
+    {
+     "sub": "entries",
+     "msg": {
+      "type": "config_entries/subscribe"
+     },
+     "first": [
+      {
+       "id": 1,
+       "type": "result",
+       "success": true,
+       "result": null
+      },
+      {
+       "id": 1,
+       "type": "event",
+       "event": []
+      }
+     ]
+    },
+    {
+     "sub": "flows",
+     "msg": {
+      "type": "config_entries/flow/subscribe"
+     },
+     "first": [
+      {
+       "id": 1,
+       "type": "event",
+       "event": []
+      },
+      {
+       "id": 1,
+       "type": "result",
+       "success": true,
+       "result": null
+      }
+     ]
+    }
+   ],
+   "steps": [
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow",
+      "user": "admin",
+      "sent": "{\"handler\": \"hue\", \"show_advanced_options\": false}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:1>",
+      "handler": "hue",
+      "data_schema": [
+       {
+        "type": "select",
+        "options": [
+         [
+          "c42996000001",
+          "192.0.2.10"
+         ],
+         [
+          "manual",
+          "Manually add a Hue Bridge"
+         ]
+        ],
+        "name": "id",
+        "required": true
+       }
+      ],
+      "errors": null,
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "init"
+     },
+     "events": [],
+     "requests": [
+      {
+       "method": "GET",
+       "url": "https://discovery.meethue.com/"
+      },
+      {
+       "method": "GET",
+       "url": "http://192.0.2.10/api/config"
+      },
+      {
+       "method": "GET",
+       "url": "https://192.0.2.10/clip/v2/resource"
+      }
+     ]
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow",
+      "user": "admin",
+      "sent": "{\"handler\": \"hue\", \"show_advanced_options\": false}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:2>",
+      "handler": "hue",
+      "data_schema": [
+       {
+        "type": "select",
+        "options": [
+         [
+          "c42996000001",
+          "192.0.2.10"
+         ],
+         [
+          "manual",
+          "Manually add a Hue Bridge"
+         ]
+        ],
+        "name": "id",
+        "required": true
+       }
+      ],
+      "errors": null,
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "init"
+     },
+     "events": [],
+     "requests": [
+      {
+       "method": "GET",
+       "url": "https://discovery.meethue.com/"
+      },
+      {
+       "method": "GET",
+       "url": "http://192.0.2.10/api/config"
+      },
+      {
+       "method": "GET",
+       "url": "https://192.0.2.10/clip/v2/resource"
+      }
+     ]
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin",
+      "sent": "{\"id\": \"c42996000001\"}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:1>",
+      "handler": "hue",
+      "data_schema": [],
+      "errors": null,
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "link"
+     },
+     "events": [],
+     "requests": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:2>",
+      "user": "admin",
+      "sent": "{\"id\": \"c42996000001\"}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:2>",
+      "handler": "hue",
+      "data_schema": [],
+      "errors": null,
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "link"
+     },
+     "events": [],
+     "requests": []
+    },
+    {
+     "ws": {
+      "user": "admin",
+      "msg": {
+       "type": "config_entries/flow/progress"
+      }
+     },
+     "replies": [
+      {
+       "type": "result",
+       "success": true,
+       "result": []
+      }
+     ],
+     "events": [],
+     "requests": []
+    },
+    {
+     "api": "pressed"
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:2>",
+      "user": "admin",
+      "sent": "{}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "create_entry",
+      "flow_id": "<flow:2>",
+      "handler": "hue",
+      "description": null,
+      "description_placeholders": null,
+      "title": "Hue Bridge c42996000001",
+      "minor_version": 1,
+      "options": {},
+      "subentries": [],
+      "version": 1,
+      "result": {
+       "created_at": "<ts>",
+       "entry_id": "<entry:1>",
+       "domain": "hue",
+       "modified_at": "<ts>",
+       "title": "Hue Bridge c42996000001",
+       "source": "user",
+       "state": "loaded",
+       "supports_options": true,
+       "supports_remove_device": false,
+       "supports_unload": true,
+       "supports_reconfigure": false,
+       "supported_subentry_types": {},
+       "pref_disable_new_entities": false,
+       "pref_disable_polling": false,
+       "disabled_by": null,
+       "reason": null,
+       "error_reason_translation_key": null,
+       "error_reason_translation_placeholders": null,
+       "num_subentries": 0
+      }
+     },
+     "events": [
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "added",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "hue",
+          "modified_at": "<ts>",
+          "title": "Hue Bridge c42996000001",
+          "source": "user",
+          "state": "not_loaded",
+          "supports_options": true,
+          "supports_remove_device": false,
+          "supports_unload": false,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "hue",
+          "modified_at": "<ts>",
+          "title": "Hue Bridge c42996000001",
+          "source": "user",
+          "state": "setup_in_progress",
+          "supports_options": true,
+          "supports_remove_device": false,
+          "supports_unload": false,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "hue",
+          "modified_at": "<ts>",
+          "title": "Hue Bridge c42996000001",
+          "source": "user",
+          "state": "loaded",
+          "supports_options": true,
+          "supports_remove_device": false,
+          "supports_unload": true,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      }
+     ],
+     "requests": [
+      {
+       "method": "POST",
+       "url": "https://192.0.2.10/api",
+       "json": {
+        "devicetype": "home-assistant#home"
+       }
+      },
+      {
+       "method": "get",
+       "url": "https://192.0.2.10/clip/v2/resource",
+       "key": true
+      }
+     ]
+    },
+    {
+     "http": {
+      "method": "GET",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin"
+     },
+     "status": 404,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "message": "Invalid flow specified"
+     },
+     "events": [],
+     "requests": []
+    }
+   ],
+   "entries": [
+    {
+     "created_at": "<time>",
+     "data": {
+      "api_key": "fake-hue-application-key-0000000000000001",
+      "api_version": 2,
+      "host": "192.0.2.10"
+     },
+     "disabled_by": null,
+     "discovery_keys": {},
+     "domain": "hue",
+     "entry_id": "<entry:1>",
+     "minor_version": 1,
+     "modified_at": "<time>",
+     "options": {},
+     "pref_disable_new_entities": false,
+     "pref_disable_polling": false,
+     "source": "user",
+     "subentries": [],
+     "title": "Hue Bridge c42996000001",
+     "unique_id": "c42996000001",
+     "version": 1
+    }
+   ],
+   "deleted_devices": 0,
+   "deleted_entities": 0
+  },
+  {
+   "name": "not_ready",
+   "doc": "The bridge gives a key and then can't be reached for its resources: the entry waits for a retry, and is removed.",
+   "subscriptions": [
+    {
+     "sub": "entries",
+     "msg": {
+      "type": "config_entries/subscribe"
+     },
+     "first": [
+      {
+       "id": 1,
+       "type": "result",
+       "success": true,
+       "result": null
+      },
+      {
+       "id": 1,
+       "type": "event",
+       "event": []
+      }
+     ]
+    },
+    {
+     "sub": "flows",
+     "msg": {
+      "type": "config_entries/flow/subscribe"
+     },
+     "first": [
+      {
+       "id": 1,
+       "type": "event",
+       "event": []
+      },
+      {
+       "id": 1,
+       "type": "result",
+       "success": true,
+       "result": null
+      }
+     ]
+    }
+   ],
+   "steps": [
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow",
+      "user": "admin",
+      "sent": "{\"handler\": \"hue\", \"show_advanced_options\": false}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:1>",
+      "handler": "hue",
+      "data_schema": [
+       {
+        "type": "select",
+        "options": [
+         [
+          "c42996000001",
+          "192.0.2.10"
+         ],
+         [
+          "manual",
+          "Manually add a Hue Bridge"
+         ]
+        ],
+        "name": "id",
+        "required": true
+       }
+      ],
+      "errors": null,
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "init"
+     },
+     "events": [],
+     "requests": [
+      {
+       "method": "GET",
+       "url": "https://discovery.meethue.com/"
+      },
+      {
+       "method": "GET",
+       "url": "http://192.0.2.10/api/config"
+      },
+      {
+       "method": "GET",
+       "url": "https://192.0.2.10/clip/v2/resource"
+      }
+     ]
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin",
+      "sent": "{\"id\": \"c42996000001\"}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:1>",
+      "handler": "hue",
+      "data_schema": [],
+      "errors": null,
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "link"
+     },
+     "events": [],
+     "requests": []
+    },
+    {
+     "api": "pressed"
+    },
+    {
+     "api": "bridge_resources_down"
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin",
+      "sent": "{}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "create_entry",
+      "flow_id": "<flow:1>",
+      "handler": "hue",
+      "description": null,
+      "description_placeholders": null,
+      "title": "Hue Bridge c42996000001",
+      "minor_version": 1,
+      "options": {},
+      "subentries": [],
+      "version": 1,
+      "result": {
+       "created_at": "<ts>",
+       "entry_id": "<entry:1>",
+       "domain": "hue",
+       "modified_at": "<ts>",
+       "title": "Hue Bridge c42996000001",
+       "source": "user",
+       "state": "setup_retry",
+       "supports_options": true,
+       "supports_remove_device": false,
+       "supports_unload": true,
+       "supports_reconfigure": false,
+       "supported_subentry_types": {},
+       "pref_disable_new_entities": false,
+       "pref_disable_polling": false,
+       "disabled_by": null,
+       "reason": "Error connecting to the Hue bridge at 192.0.2.10",
+       "error_reason_translation_key": null,
+       "error_reason_translation_placeholders": null,
+       "num_subentries": 0
+      }
+     },
+     "events": [
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "added",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "hue",
+          "modified_at": "<ts>",
+          "title": "Hue Bridge c42996000001",
+          "source": "user",
+          "state": "not_loaded",
+          "supports_options": true,
+          "supports_remove_device": false,
+          "supports_unload": false,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "hue",
+          "modified_at": "<ts>",
+          "title": "Hue Bridge c42996000001",
+          "source": "user",
+          "state": "setup_in_progress",
+          "supports_options": true,
+          "supports_remove_device": false,
+          "supports_unload": false,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "hue",
+          "modified_at": "<ts>",
+          "title": "Hue Bridge c42996000001",
+          "source": "user",
+          "state": "setup_retry",
+          "supports_options": true,
+          "supports_remove_device": false,
+          "supports_unload": true,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": "Error connecting to the Hue bridge at 192.0.2.10",
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      }
+     ],
+     "requests": [
+      {
+       "method": "POST",
+       "url": "https://192.0.2.10/api",
+       "json": {
+        "devicetype": "home-assistant#home"
+       }
+      },
+      {
+       "method": "get",
+       "url": "https://192.0.2.10/clip/v2/resource",
+       "key": true
+      }
+     ]
+    },
+    {
+     "ws": {
+      "user": "admin",
+      "msg": {
+       "type": "config_entries/get"
+      }
+     },
+     "replies": [
+      {
+       "type": "result",
+       "success": true,
+       "result": [
+        {
+         "created_at": "<ts>",
+         "entry_id": "<entry:1>",
+         "domain": "hue",
+         "modified_at": "<ts>",
+         "title": "Hue Bridge c42996000001",
+         "source": "user",
+         "state": "setup_retry",
+         "supports_options": true,
+         "supports_remove_device": false,
+         "supports_unload": true,
+         "supports_reconfigure": false,
+         "supported_subentry_types": {},
+         "pref_disable_new_entities": false,
+         "pref_disable_polling": false,
+         "disabled_by": null,
+         "reason": "Error connecting to the Hue bridge at 192.0.2.10",
+         "error_reason_translation_key": null,
+         "error_reason_translation_placeholders": null,
+         "num_subentries": 0
+        }
+       ]
+      }
+     ],
+     "events": [],
+     "requests": []
+    },
+    {
+     "http": {
+      "method": "DELETE",
+      "path": "/api/config/config_entries/entry/<entry:1>",
+      "user": "admin"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "require_restart": false
+     },
+     "events": [
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "hue",
+          "modified_at": "<ts>",
+          "title": "Hue Bridge c42996000001",
+          "source": "user",
+          "state": "not_loaded",
+          "supports_options": true,
+          "supports_remove_device": false,
+          "supports_unload": true,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "removed",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "hue",
+          "modified_at": "<ts>",
+          "title": "Hue Bridge c42996000001",
+          "source": "user",
+          "state": "not_loaded",
+          "supports_options": true,
+          "supports_remove_device": false,
+          "supports_unload": true,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      }
+     ],
+     "requests": []
+    },
+    {
+     "ws": {
+      "user": "admin",
+      "msg": {
+       "type": "config_entries/get"
+      }
+     },
+     "replies": [
+      {
+       "type": "result",
+       "success": true,
+       "result": []
+      }
+     ],
+     "events": [],
+     "requests": []
+    }
+   ],
+   "entries": [],
+   "deleted_devices": 0,
+   "deleted_entities": 0
+  },
+  {
+   "name": "remove",
+   "doc": "A set-up bridge is removed: its entry, devices, entities and states go.",
+   "subscriptions": [
+    {
+     "sub": "entries",
+     "msg": {
+      "type": "config_entries/subscribe"
+     },
+     "first": [
+      {
+       "id": 1,
+       "type": "result",
+       "success": true,
+       "result": null
+      },
+      {
+       "id": 1,
+       "type": "event",
+       "event": []
+      }
+     ]
+    },
+    {
+     "sub": "flows",
+     "msg": {
+      "type": "config_entries/flow/subscribe"
+     },
+     "first": [
+      {
+       "id": 1,
+       "type": "event",
+       "event": []
+      },
+      {
+       "id": 1,
+       "type": "result",
+       "success": true,
+       "result": null
+      }
+     ]
+    }
+   ],
+   "steps": [
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow",
+      "user": "admin",
+      "sent": "{\"handler\": \"hue\", \"show_advanced_options\": false}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:1>",
+      "handler": "hue",
+      "data_schema": [
+       {
+        "type": "select",
+        "options": [
+         [
+          "c42996000001",
+          "192.0.2.10"
+         ],
+         [
+          "manual",
+          "Manually add a Hue Bridge"
+         ]
+        ],
+        "name": "id",
+        "required": true
+       }
+      ],
+      "errors": null,
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "init"
+     },
+     "events": [],
+     "requests": [
+      {
+       "method": "GET",
+       "url": "https://discovery.meethue.com/"
+      },
+      {
+       "method": "GET",
+       "url": "http://192.0.2.10/api/config"
+      },
+      {
+       "method": "GET",
+       "url": "https://192.0.2.10/clip/v2/resource"
+      }
+     ]
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin",
+      "sent": "{\"id\": \"c42996000001\"}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:1>",
+      "handler": "hue",
+      "data_schema": [],
+      "errors": null,
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "link"
+     },
+     "events": [],
+     "requests": []
+    },
+    {
+     "api": "pressed"
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin",
+      "sent": "{}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "create_entry",
+      "flow_id": "<flow:1>",
+      "handler": "hue",
+      "description": null,
+      "description_placeholders": null,
+      "title": "Hue Bridge c42996000001",
+      "minor_version": 1,
+      "options": {},
+      "subentries": [],
+      "version": 1,
+      "result": {
+       "created_at": "<ts>",
+       "entry_id": "<entry:1>",
+       "domain": "hue",
+       "modified_at": "<ts>",
+       "title": "Hue Bridge c42996000001",
+       "source": "user",
+       "state": "loaded",
+       "supports_options": true,
+       "supports_remove_device": false,
+       "supports_unload": true,
+       "supports_reconfigure": false,
+       "supported_subentry_types": {},
+       "pref_disable_new_entities": false,
+       "pref_disable_polling": false,
+       "disabled_by": null,
+       "reason": null,
+       "error_reason_translation_key": null,
+       "error_reason_translation_placeholders": null,
+       "num_subentries": 0
+      }
+     },
+     "events": [
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "added",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "hue",
+          "modified_at": "<ts>",
+          "title": "Hue Bridge c42996000001",
+          "source": "user",
+          "state": "not_loaded",
+          "supports_options": true,
+          "supports_remove_device": false,
+          "supports_unload": false,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "hue",
+          "modified_at": "<ts>",
+          "title": "Hue Bridge c42996000001",
+          "source": "user",
+          "state": "setup_in_progress",
+          "supports_options": true,
+          "supports_remove_device": false,
+          "supports_unload": false,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "hue",
+          "modified_at": "<ts>",
+          "title": "Hue Bridge c42996000001",
+          "source": "user",
+          "state": "loaded",
+          "supports_options": true,
+          "supports_remove_device": false,
+          "supports_unload": true,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      }
+     ],
+     "requests": [
+      {
+       "method": "POST",
+       "url": "https://192.0.2.10/api",
+       "json": {
+        "devicetype": "home-assistant#home"
+       }
+      },
+      {
+       "method": "get",
+       "url": "https://192.0.2.10/clip/v2/resource",
+       "key": true
+      }
+     ]
+    },
+    {
+     "http": {
+      "method": "DELETE",
+      "path": "/api/config/config_entries/entry/<entry:1>",
+      "user": "admin"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "require_restart": false
+     },
+     "events": [
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "hue",
+          "modified_at": "<ts>",
+          "title": "Hue Bridge c42996000001",
+          "source": "user",
+          "state": "unload_in_progress",
+          "supports_options": true,
+          "supports_remove_device": false,
+          "supports_unload": true,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "hue",
+          "modified_at": "<ts>",
+          "title": "Hue Bridge c42996000001",
+          "source": "user",
+          "state": "not_loaded",
+          "supports_options": true,
+          "supports_remove_device": false,
+          "supports_unload": true,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "removed",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "hue",
+          "modified_at": "<ts>",
+          "title": "Hue Bridge c42996000001",
+          "source": "user",
+          "state": "not_loaded",
+          "supports_options": true,
+          "supports_remove_device": false,
+          "supports_unload": true,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      }
+     ],
+     "requests": []
+    },
+    {
+     "ws": {
+      "user": "admin",
+      "msg": {
+       "type": "config_entries/get"
+      }
+     },
+     "replies": [
+      {
+       "type": "result",
+       "success": true,
+       "result": []
+      }
+     ],
+     "events": [],
+     "requests": []
+    },
+    {
+     "api": "not_pressed"
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow",
+      "user": "admin",
+      "sent": "{\"handler\": \"hue\", \"show_advanced_options\": false}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:2>",
+      "handler": "hue",
+      "data_schema": [
+       {
+        "type": "select",
+        "options": [
+         [
+          "c42996000001",
+          "192.0.2.10"
+         ],
+         [
+          "manual",
+          "Manually add a Hue Bridge"
+         ]
+        ],
+        "name": "id",
+        "required": true
+       }
+      ],
+      "errors": null,
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "init"
+     },
+     "events": [],
+     "requests": [
+      {
+       "method": "GET",
+       "url": "https://discovery.meethue.com/"
+      },
+      {
+       "method": "GET",
+       "url": "http://192.0.2.10/api/config"
+      },
+      {
+       "method": "GET",
+       "url": "https://192.0.2.10/clip/v2/resource"
+      }
+     ]
+    }
+   ],
+   "entries": [],
+   "deleted_devices": 10,
+   "deleted_entities": 28
+  }
+ ]
+}

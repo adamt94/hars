@@ -164,9 +164,10 @@ domain and spawns one task per entry. Each integration's `run` function:
    entity registry, and then sleeps until the next push, poll or timer.
 
 Integrations have no stop hook: their tasks end with the runtime. Anything
-that must reach disk at stop registers with `hass.on_final_write`. The one
-exception is `switchbot_cloud`, whose entry's task `flow::Manager` keeps a
-handle to and aborts (and waits for) when the entry is removed; a
+that must reach disk at stop registers with `hass.on_final_write`. The
+exceptions are `switchbot_cloud` and `hue`, whose entries' tasks
+`flow::Manager` keeps a handle to and aborts (and waits for) when the
+entry is removed, after which nothing of the entry writes a state; a
 `mobile_app` entry's registration is stopped the way a re-pair stops it.
 
 **Config flows** (`ha_integrations::flow`) add an entry while `hars` runs.
@@ -187,15 +188,18 @@ through a `config_entries::Status` (`setup_in_progress`, `loaded`,
 `config_entries/subscribe` each `added`, `updated` and `removed`.
 
 An entry set up at runtime needs registry rows nobody imported, so
-`switchbot_cloud`'s setup makes its devices' and entities' rows with
-`Registry::get_or_create_device` and `get_or_create_entity`, as HA's
-platforms do on every setup, then names its entities from the registry as
-before. `Components` holds an `ha_registry::Lookup`: the live registry in
+`switchbot_cloud`'s and `hue`'s set-ups make their devices' and entities'
+rows with `Registry::get_or_create_device` and `get_or_create_entity`, as
+HA's platforms do on every setup (`hue/register.rs` for a bridge: the
+bridge, each device, each room and zone as a service device with HA's
+suggested areas, a row per entity), then name their entities from the
+registry as before. A row that exists is changed only where HA's values
+differ, so an imported install's rows come out as they went in. `Components` holds an `ha_registry::Lookup`: the live registry in
 `hars` (a fixed set in tests), so the entity services resolve device and
 area targets against rows made after start-up. What `hars` calls outside
-(`ha_integrations::Endpoints`: the SwitchBot API's base URL) is a
-parameter, so tests and a debug build's browser run point it at
-127.0.0.1.
+(`ha_integrations::Endpoints`: the SwitchBot API's base URL, Hue's
+discovery service, and a stand-in for every Hue bridge) is a parameter,
+so tests and a debug build's browser run point it at 127.0.0.1.
 
 **Registry changes that reach running entities.** HA's entities each
 listen for their registry row and their device to change. In `hars` an
@@ -572,7 +576,8 @@ and to the diagram above in the same pull request.
 - **Runtime.** A multi-thread tokio runtime today. A `current_thread`
   runtime may suit single-core devices; it needs measuring.
 - **Integration stop hooks.** Integrations end with the runtime, except
-  that `switchbot_cloud`'s task is aborted when its entry is removed. If
+  that a `switchbot_cloud` or `hue` entry's task is aborted when the entry
+  is removed. If
   one needs to say goodbye to a device, it should use `on_final_write` or a
   new hook; removing or reloading the other integrations' entries without a
   restart needs one too.

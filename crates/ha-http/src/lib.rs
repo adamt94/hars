@@ -51,6 +51,9 @@ pub struct Client {
     max_body: usize,
     /// At most this many requests (streams included) at once.
     slots: Option<Arc<Semaphore>>,
+    /// Headers of the caller's that are credentials too
+    /// ([`Builder::credential_header`]).
+    credentials: Vec<header::HeaderName>,
 }
 
 /// aiohttp's `max_redirects`: the 10th redirect is an error.
@@ -95,6 +98,7 @@ pub struct Builder {
     verify_tls: bool,
     max_connections: Option<usize>,
     keepalive: bool,
+    credentials: Vec<header::HeaderName>,
 }
 
 impl Builder {
@@ -117,6 +121,15 @@ impl Builder {
     /// timer in `hars`.
     pub fn tcp_keepalive(mut self) -> Self {
         self.keepalive = true;
+        self
+    }
+
+    /// A header that carries a credential under a name of the service's
+    /// own (a Hue bridge's `hue-application-key`): like `Authorization`,
+    /// it is not sent on when a redirect leaves the origin. aiohttp knows
+    /// only the standard names, so there HA would send it on.
+    pub fn credential_header(mut self, name: header::HeaderName) -> Self {
+        self.credentials.push(name);
         self
     }
 
@@ -152,6 +165,7 @@ impl Builder {
             total_timeout: Duration::from_secs(300),
             max_body: 4 * 1024 * 1024,
             slots: self.max_connections.map(|n| Arc::new(Semaphore::new(n))),
+            credentials: self.credentials,
         })
     }
 }
@@ -171,6 +185,7 @@ impl Client {
             verify_tls: true,
             max_connections: None,
             keepalive: false,
+            credentials: Vec::new(),
         }
     }
 
@@ -299,12 +314,11 @@ impl Client {
             // aiohttp: a redirect to another origin takes no credentials
             // with it, on that hop or any after it (a token must not reach
             // whatever host a compromised or mistaken server names).
-            if origin(&uri) != origin(&next)
-                && headers.iter().any(|(name, _)| CREDENTIALS.contains(name))
-            {
-                headers
-                    .to_mut()
-                    .retain(|(name, _)| !CREDENTIALS.contains(name));
+            let credential = |name: &header::HeaderName| {
+                CREDENTIALS.contains(name) || self.credentials.contains(name)
+            };
+            if origin(&uri) != origin(&next) && headers.iter().any(|(name, _)| credential(name)) {
+                headers.to_mut().retain(|(name, _)| !credential(name));
             }
             uri = next;
         }
@@ -975,6 +989,37 @@ mod tests {
             seen
         });
         (base, task)
+    }
+
+    /// A header the caller named as a credential
+    /// ([`Builder::credential_header`]) stays within the origin too, where
+    /// one aiohttp doesn't know by name is sent on.
+    #[tokio::test]
+    async fn a_named_credential_header_does_not_cross_origins() {
+        let moved = |to: &str| {
+            format!(
+                "HTTP/1.1 302 Found\r\nLocation: {to}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+            )
+        };
+        let ok = "HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".to_owned();
+        let key = header::HeaderName::from_static("hue-application-key");
+        let headers = [(key.clone(), "the-key".to_owned())];
+        let client = Client::builder("t").credential_header(key).build().unwrap();
+        // Within the origin it is sent again.
+        let (base, server) = serve_heads(vec![moved("/next"), ok.clone()]).await;
+        client.get(&format!("{base}/a"), &headers).await.unwrap();
+        assert!(server.await.unwrap()[1].contains("the-key"));
+        // To another origin it is not.
+        let (second, second_server) = serve_heads(vec![ok.clone()]).await;
+        let (first, first_server) = serve_heads(vec![moved(&format!("{second}/there"))]).await;
+        client.get(&format!("{first}/a"), &headers).await.unwrap();
+        assert!(first_server.await.unwrap()[0].contains("the-key"));
+        let there = &second_server.await.unwrap()[0];
+        assert!(there.starts_with("get /there "), "{there}");
+        assert!(
+            !there.contains("the-key"),
+            "the key crossed origins:\n{there}"
+        );
     }
 
     /// aiohttp 3.13.5: a redirect to another origin (here another port)

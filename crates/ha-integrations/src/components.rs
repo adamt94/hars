@@ -40,6 +40,8 @@ pub struct Components {
     scenes: OnceLock<Arc<Scenes>>,
     buttons: OnceLock<Arc<Buttons>>,
     climates: OnceLock<Arc<Climates>>,
+    /// What every Hue bridge shares, made with the first.
+    hue: OnceLock<Arc<crate::hue::Platforms>>,
     /// The entries that follow the registry, by entry id, from their
     /// set-up until they are removed (so that one whose task was stopped
     /// can still move its entities for the removal to find). Empty, and
@@ -58,6 +60,7 @@ impl Components {
             scenes: OnceLock::new(),
             buttons: OnceLock::new(),
             climates: OnceLock::new(),
+            hue: OnceLock::new(),
             followers: Mutex::default(),
         })
     }
@@ -107,6 +110,18 @@ impl Components {
     /// The registries as they are now: what an entry reads at setup.
     pub fn registries(&self) -> Arc<Registries> {
         self.registries.get()
+    }
+
+    /// The registries as they change (or the fixed set of a test).
+    pub fn lookup(&self) -> Lookup {
+        self.registries.clone()
+    }
+
+    /// Hue's entity services and bridges, made when first asked for.
+    pub fn hue(&self) -> Arc<crate::hue::Platforms> {
+        self.hue
+            .get_or_init(|| crate::hue::Platforms::new(self))
+            .clone()
     }
 
     /// Where an entry makes its device and entity rows (`None` in tests

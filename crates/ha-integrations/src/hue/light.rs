@@ -640,7 +640,7 @@ impl GroupLight {
         }
     }
 
-    fn state_in(&self, store: &Store) -> LightState {
+    pub(super) fn state_in(&self, store: &Store) -> LightState {
         let v = self.values.lock().clone();
         LightState {
             on: store

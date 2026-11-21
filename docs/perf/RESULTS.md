@@ -419,6 +419,39 @@ Against HA on the same host and devices: about 1/18th of the memory, 1/13th
 of the CPU, a fifth of the wakeups and a tenth of the start-up time. Within
 the [budgets](../PERF.md#budgets).
 
+### Philips Hue from the UI, 2026-11-21
+
+Hue's config flow, its discovery, the registry rows its set-up makes and a
+stop hook for its entries. Nothing of it runs on an install with no flow
+open and no Hue entry: no timer, no task, no socket (`hars` does not
+listen for bridges that announce themselves; the user starts the dialog,
+and discovery is one request then). An install with a Hue entry runs what
+it ran before (the bridge's event stream), plus one lock per bridge that
+a state write takes. At each start its set-up now goes over the bridge's
+registry rows (one registry write per device and entity, each a copy of
+the row pointers, under the set-up lock): not measured on a large
+registry. Every install holds one more short string from start (the
+discovery service's address).
+
+Release binary (macOS arm64, stripped, `cargo build --release -p
+ha-server`): main (176d942) 9,535,472 bytes, branch 9,667,728
+(+132,256): the flow, the discovery and key requests, and the row
+registration.
+
+Idle, a fresh install with no Hue entry. The Linux gate
+(`scripts/perf-docker.sh`) was not run for this change: Docker was not
+running on the machine and was left that way. Measured on macOS instead
+(an Apple-silicon Mac, both binaries at once on their own ports and
+throwaway configs, 15 s warm-up, then 60 s; `top`'s idle wake-ups and CPU
+time read at both ends, `ps` for RSS):
+
+| | idle wake-ups in 60 s | CPU time in 60 s | RSS | threads |
+|---|---|---|---|---|
+| main (176d942) | 0 | 0.00 s | 8,448 KiB | 12 |
+| branch | 0 | 0.00 s | 8,528 KiB | 12 |
+
+CI's resource step runs the Linux gate on the pull request.
+
 ### Device and area edits, 2026-11-20
 
 The Add integration dialog's last step: a device's name, area and labels,

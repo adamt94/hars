@@ -173,6 +173,7 @@ async fn run(thp_disabled: std::io::Result<bool>) -> anyhow::Result<()> {
         entries.as_deref(),
         profiles,
         &endpoints,
+        Some(&config_entries),
     );
     api_config.integrations = started.running;
     // The apps' registrations, before the listener serves their webhooks:
@@ -455,8 +456,11 @@ fn api_config() -> anyhow::Result<ha_api::ApiConfig> {
 }
 
 /// Where the integrations' services are: the real hosts. A debug build
-/// (never a release) reads `HARS_DEV_SWITCHBOT_HOST`, so a contributor can
-/// drive the UI against a stand-in on 127.0.0.1 instead of SwitchBot's API.
+/// (never a release) reads `HARS_DEV_SWITCHBOT_HOST` and `HARS_DEV_HUE`,
+/// so a contributor can drive the UI against stand-ins on 127.0.0.1
+/// instead of SwitchBot's API, Hue's discovery service and a bridge.
+/// `HARS_DEV_HUE` is a base URL: discovery is asked at `<base>/discovery`
+/// and every bridge at `<base>/<scheme>/<host>/…`.
 fn endpoints() -> ha_integrations::Endpoints {
     #[allow(unused_mut)]
     let mut endpoints = ha_integrations::Endpoints::default();
@@ -464,6 +468,12 @@ fn endpoints() -> ha_integrations::Endpoints {
     if let Ok(host) = std::env::var("HARS_DEV_SWITCHBOT_HOST") {
         tracing::warn!("debug build: the SwitchBot API is {host}");
         endpoints.switchbot = host;
+    }
+    #[cfg(debug_assertions)]
+    if let Ok(base) = std::env::var("HARS_DEV_HUE") {
+        tracing::warn!("debug build: Hue discovery and every Hue bridge are at {base}");
+        endpoints.hue_discovery = format!("{base}/discovery");
+        endpoints.hue_bridge = Some(base);
     }
     endpoints
 }

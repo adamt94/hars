@@ -52,7 +52,9 @@ A **debug** build reads `HARS_DEV_SWITCHBOT_HOST` and uses it as the
 SwitchBot API's base URL, so the UI's config flow can be driven against a
 stand-in on 127.0.0.1 (`cargo run`, not `--release`: a release build has no
 such setting and always calls SwitchBot). Never point a test at a real
-account.
+account. `HARS_DEV_HUE` does the same for Philips Hue: it is a base URL
+where a stand-in answers both as Hue's discovery service
+(`<base>/discovery`) and as every bridge (`<base>/<scheme>/<host>/…`).
 
 CI also has a `docker` job: it builds the image, smoke-tests it, and runs the
 resource budget gate (`PERF_GATE=1 scripts/perf.sh`, see

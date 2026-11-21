@@ -588,6 +588,13 @@ fn register(
     devices: &[Device],
     polled: &HashMap<String, Polled>,
 ) {
+    // Nothing is registered when the device or entity store can't be
+    // written (an install imported from an older Home Assistant): rows
+    // made now would be gone after a restart while rows that point at
+    // them were saved.
+    if registry.read_only().is_some() {
+        return;
+    }
     let before = registry.snapshot();
     for d in devices {
         let status = polled.get(&d.id);
@@ -609,6 +616,7 @@ fn register(
                 .and_then(|p| p.data.get("version"))
                 .and_then(Value::as_str)
                 .map(str::to_owned),
+            ..Default::default()
         });
         for row in rows {
             let text = |s: Option<&str>| Some(s.map(str::to_owned));

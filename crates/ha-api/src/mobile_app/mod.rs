@@ -754,6 +754,7 @@ fn update_registration(shared: &Shared, reg: &Registration, payload: &Value) -> 
             model: field("model"),
             name: field("device_name"),
             sw_version: field("os_version"),
+            ..Default::default()
         });
     }
     let new = reg.merge(update);

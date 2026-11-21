@@ -15,7 +15,7 @@ memory and wakeup cost is measured before it merges.
 
 | Integration | Domain | Connection | Add it by |
 |---|---|---|---|
-| [Philips Hue](#philips-hue) | `hue` | Local, pushed by the bridge | Import |
+| [Philips Hue](#philips-hue) | `hue` | Local, pushed by the bridge | The UI, or import |
 | [LIFX](#lifx) | `lifx` | Local, polled every 10 s | Import |
 | [SwitchBot Cloud](#switchbot-cloud) | `switchbot_cloud` | Cloud, polled every 600 s | The UI, or import |
 | [Weather](#weather) | `met` | Cloud, fetched about once an hour | Onboarding |
@@ -32,8 +32,8 @@ The domains that hars starts from config entries are the `SUPPORTED` list in
 An integration reaches hars in one of four ways:
 
 - **The UI.** Open **Settings > Devices & services**, choose **Add
-  integration**, and pick the integration. Today the list holds SwitchBot
-  Cloud only. hars checks what you type before it saves anything, starts the
+  integration**, and pick the integration. Today the list holds Philips
+  Hue and SwitchBot Cloud. hars checks what you type before it saves anything, starts the
   integration at once, and shows the devices that it found. In that last
   step you can give each device a name and an area, or make a new area
   there. A device that you name gets entity ids to match, as in Home
@@ -77,6 +77,38 @@ An integration reaches hars in one of four ways:
 hars talks to the Hue bridge on your network over the bridge's v2 API. The
 bridge pushes each change to hars, so hars does not poll.
 
+**Adding a bridge.** In **Settings > Devices & services > Add integration**,
+pick **Philips Hue**. hars asks Philips' discovery service
+(discovery.meethue.com) which bridges are on your network, as Home
+Assistant does, and lists them by address. Pick yours, or pick **Manually
+add a Hue Bridge** and type its address if the list is empty or the
+service can't be reached. Then press the round button on the bridge and
+choose **Submit** within about 30 seconds. If you submit before pressing,
+the dialog just stays open: press the button and submit again. For
+everything listed above, hars then makes the same devices, areas,
+entities and entity ids as a fresh Home Assistant 2026.6 would, and the
+lights work at once. (Home Assistant also lists buttons, dials and
+doorbells; hars has no entities for those yet.) In the dialog's last
+step you can put each device in an area. To remove the bridge, open the
+integration and delete its entry: no restart is needed.
+
+Three limits of adding from the UI:
+
+- hars does not listen for bridges that announce themselves on the network
+  (zeroconf, SSDP, HomeKit), because listening would wake it while idle.
+  So a bridge never shows up as "Discovered": you start the dialog.
+- A first-generation (round) bridge, which only has the old v1 API, can't
+  be added. hars says so and makes nothing, where Home Assistant would set
+  it up over v1.
+- A Hue device can't be renamed from hars yet (see
+  [the UI](#how-you-add-an-integration)). Rename it in the Hue app instead.
+
+The key that the bridge hands out when you press its button is saved in
+`.storage/core.config_entries`, as in Home Assistant. hars does not write
+it to the log or send it to the browser. hars does not
+check the bridge's TLS certificate (bridges sign their own), again as
+Home Assistant, so only add a bridge on a network you trust.
+
 - **Lights:** each light, and each room and zone as a grouped light.
   Brightness, colour, colour temperature, and transitions work as in Home
   Assistant.
@@ -95,7 +127,20 @@ Not yet:
   sensor.
 - A new search for the bridge when its IP address changes. Give the bridge a
   fixed address in your router's settings.
-- Pairing again when the bridge rejects the imported key.
+- Tidying up after the bridge: a light that you delete in the Hue app
+  keeps its device in hars until you remove the bridge, where Home
+  Assistant removes it at the next start. A light or scene that you add in
+  the Hue app works at once and is listed with its device after the next
+  start.
+- Two entries for one bridge. If an imported install has the same bridge
+  twice, hars starts the first and marks the second as failed; delete the
+  second. A bridge that you ignored in Home Assistant stays ignored: hars
+  does not start it. When you add that bridge from the UI, the new entry
+  replaces the ignored one, as in Home Assistant.
+- Pairing again when the bridge rejects its key (after a factory reset,
+  say). Home Assistant opens the link dialog by itself; in hars, delete the
+  entry and add the bridge again.
+- Options (Home Assistant's **Configure** button for a bridge).
 
 ### LIFX
 
@@ -214,7 +259,7 @@ New integrations and features:
 
 | Planned | What it brings |
 |---|---|
-| Adding Hue and LIFX from the UI | Set up a bridge or a bulb in **Settings** with no import, as SwitchBot Cloud is today |
+| Adding LIFX from the UI | Set up a bulb in **Settings** with no import, as Hue and SwitchBot Cloud are today |
 | MQTT (`mqtt`) | Devices that publish to an MQTT broker |
 | zigbee2mqtt | Zigbee devices, through MQTT |
 | ESPHome (`esphome`) | ESPHome devices, over their native API |

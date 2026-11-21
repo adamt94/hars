@@ -35,6 +35,7 @@ async fn home() -> Home {
         components,
         Endpoints {
             switchbot: base.clone(),
+            ..Default::default()
         },
         Vec::new(),
         None,
@@ -175,7 +176,7 @@ async fn a_flow_adds_switchbot_as_home_assistant_does() {
         panic!("no form");
     };
     assert_eq!((handler, step_id), ("switchbot_cloud", "user"));
-    assert!(errors.is_empty());
+    assert_eq!(errors, Some(Vec::new()));
     // `voluptuous_serialize` of `STEP_USER_DATA_SCHEMA`, as HA sends it.
     assert_eq!(
         schema_json(schema.as_deref()),
@@ -326,14 +327,14 @@ async fn bad_credentials_show_the_form_again() {
         else {
             panic!("no form");
         };
-        assert_eq!((step_id, errors), ("user", vec![("base", error)]));
+        assert_eq!((step_id, errors), ("user", Some(vec![("base", error)])));
     }
     // Shown again (a GET), the form has no error.
     let FlowResult::Form { errors, .. } = home.flows.configure(&flow_id, None).await.unwrap()
     else {
         panic!("no form");
     };
-    assert!(errors.is_empty());
+    assert_eq!(errors, Some(Vec::new()));
     assert_eq!(home.entries.list(), Some(Vec::new()));
     assert_eq!(home.flows.in_progress(), 1);
 }
@@ -422,6 +423,86 @@ async fn one_entry_per_account() {
     );
     assert_eq!(home.flows.abort("nope"), Err(Error::UnknownFlow));
     assert_eq!(home.flows.in_progress(), 0);
+}
+
+/// An entry the user ignored is not in a flow's way (HA's
+/// `async_finish_flow`): the flow's entry replaces it. It leaves the list
+/// before the new entry is added; a row that still named it goes, and its
+/// removal is told, after the new entry is set up.
+#[tokio::test]
+async fn an_ignored_entry_makes_way_for_a_flows() {
+    let home = home().await;
+    let old = home.entries.new_entry(
+        "switchbot_cloud",
+        "ignore",
+        "Ignored",
+        Some(TOKEN),
+        Map::new(),
+    );
+    let old_id = old["entry_id"].as_str().unwrap().to_owned();
+    home.entries.add(old);
+    home.registry.get_or_create_device(ha_registry::DeviceInfo {
+        config_entry_id: old_id.clone(),
+        identifiers: vec![json!(["switchbot_cloud", "left-behind"])],
+        ..Default::default()
+    });
+    let heard = Arc::new(Mutex::new(Vec::new()));
+    let listener: Listener = {
+        let (heard, entries) = (heard.clone(), home.entries.clone());
+        Box::new(move |change: Change, entry: &Map<String, Value>| {
+            let id = entry["entry_id"].as_str().unwrap().to_owned();
+            let listed = entries.get(&id).is_some();
+            let state = entries.runtime(&id).map(|r| r.state);
+            heard.lock().push((change, id, listed, state));
+            true
+        })
+    };
+    home.entries
+        .subscribe(Arc::new(Mutex::new(true)), listener, || {});
+    let new_id = entry_id(&add(&home, TOKEN).await);
+    assert_ne!(new_id, old_id);
+    let listed = home.entries.list().unwrap();
+    assert_eq!(listed.len(), 1);
+    assert_eq!(listed[0]["entry_id"], new_id.as_str());
+    let heard = heard.lock().clone();
+    assert_eq!(
+        heard[0],
+        (
+            Change::Added,
+            new_id.clone(),
+            true,
+            Some(EntryState::NotLoaded)
+        )
+    );
+    let loaded = (
+        Change::Updated,
+        new_id.clone(),
+        true,
+        Some(EntryState::Loaded),
+    );
+    let removed = (Change::Removed, old_id.clone(), false, None);
+    assert!(heard.contains(&loaded), "{heard:?}");
+    assert_eq!(heard.last(), Some(&removed), "{heard:?}");
+    let rows = home.registry.snapshot();
+    assert!(!rows.devices.is_empty());
+    assert!(
+        rows.devices
+            .iter()
+            .all(|d| d.config_entries == [new_id.clone()]),
+        "a row of the ignored entry was left"
+    );
+    // An entry that is set up is still in the way, ignored ones or not.
+    let again = add(&home, TOKEN).await;
+    assert!(
+        matches!(
+            again,
+            FlowResult::Abort {
+                reason: "already_configured",
+                ..
+            }
+        ),
+        "{again:?}"
+    );
 }
 
 /// A flow that is left (the dialog closed) is dropped, and an empty list
@@ -925,7 +1006,9 @@ async fn removing_a_disabled_entry_needs_no_restart() {
         Profiles::default(),
         &Endpoints {
             switchbot: home.base.clone(),
+            ..Default::default()
         },
+        None,
     );
     assert!(started.tasks.is_empty());
     registry.snapshot().write_unavailable_states(&hass);
@@ -939,6 +1022,7 @@ async fn removing_a_disabled_entry_needs_no_restart() {
         started.components,
         Endpoints {
             switchbot: home.base.clone(),
+            ..Default::default()
         },
         started.tasks,
         None,
@@ -1013,7 +1097,9 @@ async fn a_restart_keeps_the_entity_ids() {
         Profiles::default(),
         &Endpoints {
             switchbot: home.base.clone(),
+            ..Default::default()
         },
+        None,
     );
     hass.setups_done().await;
     assert_eq!(started.tasks.len(), 1);
@@ -1069,6 +1155,7 @@ impl Disk {
         registry.set_entry_lookup(Arc::new(move |id: &str| lookup.info(id)));
         let endpoints = Endpoints {
             switchbot: base.to_owned(),
+            ..Default::default()
         };
         let stored = entries.list();
         let started = crate::start(
@@ -1077,6 +1164,7 @@ impl Disk {
             stored.as_deref(),
             Profiles::default(),
             &endpoints,
+            None,
         );
         let flows = Manager::new(
             hass,
@@ -1266,13 +1354,17 @@ async fn an_enabled_account_takes_over_a_disabled_ones_devices() {
     let entries = ConfigEntries::in_memory(&hass, stored.clone());
     let lookup = entries.clone();
     registry.set_entry_lookup(Arc::new(move |id: &str| lookup.info(id)));
-    let endpoints = Endpoints { switchbot: base };
+    let endpoints = Endpoints {
+        switchbot: base,
+        ..Default::default()
+    };
     let started = crate::start(
         &hass,
         registry.clone().into(),
         Some(&stored),
         Profiles::default(),
         &endpoints,
+        None,
     );
     assert!(started.tasks.is_empty(), "a disabled entry isn't started");
     let flows = Manager::new(
@@ -1550,6 +1642,7 @@ async fn removing_a_boot_time_entry_waits_for_its_first_attempt() {
     let entries = ConfigEntries::in_memory(&hass, stored.clone());
     let endpoints = Endpoints {
         switchbot: home.base.clone(),
+        ..Default::default()
     };
     home.api.take();
     let hold = Arc::new(tokio::sync::Notify::new());
@@ -1560,6 +1653,7 @@ async fn removing_a_boot_time_entry_waits_for_its_first_attempt() {
         Some(&stored),
         Profiles::default(),
         &endpoints,
+        None,
     );
     let flows = Manager::new(
         &hass,

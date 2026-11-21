@@ -5,6 +5,14 @@
 
 use crate::i18n_data::{ICONS, TRANSLATIONS};
 
+/// Strings of `hars`'s own, beside HA's for the same `(category,
+/// domain)`: what a flow says where `hars` stops and HA would go on.
+static OWN: &[(&str, &str, &str)] = &[(
+    "config",
+    "hue",
+    r#""component.hue.config.abort.not_v2_bridge":"This bridge only has the first version of the Hue API, which hars can't use. hars needs a bridge with the current Hue software (the square bridge)""#,
+)];
+
 /// The entry for `(category, domain)` in a sorted table.
 fn find(
     table: &'static [(&str, &str, &str)],
@@ -34,7 +42,11 @@ pub(crate) fn translations(category: &str, domains: &[&str]) -> String {
     let mut out = String::from(r#"{"resources":{"#);
     let mut first = true;
     for d in unique(domains) {
-        if let Some(body) = find(TRANSLATIONS, category, d) {
+        let own = OWN.iter().find(|(c, o, _)| *c == category && o == &d);
+        for body in [find(TRANSLATIONS, category, d), own.map(|o| o.2)]
+            .into_iter()
+            .flatten()
+        {
             if !first {
                 out.push(',');
             }

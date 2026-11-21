@@ -92,6 +92,75 @@ impl Kind {
         self != Self::Zigbee
     }
 
+    /// Named by its resource (a scene's or an automation's own name), not
+    /// by a fixed word HA translates.
+    pub fn named_by_resource(self) -> bool {
+        matches!(
+            self,
+            Self::Scene | Self::SmartScene | Self::Behavior | Self::Entertainment
+        )
+    }
+
+    /// The registry's `original_device_class`.
+    pub fn device_class(self) -> Option<&'static str> {
+        Some(match self {
+            Self::Motion | Self::GroupedMotion => "motion",
+            Self::Entertainment => "running",
+            Self::Contact => "opening",
+            Self::Tamper => "tamper",
+            Self::Scene | Self::SmartScene => return None,
+            Self::Temperature => "temperature",
+            Self::LightLevel | Self::GroupedLightLevel => "illuminance",
+            Self::Battery => "battery",
+            Self::Zigbee => "enum",
+            Self::MotionEnabled | Self::LightLevelEnabled | Self::Behavior => "switch",
+        })
+    }
+
+    /// The registry's `entity_category`.
+    pub fn category(self) -> Option<&'static str> {
+        match self {
+            Self::Tamper | Self::Battery | Self::Zigbee => Some("diagnostic"),
+            Self::MotionEnabled | Self::LightLevelEnabled | Self::Behavior => Some("config"),
+            _ => None,
+        }
+    }
+
+    pub fn translation_key(self) -> Option<&'static str> {
+        match self {
+            Self::Zigbee => Some("zigbee_connectivity"),
+            Self::MotionEnabled => Some("motion_sensor_enabled"),
+            Self::LightLevelEnabled => Some("light_sensor_enabled"),
+            _ => None,
+        }
+    }
+
+    /// The registry's `unit_of_measurement` (a metric system's).
+    pub fn unit(self) -> Option<&'static str> {
+        match self {
+            Self::Temperature => Some("°C"),
+            Self::LightLevel | Self::GroupedLightLevel => Some("lx"),
+            Self::Battery => Some("%"),
+            _ => None,
+        }
+    }
+
+    /// The registry's `capabilities` (a sensor's `capability_attributes`).
+    pub fn capabilities(self) -> Option<Value> {
+        match self {
+            Self::Temperature | Self::LightLevel | Self::GroupedLightLevel | Self::Battery => {
+                Some(json!({"state_class": "measurement"}))
+            }
+            Self::Zigbee => Some(json!({"options": ZIGBEE_OPTIONS})),
+            _ => None,
+        }
+    }
+
+    /// `suggested_display_precision`, which HA stores in the row's options.
+    pub fn suggested_precision(self) -> Option<u8> {
+        (self == Self::Temperature).then_some(1)
+    }
+
     /// The entities a resource type gets, in platform order.
     pub fn for_type(ty: &str) -> &'static [Kind] {
         match ty {
