@@ -87,7 +87,9 @@ resource budget gate (`PERF_GATE=1 scripts/perf.sh`, see
   script that made it in `scripts/vectors/` (`onboarding.py`,
   `render_template.py`, `mobile_app_notify.py`, `template_functions.py`,
   `automation_templates.py`, `automation_reload.py`, `yaml_dump.py`,
-  `automation_editor.py`, `entity_registry_ws.py`, `config_flow.py` and
+  `automation_editor.py`, `entity_registry_ws.py`, `config_flow.py`,
+  `hue_flow.py`, `hue_rows.py`, `lifx_flow.py`, `lifx_rows.py`,
+  `lifx_products.py` and
   `import_releases.py`, which also runs later releases' code,
   so far); the sets made before that rule have none yet
   and are listed there as a backlog. The rules, a skeleton

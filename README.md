@@ -105,10 +105,9 @@ To add your phone, install the Home Assistant app on your iPhone and give it
 the same address.
 
 **Do you already run Home Assistant?** Follow
-[Move from Home Assistant](#move-from-home-assistant) instead. An import is
-also the only way to add LIFX devices today. A Philips Hue bridge and
-SwitchBot Cloud can be added in **Settings > Devices & services > Add
-integration**.
+[Move from Home Assistant](#move-from-home-assistant) instead. A Philips Hue
+bridge, a LIFX bulb and SwitchBot Cloud can also be added in **Settings >
+Devices & services > Add integration**.
 
 ### What the command does
 
@@ -127,15 +126,16 @@ Use a computer that stays on. A Raspberry Pi 4 or 5 (64-bit), a mini PC, a
 NAS, or any Linux server is ideal.
 
 A Mac or a Windows PC works too, with one limit. The way the installer runs
-hars in Docker Desktop, hars can't search your network. If a LIFX bulb gets a
-new IP address, hars won't find the bulb again. Give your bulbs a fixed address in your router's
+hars in Docker Desktop, hars can't search your network. To add a LIFX bulb
+there, type its IP address. If a LIFX bulb gets a new IP address, hars won't
+find the bulb again. Give your bulbs a fixed address in your router's
 settings. Home Assistant in Docker Desktop has the same limit.
 
 ## What works today
 
 | Area | Works today | Not yet |
 |---|---|---|
-| Setup | Home Assistant's onboarding screens in the browser, logins, and import of a Home Assistant 2026.6 to 2026.11 install. A Philips Hue bridge and SwitchBot Cloud can be added and removed in **Settings > Devices & services**. New devices can be given an area as they are added, and SwitchBot Cloud's a name. Any device can be moved to another area or labelled | Adding LIFX from the UI. Renaming a device that has entities of another integration than SwitchBot Cloud (a Hue device, for one), disabling a device, and editing or deleting an area |
+| Setup | Home Assistant's onboarding screens in the browser, logins, and import of a Home Assistant 2026.6 to 2026.11 install. A Philips Hue bridge, a LIFX bulb and SwitchBot Cloud can be added and removed in **Settings > Devices & services**. New devices can be given an area as they are added, and SwitchBot Cloud's a name. Any device can be moved to another area or labelled | LIFX light strips, tiles, the Clean and Night Vision bulbs from the UI. Renaming a device that has entities of another integration than SwitchBot Cloud (a Hue or LIFX device, for one), disabling a device, and editing or deleting an area |
 | Web UI | The official frontend: dashboards, device controls, the map, history, the logbook, and the automation list and editor in **Settings** | Translated names from integrations. The UI itself is translated, but entity and service names are in English |
 | Automations | YAML automations and ones you make in **Settings**. State, numeric-state, time, and template triggers. Templates in conditions, variables, and service calls. Reload without a restart | Traces, the `delay` and `wait_template` actions, scripts, and blueprints |
 | Templates | States, time, maths, and type casts | Areas, devices, labels, regex, and JSON functions. Live updates of a rendered template |
@@ -150,7 +150,7 @@ The [roadmap](docs/ROADMAP.md) tracks every item.
 | Integration | What you get | How you add it today |
 |---|---|---|
 | Philips Hue (`hue`) | Lights, rooms and zones, scenes, and motion, temperature, light-level, and battery sensors | **Settings > Devices & services > Add integration**, or import |
-| LIFX (`lifx`) | Colour bulbs, with identify and restart buttons | Import |
+| LIFX (`lifx`) | Colour and white bulbs, with identify and restart buttons | **Settings > Devices & services > Add integration**, or import |
 | SwitchBot Cloud (`switchbot_cloud`) | Bot, Hub 2 temperature and humidity, and an infrared air conditioner | **Settings > Devices & services > Add integration**, or import |
 | Weather (`met`) | The forecast for your home from met.no | Set during setup |
 | Sun (`sun`) | Sunrise, sunset, and the sun's position | On by default |

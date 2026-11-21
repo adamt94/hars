@@ -16,7 +16,7 @@ memory and wakeup cost is measured before it merges.
 | Integration | Domain | Connection | Add it by |
 |---|---|---|---|
 | [Philips Hue](#philips-hue) | `hue` | Local, pushed by the bridge | The UI, or import |
-| [LIFX](#lifx) | `lifx` | Local, polled every 10 s | Import |
+| [LIFX](#lifx) | `lifx` | Local, polled every 10 s | The UI, or import |
 | [SwitchBot Cloud](#switchbot-cloud) | `switchbot_cloud` | Cloud, polled every 600 s | The UI, or import |
 | [Weather](#weather) | `met` | Cloud, fetched about once an hour | Onboarding |
 | [Sun](#sun) | `sun` | None, calculated | On by default |
@@ -33,11 +33,12 @@ An integration reaches hars in one of four ways:
 
 - **The UI.** Open **Settings > Devices & services**, choose **Add
   integration**, and pick the integration. Today the list holds Philips
-  Hue and SwitchBot Cloud. hars checks what you type before it saves anything, starts the
-  integration at once, and shows the devices that it found. In that last
-  step you can give each device an area, or make a new area there. You can
-  also give a SwitchBot Cloud device a name there. A Philips Hue device
-  can't be named in hars yet: only its area can be set. A device that you
+  Hue, LIFX and SwitchBot Cloud. hars checks what you type before it saves
+  anything, starts the integration at once, and shows the devices that it
+  found. In that last step you can give each device an area, or make a new
+  area there. You can also give a SwitchBot Cloud device a name there. A
+  Philips Hue or LIFX device can't be named in hars yet: only its area can
+  be set. A device that you
   name gets entity ids to match, as in Home Assistant: a Bot called
   "Coffee machine" in the Kitchen has `button.kitchen_coffee_machine`.
   History that was recorded under the old id stays under it. To undo the
@@ -152,17 +153,43 @@ Not yet:
 ### LIFX
 
 hars talks to each bulb on your network over UDP and asks for its state
-every 10 seconds, as Home Assistant does. hars supports single-zone colour
-bulbs. Light strips, tiles, and other multi-zone products are not supported.
+every 10 seconds, as Home Assistant does. hars supports single-zone bulbs,
+colour and white.
+
+To add a bulb, open **Settings > Devices & services > Add integration** and
+pick **LIFX**. Type the bulb's IP address, or leave the field empty: hars then
+sends one search across your network, listens for 8.5 seconds, and lists the
+bulbs that answered. Nothing searches while the dialog is closed. With
+the installer's set-up for Docker Desktop on a Mac or on Windows, the search
+finds nothing, as Home Assistant's does there: type the bulb's address.
+
+Which products hars adds:
+
+- Colour and white single-zone bulbs (the A19, BR30, Mini, GU10, Candle,
+  Filament and Downlight families, and the rest that have neither zones nor
+  extra features). A white bulb gets a white light, as in Home Assistant.
+- Not light strips (Z, Beam, Neon, String), tiles, ceilings, the Clean
+  (HEV light) and the Night Vision bulbs (infrared). Home Assistant adds
+  them with entities that hars doesn't run yet, so hars says that it can't
+  run that product and adds nothing. An imported one is still run, as a
+  single-zone bulb.
+- A LIFX Switch is refused, as in Home Assistant: the dialog says it can't
+  connect.
+
+Home Assistant also finds new bulbs by itself (through DHCP, HomeKit and a
+search every 15 minutes) and offers them in **Discovered**. hars doesn't:
+start the dialog yourself.
 
 - **Lights:** power, brightness, colour, colour temperature, and
   transitions.
 - **Buttons:** identify and restart.
+- **Signal strength:** the sensor is listed, disabled, as in Home
+  Assistant, but hars doesn't read it: enabled, it stays unavailable.
 
 Not yet:
 
 - The `lifx.*` services: effects, `lifx.set_state`, and themes.
-- The signal-strength sensor.
+- The signal-strength sensor's readings.
 - Saving a bulb's new IP address. hars finds a bulb that moved, but it
   searches again after a restart. The installer's set-up for Docker Desktop
   on a Mac or on Windows publishes one port, so hars can't search there.
@@ -260,14 +287,14 @@ or add a 👍 to a request that exists.
 Work left on the integrations above:
 
 - Hue button, dial, and doorbell events.
-- The `lifx.*` services and the signal-strength sensor.
+- The `lifx.*` services, the signal-strength sensor's readings, and LIFX
+  light strips, tiles, the Clean and Night Vision bulbs.
 - More SwitchBot device types.
 
 New integrations and features:
 
 | Planned | What it brings |
 |---|---|
-| Adding LIFX from the UI | Set up a bulb in **Settings** with no import, as Hue and SwitchBot Cloud are today |
 | MQTT (`mqtt`) | Devices that publish to an MQTT broker |
 | zigbee2mqtt | Zigbee devices, through MQTT |
 | ESPHome (`esphome`) | ESPHome devices, over their native API |

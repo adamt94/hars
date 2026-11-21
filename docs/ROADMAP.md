@@ -686,8 +686,25 @@ ids, addresses, names and coordinates replaced with fake ones
       sent on when a bridge redirects to another origin (aiohttp sends
       it); the v2 probe waits for the whole reply where aiohue reads its
       status
-- [ ] Config flows: LIFX (type a host or pick a found bulb);
-      Hue's options flow, its link flow after a bridge refuses its key,
+- [x] Config flow: LIFX. A bulb's address typed in, or one picked from a
+      broadcast (aiolifx's `LifxDiscovery`, listened to for HA's 8.5 s
+      within the step); the bulb is asked what HA's flow asks, with HA's
+      retries over aiolifx's own; the entry is set up before the reply,
+      with the device and the light, identify, restart and RSSI rows of a
+      fresh HA for a colour and a white bulb, and is removed with no
+      restart, a command in flight ending there. A flow for a set-up bulb
+      at a new address moves the entry and reloads it, as HA does. All 8
+      scenarios of `scripts/vectors/lifx_flow.py` match HA 2026.6.1 with
+      aiolifx 1.2.1: every reply, every datagram the bulbs and the
+      broadcast got, the entry, the rows and the states. A start on the
+      files HA left of a used install (`scripts/vectors/lifx_rows.py`)
+      leaves them byte for byte, and removed rows come back as in HA.
+      `hars` differs on purpose: a product it doesn't run as HA does
+      (light strips, tiles, ceilings, the Clean, Night Vision) ends the
+      flow (`unsupported_device`) where HA makes an entry; flows HA starts
+      itself (DHCP, HomeKit, its 15-minute search, the old shared entry's
+      migration) don't exist; the RSSI sensor has its row but no readings
+- [ ] Config flows: Hue's options flow, its link flow after a bridge refuses its key,
       and its entities taking a device's new name (so a Hue device can be
       named in the dialog's last step, where today only its area can be
       set); registry rows for Hue resources that appear after set-up, and

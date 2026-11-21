@@ -140,7 +140,8 @@ integration**, port HA's `components/<domain>/config_flow.py` as
 `crates/ha-integrations/src/<domain>/config_flow.rs`.
 `switchbot_cloud/config_flow.rs` is the example with one step,
 `hue/config_flow.rs` the one with several (a choice, a typed host, a form
-with only a button); the engine is `crates/ha-integrations/src/flow.rs`.
+with only a button), `lifx/config_flow.rs` one that searches the network
+within a step; the engine is `crates/ha-integrations/src/flow.rs`.
 
 1. **The handler.** A `flow::Handler` const: the domain, HA's class name
    (its errors quote it), `VERSION`/`MINOR_VERSION`, the step ids, and `new`,
@@ -148,7 +149,9 @@ with only a button); the engine is `crates/ha-integrations/src/flow.rs`.
 2. **The steps.** `Flow::step(cx, step_id, input)` is HA's
    `async_step_<step_id>`: `input` is `None` when the step is shown and the
    checked answer when the form is sent. Return a `Step::Form` (fields as
-   `flow::Field`s: `Kind::Str`, or `Kind::Select` for a `vol.In` choice;
+   `flow::Field`s: `Field::required_str`, `Field::optional_str(name,
+   default)` for `vol.Optional(name, default=…)`, or `Field::required(name,
+   Kind::Select(…))` for a `vol.In` choice;
    add a `flow::Kind` for a field type that isn't there yet; `schema: None`
    for a form with only a button; `errors: None` where HA passes no
    `errors` and the reply says `null`, `Some(vec![])` where it passes `{}`),
@@ -160,8 +163,13 @@ with only a button); the engine is `crates/ha-integrations/src/flow.rs`.
 3. **The unique id.** `cx.set_unique_id(…)`, then
    `cx.abort_if_unique_id_configured()` before `CreateEntry`.
    `cx.current_unique_ids()` is HA's `_async_current_ids` (to leave out
-   what is set up already) and `cx.entry_with_data(key, value)` its
-   `_async_abort_entries_match`.
+   what is set up already), `cx.current_entries(key)` its
+   `_async_current_entries()`, and `cx.entry_with_data(key, value)` its
+   `_async_abort_entries_match`. For HA's
+   `_abort_if_unique_id_configured(updates={key: value})` use
+   `cx.abort_if_unique_id_configured_updating(key, value)`: the entry gets
+   the new value and is reloaded (stopped and started again) after the
+   reply, as HA's is.
 4. **Starting the entry.** Add the domain to `flow::Manager::setup_entry`,
    which spawns the same `run` as start-up does with a
    `config_entries::Status`; `run` must report `Loaded`, `SetupRetry(reason)`
