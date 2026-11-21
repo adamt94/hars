@@ -28,6 +28,16 @@ impl Scenes {
         self.items.write().push(s);
     }
 
+    /// The ids a call reaches the scenes under (one per scene served).
+    #[cfg(test)]
+    pub(crate) fn ids(&self) -> Vec<EntityId> {
+        self.items
+            .read()
+            .iter()
+            .map(|s| s.entity_id().clone())
+            .collect()
+    }
+
     pub fn remove(&self, entity_id: &EntityId) {
         self.items.write().retain(|s| s.entity_id() != entity_id);
     }

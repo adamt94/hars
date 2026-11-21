@@ -1046,25 +1046,20 @@ async fn an_activation_does_not_reach_a_scene_made_since() {
     assert_eq!(state_json(&b.hass, id).unwrap().0, "unknown");
 }
 
-/// A Hue light the bridge reports while a rename gives another light the
-/// id it would take (the registry has the new row, the running entities
-/// have not followed yet): it waits for them, and takes another id. One
-/// light is served under the rename's id.
-#[test]
-fn a_new_light_does_not_take_an_id_a_rename_is_giving() {
-    let rt = tokio::runtime::Builder::new_multi_thread()
-        .worker_threads(2)
-        .enable_all()
-        .build()
-        .unwrap();
-    let _rt = rt.enter();
+/// A bridge on a live registry (in memory), following it as a set-up
+/// one does, with its entities made and written. Run inside a runtime.
+fn live_bridge() -> (
+    Arc<Bridge>,
+    Arc<ha_registry::Registry>,
+    Arc<crate::components::Components>,
+) {
     let hass = Hass::new();
     let registry = ha_registry::Registry::in_memory(&hass, registries());
     let components =
         crate::components::Components::new(&hass, registry.clone(), Profiles::default());
     let resources = fixture("resource")["data"].as_array().unwrap().clone();
     let b = Arc::new(Bridge {
-        hass: hass.clone(),
+        hass,
         registries: RwLock::new(components.registries()),
         names: Default::default(),
         api: offline(),
@@ -1077,48 +1072,106 @@ fn a_new_light_does_not_take_an_id_a_rename_is_giving() {
         alive: parking_lot::Mutex::new(true),
     });
     b.add_entities();
-    b.write_all();
     components.follow("entry", Arc::new(follow::Follow(Arc::downgrade(&b))));
+    (b, registry, components)
+}
+
+/// Rename the entity `old` to `new` as the WebSocket command does.
+fn rename(
+    registry: &ha_registry::Registry,
+    components: &crate::components::Components,
+    old: &str,
+    new: &str,
+) -> Result<Arc<ha_registry::Entity>, ha_registry::RenameRefusal> {
+    let follows = &crate::components::follows;
+    components.registry_edit(|| registry.rename_entity(old, new, &Default::default(), follows))
+}
+
+/// A new resource like `like`, with id `id` and `fields` replaced.
+fn like(b: &Bridge, like: &str, id: &str, fields: Value) -> Value {
+    let mut r = b.store.read().get(like).unwrap().clone();
+    r["id"] = json!(id);
+    for (k, v) in fields.as_object().unwrap() {
+        r[k] = v.clone();
+    }
+    r
+}
+
+/// A Hue light the bridge reports while a rename gives another light the
+/// id it would take (the registry has the new row, the running entities
+/// have not followed yet), by the event stream or in a reconnect's
+/// snapshot: it waits for them, and takes another id. One light is served
+/// under the rename's id.
+#[test]
+fn a_new_light_does_not_take_an_id_a_rename_is_giving() {
+    for snapshot in [false, true] {
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(2)
+            .enable_all()
+            .build()
+            .unwrap();
+        let _rt = rt.enter();
+        new_light_during_a_rename(snapshot);
+    }
+}
+
+fn new_light_during_a_rename(snapshot: bool) {
+    let (b, registry, components) = live_bridge();
     let light = b.lights.read()[0].clone();
     let old = light.entity_id.to_string();
     let wanted = "light.review_desk";
     // A new device with one light, named so its light takes `wanted`.
-    let (device, mut resource) = {
-        let store = b.store.read();
-        (
-            store.device_of(&light.rid).unwrap().clone(),
-            store.get(&light.rid).unwrap().clone(),
-        )
-    };
     let (device_id, light_id) = (
         "00000000-0000-4000-8000-0000000000d1",
         "00000000-0000-4000-8000-0000000000d2",
     );
-    let mut device = device;
-    device["id"] = json!(device_id);
-    device["metadata"]["name"] = json!("Review Desk");
-    device["services"] = json!([{"rid": light_id, "rtype": "light"}]);
-    resource["id"] = json!(light_id);
-    resource["owner"] = json!({"rid": device_id, "rtype": "device"});
+    let device = b.store.read().device_of(&light.rid).unwrap()["id"].clone();
+    let device = like(
+        &b,
+        device.as_str().unwrap(),
+        device_id,
+        json!({
+            "metadata": {"name": "Review Desk", "archetype": "classic_bulb"},
+            "services": [{"rid": light_id, "rtype": "light"}],
+        }),
+    );
+    let resource = like(
+        &b,
+        &light.rid,
+        light_id,
+        json!({
+            "owner": {"rid": device_id, "rtype": "device"},
+        }),
+    );
+    let mut fresh = fixture("resource")["data"].as_array().unwrap().clone();
+    fresh.extend([device.clone(), resource.clone()]);
     let added = json!([{"creationtime": "2026-01-01T00:00:00Z", "id": "new", "type": "add",
                         "data": [device, resource]}])
     .to_string();
     // Between the registry's change and the entities following it, the
-    // bridge reports the new light (on its own thread, as the stream).
+    // bridge reports the new light, on a thread of its own as the stream
+    // does. The rename goes on once that thread either waits for the
+    // set-up lock or is done.
     let stream = b.clone();
     let reported: Arc<parking_lot::Mutex<Option<std::thread::JoinHandle<()>>>> = Arc::default();
     let handle = reported.clone();
     crate::components::hooks::set("edited", move || {
-        let t = std::thread::spawn(move || stream.handle_data(&added));
-        let since = std::time::Instant::now();
-        while !t.is_finished() && since.elapsed() < Duration::from_millis(300) {
-            std::thread::sleep(Duration::from_millis(5));
-        }
+        let (tx, rx) = std::sync::mpsc::channel();
+        let waits = tx.clone();
+        let t = std::thread::spawn(move || {
+            crate::components::hooks::set("setup_waits", move || {
+                let _ = waits.send("waits");
+            });
+            match snapshot {
+                true => stream.apply_snapshot(fresh),
+                false => stream.handle_data(&added),
+            }
+            let _ = tx.send("done");
+        });
+        let _ = rx.recv();
         *handle.lock() = Some(t);
     });
-    let follows = &crate::components::follows;
-    let renamed = components
-        .registry_edit(|| registry.rename_entity(&old, wanted, &Default::default(), follows));
+    let renamed = rename(&registry, &components, &old, wanted);
     assert!(renamed.is_ok(), "{renamed:?}");
     reported.lock().take().expect("not reached").join().unwrap();
     let lights = b.lights.read().clone();
@@ -1127,13 +1180,125 @@ fn a_new_light_does_not_take_an_id_a_rename_is_giving() {
         .filter(|l| l.entity_id.as_str() == wanted)
         .map(|l| l.rid.as_str())
         .collect();
-    assert_eq!(under, [light.rid.as_str()]);
+    assert_eq!(under, [light.rid.as_str()], "snapshot: {snapshot}");
     assert!(
         lights
             .iter()
             .any(|l| l.rid == light_id && l.entity_id.as_str() != wanted)
     );
-    assert_eq!(routed(&b, wanted), 1);
+    assert_eq!(routed(&b, wanted), 1, "snapshot: {snapshot}");
+}
+
+/// A scene the bridge reports before its room is made when the room comes,
+/// with its state written then: a rename to its id after that is refused
+/// (the id is taken), and one scene is served under it.
+#[tokio::test]
+async fn a_scene_made_when_its_room_comes_has_its_state_at_once() {
+    let (b, registry, components) = live_bridge();
+    let (scene, room) = scene_and_room(&b, "scene.bedroom_bedroom_dimmed");
+    let (room_id, scene_id) = (
+        "00000000-0000-4000-8000-0000000000e1",
+        "00000000-0000-4000-8000-0000000000e2",
+    );
+    let new_room = like(
+        &b,
+        &room,
+        room_id,
+        json!({
+            "metadata": {"name": "Review Desk", "archetype": "office"},
+            "children": [], "services": [],
+        }),
+    );
+    let new_scene = like(
+        &b,
+        &scene.rid,
+        scene_id,
+        json!({
+            "group": {"rid": room_id, "rtype": "room"},
+        }),
+    );
+    let add = |r: &Value| {
+        json!([{"creationtime": "2026-01-01T00:00:00Z", "id": "new", "type": "add",
+                "data": [r]}])
+        .to_string()
+    };
+    b.handle_data(&add(&new_scene));
+    assert!(
+        b.others.read().iter().all(|e| e.rid != scene_id),
+        "made before its room"
+    );
+    b.handle_data(&add(&new_room));
+    let made = b.others.read().iter().find(|e| e.rid == scene_id).cloned();
+    let made = made.expect("not made when its room came");
+    let id = made.entity_id.to_string();
+    assert!(state_json(&b.hass, &id).is_some(), "{id} has no state");
+    let renamed = rename(&registry, &components, scene.entity_id.as_str(), &id);
+    assert_eq!(renamed.err(), Some(ha_registry::RenameRefusal::Registered));
+    let served = b
+        .platforms
+        .scenes
+        .ids()
+        .iter()
+        .filter(|s| s.as_str() == id)
+        .count();
+    assert_eq!(served, 1);
+}
+
+/// A reconnect's snapshot with an update before an addition: the update
+/// is written with the set-up lock free (only the addition takes it), so a
+/// registry edit or a set-up elsewhere doesn't wait for the whole batch.
+#[tokio::test]
+async fn a_reconnects_updates_wait_for_no_lock() {
+    let b = bridge(offline());
+    let mut fresh = fixture("resource")["data"].as_array().unwrap().clone();
+    let first_light = fresh.iter().position(|r| r["type"] == "light").unwrap();
+    fresh[first_light]["on"]["on"] = json!(!fresh[first_light]["on"]["on"].as_bool().unwrap());
+    let (device_id, light_id) = (
+        "00000000-0000-4000-8000-0000000000f0",
+        "00000000-0000-4000-8000-0000000000f1",
+    );
+    let device = like(
+        &b,
+        LAMP_DEVICE,
+        device_id,
+        json!({
+            "metadata": {"name": "Late lamp", "archetype": "classic_bulb"},
+            "services": [{"rid": light_id, "rtype": "light"}],
+        }),
+    );
+    let light = like(
+        &b,
+        LAMP,
+        light_id,
+        json!({"owner": {"rid": device_id, "rtype": "device"}}),
+    );
+    fresh.extend([device, light]);
+    let free = Arc::new(parking_lot::Mutex::new(None));
+    let seen = free.clone();
+    AFTER_RENDER.with(|hook| {
+        *hook.borrow_mut() = Some(Box::new(move || {
+            // Another thread can take it (other tests hold it briefly):
+            // this one doesn't hold it.
+            let other = std::thread::spawn(|| {
+                crate::switchbot_cloud::SETUP
+                    .try_lock_for(Duration::from_secs(2))
+                    .is_some()
+            });
+            *seen.lock() = Some(other.join().unwrap());
+        }));
+    });
+    b.apply_snapshot(fresh);
+    assert_eq!(
+        *free.lock(),
+        Some(true),
+        "the update waited for the set-up lock"
+    );
+    assert!(
+        b.lights
+            .read()
+            .iter()
+            .any(|l| l.rid == "00000000-0000-4000-8000-0000000000f1")
+    );
 }
 
 /// A second bridge, sharing the first's hass and services.

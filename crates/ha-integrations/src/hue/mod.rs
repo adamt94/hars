@@ -79,6 +79,39 @@ pub struct Bridge {
     alive: parking_lot::Mutex<bool>,
 }
 
+/// The entities [`Bridge::expose`] made.
+#[derive(Default)]
+struct Made {
+    lights: Vec<Arc<HueLight>>,
+    groups: Vec<Arc<GroupLight>>,
+    others: Vec<Arc<HueEntity>>,
+}
+
+impl Made {
+    fn light(&self, l: &Arc<HueLight>) -> bool {
+        self.lights.iter().any(|m| Arc::ptr_eq(m, l))
+    }
+
+    fn group(&self, g: &Arc<GroupLight>) -> bool {
+        self.groups.iter().any(|m| Arc::ptr_eq(m, g))
+    }
+
+    fn other(&self, e: &Arc<HueEntity>) -> bool {
+        self.others.iter().any(|m| Arc::ptr_eq(m, e))
+    }
+}
+
+/// The set-up lock, for [`Bridge::expose`]. A test learns that it had to
+/// wait (`setup_waits`): another holds it.
+fn hold_setup() -> parking_lot::MutexGuard<'static, ()> {
+    #[cfg(test)]
+    match crate::switchbot_cloud::SETUP.try_lock() {
+        Some(one) => return one,
+        None => crate::components::hooks::at("setup_waits"),
+    }
+    crate::switchbot_cloud::SETUP.lock()
+}
+
 /// What a deleted device takes with it.
 #[derive(Default, Clone)]
 struct Gone {
@@ -264,18 +297,32 @@ impl Bridge {
         EntityId::parse(&id).ok()
     }
 
-    /// Make entities for resources that have none yet.
-    ///
-    /// Under the write guard, from choosing the ids to handing the
-    /// entities to their components: a rename ([`follow`]) sees each new
-    /// entity in its list and its component, or neither.
-    fn add_entities(self: &Arc<Self>) {
+    /// Make entities for resources that have none yet: [`Bridge::expose`]
+    /// under the set-up lock. Every entity the bridge makes after set-up
+    /// (an event-stream addition, a reconnect's snapshot, a room that
+    /// comes after its scenes) is made here.
+    fn add_entities(self: &Arc<Self>) -> Made {
+        let _one = hold_setup();
+        self.expose()
+    }
+
+    /// The one place an entity of the bridge comes to be. With the set-up
+    /// lock held (the caller's) and then the write guard, each new entity
+    /// is given its id, put in its list and its component, and has its
+    /// first state written, in HA's platform order. A registry edit holds
+    /// the set-up lock until the running entities have followed it
+    /// ([`crate::components::Components::registry_edit`]), so an entity
+    /// made here takes no id a rename is giving, and a rename after finds
+    /// it everywhere, with a state (so its id is taken). What the entities
+    /// that exist already write is not done here: it waits for no lock.
+    fn expose(self: &Arc<Self>) -> Made {
         let alive = self.alive.lock();
         if !*alive {
-            return;
+            return Made::default();
         }
         let store = self.store.read();
-        let mut new: Vec<Arc<dyn crate::light::Light>> = Vec::new();
+        let mut new_lights: Vec<Arc<HueLight>> = Vec::new();
+        let mut new_groups: Vec<Arc<GroupLight>> = Vec::new();
         for r in store.of_type("light") {
             let rid = r["id"].as_str().unwrap_or_default();
             if self.lights.read().iter().any(|l| l.rid == rid) {
@@ -286,7 +333,7 @@ impl Bridge {
                 continue;
             };
             let l = Arc::new(HueLight::new(Arc::downgrade(self), r, id));
-            new.push(l.clone());
+            new_lights.push(l.clone());
             self.lights.write().push(l);
         }
         for r in store.of_type("grouped_light") {
@@ -306,7 +353,7 @@ impl Bridge {
                 continue;
             };
             let g = Arc::new(GroupLight::new(Arc::downgrade(self), rid, gid, id, &store));
-            new.push(g.clone());
+            new_groups.push(g.clone());
             self.groups.write().push(g);
         }
         let mut made: Vec<Arc<HueEntity>> = Vec::new();
@@ -345,15 +392,44 @@ impl Bridge {
         drop(store);
         #[cfg(test)]
         crate::components::hooks::at("hue_added");
-        for l in new {
-            self.platforms.lights.add(l);
+        for l in &new_lights {
+            self.platforms.lights.add(l.clone());
         }
-        for e in made {
+        for g in &new_groups {
+            self.platforms.lights.add(g.clone());
+        }
+        made.sort_by_key(|e| e.order);
+        for e in &made {
             match e.kind.domain() {
-                "switch" => self.platforms.switches.add(e),
-                "scene" => self.platforms.scenes.add(e),
+                "switch" => self.platforms.switches.add(e.clone()),
+                "scene" => self.platforms.scenes.add(e.clone()),
                 _ => {}
             }
+        }
+        // Their first states, as `write_all` orders them.
+        let store = self.store.read();
+        let first = |id: &EntityId, rendered: Option<(String, Map<String, Value>)>| {
+            if let Some((state, attrs)) = rendered {
+                self.hass.set_state(id.clone(), state, attrs);
+            }
+        };
+        for e in made.iter().filter(|e| e.order < 20) {
+            first(&e.entity_id, e.render(self, &store));
+        }
+        for l in &new_lights {
+            first(&l.entity_id, l.render(self, &store));
+        }
+        for g in &new_groups {
+            g.update_values(&store);
+            first(&g.entity_id, g.render(self, &store));
+        }
+        for e in made.iter().filter(|e| e.order > 20) {
+            first(&e.entity_id, e.render(self, &store));
+        }
+        Made {
+            lights: new_lights,
+            groups: new_groups,
+            others: made,
         }
     }
 
@@ -576,7 +652,8 @@ impl Bridge {
         });
     }
 
-    /// Write every entity (at start), in HA's platform order.
+    /// Write every entity, in HA's platform order.
+    #[cfg(test)]
     fn write_all(&self) {
         let others = self.others.read().clone();
         for e in others.iter().filter(|e| e.order < 20) {
@@ -615,9 +692,6 @@ impl Bridge {
         let Some(change) = change else {
             return;
         };
-        // An addition chooses ids: under the set-up lock, through its
-        // first writes, as [`Bridge::apply_snapshot`].
-        let _one = matches!(change, Change::Added).then(|| crate::switchbot_cloud::SETUP.lock());
         self.after(change, &ty, &id, gone);
     }
 
@@ -626,21 +700,30 @@ impl Bridge {
         match change {
             Change::Added => {
                 // A room or zone can arrive after its `grouped_light` (the
-                // race HA's `group.py` retries for): it makes that group.
-                self.add_entities();
+                // race HA's `group.py` retries for): it makes that group,
+                // and the scenes that waited for it. What is made writes
+                // there; what was there writes here.
+                let made = self.add_entities();
                 for e in self.others_of(id).iter().filter(|e| e.order < 20) {
-                    self.write_entity(e);
+                    if !made.other(e) {
+                        self.write_entity(e);
+                    }
                 }
                 let lights = self.lights.read().clone();
-                for l in lights.iter().filter(|l| l.rid == id) {
+                for l in lights.iter().filter(|l| l.rid == id && !made.light(l)) {
                     self.write_light(l);
                 }
                 let groups = self.groups.read().clone();
-                for g in groups.iter().filter(|g| g.rid == id || g.group == id) {
+                for g in groups
+                    .iter()
+                    .filter(|g| (g.rid == id || g.group == id) && !made.group(g))
+                {
                     self.write_group(g);
                 }
                 for e in self.others_of(id).iter().filter(|e| e.order > 20) {
-                    self.write_entity(e);
+                    if !made.other(e) {
+                        self.write_entity(e);
+                    }
                 }
             }
             Change::Deleted => {
@@ -663,8 +746,6 @@ impl Bridge {
                     // group goes from where it is now (a rename may have
                     // given it another id), and nothing writes it after.
                     let _writes = self.alive.lock();
-                    #[cfg(test)]
-                    crate::components::hooks::at("group_deleted");
                     let mut groups = Vec::new();
                     self.groups.write().retain(|g| {
                         let dropped = g.rid == id;
@@ -673,6 +754,10 @@ impl Bridge {
                         }
                         !dropped
                     });
+                    // The groups to drop are known: a rename now would
+                    // leave one under its new id, were the guard not held.
+                    #[cfg(test)]
+                    crate::components::hooks::at("group_deleted");
                     for g in groups {
                         g.gone.store(true, std::sync::atomic::Ordering::Relaxed);
                         self.platforms.lights.remove(&g.entity_id);
@@ -802,13 +887,9 @@ impl Bridge {
             })
             .collect();
         let changes = self.store.write().reconcile(fresh);
-        // Entities made now take ids no registry edit is changing: the
-        // set-up lock, which every such edit holds until the running
-        // entities have followed it ([`crate::components::Components::registry_edit`]), is
-        // held from choosing their ids through their first writes. Taken
-        // after the store is let go, and before the write guard.
-        let added = changes.iter().any(|(c, _)| matches!(c, Change::Added));
-        let _one = added.then(|| crate::switchbot_cloud::SETUP.lock());
+        // Each addition makes its entities through [`Bridge::expose`], which
+        // holds the set-up lock only while it does; the updates wait for
+        // no lock.
         for (change, id) in changes {
             let ty = match change {
                 Change::Deleted => types
@@ -1208,8 +1289,8 @@ pub async fn run(
             alive: parking_lot::Mutex::new(true),
         });
         platforms.bridges.write().push(Arc::downgrade(&bridge));
-        bridge.add_entities();
-        bridge.write_all();
+        // The set-up lock is held: the entities are made, and written.
+        bridge.expose();
         if let Some(entry_id) = entry.get("entry_id").and_then(Value::as_str) {
             let follower = Arc::new(follow::Follow(Arc::downgrade(&bridge)));
             components.follow(entry_id, follower);

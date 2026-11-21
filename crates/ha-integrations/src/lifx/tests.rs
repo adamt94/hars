@@ -972,9 +972,12 @@ async fn a_device_named_as_it_was_has_its_entities_write() {
 }
 
 /// A press while a rename moves the button to an id under which `unknown`
-/// was kept: the move comes first, whole (its restore doesn't take the
-/// press away), and the press is written under the new id with the
-/// caller's context.
+/// was kept: the two come one after the other, never one inside the
+/// other. The rename is tried once the press is taken: if the press holds
+/// the write guard it waits until the press is written. Either way the
+/// end is one of the two orders: renamed then pressed (the press under
+/// the new id, with the caller's context), or pressed then renamed (the
+/// press kept for the old id, and the new id restoring `unknown`).
 #[tokio::test]
 async fn a_press_while_its_button_moves_is_written_whole_under_the_new_id() {
     let f = fake_bulb(65535, [0, 0, 39321, 2700]).await;
@@ -994,14 +997,32 @@ async fn a_press_while_its_button_moves_is_written_whole_under_the_new_id() {
             }
         }
     });
-    let bulb = b.clone();
-    crate::components::hooks::set("lifx_pressed", move || bulb.follow(&moved));
+    let later = Arc::new(Mutex::new(None));
+    let (bulb, deferred) = (b.clone(), later.clone());
+    crate::components::hooks::set("lifx_pressed", move || {
+        let free = bulb.now.try_lock().is_some();
+        match free {
+            true => bulb.follow(&moved),
+            false => *deferred.lock() = Some(moved),
+        }
+    });
     let context = ha_core::Context::new();
     let at = "2026-01-01T00:00:00+00:00".to_owned();
     LifxButton(b.clone(), 0, old.clone()).pressed(at.clone(), &context);
     assert!(!crate::components::hooks::pending("lifx_pressed"));
+    let pressed_first = later.lock().is_some();
+    if let Some(moved) = later.lock().take() {
+        b.follow(&moved);
+    }
     assert!(hass.states().get(&old).is_none());
     let state = hass.states().get(&new).unwrap();
-    assert_eq!(state.state.as_str(), at);
-    assert_eq!(state.context.id, context.id);
+    if pressed_first {
+        let kept = hass.restore().last_state(old.as_str()).unwrap();
+        assert_eq!(kept["state"], at.as_str());
+        assert_eq!(state.state.as_str(), "unknown");
+        assert_ne!(state.context.id, context.id);
+    } else {
+        assert_eq!(state.state.as_str(), at);
+        assert_eq!(state.context.id, context.id);
+    }
 }
