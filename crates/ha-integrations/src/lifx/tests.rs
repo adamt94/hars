@@ -8,8 +8,9 @@ use proto::Out;
 
 /// What an entry's task does just after it has claimed its bulb (the
 /// set-up lock held): a test pauses one there.
-static CLAIMED: parking_lot::Mutex<Option<Arc<dyn Fn(&str) + Send + Sync>>> =
-    parking_lot::Mutex::new(None);
+type Hook = Arc<dyn Fn(&str) + Send + Sync>;
+
+static CLAIMED: parking_lot::Mutex<Option<Hook>> = parking_lot::Mutex::new(None);
 
 pub(super) fn claimed(entry_id: &str) {
     let hook = CLAIMED.lock().clone();
