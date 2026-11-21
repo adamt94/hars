@@ -21,8 +21,11 @@
 //!   setup ends (HA removes it after).
 //! - A flow deleted while one of its steps runs (a request waiting for a
 //!   device) ends that step there, with what it holds (a socket, a
-//!   timer). HA lets the step run to its end; the request's answer is the
-//!   same (`UnknownFlow`).
+//!   timer), and the request answers `UnknownFlow`. HA lets the step run
+//!   to its end and answers with an abort the step returns (or
+//!   `UnknownFlow` for anything else). A step that has already ended when
+//!   the deletion comes is answered as HA answers it, and what it did (a
+//!   changed entry, a reload) stands, as in HA.
 //! - An integration with no way to stop (all but `switchbot_cloud` and
 //!   `mobile_app`) is removed as HA removes one that can't unload: the
 //!   entry and its registry rows go, and its entities stay until a

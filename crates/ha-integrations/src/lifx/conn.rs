@@ -289,14 +289,16 @@ impl Conn {
                 for (i, seq, frame) in &sent {
                     // Only a message aiolifx still waits for: one a reply
                     // of another kind ended isn't sent again.
-                    let waiting = self
-                        .pending
-                        .lock()
+                    // Checked and sent under the lock the reader takes to
+                    // drop a message, as aiolifx does both in one turn.
+                    let pending = self.pending.lock();
+                    let waiting = pending
                         .get(seq)
                         .is_some_and(|p| Arc::ptr_eq(&p.notify, &notify));
                     if !done(*i) && waiting {
                         self.send(frame);
                     }
+                    drop(pending);
                 }
                 let next = start + self.resend.every * (k + 1);
                 let until = next.min(start + per_try);

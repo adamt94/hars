@@ -826,13 +826,21 @@ impl Registry {
     /// `from` that has `identifier` moves to entry `to`
     /// (`async_update_device(add_config_entry_id=to,
     /// remove_config_entry_id=from)`), and then each entity of `from` on such
-    /// a device (`async_update_entity(config_entry_id=to)`). Each change
-    /// fires its `update`, as HA's do.
+    /// a device (`async_update_entity(config_entry_id=to)`), in one write
+    /// (no reader sees a device and its entities apart). Each change fires
+    /// its `update`.
+    ///
+    /// Where `hars` differs from HA, on purpose: in HA 2026.6.1 the device
+    /// update itself takes the moved entities to `deleted_entities` (they
+    /// belonged to the entry the device left) and leaves the device with no
+    /// subentry for `to`, and the set-up after makes them again from the
+    /// deleted rows. `hars` keeps the entities in place and gives the device
+    /// `to`'s subentry, so nothing of an imported install is lost on the way.
     pub fn move_devices_to_entry(&self, identifier: &Value, from: &str, to: &str) {
         let now = now_iso(&self.hass);
         let to_disabled = self.entry_disabled(Some(to));
-        let moved: Vec<String> = self.write(|tx| {
-            let mut moved = Vec::new();
+        self.write(|tx| {
+            let mut moved: Vec<String> = Vec::new();
             for i in 0..tx.r.devices.len() {
                 let old = &tx.r.devices[i];
                 if !old.config_entries.iter().any(|e| e == from)
@@ -874,23 +882,19 @@ impl Registry {
                 tx.device_event(json!({"action": "update", "device_id": id, "changes": changes}));
                 moved.push(id);
             }
-            moved
-        });
-        let rows: Vec<String> = self
-            .snapshot()
-            .entities
-            .iter()
-            .filter(|e| e.config_entry_id.as_deref() == Some(from))
-            .filter(|e| e.device_id.as_ref().is_some_and(|d| moved.contains(d)))
-            .map(|e| e.entity_id.clone())
-            .collect();
-        for entity_id in rows {
             let patch = EntityPatch {
                 config_entry_id: Some(Some(to.to_owned())),
                 ..Default::default()
             };
-            self.update_entity(&entity_id, patch);
-        }
+            for i in 0..tx.r.entities.len() {
+                let e = &tx.r.entities[i];
+                if e.config_entry_id.as_deref() == Some(from)
+                    && e.device_id.as_ref().is_some_and(|d| moved.contains(d))
+                {
+                    update_row(tx, i, &patch, &now, None);
+                }
+            }
+        });
     }
 
     /// `async_get_or_create`: the existing row, updated with `patch`, or a

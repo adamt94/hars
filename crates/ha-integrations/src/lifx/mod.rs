@@ -787,12 +787,14 @@ pub async fn run(
             .unwrap_or_else(|| fallback.to_owned())
     };
     // A bulb found at a new address: the entry has it from now on, as HA's
-    // discovery flow writes it.
-    let save_host = |host: &str| {
+    // discovery flow writes it. Not if the entry's address changed since
+    // this task read it (a flow wrote a newer one): that one stands.
+    let save_host = |was: &str, host: &str| {
         if let Some((entries, id)) = status.entry()
             && let Some(mut data) = entries
                 .get(id)
                 .and_then(|e| e.get("data")?.as_object().cloned())
+            && data.get("host").and_then(Value::as_str) == Some(was)
         {
             data.insert("host".into(), json!(host));
             entries.update_data(id, data);
@@ -839,23 +841,25 @@ pub async fn run(
                     // Discovery of the bulb retries at once.
                     tokio::select! {
                         () = components.hass().setup_retry_wait(Duration::from_secs(wait) + jitter) => {}
-                        Some(found) = found_rx.recv() => save_host(&found),
+                        Some(found) = found_rx.recv() => save_host(&host, &found),
                     }
                     status.set(EntryState::SetupInProgress, None);
                 }
             }
         };
         // Two entries for one bulb (an imported install can have that):
-        // the first that reaches it runs it, as only the first's entities
-        // are added in HA.
+        // the first that reaches it runs it. The other is set up with no
+        // entities, as HA sets it up with its entities refused (their
+        // unique ids are taken), and waits: a reload (a flow that finds the
+        // bulb at a new address) tries again.
         if !runs_it.3 {
             if !components.run_device(&unique_id, &entry_id) {
                 tracing::error!(
-                    "lifx: another entry already runs {unique_id}; this one isn't started"
+                    "Platform lifx does not generate unique IDs. ID {unique_id} already exists - ignoring the entities of '{title}'"
                 );
-                status.set(EntryState::SetupError, None);
+                status.set(EntryState::Loaded, None);
                 drop(ready.take());
-                return;
+                return std::future::pending().await;
             }
             runs_it.3 = true;
         }
@@ -889,7 +893,7 @@ pub async fn run(
             match found_rx.recv().await {
                 Some(found) if found != host => {
                     tracing::info!("lifx: {title} moved from {host} to {found}; reconnecting");
-                    save_host(&found);
+                    save_host(&host, &found);
                     host = found;
                     break;
                 }
@@ -898,6 +902,9 @@ pub async fn run(
             }
         }
         drop(stopped);
+        // Not running the bulb while it is reached again.
+        components.let_go(&unique_id, &entry_id);
+        runs_it.3 = false;
     }
 }
 

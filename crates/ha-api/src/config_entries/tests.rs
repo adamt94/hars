@@ -1910,7 +1910,9 @@ async fn until(what: &str, mut check: impl FnMut() -> bool) {
 /// While HA's old shared LIFX entry is there, a bulb's own entry takes
 /// its device and entities from it at set-up, before it reaches the bulb
 /// (HA's `async_migrate_entities_devices`): removing the old entry then
-/// leaves them, though the bulb doesn't answer.
+/// leaves them, though the bulb doesn't answer. On purpose, the entity keeps
+/// its row where HA 2026.6.1 moves it to the deleted rows on the way (see
+/// `Registry::move_devices_to_entry`).
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn a_lifx_bulbs_rows_move_from_the_old_shared_entry() {
     let hass = Hass::new();
@@ -2000,6 +2002,7 @@ async fn the_reachable_entry_of_a_lifx_bulb_listed_twice_runs_it() {
     let (hass, store, registry, _flows, api) = lifx_home(entries, Default::default()).await;
     // Rediscovery would move the stale one to the bulb: no broadcast here.
     api.lifx.set("discovery_none");
+    drop(api);
     hass.setups_done().await;
     until("the reachable entry runs the bulb", || {
         store.runtime("good").map(|r| r.state) == Some(EntryState::Loaded)
@@ -2016,6 +2019,36 @@ async fn the_reachable_entry_of_a_lifx_bulb_listed_twice_runs_it() {
         store.runtime("stale").map(|r| r.state),
         Some(EntryState::Loaded)
     );
+}
+
+/// Two entries that both reach one bulb: the first to reach it runs it, the
+/// other is set up with no entities (HA sets it up and refuses its
+/// entities, their unique ids being taken), and stays ready for a reload.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_second_lifx_entry_for_a_reachable_bulb_loads_without_entities() {
+    use ha_integrations::config_entries::EntryState;
+    let hass = Hass::new();
+    let serial = "d0:73:d5:00:00:20";
+    let entries = vec![
+        lifx_entry(&hass, "one", Some(serial), Some(lifx_fake::COLOUR)),
+        lifx_entry(&hass, "two", Some(serial), Some(lifx_fake::ALIAS)),
+    ];
+    let (hass, store, registry, _flows, _api) = lifx_home(entries, Default::default()).await;
+    hass.setups_done().await;
+    until("both loaded", || {
+        ["one", "two"]
+            .iter()
+            .all(|id| store.runtime(id).map(|r| r.state) == Some(EntryState::Loaded))
+    })
+    .await;
+    let owners: std::collections::BTreeSet<String> = registry
+        .snapshot()
+        .entities
+        .iter()
+        .filter_map(|e| e.config_entry_id.clone())
+        .collect();
+    assert_eq!(owners.len(), 1, "one entry has the rows: {owners:?}");
+    assert_eq!(registry.snapshot().entities.len(), 4);
 }
 
 /// A LIFX flow deleted while its step waits for a bulb that says nothing
