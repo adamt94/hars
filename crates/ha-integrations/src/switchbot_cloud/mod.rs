@@ -46,7 +46,61 @@ pub const COMPONENTS: &[&str] = &["switchbot_cloud", "button", "climate", "senso
 /// while a removed entry's are taken away: one entry at a time, so two
 /// accounts that list the same devices can't both take them (HA reserves
 /// an entity id before its setup yields). Never held across an `await`.
-pub(crate) static SETUP: Mutex<()> = parking_lot::const_mutex(());
+pub(crate) static SETUP: Setup = Setup {
+    lock: parking_lot::const_mutex(()),
+    #[cfg(test)]
+    owner: parking_lot::const_mutex(None),
+};
+
+/// The set-up lock ([`SETUP`]). A test can ask whether its thread holds it.
+pub(crate) struct Setup {
+    lock: Mutex<()>,
+    /// The thread that holds it.
+    #[cfg(test)]
+    owner: Mutex<Option<std::thread::ThreadId>>,
+}
+
+/// [`SETUP`] held, until dropped.
+pub(crate) struct SetupGuard {
+    _held: parking_lot::MutexGuard<'static, ()>,
+}
+
+impl Setup {
+    pub(crate) fn lock(&'static self) -> SetupGuard {
+        self.held(self.lock.lock())
+    }
+
+    #[cfg(test)]
+    pub(crate) fn try_lock(&'static self) -> Option<SetupGuard> {
+        self.lock.try_lock().map(|held| self.held(held))
+    }
+
+    #[cfg(test)]
+    pub(crate) fn is_locked(&self) -> bool {
+        self.lock.is_locked()
+    }
+
+    /// Whether the calling thread holds it.
+    #[cfg(test)]
+    pub(crate) fn held_here(&self) -> bool {
+        *self.owner.lock() == Some(std::thread::current().id())
+    }
+
+    fn held(&'static self, held: parking_lot::MutexGuard<'static, ()>) -> SetupGuard {
+        #[cfg(test)]
+        {
+            *self.owner.lock() = Some(std::thread::current().id());
+        }
+        SetupGuard { _held: held }
+    }
+}
+
+#[cfg(test)]
+impl Drop for SetupGuard {
+    fn drop(&mut self) {
+        *SETUP.owner.lock() = None;
+    }
+}
 
 /// Every coordinator's `update_interval`.
 const INTERVAL: Duration = Duration::from_secs(600);

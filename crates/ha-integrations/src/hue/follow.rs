@@ -117,6 +117,8 @@ impl Bridge {
                     if !swap(&self.groups, &g, &moved) {
                         continue;
                     }
+                    #[cfg(test)]
+                    crate::components::hooks::at("group_swapped");
                     g.gone.store(true, Ordering::Relaxed);
                     self.platforms.lights.remove(&g.entity_id);
                     self.hass.remove_state(&g.entity_id);

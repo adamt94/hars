@@ -236,11 +236,17 @@ bridge's list and its component, and writes its first state. Set-up, an
 event-stream addition, each addition in a reconnect's snapshot, and a
 room that releases the scenes waiting for it all go through it. A
 registry edit holds the same lock until the running entities have
-followed it. So a new entity never takes an id a rename is giving, and
-a rename that comes after finds the entity in its list, in its
-component and with a state (its id is taken). What existing entities
-write after a change waits for no lock: a reconnect's updates don't hold
-up a set-up or a registry edit.
+followed it. So a new entity never takes an id a rename is giving or
+one another entry's row has (ids are checked against the live
+registry), and a rename that comes after finds the entity in its list,
+in its component and with a state (its id is taken). A resource the
+bridge reports again as another type, while an entity of the same
+domain runs for its id, makes no second entity, as HA's platform
+refuses a unique id that is taken. A reconnect's snapshot is taken one
+resource at a time, in its order, each followed by its writes, as the
+events it stands for: an addition makes only what that resource lets
+be made. What existing entities write after a change waits for no
+lock: a reconnect's updates don't hold up a set-up or a registry edit.
 
 ### Storage and restore
 

@@ -103,7 +103,7 @@ impl Made {
 
 /// The set-up lock, for [`Bridge::expose`]. A test learns that it had to
 /// wait (`setup_waits`): another holds it.
-fn hold_setup() -> parking_lot::MutexGuard<'static, ()> {
+fn hold_setup() -> crate::switchbot_cloud::SetupGuard {
     #[cfg(test)]
     match crate::switchbot_cloud::SETUP.try_lock() {
         Some(one) => return one,
@@ -267,10 +267,15 @@ impl Bridge {
             .flatten()
             .collect();
         let base = format!("{domain}.{}", ha_components::slugify(&parts.join(" ")));
-        // Ids in the registry, in the state machine, or given to an entity
-        // not yet written: each new entity gets its own.
+        // Ids in the registry as it is now (another entry's rows, made
+        // since this bridge last took the registries, among them: no edit
+        // is under way, [`Bridge::expose`] holds the set-up lock), in the
+        // state machine, or given to an entity not yet written: each new
+        // entity gets its own.
+        let live = self.platforms.registries.get();
         let taken = |id: &str| {
             r.entities.iter().any(|e| e.entity_id == id)
+                || live.entities.iter().any(|e| e.entity_id == id)
                 || EntityId::parse(id).is_ok_and(|i| self.hass.states().get(&i).is_some())
                 || self
                     .lights
@@ -295,6 +300,17 @@ impl Bridge {
             n += 1;
         }
         EntityId::parse(&id).ok()
+    }
+
+    /// The write guard. A test learns that it had to wait (`alive_waits`):
+    /// another holds it.
+    fn hold_alive(&self) -> parking_lot::MutexGuard<'_, bool> {
+        #[cfg(test)]
+        match self.alive.try_lock() {
+            Some(alive) => return alive,
+            None => crate::components::hooks::at("alive_waits"),
+        }
+        self.alive.lock()
     }
 
     /// Make entities for resources that have none yet: [`Bridge::expose`]
@@ -369,6 +385,22 @@ impl Bridge {
                         .iter()
                         .any(|e| e.rid == rid && e.kind == kind)
                 {
+                    continue;
+                }
+                // A resource that comes back as another type (a scene as a
+                // smart scene) while an entity of the same domain runs for
+                // its id: HA's platform refuses the new entity, its unique
+                // id being taken, and the one that runs goes on.
+                let running = self
+                    .others
+                    .read()
+                    .iter()
+                    .find(|e| e.rid == rid && e.kind.domain() == kind.domain())
+                    .map(|e| e.entity_id.clone());
+                if let Some(running) = running {
+                    tracing::error!(
+                        "Platform hue does not generate unique IDs. ID {rid} already exists - ignoring {running}"
+                    );
                     continue;
                 }
                 let device = HueEntity::device(kind, rid, r, &store);
@@ -597,7 +629,7 @@ impl Bridge {
     /// none comes after, and an entity given another id since `gone` was
     /// found ([`follow`]) is dropped where it is now.
     fn remove(&self, gone: &Gone) {
-        let _writes = self.alive.lock();
+        let _writes = self.hold_alive();
         let mut lights = Vec::new();
         self.lights.write().retain(|l| {
             let dropped = gone.lights.iter().any(|g| g.rid == l.rid);
@@ -652,26 +684,6 @@ impl Bridge {
         });
     }
 
-    /// Write every entity, in HA's platform order.
-    #[cfg(test)]
-    fn write_all(&self) {
-        let others = self.others.read().clone();
-        for e in others.iter().filter(|e| e.order < 20) {
-            self.write_entity(e);
-        }
-        let lights = self.lights.read().clone();
-        for l in &lights {
-            self.write_light(l);
-        }
-        let groups = self.groups.read().clone();
-        for g in &groups {
-            self.write_group(g);
-        }
-        for e in others.iter().filter(|e| e.order > 20) {
-            self.write_entity(e);
-        }
-    }
-
     /// One event-stream item: merge it, then write what HA writes, in its
     /// order (no coalescing: every item writes).
     fn handle(self: &Arc<Self>, kind: &str, item: &Value) {
@@ -704,6 +716,28 @@ impl Bridge {
                 // and the scenes that waited for it. What is made writes
                 // there; what was there writes here.
                 let made = self.add_entities();
+                // What there is already that depends on the resource (a
+                // room's scenes) writes again, as an update of it does: a
+                // scene that couldn't be written while its room was away
+                // has its state again.
+                let dependants: Vec<Arc<HueEntity>> = {
+                    let store = self.store.read();
+                    let others = self.others.read();
+                    others
+                        .iter()
+                        .filter(|e| e.rid != id && !made.other(e))
+                        .filter(|e| {
+                            let r = store.get(&e.rid);
+                            let device =
+                                r.and_then(|r| HueEntity::device(e.kind, &e.rid, r, &store));
+                            device.is_some_and(|d| d["id"] == id)
+                        })
+                        .cloned()
+                        .collect()
+                };
+                for e in &dependants {
+                    self.write_entity(e);
+                }
                 for e in self.others_of(id).iter().filter(|e| e.order < 20) {
                     if !made.other(e) {
                         self.write_entity(e);
@@ -745,7 +779,7 @@ impl Bridge {
                     // Under the write guard, as [`Bridge::remove`]: the
                     // group goes from where it is now (a rename may have
                     // given it another id), and nothing writes it after.
-                    let _writes = self.alive.lock();
+                    let _writes = self.hold_alive();
                     let mut groups = Vec::new();
                     self.groups.write().retain(|g| {
                         let dropped = g.rid == id;
@@ -863,53 +897,43 @@ impl Bridge {
     /// Apply a fresh snapshot: additions, changes and removals, each with
     /// the writes an event for it would make.
     fn apply_snapshot(self: &Arc<Self>, fresh: Vec<Value>) {
-        // What may be removed, known before the store forgets it: each
-        // resource's type, and what each device takes with it.
-        let (types, devices): (Vec<(String, String)>, Vec<String>) = {
-            let store = self.store.read();
-            let types = store
-                .order()
-                .filter_map(|r| {
-                    Some((r["id"].as_str()?.to_owned(), r["type"].as_str()?.to_owned()))
-                })
-                .collect();
-            let devices = store
-                .of_type("device")
-                .filter_map(|d| d["id"].as_str().map(str::to_owned))
-                .collect();
-            (types, devices)
-        };
-        let gone: Vec<(String, Gone)> = devices
+        // The snapshot's resources one at a time, in its order, each
+        // taken into the store and followed by its writes before the next
+        // is taken, as the events they stand for would be: an addition
+        // makes only what that resource lets be made (a device does not
+        // make the light the snapshot adds after it), and what comes
+        // before it in the snapshot is written before it.
+        let fresh = Store::new(fresh);
+        for new in fresh.order() {
+            let change = self.store.write().take(new);
+            if let Some(change) = change {
+                let id = new["id"].as_str().unwrap_or_default();
+                let ty = new["type"].as_str().unwrap_or_default();
+                self.after(change, ty, id, Gone::default());
+            }
+        }
+        // Then what the bridge no longer has. What each device takes with
+        // it, and each resource's type, known before the store forgets.
+        let missing = self.store.read().missing(&fresh);
+        let gone: Vec<(String, String, Gone)> = missing
             .into_iter()
-            .map(|d| {
-                let g = self.on_device(&d);
-                (d, g)
-            })
-            .collect();
-        let changes = self.store.write().reconcile(fresh);
-        // Each addition makes its entities through [`Bridge::expose`], which
-        // holds the set-up lock only while it does; the updates wait for
-        // no lock.
-        for (change, id) in changes {
-            let ty = match change {
-                Change::Deleted => types
-                    .iter()
-                    .find(|(i, _)| *i == id)
-                    .map(|(_, t)| t.clone())
-                    .unwrap_or_default(),
-                _ => self
+            .map(|id| {
+                let ty = self
                     .store
                     .read()
                     .get(&id)
                     .and_then(|r| r["type"].as_str().map(str::to_owned))
-                    .unwrap_or_default(),
-            };
-            let g = gone
-                .iter()
-                .find(|(d, _)| *d == id)
-                .map(|(_, g)| g.clone())
-                .unwrap_or_default();
-            self.after(change, &ty, &id, g);
+                    .unwrap_or_default();
+                let g = match ty == "device" {
+                    true => self.on_device(&id),
+                    false => Gone::default(),
+                };
+                (id, ty, g)
+            })
+            .collect();
+        for (id, ty, g) in gone {
+            self.store.write().forget(&id);
+            self.after(Change::Deleted, &ty, &id, g);
         }
     }
 

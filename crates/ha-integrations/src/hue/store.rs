@@ -138,37 +138,51 @@ impl Store {
 
     /// Reconcile with a fresh snapshot: what was added, changed (merged as
     /// an update would be) and removed, in snapshot order then removals.
+    #[cfg(test)]
     pub fn reconcile(&mut self, fresh: Vec<Value>) -> Vec<(Change, String)> {
         let fresh = Store::new(fresh);
         let mut out = Vec::new();
-        for id in &fresh.order {
-            let new = &fresh.by_id[id];
-            match self.by_id.get_mut(id) {
-                Some(Value::Object(cur)) => {
-                    if let Value::Object(n) = new
-                        && merge(cur, n)
-                    {
-                        out.push((Change::Updated, id.clone()));
-                    }
-                }
-                _ => {
-                    self.insert(new.clone());
-                    out.push((Change::Added, id.clone()));
-                }
+        for new in fresh.order() {
+            if let Some(change) = self.take(new) {
+                out.push((change, new["id"].as_str().unwrap_or_default().to_owned()));
             }
         }
-        let gone: Vec<String> = self
-            .order
-            .iter()
-            .filter(|id| !fresh.by_id.contains_key(*id))
-            .cloned()
-            .collect();
-        for id in gone {
-            self.by_id.remove(&id);
-            self.order.retain(|i| *i != id);
+        for id in self.missing(&fresh) {
+            self.forget(&id);
             out.push((Change::Deleted, id));
         }
         out
+    }
+
+    /// One resource of a fresh snapshot ([`Store::new`]): merged into the
+    /// one there is (an update, if that changed anything), or added.
+    pub fn take(&mut self, new: &Value) -> Option<Change> {
+        let id = new["id"].as_str()?;
+        match self.by_id.get_mut(id) {
+            Some(Value::Object(cur)) => match new {
+                Value::Object(n) if merge(cur, n) => Some(Change::Updated),
+                _ => None,
+            },
+            _ => {
+                self.insert(new.clone());
+                Some(Change::Added)
+            }
+        }
+    }
+
+    /// The resources `fresh` no longer has, in the bridge's order.
+    pub fn missing(&self, fresh: &Store) -> Vec<String> {
+        self.order
+            .iter()
+            .filter(|id| !fresh.by_id.contains_key(*id))
+            .cloned()
+            .collect()
+    }
+
+    /// Forget a resource.
+    pub fn forget(&mut self, id: &str) {
+        self.by_id.remove(id);
+        self.order.retain(|i| i != id);
     }
 
     /// Every resource, in the bridge's order.

@@ -77,7 +77,6 @@ fn bridge(api: Api) -> Arc<Bridge> {
     });
     platforms.bridges.write().push(Arc::downgrade(&bridge));
     bridge.add_entities();
-    bridge.write_all();
     bridge
 }
 
@@ -971,21 +970,106 @@ fn rename_at(b: &Arc<Bridge>, point: &'static str, moved: Arc<Registries>) -> im
     }
 }
 
-/// A light group deleted on the bridge while a rename gives it another id:
-/// neither id is left serving it, and neither has a state.
-#[tokio::test]
+/// A light group deleted on the bridge while a rename is moving it (the
+/// rename has put the group in the bridge's list under its new id, and
+/// not yet handed it to the light component): the deletion waits for the
+/// rename, then drops the group where it is, so neither id serves it or
+/// has a state.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn a_group_deleted_while_it_moves_leaves_nothing() {
     let b = bridge(offline());
     let g = b.groups.read()[0].clone();
     let (old, new) = (g.entity_id.to_string(), "light.moved_group");
-    let finish = rename_at(&b, "group_deleted", moved_to(&b, &old, new));
+    let moved = moved_to(&b, &old, new);
     let deleted = json!([{"creationtime": "2026-01-01T00:00:00Z", "id": "gone", "type": "delete",
-                          "data": [{"id": g.rid, "type": "grouped_light"}]}]);
-    b.handle_data(&deleted.to_string());
-    finish();
+                          "data": [{"id": g.rid, "type": "grouped_light"}]}])
+    .to_string();
+    // The rename, paused between the list and the component.
+    let (paused_tx, paused) = std::sync::mpsc::channel();
+    let (resume, resume_rx) = std::sync::mpsc::channel::<()>();
+    let renamer = b.clone();
+    let rename = std::thread::spawn(move || {
+        crate::components::hooks::set("group_swapped", move || {
+            let _ = paused_tx.send(());
+            let _ = resume_rx.recv();
+        });
+        renamer.follow(moved);
+    });
+    paused.recv().unwrap();
+    // The deletion, on its own thread: it goes on once it waits for the
+    // write guard, or is done.
+    let (said_tx, said) = std::sync::mpsc::channel();
+    let deleter = b.clone();
+    let waits = said_tx.clone();
+    let delete = std::thread::spawn(move || {
+        crate::components::hooks::set("alive_waits", move || {
+            let _ = waits.send("waits");
+        });
+        deleter.handle_data(&deleted);
+        let _ = said_tx.send("done");
+    });
+    said.recv().unwrap();
+    resume.send(()).unwrap();
+    rename.join().unwrap();
+    delete.join().unwrap();
     assert_eq!((routed(&b, &old), routed(&b, new)), (0, 0));
     assert_eq!(state_json(&b.hass, &old), None);
     assert_eq!(state_json(&b.hass, new), None);
+}
+
+/// A scene reported again as a smart scene (the same resource id) while
+/// the scene runs: as HA's platform does with an entity whose unique id is
+/// taken, the new one is not made, and one entity serves the id.
+#[tokio::test]
+async fn a_resource_back_as_another_type_makes_no_second_entity() {
+    let b = bridge(offline());
+    let id = "scene.bedroom_bedroom_dimmed";
+    let (scene, _) = scene_and_room(&b, id);
+    let mut smart = b.store.read().get(&scene.rid).unwrap().clone();
+    smart["type"] = json!("smart_scene");
+    let added = json!([{"creationtime": "2026-01-01T00:00:00Z", "id": "again", "type": "add",
+                        "data": [smart]}]);
+    b.handle_data(&added.to_string());
+    let running: Vec<String> = b
+        .others
+        .read()
+        .iter()
+        .filter(|e| e.rid == scene.rid)
+        .map(|e| e.entity_id.to_string())
+        .collect();
+    assert_eq!(running, [id]);
+    let served = b
+        .platforms
+        .scenes
+        .ids()
+        .iter()
+        .filter(|s| s.as_str() == id)
+        .count();
+    assert_eq!(served, 1);
+}
+
+/// A scene renamed while its room is away (it can't be written then, so
+/// it has no state under its new id) has its state again when the room
+/// comes back.
+#[tokio::test]
+async fn a_scene_renamed_while_its_room_is_away_is_written_when_it_returns() {
+    let b = bridge(offline());
+    let (old, new) = ("scene.bedroom_bedroom_dimmed", "scene.bedroom_dimmed");
+    let (_, room) = scene_and_room(&b, old);
+    let resource = b.store.read().get(&room).unwrap().clone();
+    let ty = resource["type"].as_str().unwrap().to_owned();
+    let deleted = json!([{"creationtime": "2026-01-01T00:00:00Z", "id": "gone", "type": "delete",
+                          "data": [{"id": room, "type": ty}]}]);
+    b.handle_data(&deleted.to_string());
+    b.follow(moved_to(&b, old, new));
+    assert_eq!(state_json(&b.hass, new), None);
+    let added = json!([{"creationtime": "2026-01-01T00:00:00Z", "id": "back", "type": "add",
+                        "data": [resource]}]);
+    b.handle_data(&added.to_string());
+    assert!(
+        state_json(&b.hass, new).is_some(),
+        "no state when its room came back"
+    );
 }
 
 /// A light group that comes back while a rename gives its row another id
@@ -1245,8 +1329,9 @@ async fn a_scene_made_when_its_room_comes_has_its_state_at_once() {
 }
 
 /// A reconnect's snapshot with an update before an addition: the update
-/// is written with the set-up lock free (only the addition takes it), so a
-/// registry edit or a set-up elsewhere doesn't wait for the whole batch.
+/// is written without the set-up lock held (only the addition takes it),
+/// so a registry edit or a set-up elsewhere doesn't wait for the whole
+/// batch.
 #[tokio::test]
 async fn a_reconnects_updates_wait_for_no_lock() {
     let b = bridge(offline());
@@ -1277,14 +1362,7 @@ async fn a_reconnects_updates_wait_for_no_lock() {
     let seen = free.clone();
     AFTER_RENDER.with(|hook| {
         *hook.borrow_mut() = Some(Box::new(move || {
-            // Another thread can take it (other tests hold it briefly):
-            // this one doesn't hold it.
-            let other = std::thread::spawn(|| {
-                crate::switchbot_cloud::SETUP
-                    .try_lock_for(Duration::from_secs(2))
-                    .is_some()
-            });
-            *seen.lock() = Some(other.join().unwrap());
+            *seen.lock() = Some(!crate::switchbot_cloud::SETUP.held_here());
         }));
     });
     b.apply_snapshot(fresh);
@@ -1299,6 +1377,134 @@ async fn a_reconnects_updates_wait_for_no_lock() {
             .iter()
             .any(|l| l.rid == "00000000-0000-4000-8000-0000000000f1")
     );
+}
+
+/// The ids `state_changed` fired for, in order.
+fn changed_ids(rx: &mut tokio::sync::broadcast::Receiver<Arc<ha_core::Event>>) -> Vec<String> {
+    let mut out = Vec::new();
+    while let Ok(e) = rx.try_recv() {
+        if let ha_core::EventKind::StateChanged { entity_id, .. } = &e.kind {
+            out.push(entity_id.to_string());
+        }
+    }
+    out
+}
+
+/// A reconnect's snapshot is written in its own order: a device the
+/// bridge adds, then a change to the lamp, then the device's light. The
+/// lamp's change is written before the new light, as the events would be.
+#[tokio::test]
+async fn a_reconnect_writes_in_the_snapshots_order() {
+    let b = bridge(offline());
+    let mut fresh = fixture("resource")["data"].as_array().unwrap().clone();
+    let lamp = fresh.iter().position(|r| r["id"] == LAMP).unwrap();
+    fresh[lamp]["on"]["on"] = json!(!fresh[lamp]["on"]["on"].as_bool().unwrap());
+    let (device_id, light_id) = (
+        "00000000-0000-4000-8000-0000000000c0",
+        "00000000-0000-4000-8000-0000000000c1",
+    );
+    let device = like(
+        &b,
+        LAMP_DEVICE,
+        device_id,
+        json!({
+            "metadata": {"name": "Late lamp", "archetype": "classic_bulb"},
+            "services": [{"rid": light_id, "rtype": "light"}],
+        }),
+    );
+    let light = like(
+        &b,
+        LAMP,
+        light_id,
+        json!({"owner": {"rid": device_id, "rtype": "device"}}),
+    );
+    fresh.insert(lamp + 1, light);
+    fresh.insert(lamp, device);
+    let lamp_id = b
+        .lights
+        .read()
+        .iter()
+        .find(|l| l.rid == LAMP)
+        .unwrap()
+        .entity_id
+        .to_string();
+    let mut rx = b.hass.bus().subscribe();
+    b.apply_snapshot(fresh);
+    let new_id = b
+        .lights
+        .read()
+        .iter()
+        .find(|l| l.rid == light_id)
+        .unwrap()
+        .entity_id
+        .to_string();
+    let order = changed_ids(&mut rx);
+    let at = |id: &str| order.iter().position(|o| o == id);
+    assert!(
+        at(&lamp_id) < at(&new_id) && at(&lamp_id).is_some(),
+        "{order:?}"
+    );
+}
+
+/// A light the bridge reports after another entry made a row (disabled,
+/// so it has no state) under the id the light would take: the light takes
+/// another id, and calls to that one reach no Hue light.
+#[tokio::test]
+async fn a_new_light_does_not_take_an_id_another_entry_has() {
+    let (b, registry, _components) = live_bridge();
+    let patch = ha_registry::EntityPatch {
+        has_entity_name: Some(false),
+        original_name: Some(Some("Reserved Name".into())),
+        ..Default::default()
+    };
+    let made =
+        registry.get_or_create_entity("light", "lifx", "reserved", Some("user".into()), patch);
+    // As that entry's user named it; not an edit this bridge follows.
+    let reserved = registry.rename_entity(
+        &made.entity_id,
+        "light.reserved_name",
+        &Default::default(),
+        &|_| true,
+    );
+    assert!(reserved.is_ok(), "{reserved:?}");
+    let lamp = b
+        .lights
+        .read()
+        .iter()
+        .find(|l| l.rid == LAMP)
+        .cloned()
+        .unwrap();
+    let (device_id, light_id) = (
+        "00000000-0000-4000-8000-0000000000b0",
+        "00000000-0000-4000-8000-0000000000b1",
+    );
+    let device = like(
+        &b,
+        LAMP_DEVICE,
+        device_id,
+        json!({
+            "metadata": {"name": "Reserved Name", "archetype": "classic_bulb"},
+            "services": [{"rid": light_id, "rtype": "light"}],
+        }),
+    );
+    let light = like(
+        &b,
+        &lamp.rid,
+        light_id,
+        json!({"owner": {"rid": device_id, "rtype": "device"}}),
+    );
+    let added = json!([{"creationtime": "2026-01-01T00:00:00Z", "id": "new", "type": "add",
+                        "data": [device, light]}]);
+    b.handle_data(&added.to_string());
+    let new = b
+        .lights
+        .read()
+        .iter()
+        .find(|l| l.rid == light_id)
+        .cloned()
+        .unwrap();
+    assert_ne!(new.entity_id.as_str(), "light.reserved_name");
+    assert_eq!(routed(&b, "light.reserved_name"), 0);
 }
 
 /// A second bridge, sharing the first's hass and services.
@@ -1489,7 +1695,6 @@ async fn scenes_restore_their_last_activation() {
         alive: parking_lot::Mutex::new(true),
     });
     b.add_entities();
-    b.write_all();
     assert_eq!(
         state_json(&hass, "scene.bedroom_bedroom_dimmed").unwrap().0,
         "2026-11-13T20:00:00.123456+00:00"
