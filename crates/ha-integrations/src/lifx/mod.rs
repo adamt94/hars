@@ -846,6 +846,10 @@ pub async fn run(
         // entities, as HA sets it up with its entities refused (their
         // unique ids are taken), and waits: a reload (a flow that finds the
         // bulb at a new address) tries again.
+        // The set-up lock is taken before the bulb is claimed and held
+        // through its rows and entities: no other entry's set-up (another
+        // for this bulb) comes between them. Nothing awaits under it.
+        let one = crate::switchbot_cloud::SETUP.lock();
         if !runs_it.3 {
             if !components.run_device(&unique_id, &entry_id) {
                 tracing::error!(
@@ -856,7 +860,6 @@ pub async fn run(
                 if runs(features(found.product))
                     && let Some(registry) = components.registry()
                 {
-                    let _one = crate::switchbot_cloud::SETUP.lock();
                     register::register(
                         components.hass(),
                         registry,
@@ -866,6 +869,7 @@ pub async fn run(
                         true,
                     );
                 }
+                drop(one);
                 // It holds nothing while it waits: no socket, no search.
                 drop(found);
                 drop(discovery);
@@ -875,11 +879,13 @@ pub async fn run(
                 return std::future::pending().await;
             }
             runs_it.3 = true;
+            #[cfg(test)]
+            tests::claimed(&entry_id);
         }
         let stopped = {
             // No other entry is set up or removed, and no registry edit
             // made, while this one's rows and entities are.
-            let _one = crate::switchbot_cloud::SETUP.lock();
+            let _one = one;
             let product = features(found.product);
             if !runs(product) {
                 tracing::warn!(

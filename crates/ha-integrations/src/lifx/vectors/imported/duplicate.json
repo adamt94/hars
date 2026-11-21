@@ -1,256 +1,510 @@
 {
- "doc": "A second entry for the colour bulb, at another of its addresses, added once the first is set up: the stores after its set-up, and the entities that have a state.",
- "entries": [
-  {
-   "created_at": "2026-06-01T12:00:00.000000+00:00",
-   "data": {
-    "host": "192.0.2.20"
+ "doc": "A second entry for the colour bulb, at another of its addresses, added once the first is set up: the stores after its set-up, and the entities that have a state. With the RSSI sensor disabled, as it starts, and with every entity of the first enabled.",
+ "rssi_disabled": {
+  "entries": [
+   {
+    "created_at": "2026-06-01T12:00:00.000000+00:00",
+    "data": {
+     "host": "192.0.2.20"
+    },
+    "disabled_by": null,
+    "discovery_keys": {},
+    "domain": "lifx",
+    "entry_id": "<first>",
+    "minor_version": 1,
+    "modified_at": "2026-06-01T12:00:00.000000+00:00",
+    "options": {},
+    "pref_disable_new_entities": false,
+    "pref_disable_polling": false,
+    "source": "user",
+    "subentries": [],
+    "title": "Desk Lamp",
+    "unique_id": "d0:73:d5:00:00:20",
+    "version": 1
    },
-   "disabled_by": null,
-   "discovery_keys": {},
-   "domain": "lifx",
-   "entry_id": "<first>",
-   "minor_version": 1,
-   "modified_at": "2026-06-01T12:00:00.000000+00:00",
-   "options": {},
-   "pref_disable_new_entities": false,
-   "pref_disable_polling": false,
-   "source": "user",
-   "subentries": [],
-   "title": "Desk Lamp",
-   "unique_id": "d0:73:d5:00:00:20",
-   "version": 1
-  },
-  {
-   "created_at": "2026-06-01T12:00:00.000000+00:00",
-   "data": {
-    "host": "192.0.2.25"
-   },
-   "disabled_by": null,
-   "discovery_keys": {},
-   "domain": "lifx",
-   "entry_id": "<second>",
-   "minor_version": 1,
-   "modified_at": "2026-06-01T12:00:00.000000+00:00",
-   "options": {},
-   "pref_disable_new_entities": false,
-   "pref_disable_polling": false,
-   "source": "user",
-   "subentries": [],
-   "title": "Desk Lamp",
-   "unique_id": "d0:73:d5:00:00:20",
-   "version": 1
-  }
- ],
- "devices": [
-  {
-   "area_id": "office",
-   "config_entries": [
-    "<second>",
-    "<first>"
-   ],
-   "config_entries_subentries": {
-    "<first>": [
+   {
+    "created_at": "2026-06-01T12:00:00.000000+00:00",
+    "data": {
+     "host": "192.0.2.25"
+    },
+    "disabled_by": null,
+    "discovery_keys": {},
+    "domain": "lifx",
+    "entry_id": "<second>",
+    "minor_version": 1,
+    "modified_at": "2026-06-01T12:00:00.000000+00:00",
+    "options": {},
+    "pref_disable_new_entities": false,
+    "pref_disable_polling": false,
+    "source": "user",
+    "subentries": [],
+    "title": "Desk Lamp",
+    "unique_id": "d0:73:d5:00:00:20",
+    "version": 1
+   }
+  ],
+  "devices": [
+   {
+    "area_id": "office",
+    "config_entries": [
+     "<first>",
+     "<second>"
+    ],
+    "config_entries_subentries": {
+     "<first>": [
+      null
+     ],
+     "<second>": [
+      null
+     ]
+    },
+    "configuration_url": null,
+    "connections": [
+     [
+      "mac",
+      "d0:73:d5:00:00:21"
+     ]
+    ],
+    "created_at": "2026-06-01T12:00:00.000000+00:00",
+    "disabled_by": null,
+    "entry_type": null,
+    "hw_version": null,
+    "id": "00000000000000000000000000000001",
+    "identifiers": [
+     [
+      "lifx",
+      "d0:73:d5:00:00:20"
+     ]
+    ],
+    "labels": [],
+    "manufacturer": "LIFX",
+    "model": "LIFX Color",
+    "model_id": null,
+    "modified_at": "2026-06-01T12:00:00.000000+00:00",
+    "name_by_user": null,
+    "name": "Desk Lamp",
+    "primary_config_entry": "<first>",
+    "serial_number": null,
+    "sw_version": "3.70",
+    "via_device_id": null
+   }
+  ],
+  "entities": [
+   {
+    "aliases": [],
+    "aliases_v2": [
      null
     ],
-    "<second>": [
+    "area_id": null,
+    "categories": {},
+    "capabilities": null,
+    "config_entry_id": "<first>",
+    "config_subentry_id": null,
+    "created_at": "2026-06-01T12:00:00.000000+00:00",
+    "device_class": null,
+    "device_id": "00000000000000000000000000000001",
+    "disabled_by": null,
+    "entity_category": "config",
+    "entity_id": "button.office_desk_lamp_identify",
+    "hidden_by": null,
+    "icon": null,
+    "id": "00000000000000000000000000000002",
+    "has_entity_name": true,
+    "labels": [],
+    "modified_at": "2026-06-01T12:00:00.000000+00:00",
+    "name": null,
+    "object_id_base": "Identify",
+    "options": {},
+    "original_device_class": "identify",
+    "original_icon": null,
+    "original_name": "Identify",
+    "platform": "lifx",
+    "suggested_object_id": null,
+    "supported_features": 0,
+    "translation_key": null,
+    "unique_id": "d0:73:d5:00:00:20_identify",
+    "previous_unique_id": null,
+    "unit_of_measurement": null
+   },
+   {
+    "aliases": [],
+    "aliases_v2": [
      null
-    ]
-   },
-   "configuration_url": null,
-   "connections": [
-    [
-     "mac",
-     "d0:73:d5:00:00:21"
-    ]
-   ],
-   "created_at": "2026-06-01T12:00:00.000000+00:00",
-   "disabled_by": null,
-   "entry_type": null,
-   "hw_version": null,
-   "id": "00000000000000000000000000000001",
-   "identifiers": [
-    [
-     "lifx",
-     "d0:73:d5:00:00:20"
-    ]
-   ],
-   "labels": [],
-   "manufacturer": "LIFX",
-   "model": "LIFX Color",
-   "model_id": null,
-   "modified_at": "2026-06-01T12:00:00.000000+00:00",
-   "name_by_user": null,
-   "name": "Desk Lamp",
-   "primary_config_entry": "<first>",
-   "serial_number": null,
-   "sw_version": "3.70",
-   "via_device_id": null
-  }
- ],
- "entities": [
-  {
-   "aliases": [],
-   "aliases_v2": [
-    null
-   ],
-   "area_id": null,
-   "categories": {},
-   "capabilities": null,
-   "config_entry_id": "<first>",
-   "config_subentry_id": null,
-   "created_at": "2026-06-01T12:00:00.000000+00:00",
-   "device_class": null,
-   "device_id": "00000000000000000000000000000001",
-   "disabled_by": null,
-   "entity_category": "config",
-   "entity_id": "button.office_desk_lamp_identify",
-   "hidden_by": null,
-   "icon": null,
-   "id": "00000000000000000000000000000002",
-   "has_entity_name": true,
-   "labels": [],
-   "modified_at": "2026-06-01T12:00:00.000000+00:00",
-   "name": null,
-   "object_id_base": "Identify",
-   "options": {},
-   "original_device_class": "identify",
-   "original_icon": null,
-   "original_name": "Identify",
-   "platform": "lifx",
-   "suggested_object_id": null,
-   "supported_features": 0,
-   "translation_key": null,
-   "unique_id": "d0:73:d5:00:00:20_identify",
-   "previous_unique_id": null,
-   "unit_of_measurement": null
-  },
-  {
-   "aliases": [],
-   "aliases_v2": [
-    null
-   ],
-   "area_id": null,
-   "categories": {},
-   "capabilities": null,
-   "config_entry_id": "<first>",
-   "config_subentry_id": null,
-   "created_at": "2026-06-01T12:00:00.000000+00:00",
-   "device_class": null,
-   "device_id": "00000000000000000000000000000001",
-   "disabled_by": null,
-   "entity_category": "config",
-   "entity_id": "button.office_desk_lamp_restart",
-   "hidden_by": null,
-   "icon": null,
-   "id": "00000000000000000000000000000003",
-   "has_entity_name": true,
-   "labels": [],
-   "modified_at": "2026-06-01T12:00:00.000000+00:00",
-   "name": null,
-   "object_id_base": "Restart",
-   "options": {},
-   "original_device_class": "restart",
-   "original_icon": null,
-   "original_name": "Restart",
-   "platform": "lifx",
-   "suggested_object_id": null,
-   "supported_features": 0,
-   "translation_key": null,
-   "unique_id": "d0:73:d5:00:00:20_restart",
-   "previous_unique_id": null,
-   "unit_of_measurement": null
-  },
-  {
-   "aliases": [],
-   "aliases_v2": [
-    null
-   ],
-   "area_id": null,
-   "categories": {},
-   "capabilities": {
-    "min_color_temp_kelvin": 1500,
-    "max_color_temp_kelvin": 9000,
-    "effect_list": [
-     "effect_colorloop",
-     "effect_pulse",
-     "effect_stop"
     ],
-    "supported_color_modes": [
-     "color_temp",
-     "hs"
-    ]
+    "area_id": null,
+    "categories": {},
+    "capabilities": null,
+    "config_entry_id": "<first>",
+    "config_subentry_id": null,
+    "created_at": "2026-06-01T12:00:00.000000+00:00",
+    "device_class": null,
+    "device_id": "00000000000000000000000000000001",
+    "disabled_by": null,
+    "entity_category": "config",
+    "entity_id": "button.office_desk_lamp_restart",
+    "hidden_by": null,
+    "icon": null,
+    "id": "00000000000000000000000000000003",
+    "has_entity_name": true,
+    "labels": [],
+    "modified_at": "2026-06-01T12:00:00.000000+00:00",
+    "name": null,
+    "object_id_base": "Restart",
+    "options": {},
+    "original_device_class": "restart",
+    "original_icon": null,
+    "original_name": "Restart",
+    "platform": "lifx",
+    "suggested_object_id": null,
+    "supported_features": 0,
+    "translation_key": null,
+    "unique_id": "d0:73:d5:00:00:20_restart",
+    "previous_unique_id": null,
+    "unit_of_measurement": null
    },
-   "config_entry_id": "<first>",
-   "config_subentry_id": null,
-   "created_at": "2026-06-01T12:00:00.000000+00:00",
-   "device_class": null,
-   "device_id": "00000000000000000000000000000001",
-   "disabled_by": null,
-   "entity_category": null,
-   "entity_id": "light.office_desk_lamp",
-   "hidden_by": null,
-   "icon": null,
-   "id": "00000000000000000000000000000004",
-   "has_entity_name": true,
-   "labels": [],
-   "modified_at": "2026-06-01T12:00:00.000000+00:00",
-   "name": null,
-   "object_id_base": null,
-   "options": {},
-   "original_device_class": null,
-   "original_icon": null,
-   "original_name": null,
-   "platform": "lifx",
-   "suggested_object_id": null,
-   "supported_features": 36,
-   "translation_key": null,
-   "unique_id": "d0:73:d5:00:00:20",
-   "previous_unique_id": null,
-   "unit_of_measurement": null
-  },
-  {
-   "aliases": [],
-   "aliases_v2": [
-    null
-   ],
-   "area_id": null,
-   "categories": {},
-   "capabilities": {
-    "state_class": "measurement"
+   {
+    "aliases": [],
+    "aliases_v2": [
+     null
+    ],
+    "area_id": null,
+    "categories": {},
+    "capabilities": {
+     "min_color_temp_kelvin": 1500,
+     "max_color_temp_kelvin": 9000,
+     "effect_list": [
+      "effect_colorloop",
+      "effect_pulse",
+      "effect_stop"
+     ],
+     "supported_color_modes": [
+      "color_temp",
+      "hs"
+     ]
+    },
+    "config_entry_id": "<first>",
+    "config_subentry_id": null,
+    "created_at": "2026-06-01T12:00:00.000000+00:00",
+    "device_class": null,
+    "device_id": "00000000000000000000000000000001",
+    "disabled_by": null,
+    "entity_category": null,
+    "entity_id": "light.office_desk_lamp",
+    "hidden_by": null,
+    "icon": null,
+    "id": "00000000000000000000000000000004",
+    "has_entity_name": true,
+    "labels": [],
+    "modified_at": "2026-06-01T12:00:00.000000+00:00",
+    "name": null,
+    "object_id_base": null,
+    "options": {},
+    "original_device_class": null,
+    "original_icon": null,
+    "original_name": null,
+    "platform": "lifx",
+    "suggested_object_id": null,
+    "supported_features": 36,
+    "translation_key": null,
+    "unique_id": "d0:73:d5:00:00:20",
+    "previous_unique_id": null,
+    "unit_of_measurement": null
    },
-   "config_entry_id": "<second>",
-   "config_subentry_id": null,
-   "created_at": "2026-06-01T12:00:00.000000+00:00",
-   "device_class": null,
-   "device_id": "00000000000000000000000000000001",
-   "disabled_by": "integration",
-   "entity_category": "diagnostic",
-   "entity_id": "sensor.office_desk_lamp_rssi",
-   "hidden_by": null,
-   "icon": null,
-   "id": "00000000000000000000000000000005",
-   "has_entity_name": true,
-   "labels": [],
-   "modified_at": "2026-06-01T12:00:00.000000+00:00",
-   "name": null,
-   "object_id_base": "RSSI",
-   "options": {},
-   "original_device_class": "signal_strength",
-   "original_icon": null,
-   "original_name": "RSSI",
-   "platform": "lifx",
-   "suggested_object_id": null,
-   "supported_features": 0,
-   "translation_key": "rssi",
-   "unique_id": "d0:73:d5:00:00:20_rssi",
-   "previous_unique_id": null,
-   "unit_of_measurement": "dBm"
-  }
- ],
- "states": [
-  "button.office_desk_lamp_identify",
-  "button.office_desk_lamp_restart",
-  "light.office_desk_lamp"
- ]
+   {
+    "aliases": [],
+    "aliases_v2": [
+     null
+    ],
+    "area_id": null,
+    "categories": {},
+    "capabilities": {
+     "state_class": "measurement"
+    },
+    "config_entry_id": "<second>",
+    "config_subentry_id": null,
+    "created_at": "2026-06-01T12:00:00.000000+00:00",
+    "device_class": null,
+    "device_id": "00000000000000000000000000000001",
+    "disabled_by": "integration",
+    "entity_category": "diagnostic",
+    "entity_id": "sensor.office_desk_lamp_rssi",
+    "hidden_by": null,
+    "icon": null,
+    "id": "00000000000000000000000000000005",
+    "has_entity_name": true,
+    "labels": [],
+    "modified_at": "2026-06-01T12:00:00.000000+00:00",
+    "name": null,
+    "object_id_base": "RSSI",
+    "options": {},
+    "original_device_class": "signal_strength",
+    "original_icon": null,
+    "original_name": "RSSI",
+    "platform": "lifx",
+    "suggested_object_id": null,
+    "supported_features": 0,
+    "translation_key": "rssi",
+    "unique_id": "d0:73:d5:00:00:20_rssi",
+    "previous_unique_id": null,
+    "unit_of_measurement": "dBm"
+   }
+  ],
+  "states": [
+   "button.office_desk_lamp_identify",
+   "button.office_desk_lamp_restart",
+   "light.office_desk_lamp"
+  ]
+ },
+ "all_enabled": {
+  "entries": [
+   {
+    "created_at": "2026-06-01T12:00:00.000000+00:00",
+    "data": {
+     "host": "192.0.2.20"
+    },
+    "disabled_by": null,
+    "discovery_keys": {},
+    "domain": "lifx",
+    "entry_id": "<first>",
+    "minor_version": 1,
+    "modified_at": "2026-06-01T12:00:00.000000+00:00",
+    "options": {},
+    "pref_disable_new_entities": false,
+    "pref_disable_polling": false,
+    "source": "user",
+    "subentries": [],
+    "title": "Desk Lamp",
+    "unique_id": "d0:73:d5:00:00:20",
+    "version": 1
+   },
+   {
+    "created_at": "2026-06-01T12:00:00.000000+00:00",
+    "data": {
+     "host": "192.0.2.25"
+    },
+    "disabled_by": null,
+    "discovery_keys": {},
+    "domain": "lifx",
+    "entry_id": "<second>",
+    "minor_version": 1,
+    "modified_at": "2026-06-01T12:00:00.000000+00:00",
+    "options": {},
+    "pref_disable_new_entities": false,
+    "pref_disable_polling": false,
+    "source": "user",
+    "subentries": [],
+    "title": "Desk Lamp",
+    "unique_id": "d0:73:d5:00:00:20",
+    "version": 1
+   }
+  ],
+  "devices": [
+   {
+    "area_id": "office",
+    "config_entries": [
+     "<first>"
+    ],
+    "config_entries_subentries": {
+     "<first>": [
+      null
+     ]
+    },
+    "configuration_url": null,
+    "connections": [
+     [
+      "mac",
+      "d0:73:d5:00:00:21"
+     ]
+    ],
+    "created_at": "2026-06-01T12:00:00.000000+00:00",
+    "disabled_by": null,
+    "entry_type": null,
+    "hw_version": null,
+    "id": "00000000000000000000000000000001",
+    "identifiers": [
+     [
+      "lifx",
+      "d0:73:d5:00:00:20"
+     ]
+    ],
+    "labels": [],
+    "manufacturer": "LIFX",
+    "model": "LIFX Color",
+    "model_id": null,
+    "modified_at": "2026-06-01T12:00:00.000000+00:00",
+    "name_by_user": null,
+    "name": "Desk Lamp",
+    "primary_config_entry": "<first>",
+    "serial_number": null,
+    "sw_version": "3.70",
+    "via_device_id": null
+   }
+  ],
+  "entities": [
+   {
+    "aliases": [],
+    "aliases_v2": [
+     null
+    ],
+    "area_id": null,
+    "categories": {},
+    "capabilities": null,
+    "config_entry_id": "<first>",
+    "config_subentry_id": null,
+    "created_at": "2026-06-01T12:00:00.000000+00:00",
+    "device_class": null,
+    "device_id": "00000000000000000000000000000001",
+    "disabled_by": null,
+    "entity_category": "config",
+    "entity_id": "button.office_desk_lamp_identify",
+    "hidden_by": null,
+    "icon": null,
+    "id": "00000000000000000000000000000002",
+    "has_entity_name": true,
+    "labels": [],
+    "modified_at": "2026-06-01T12:00:00.000000+00:00",
+    "name": null,
+    "object_id_base": "Identify",
+    "options": {},
+    "original_device_class": "identify",
+    "original_icon": null,
+    "original_name": "Identify",
+    "platform": "lifx",
+    "suggested_object_id": null,
+    "supported_features": 0,
+    "translation_key": null,
+    "unique_id": "d0:73:d5:00:00:20_identify",
+    "previous_unique_id": null,
+    "unit_of_measurement": null
+   },
+   {
+    "aliases": [],
+    "aliases_v2": [
+     null
+    ],
+    "area_id": null,
+    "categories": {},
+    "capabilities": null,
+    "config_entry_id": "<first>",
+    "config_subentry_id": null,
+    "created_at": "2026-06-01T12:00:00.000000+00:00",
+    "device_class": null,
+    "device_id": "00000000000000000000000000000001",
+    "disabled_by": null,
+    "entity_category": "config",
+    "entity_id": "button.office_desk_lamp_restart",
+    "hidden_by": null,
+    "icon": null,
+    "id": "00000000000000000000000000000003",
+    "has_entity_name": true,
+    "labels": [],
+    "modified_at": "2026-06-01T12:00:00.000000+00:00",
+    "name": null,
+    "object_id_base": "Restart",
+    "options": {},
+    "original_device_class": "restart",
+    "original_icon": null,
+    "original_name": "Restart",
+    "platform": "lifx",
+    "suggested_object_id": null,
+    "supported_features": 0,
+    "translation_key": null,
+    "unique_id": "d0:73:d5:00:00:20_restart",
+    "previous_unique_id": null,
+    "unit_of_measurement": null
+   },
+   {
+    "aliases": [],
+    "aliases_v2": [
+     null
+    ],
+    "area_id": null,
+    "categories": {},
+    "capabilities": {
+     "min_color_temp_kelvin": 1500,
+     "max_color_temp_kelvin": 9000,
+     "effect_list": [
+      "effect_colorloop",
+      "effect_pulse",
+      "effect_stop"
+     ],
+     "supported_color_modes": [
+      "color_temp",
+      "hs"
+     ]
+    },
+    "config_entry_id": "<first>",
+    "config_subentry_id": null,
+    "created_at": "2026-06-01T12:00:00.000000+00:00",
+    "device_class": null,
+    "device_id": "00000000000000000000000000000001",
+    "disabled_by": null,
+    "entity_category": null,
+    "entity_id": "light.office_desk_lamp",
+    "hidden_by": null,
+    "icon": null,
+    "id": "00000000000000000000000000000004",
+    "has_entity_name": true,
+    "labels": [],
+    "modified_at": "2026-06-01T12:00:00.000000+00:00",
+    "name": null,
+    "object_id_base": null,
+    "options": {},
+    "original_device_class": null,
+    "original_icon": null,
+    "original_name": null,
+    "platform": "lifx",
+    "suggested_object_id": null,
+    "supported_features": 36,
+    "translation_key": null,
+    "unique_id": "d0:73:d5:00:00:20",
+    "previous_unique_id": null,
+    "unit_of_measurement": null
+   },
+   {
+    "aliases": [],
+    "aliases_v2": [
+     null
+    ],
+    "area_id": null,
+    "categories": {},
+    "capabilities": {
+     "state_class": "measurement"
+    },
+    "config_entry_id": "<first>",
+    "config_subentry_id": null,
+    "created_at": "2026-06-01T12:00:00.000000+00:00",
+    "device_class": null,
+    "device_id": "00000000000000000000000000000001",
+    "disabled_by": null,
+    "entity_category": "diagnostic",
+    "entity_id": "sensor.office_desk_lamp_rssi",
+    "hidden_by": null,
+    "icon": null,
+    "id": "00000000000000000000000000000005",
+    "has_entity_name": true,
+    "labels": [],
+    "modified_at": "2026-06-01T12:00:00.000000+00:00",
+    "name": null,
+    "object_id_base": "RSSI",
+    "options": {},
+    "original_device_class": "signal_strength",
+    "original_icon": null,
+    "original_name": "RSSI",
+    "platform": "lifx",
+    "suggested_object_id": null,
+    "supported_features": 0,
+    "translation_key": "rssi",
+    "unique_id": "d0:73:d5:00:00:20_rssi",
+    "previous_unique_id": null,
+    "unit_of_measurement": "dBm"
+   }
+  ],
+  "states": [
+   "button.office_desk_lamp_identify",
+   "button.office_desk_lamp_restart",
+   "light.office_desk_lamp",
+   "sensor.office_desk_lamp_rssi"
+  ]
+ }
 }

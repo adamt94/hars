@@ -6,6 +6,18 @@ use crate::light::Profiles;
 use ha_registry::Registries;
 use proto::Out;
 
+/// What an entry's task does just after it has claimed its bulb (the
+/// set-up lock held): a test pauses one there.
+static CLAIMED: parking_lot::Mutex<Option<Arc<dyn Fn(&str) + Send + Sync>>> =
+    parking_lot::Mutex::new(None);
+
+pub(super) fn claimed(entry_id: &str) {
+    let hook = CLAIMED.lock().clone();
+    if let Some(hook) = hook {
+        hook(entry_id);
+    }
+}
+
 const SERIAL: [u8; 6] = [0xd0, 0x73, 0xd5, 0x01, 0x02, 0x03];
 const UID: &str = "d0:73:d5:01:02:03";
 
@@ -763,4 +775,97 @@ fn a_newer_host_is_not_overwritten_by_rediscovery() {
     let (_, read) = entries.data_value("e", "host").unwrap();
     assert!(save_host(&entries, "e", read, "192.0.2.2"));
     assert_eq!(stored(&entries), json!({"host": "192.0.2.2"}));
+}
+
+/// Two entries for one bulb. The first claims it and is paused right there
+/// (a test signal); the second, started then, waits for the first's rows
+/// and entities: the first is the device's primary entry and keeps every
+/// live row, and the second takes only the disabled RSSI row, as in HA.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn the_entry_that_claims_a_bulb_sets_it_up_before_another() {
+    use crate::config_entries::{ConfigEntries, EntryState, Status};
+    let f = fake_bulb(65535, [0, 0, 39321, 2700]).await;
+    let hass = Hass::new();
+    let entries = ConfigEntries::in_memory(&hass, Vec::new());
+    for (id, host) in [("dup-first", "192.0.2.40"), ("dup-second", "192.0.2.41")] {
+        let data = json!({"host": host}).as_object().unwrap().clone();
+        let mut entry = entries.new_entry("lifx", "user", "Kitchen Light", Some(UID), data);
+        entry.insert("entry_id".into(), json!(id));
+        entries.add(entry);
+    }
+    let registry = ha_registry::Registry::in_memory(&hass, Registries::default());
+    let lookup = entries.clone();
+    registry.set_entry_lookup(Arc::new(move |id: &str| lookup.info(id)));
+    let components = Components::new(&hass, registry.clone(), Profiles::default());
+    let bulb_at: std::net::SocketAddr = ([127, 0, 0, 1], f.port).into();
+    let at = Where {
+        stand_ins: vec![
+            ("192.0.2.40".into(), bulb_at),
+            ("192.0.2.41".into(), bulb_at),
+        ],
+        timing: Timing {
+            rediscover_after: Duration::from_secs(3600),
+            ..timing(true)
+        },
+        ..Where::default()
+    };
+    // The first is held just after its claim until let go.
+    let (claimed_tx, claimed_rx) = std::sync::mpsc::channel::<()>();
+    let (go_tx, go_rx) = std::sync::mpsc::channel::<()>();
+    let go_rx = parking_lot::Mutex::new(go_rx);
+    let claimed_tx = parking_lot::Mutex::new(claimed_tx);
+    *CLAIMED.lock() = Some(Arc::new(move |entry_id: &str| {
+        if entry_id == "dup-first" {
+            let _ = claimed_tx.lock().send(());
+            tokio::task::block_in_place(|| {
+                let _ = go_rx.lock().recv_timeout(Duration::from_secs(5));
+            });
+        }
+    }));
+    let start = |id: &str| {
+        let entry = entries.get(id).unwrap();
+        tokio::spawn(run(
+            components.clone(),
+            entry,
+            at.clone(),
+            hass.setup_guard(),
+            Status::new(entries.clone(), id),
+        ))
+    };
+    let first = start("dup-first");
+    tokio::task::spawn_blocking(move || claimed_rx.recv_timeout(Duration::from_secs(5)))
+        .await
+        .unwrap()
+        .unwrap();
+    let second = start("dup-second");
+    // The second gets as far as it can while the first is held (a sleep on
+    // the blocking pool: the paused tasks hold worker threads).
+    tokio::task::spawn_blocking(|| std::thread::sleep(Duration::from_millis(300)))
+        .await
+        .unwrap();
+    go_tx.send(()).unwrap();
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+    while ["dup-first", "dup-second"]
+        .iter()
+        .any(|id| entries.runtime(id).map(|r| r.state) != Some(EntryState::Loaded))
+    {
+        assert!(tokio::time::Instant::now() < deadline, "not both loaded");
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    *CLAIMED.lock() = None;
+    let rows = registry.snapshot();
+    let device = &rows.devices[0];
+    assert_eq!(device.primary_config_entry.as_deref(), Some("dup-first"));
+    let mut owners = device.config_entries.clone();
+    owners.sort();
+    assert_eq!(owners, ["dup-first", "dup-second"]);
+    for e in &rows.entities {
+        let owner = match e.entity_id.ends_with("_rssi") {
+            true => "dup-second",
+            false => "dup-first",
+        };
+        assert_eq!(e.config_entry_id.as_deref(), Some(owner), "{}", e.entity_id);
+    }
+    first.abort();
+    second.abort();
 }

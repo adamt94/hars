@@ -28,7 +28,9 @@ It writes, in crates/ha-integrations/src/lifx/vectors/imported/:
 - `duplicate.json`: a second entry for the colour bulb, at another of its
   addresses, added once the first is set up (an imported install can have
   two): the entries and the device and entity rows after its set-up, the
-  first entry as `<first>` and the second as `<second>`;
+  first entry as `<first>` and the second as `<second>`. Once with the
+  RSSI sensor disabled, as it starts (`rssi_disabled`), and once with every
+  entity of the first enabled (`all_enabled`);
 - `restored.json`: rows the user removed come back at the next start,
   once with the colour entry's "new entities start disabled" on and once
   with it off. Before that start the stores are the files above but for
@@ -122,17 +124,25 @@ def remove_rows(hass):
         entities.async_remove(entities.async_get_entity_id(domain, "lifx", unique_id))
 
 
-async def duplicate(fake):
-    """The colour bulb added, then a second entry for it at its other
+async def duplicate(fake, enable_rssi):
+    """The colour bulb added (and its RSSI sensor enabled, then the entry
+    reloaded, if `enable_rssi`), then a second entry for it at its other
     address: the stores after the second's set-up."""
     from types import MappingProxyType
 
     from homeassistant.config_entries import ConfigEntry
+    from homeassistant.helpers import entity_registry as er
 
     tmp = pathlib.Path(tempfile.mkdtemp())
     try:
         hass = await hr.boot(tmp, fake)
         first = await add(hass, lf.COLOUR)
+        if enable_rssi:
+            entities = er.async_get(hass)
+            rssi = entities.async_get_entity_id("sensor", "lifx", f"{lf.COLOUR_SERIAL}_rssi")
+            entities.async_update_entity(rssi, disabled_by=None)
+            await hass.config_entries.async_reload(first.entry_id)
+            await hr.settle(hass)
         second = ConfigEntry(data={"host": lf.ALIAS}, discovery_keys=MappingProxyType({}),
                              domain="lifx", minor_version=1, options={}, source="user",
                              subentries_data=None, title="Desk Lamp",
@@ -146,13 +156,13 @@ async def duplicate(fake):
         shutil.rmtree(tmp, ignore_errors=True)
     text = {name: files[name].replace(first.entry_id, "<first>")
             .replace(second.entry_id, "<second>") for name in STORES}
-    normal = hr.Normal()
-    return normal.value({
-        "doc": "A second entry for the colour bulb, at another of its addresses, added"
-               " once the first is set up: the stores after its set-up, and the"
-               " entities that have a state.",
+    devices = json.loads(text["core.device_registry"])["data"]["devices"]
+    for device in devices:
+        # A set in HA: written in whatever order it comes out.
+        device["config_entries"].sort()
+    return hr.Normal().value({
         "entries": json.loads(text["core.config_entries"])["data"]["entries"],
-        "devices": json.loads(text["core.device_registry"])["data"]["devices"],
+        "devices": devices,
         "entities": json.loads(text["core.entity_registry"])["data"]["entities"],
         "states": states,
     })
@@ -170,7 +180,14 @@ async def main():
         sys.exit(f"aiolifx is {found}, the vectors are pinned to {lf.AIOLIFX}")
     fake = Fake()
     await fake.start()
-    duplicated = await duplicate(fake)
+    duplicated = {
+        "doc": "A second entry for the colour bulb, at another of its addresses, added"
+               " once the first is set up: the stores after its set-up, and the"
+               " entities that have a state. With the RSSI sensor disabled, as it"
+               " starts, and with every entity of the first enabled.",
+        "rssi_disabled": await duplicate(fake, False),
+        "all_enabled": await duplicate(fake, True),
+    }
     tmp = pathlib.Path(tempfile.mkdtemp())
     scratch = []
     try:

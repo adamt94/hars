@@ -37,6 +37,27 @@ pub(super) fn register(
     }
     let serial = found.serial();
     let label = found.cached.label.clone();
+    // An entity the other entry runs (its row is enabled) is refused before
+    // HA's platform gets to the device: a duplicate with nothing else to
+    // take over leaves the device as it is.
+    let runs_elsewhere = |domain: &str, unique_id: &str| {
+        duplicate
+            && registry
+                .entity_by_unique_id(domain, DOMAIN, unique_id)
+                .is_some_and(|row| row.disabled_by.is_none())
+    };
+    let rows = [
+        ("button", format!("{serial}_restart")),
+        ("button", format!("{serial}_identify")),
+        ("light", serial.clone()),
+        ("sensor", format!("{serial}_rssi")),
+    ];
+    if rows
+        .iter()
+        .all(|(domain, unique_id)| runs_elsewhere(domain, unique_id))
+    {
+        return;
+    }
     let device = registry.get_or_create_device(DeviceInfo {
         config_entry_id: entry_id.to_owned(),
         identifiers: vec![json!([DOMAIN, serial])],
@@ -49,12 +70,6 @@ pub(super) fn register(
         ..Default::default()
     });
     let device_disabled = device.disabled_by.is_some();
-    let runs_elsewhere = |domain: &str, unique_id: &str| {
-        duplicate
-            && registry
-                .entity_by_unique_id(domain, DOMAIN, unique_id)
-                .is_some_and(|row| row.disabled_by.is_none())
-    };
     let patch = || EntityPatch {
         config_entry_id: Some(Some(entry_id.to_owned())),
         device_id: Some(Some(device.id.clone())),
