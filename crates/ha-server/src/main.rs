@@ -458,7 +458,8 @@ fn api_config() -> anyhow::Result<ha_api::ApiConfig> {
 /// Where the integrations' services are: the real hosts. A debug build
 /// (never a release) reads `HARS_DEV_SWITCHBOT_HOST` and `HARS_DEV_HUE`,
 /// so a contributor can drive the UI against stand-ins on 127.0.0.1
-/// instead of SwitchBot's API, Hue's discovery service and a bridge.
+/// instead of SwitchBot's API, Hue's discovery service and a bridge, and
+/// LIFX's broadcast and bulbs (`HARS_DEV_LIFX`).
 /// `HARS_DEV_HUE` is a base URL: discovery is asked at `<base>/discovery`
 /// and every bridge at `<base>/<scheme>/<host>/…`.
 fn endpoints() -> ha_integrations::Endpoints {
@@ -474,6 +475,28 @@ fn endpoints() -> ha_integrations::Endpoints {
         tracing::warn!("debug build: Hue discovery and every Hue bridge are at {base}");
         endpoints.hue_discovery = format!("{base}/discovery");
         endpoints.hue_bridge = Some(base);
+    }
+    #[cfg(debug_assertions)]
+    if let Ok(list) = std::env::var("HARS_DEV_LIFX") {
+        // `broadcast=127.0.0.1:P,<bulb address>=127.0.0.1:Q,...`: where a
+        // LIFX discovery broadcasts, and the stand-in for each bulb.
+        for item in list.split(',').filter(|i| !i.is_empty()) {
+            let Some((name, at)) = item.split_once('=') else {
+                continue;
+            };
+            let Ok(at) = at.parse::<std::net::SocketAddr>() else {
+                continue;
+            };
+            if !at.ip().is_loopback() {
+                tracing::error!("debug build: HARS_DEV_LIFX takes only 127.0.0.1 stand-ins");
+                continue;
+            }
+            match name {
+                "broadcast" => endpoints.lifx.broadcast = at,
+                bulb => endpoints.lifx.stand_ins.push((bulb.to_owned(), at)),
+            }
+        }
+        tracing::warn!("debug build: LIFX bulbs and discovery are at stand-ins ({list})");
     }
     endpoints
 }

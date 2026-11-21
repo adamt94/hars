@@ -521,3 +521,69 @@ async fn a_new_command_drops_the_pending_refresh() {
     let gets = f.got.lock().iter().filter(|g| g.0 == ty::LIGHT_GET).count();
     assert_eq!(gets, 1);
 }
+
+/// A command that is waiting to be sent again when its entry is removed
+/// ends there: the service call holds the bulb and its socket itself, and
+/// would go on trying (HA's 5 tries) and then send what follows. Here the
+/// light is turned off while the bulb says nothing, and the entry is
+/// stopped during the wait. Nothing reaches the bulb after, and the
+/// entities, their states and the polling are gone.
+#[tokio::test]
+async fn a_command_ends_when_its_entry_is_removed() {
+    let f = fake_bulb(65535, [0, 0, 39321, 2700]).await;
+    let (hass, b, components) = setup(&f, timing(false)).await;
+    let coordinator_polls = || f.got.lock().iter().filter(|g| g.0 == ty::LIGHT_GET).count();
+    assert!(state(&hass, LIGHT) != Value::Null);
+    f.silent.store(true, Ordering::Relaxed);
+    let light = LifxLight(b.clone());
+    let call = tokio::spawn(async move {
+        use crate::light::Light;
+        light.turn_off(Default::default()).await
+    });
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+    while !f.got.lock().iter().any(|g| g.0 == ty::LIGHT_SET_POWER) {
+        assert!(tokio::time::Instant::now() < deadline, "nothing was sent");
+        tokio::time::sleep(Duration::from_millis(5)).await;
+    }
+    b.stop();
+    // The call ends at once, not after its next try (3 s later).
+    let ended = tokio::time::timeout(Duration::from_millis(250), call).await;
+    assert!(matches!(ended, Ok(Ok(Err(_)))), "{ended:?}");
+    let sent = f.got.lock().len();
+    let polls = coordinator_polls();
+    tokio::time::sleep(Duration::from_millis(3500)).await;
+    assert_eq!(f.got.lock().len(), sent, "something reached the bulb after");
+    assert_eq!(coordinator_polls(), polls);
+    for id in [LIGHT, "button.kitchen_kitchen_light_restart"] {
+        assert_eq!(state(&hass, id), Value::Null, "{id}");
+    }
+    // No longer a target: a call for every light reaches nothing.
+    let all = json!({"entity_id": "all"}).as_object().unwrap().clone();
+    let _ = hass
+        .call_service("light", "turn_on", all, None, false, None)
+        .await;
+    assert_eq!(f.got.lock().len(), sent);
+    drop(components);
+    // A press of a button it still holds reaches nothing either.
+    LifxButton(b.clone(), 0).press().await.unwrap();
+    assert_eq!(f.got.lock().len(), sent);
+}
+
+/// The broadcast's socket and a flow's socket to a bulb are gone when the
+/// flow's step answers: nothing of a flow listens or waits afterwards.
+#[tokio::test]
+async fn a_flows_sockets_are_gone_when_its_step_answers() {
+    let broadcast = tokio::net::UdpSocket::bind("127.0.0.1:0").await.unwrap();
+    let at = Where {
+        broadcast: broadcast.local_addr().unwrap(),
+        ..Where::default()
+    };
+    let scan = tokio::spawn(async move { scan(&at, Duration::from_millis(100)).await });
+    let mut buf = [0u8; 64];
+    let (n, from) = broadcast.recv_from(&mut buf).await.unwrap();
+    let (h, _) = proto::decode(&buf[..n]).unwrap();
+    assert_eq!((h.ty, h.seq, h.target), (ty::GET_SERVICE, 0, [0; 6]));
+    assert!(scan.await.unwrap().is_empty());
+    // Its port is free again.
+    assert!(std::net::UdpSocket::bind(("0.0.0.0", from.port())).is_ok());
+}
