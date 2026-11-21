@@ -1,0 +1,564 @@
+{
+ "colour": {
+  "entries": [
+   {
+    "created_at": "<time>",
+    "data": {
+     "host": "192.0.2.20"
+    },
+    "disabled_by": null,
+    "discovery_keys": {},
+    "domain": "lifx",
+    "entry_id": "<entry:1>",
+    "minor_version": 1,
+    "modified_at": "<time>",
+    "options": {},
+    "pref_disable_new_entities": false,
+    "pref_disable_polling": false,
+    "source": "user",
+    "subentries": [],
+    "title": "Desk Lamp",
+    "unique_id": "d0:73:d5:00:00:20",
+    "version": 1
+   }
+  ],
+  "devices": [
+   {
+    "area_id": "office",
+    "config_entries": [
+     "<entry:1>"
+    ],
+    "config_entries_subentries": {
+     "<entry:1>": [
+      null
+     ]
+    },
+    "configuration_url": null,
+    "connections": [
+     [
+      "mac",
+      "d0:73:d5:00:00:21"
+     ]
+    ],
+    "created_at": "<time>",
+    "disabled_by": null,
+    "entry_type": null,
+    "hw_version": null,
+    "id": "<device:d0:73:d5:00:00:20>",
+    "identifiers": [
+     [
+      "lifx",
+      "d0:73:d5:00:00:20"
+     ]
+    ],
+    "labels": [],
+    "manufacturer": "LIFX",
+    "model": "LIFX Color",
+    "model_id": null,
+    "modified_at": "<time>",
+    "name_by_user": null,
+    "name": "Desk Lamp",
+    "primary_config_entry": "<entry:1>",
+    "serial_number": null,
+    "sw_version": "3.70",
+    "via_device_id": null
+   }
+  ],
+  "entities": [
+   {
+    "aliases": [],
+    "aliases_v2": [
+     null
+    ],
+    "area_id": null,
+    "categories": {},
+    "capabilities": null,
+    "config_entry_id": "<entry:1>",
+    "config_subentry_id": null,
+    "created_at": "<time>",
+    "device_class": null,
+    "device_id": "<device:d0:73:d5:00:00:20>",
+    "disabled_by": null,
+    "entity_category": "config",
+    "entity_id": "button.office_desk_lamp_identify",
+    "hidden_by": null,
+    "icon": null,
+    "id": "<id>",
+    "has_entity_name": true,
+    "labels": [],
+    "modified_at": "<time>",
+    "name": null,
+    "object_id_base": "Identify",
+    "options": {},
+    "original_device_class": "identify",
+    "original_icon": null,
+    "original_name": "Identify",
+    "platform": "lifx",
+    "suggested_object_id": null,
+    "supported_features": 0,
+    "translation_key": null,
+    "unique_id": "d0:73:d5:00:00:20_identify",
+    "previous_unique_id": null,
+    "unit_of_measurement": null
+   },
+   {
+    "aliases": [],
+    "aliases_v2": [
+     null
+    ],
+    "area_id": null,
+    "categories": {},
+    "capabilities": null,
+    "config_entry_id": "<entry:1>",
+    "config_subentry_id": null,
+    "created_at": "<time>",
+    "device_class": null,
+    "device_id": "<device:d0:73:d5:00:00:20>",
+    "disabled_by": null,
+    "entity_category": "config",
+    "entity_id": "button.office_desk_lamp_restart",
+    "hidden_by": null,
+    "icon": null,
+    "id": "<id>",
+    "has_entity_name": true,
+    "labels": [],
+    "modified_at": "<time>",
+    "name": null,
+    "object_id_base": "Restart",
+    "options": {},
+    "original_device_class": "restart",
+    "original_icon": null,
+    "original_name": "Restart",
+    "platform": "lifx",
+    "suggested_object_id": null,
+    "supported_features": 0,
+    "translation_key": null,
+    "unique_id": "d0:73:d5:00:00:20_restart",
+    "previous_unique_id": null,
+    "unit_of_measurement": null
+   },
+   {
+    "aliases": [],
+    "aliases_v2": [
+     null
+    ],
+    "area_id": null,
+    "categories": {},
+    "capabilities": {
+     "min_color_temp_kelvin": 1500,
+     "max_color_temp_kelvin": 9000,
+     "effect_list": [
+      "effect_colorloop",
+      "effect_pulse",
+      "effect_stop"
+     ],
+     "supported_color_modes": [
+      "color_temp",
+      "hs"
+     ]
+    },
+    "config_entry_id": "<entry:1>",
+    "config_subentry_id": null,
+    "created_at": "<time>",
+    "device_class": null,
+    "device_id": "<device:d0:73:d5:00:00:20>",
+    "disabled_by": null,
+    "entity_category": null,
+    "entity_id": "light.office_desk_lamp",
+    "hidden_by": null,
+    "icon": null,
+    "id": "<id>",
+    "has_entity_name": true,
+    "labels": [],
+    "modified_at": "<time>",
+    "name": null,
+    "object_id_base": null,
+    "options": {},
+    "original_device_class": null,
+    "original_icon": null,
+    "original_name": null,
+    "platform": "lifx",
+    "suggested_object_id": null,
+    "supported_features": 36,
+    "translation_key": null,
+    "unique_id": "d0:73:d5:00:00:20",
+    "previous_unique_id": null,
+    "unit_of_measurement": null
+   },
+   {
+    "aliases": [],
+    "aliases_v2": [
+     null
+    ],
+    "area_id": null,
+    "categories": {},
+    "capabilities": {
+     "state_class": "measurement"
+    },
+    "config_entry_id": "<entry:1>",
+    "config_subentry_id": null,
+    "created_at": "<time>",
+    "device_class": null,
+    "device_id": "<device:d0:73:d5:00:00:20>",
+    "disabled_by": "integration",
+    "entity_category": "diagnostic",
+    "entity_id": "sensor.office_desk_lamp_rssi",
+    "hidden_by": null,
+    "icon": null,
+    "id": "<id>",
+    "has_entity_name": true,
+    "labels": [],
+    "modified_at": "<time>",
+    "name": null,
+    "object_id_base": "RSSI",
+    "options": {},
+    "original_device_class": "signal_strength",
+    "original_icon": null,
+    "original_name": "RSSI",
+    "platform": "lifx",
+    "suggested_object_id": null,
+    "supported_features": 0,
+    "translation_key": "rssi",
+    "unique_id": "d0:73:d5:00:00:20_rssi",
+    "previous_unique_id": null,
+    "unit_of_measurement": "dBm"
+   }
+  ],
+  "states": {
+   "button.office_desk_lamp_identify": {
+    "state": "unknown",
+    "attributes": {
+     "device_class": "identify",
+     "friendly_name": "Desk Lamp Identify"
+    }
+   },
+   "button.office_desk_lamp_restart": {
+    "state": "unknown",
+    "attributes": {
+     "device_class": "restart",
+     "friendly_name": "Desk Lamp Restart"
+    }
+   },
+   "light.office_desk_lamp": {
+    "state": "on",
+    "attributes": {
+     "min_color_temp_kelvin": 1500,
+     "max_color_temp_kelvin": 9000,
+     "effect_list": [
+      "effect_colorloop",
+      "effect_pulse",
+      "effect_stop"
+     ],
+     "supported_color_modes": [
+      "color_temp",
+      "hs"
+     ],
+     "effect": null,
+     "color_mode": "color_temp",
+     "brightness": 153,
+     "color_temp_kelvin": 2700,
+     "hs_color": [
+      28.395,
+      65.723
+     ],
+     "rgb_color": [
+      255,
+      167,
+      87
+     ],
+     "xy_color": [
+      0.525,
+      0.388
+     ],
+     "friendly_name": "Desk Lamp",
+     "supported_features": 36
+    }
+   }
+  },
+  "areas": [
+   {
+    "aliases": [],
+    "floor_id": null,
+    "humidity_entity_id": null,
+    "icon": null,
+    "id": "office",
+    "labels": [],
+    "name": "Office",
+    "picture": null,
+    "temperature_entity_id": null,
+    "created_at": "<time>",
+    "modified_at": "<time>"
+   }
+  ]
+ },
+ "white": {
+  "entries": [
+   {
+    "created_at": "<time>",
+    "data": {
+     "host": "192.0.2.21"
+    },
+    "disabled_by": null,
+    "discovery_keys": {},
+    "domain": "lifx",
+    "entry_id": "<entry:1>",
+    "minor_version": 1,
+    "modified_at": "<time>",
+    "options": {},
+    "pref_disable_new_entities": false,
+    "pref_disable_polling": false,
+    "source": "user",
+    "subentries": [],
+    "title": "Hall Light",
+    "unique_id": "d0:73:d5:00:00:21",
+    "version": 1
+   }
+  ],
+  "devices": [
+   {
+    "area_id": "hallway",
+    "config_entries": [
+     "<entry:1>"
+    ],
+    "config_entries_subentries": {
+     "<entry:1>": [
+      null
+     ]
+    },
+    "configuration_url": null,
+    "connections": [
+     [
+      "mac",
+      "d0:73:d5:00:00:21"
+     ]
+    ],
+    "created_at": "<time>",
+    "disabled_by": null,
+    "entry_type": null,
+    "hw_version": null,
+    "id": "<device:d0:73:d5:00:00:21>",
+    "identifiers": [
+     [
+      "lifx",
+      "d0:73:d5:00:00:21"
+     ]
+    ],
+    "labels": [],
+    "manufacturer": "LIFX",
+    "model": "LIFX Mini White",
+    "model_id": null,
+    "modified_at": "<time>",
+    "name_by_user": null,
+    "name": "Hall Light",
+    "primary_config_entry": "<entry:1>",
+    "serial_number": null,
+    "sw_version": "2.77",
+    "via_device_id": null
+   }
+  ],
+  "entities": [
+   {
+    "aliases": [],
+    "aliases_v2": [
+     null
+    ],
+    "area_id": null,
+    "categories": {},
+    "capabilities": null,
+    "config_entry_id": "<entry:1>",
+    "config_subentry_id": null,
+    "created_at": "<time>",
+    "device_class": null,
+    "device_id": "<device:d0:73:d5:00:00:21>",
+    "disabled_by": null,
+    "entity_category": "config",
+    "entity_id": "button.hallway_hall_light_identify",
+    "hidden_by": null,
+    "icon": null,
+    "id": "<id>",
+    "has_entity_name": true,
+    "labels": [],
+    "modified_at": "<time>",
+    "name": null,
+    "object_id_base": "Identify",
+    "options": {},
+    "original_device_class": "identify",
+    "original_icon": null,
+    "original_name": "Identify",
+    "platform": "lifx",
+    "suggested_object_id": null,
+    "supported_features": 0,
+    "translation_key": null,
+    "unique_id": "d0:73:d5:00:00:21_identify",
+    "previous_unique_id": null,
+    "unit_of_measurement": null
+   },
+   {
+    "aliases": [],
+    "aliases_v2": [
+     null
+    ],
+    "area_id": null,
+    "categories": {},
+    "capabilities": null,
+    "config_entry_id": "<entry:1>",
+    "config_subentry_id": null,
+    "created_at": "<time>",
+    "device_class": null,
+    "device_id": "<device:d0:73:d5:00:00:21>",
+    "disabled_by": null,
+    "entity_category": "config",
+    "entity_id": "button.hallway_hall_light_restart",
+    "hidden_by": null,
+    "icon": null,
+    "id": "<id>",
+    "has_entity_name": true,
+    "labels": [],
+    "modified_at": "<time>",
+    "name": null,
+    "object_id_base": "Restart",
+    "options": {},
+    "original_device_class": "restart",
+    "original_icon": null,
+    "original_name": "Restart",
+    "platform": "lifx",
+    "suggested_object_id": null,
+    "supported_features": 0,
+    "translation_key": null,
+    "unique_id": "d0:73:d5:00:00:21_restart",
+    "previous_unique_id": null,
+    "unit_of_measurement": null
+   },
+   {
+    "aliases": [],
+    "aliases_v2": [
+     null
+    ],
+    "area_id": null,
+    "categories": {},
+    "capabilities": {
+     "effect_list": [
+      "effect_pulse",
+      "effect_stop"
+     ],
+     "supported_color_modes": [
+      "brightness"
+     ]
+    },
+    "config_entry_id": "<entry:1>",
+    "config_subentry_id": null,
+    "created_at": "<time>",
+    "device_class": null,
+    "device_id": "<device:d0:73:d5:00:00:21>",
+    "disabled_by": null,
+    "entity_category": null,
+    "entity_id": "light.hallway_hall_light",
+    "hidden_by": null,
+    "icon": null,
+    "id": "<id>",
+    "has_entity_name": true,
+    "labels": [],
+    "modified_at": "<time>",
+    "name": null,
+    "object_id_base": null,
+    "options": {},
+    "original_device_class": null,
+    "original_icon": null,
+    "original_name": null,
+    "platform": "lifx",
+    "suggested_object_id": null,
+    "supported_features": 36,
+    "translation_key": null,
+    "unique_id": "d0:73:d5:00:00:21",
+    "previous_unique_id": null,
+    "unit_of_measurement": null
+   },
+   {
+    "aliases": [],
+    "aliases_v2": [
+     null
+    ],
+    "area_id": null,
+    "categories": {},
+    "capabilities": {
+     "state_class": "measurement"
+    },
+    "config_entry_id": "<entry:1>",
+    "config_subentry_id": null,
+    "created_at": "<time>",
+    "device_class": null,
+    "device_id": "<device:d0:73:d5:00:00:21>",
+    "disabled_by": "integration",
+    "entity_category": "diagnostic",
+    "entity_id": "sensor.hallway_hall_light_rssi",
+    "hidden_by": null,
+    "icon": null,
+    "id": "<id>",
+    "has_entity_name": true,
+    "labels": [],
+    "modified_at": "<time>",
+    "name": null,
+    "object_id_base": "RSSI",
+    "options": {},
+    "original_device_class": "signal_strength",
+    "original_icon": null,
+    "original_name": "RSSI",
+    "platform": "lifx",
+    "suggested_object_id": null,
+    "supported_features": 0,
+    "translation_key": "rssi",
+    "unique_id": "d0:73:d5:00:00:21_rssi",
+    "previous_unique_id": null,
+    "unit_of_measurement": "dB"
+   }
+  ],
+  "states": {
+   "button.hallway_hall_light_identify": {
+    "state": "unknown",
+    "attributes": {
+     "device_class": "identify",
+     "friendly_name": "Hall Light Identify"
+    }
+   },
+   "button.hallway_hall_light_restart": {
+    "state": "unknown",
+    "attributes": {
+     "device_class": "restart",
+     "friendly_name": "Hall Light Restart"
+    }
+   },
+   "light.hallway_hall_light": {
+    "state": "on",
+    "attributes": {
+     "effect_list": [
+      "effect_pulse",
+      "effect_stop"
+     ],
+     "supported_color_modes": [
+      "brightness"
+     ],
+     "effect": null,
+     "color_mode": "brightness",
+     "brightness": 153,
+     "friendly_name": "Hall Light",
+     "supported_features": 36
+    }
+   }
+  },
+  "areas": [
+   {
+    "aliases": [],
+    "floor_id": null,
+    "humidity_entity_id": null,
+    "icon": null,
+    "id": "hallway",
+    "labels": [],
+    "name": "Hallway",
+    "picture": null,
+    "temperature_entity_id": null,
+    "created_at": "<time>",
+    "modified_at": "<time>"
+   }
+  ]
+ }
+}

@@ -1,0 +1,4754 @@
+{
+ "scenarios": [
+  {
+   "name": "add",
+   "doc": "The colour bulb's address is typed in: the entry is made and set up.",
+   "subscriptions": [
+    {
+     "sub": "entries",
+     "msg": {
+      "type": "config_entries/subscribe"
+     },
+     "first": [
+      {
+       "id": 1,
+       "type": "result",
+       "success": true,
+       "result": null
+      },
+      {
+       "id": 1,
+       "type": "event",
+       "event": []
+      }
+     ]
+    },
+    {
+     "sub": "flows",
+     "msg": {
+      "type": "config_entries/flow/subscribe"
+     },
+     "first": [
+      {
+       "id": 1,
+       "type": "event",
+       "event": []
+      },
+      {
+       "id": 1,
+       "type": "result",
+       "success": true,
+       "result": null
+      }
+     ]
+    }
+   ],
+   "steps": [
+    {
+     "ws": {
+      "user": "admin",
+      "msg": {
+       "type": "config_entries/get"
+      }
+     },
+     "replies": [
+      {
+       "type": "result",
+       "success": true,
+       "result": []
+      }
+     ],
+     "events": [],
+     "requests": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow",
+      "user": "admin",
+      "sent": "{\"handler\": \"lifx\", \"show_advanced_options\": false}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:1>",
+      "handler": "lifx",
+      "data_schema": [
+       {
+        "type": "string",
+        "name": "host",
+        "required": false,
+        "optional": true,
+        "default": ""
+       }
+      ],
+      "errors": {},
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "user"
+     },
+     "events": [],
+     "requests": []
+    },
+    {
+     "http": {
+      "method": "GET",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:1>",
+      "handler": "lifx",
+      "data_schema": [
+       {
+        "type": "string",
+        "name": "host",
+        "required": false,
+        "optional": true,
+        "default": ""
+       }
+      ],
+      "errors": {},
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "user"
+     },
+     "events": [],
+     "requests": []
+    },
+    {
+     "ws": {
+      "user": "admin",
+      "msg": {
+       "type": "config_entries/flow/progress"
+      }
+     },
+     "replies": [
+      {
+       "type": "result",
+       "success": true,
+       "result": []
+      }
+     ],
+     "events": [],
+     "requests": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin",
+      "sent": "{\"host\": \"192.0.2.20\"}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "create_entry",
+      "flow_id": "<flow:1>",
+      "handler": "lifx",
+      "description": null,
+      "description_placeholders": null,
+      "title": "Desk Lamp",
+      "minor_version": 1,
+      "options": {},
+      "subentries": [],
+      "version": 1,
+      "result": {
+       "created_at": "<ts>",
+       "entry_id": "<entry:1>",
+       "domain": "lifx",
+       "modified_at": "<ts>",
+       "title": "Desk Lamp",
+       "source": "user",
+       "state": "loaded",
+       "supports_options": false,
+       "supports_remove_device": false,
+       "supports_unload": true,
+       "supports_reconfigure": false,
+       "supported_subentry_types": {},
+       "pref_disable_new_entities": false,
+       "pref_disable_polling": false,
+       "disabled_by": null,
+       "reason": null,
+       "error_reason_translation_key": null,
+       "error_reason_translation_placeholders": null,
+       "num_subentries": 0
+      }
+     },
+     "events": [
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "added",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "lifx",
+          "modified_at": "<ts>",
+          "title": "Desk Lamp",
+          "source": "user",
+          "state": "not_loaded",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": false,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "lifx",
+          "modified_at": "<ts>",
+          "title": "Desk Lamp",
+          "source": "user",
+          "state": "setup_in_progress",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": false,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "lifx",
+          "modified_at": "<ts>",
+          "title": "Desk Lamp",
+          "source": "user",
+          "state": "loaded",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": true,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      }
+     ],
+     "requests": [
+      {
+       "to": "192.0.2.20",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 1,
+       "type": 14,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.20",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 2,
+       "type": 32,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.20",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 3,
+       "type": 23,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.20",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 4,
+       "type": 51,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.20",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 1,
+       "type": 14,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.20",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 2,
+       "type": 32,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.20",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 3,
+       "type": 51,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.20",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 4,
+       "type": 101,
+       "payload": ""
+      }
+     ]
+    },
+    {
+     "ws": {
+      "user": "admin",
+      "msg": {
+       "type": "config_entries/get"
+      }
+     },
+     "replies": [
+      {
+       "type": "result",
+       "success": true,
+       "result": [
+        {
+         "created_at": "<ts>",
+         "entry_id": "<entry:1>",
+         "domain": "lifx",
+         "modified_at": "<ts>",
+         "title": "Desk Lamp",
+         "source": "user",
+         "state": "loaded",
+         "supports_options": false,
+         "supports_remove_device": false,
+         "supports_unload": true,
+         "supports_reconfigure": false,
+         "supported_subentry_types": {},
+         "pref_disable_new_entities": false,
+         "pref_disable_polling": false,
+         "disabled_by": null,
+         "reason": null,
+         "error_reason_translation_key": null,
+         "error_reason_translation_placeholders": null,
+         "num_subentries": 0
+        }
+       ]
+      }
+     ],
+     "events": [],
+     "requests": []
+    },
+    {
+     "http": {
+      "method": "GET",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin"
+     },
+     "status": 404,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "message": "Invalid flow specified"
+     },
+     "events": [],
+     "requests": []
+    }
+   ],
+   "entries": [
+    {
+     "created_at": "<time>",
+     "data": {
+      "host": "192.0.2.20"
+     },
+     "disabled_by": null,
+     "discovery_keys": {},
+     "domain": "lifx",
+     "entry_id": "<entry:1>",
+     "minor_version": 1,
+     "modified_at": "<time>",
+     "options": {},
+     "pref_disable_new_entities": false,
+     "pref_disable_polling": false,
+     "source": "user",
+     "subentries": [],
+     "title": "Desk Lamp",
+     "unique_id": "d0:73:d5:00:00:20",
+     "version": 1
+    }
+   ],
+   "deleted_devices": 0,
+   "deleted_entities": 0,
+   "devices": [
+    {
+     "area_id": "office",
+     "config_entries": [
+      "<entry:1>"
+     ],
+     "config_entries_subentries": {
+      "<entry:1>": [
+       null
+      ]
+     },
+     "configuration_url": null,
+     "connections": [
+      [
+       "mac",
+       "d0:73:d5:00:00:21"
+      ]
+     ],
+     "created_at": "<time>",
+     "disabled_by": null,
+     "entry_type": null,
+     "hw_version": null,
+     "id": "<device:d0:73:d5:00:00:20>",
+     "identifiers": [
+      [
+       "lifx",
+       "d0:73:d5:00:00:20"
+      ]
+     ],
+     "labels": [],
+     "manufacturer": "LIFX",
+     "model": "LIFX Color",
+     "model_id": null,
+     "modified_at": "<time>",
+     "name_by_user": null,
+     "name": "Desk Lamp",
+     "primary_config_entry": "<entry:1>",
+     "serial_number": null,
+     "sw_version": "3.70",
+     "via_device_id": null
+    }
+   ],
+   "entities": [
+    {
+     "aliases": [],
+     "aliases_v2": [
+      null
+     ],
+     "area_id": null,
+     "categories": {},
+     "capabilities": null,
+     "config_entry_id": "<entry:1>",
+     "config_subentry_id": null,
+     "created_at": "<time>",
+     "device_class": null,
+     "device_id": "<device:d0:73:d5:00:00:20>",
+     "disabled_by": null,
+     "entity_category": "config",
+     "entity_id": "button.office_desk_lamp_identify",
+     "hidden_by": null,
+     "icon": null,
+     "id": "<id>",
+     "has_entity_name": true,
+     "labels": [],
+     "modified_at": "<time>",
+     "name": null,
+     "object_id_base": "Identify",
+     "options": {},
+     "original_device_class": "identify",
+     "original_icon": null,
+     "original_name": "Identify",
+     "platform": "lifx",
+     "suggested_object_id": null,
+     "supported_features": 0,
+     "translation_key": null,
+     "unique_id": "d0:73:d5:00:00:20_identify",
+     "previous_unique_id": null,
+     "unit_of_measurement": null
+    },
+    {
+     "aliases": [],
+     "aliases_v2": [
+      null
+     ],
+     "area_id": null,
+     "categories": {},
+     "capabilities": null,
+     "config_entry_id": "<entry:1>",
+     "config_subentry_id": null,
+     "created_at": "<time>",
+     "device_class": null,
+     "device_id": "<device:d0:73:d5:00:00:20>",
+     "disabled_by": null,
+     "entity_category": "config",
+     "entity_id": "button.office_desk_lamp_restart",
+     "hidden_by": null,
+     "icon": null,
+     "id": "<id>",
+     "has_entity_name": true,
+     "labels": [],
+     "modified_at": "<time>",
+     "name": null,
+     "object_id_base": "Restart",
+     "options": {},
+     "original_device_class": "restart",
+     "original_icon": null,
+     "original_name": "Restart",
+     "platform": "lifx",
+     "suggested_object_id": null,
+     "supported_features": 0,
+     "translation_key": null,
+     "unique_id": "d0:73:d5:00:00:20_restart",
+     "previous_unique_id": null,
+     "unit_of_measurement": null
+    },
+    {
+     "aliases": [],
+     "aliases_v2": [
+      null
+     ],
+     "area_id": null,
+     "categories": {},
+     "capabilities": {
+      "min_color_temp_kelvin": 1500,
+      "max_color_temp_kelvin": 9000,
+      "effect_list": [
+       "effect_colorloop",
+       "effect_pulse",
+       "effect_stop"
+      ],
+      "supported_color_modes": [
+       "color_temp",
+       "hs"
+      ]
+     },
+     "config_entry_id": "<entry:1>",
+     "config_subentry_id": null,
+     "created_at": "<time>",
+     "device_class": null,
+     "device_id": "<device:d0:73:d5:00:00:20>",
+     "disabled_by": null,
+     "entity_category": null,
+     "entity_id": "light.office_desk_lamp",
+     "hidden_by": null,
+     "icon": null,
+     "id": "<id>",
+     "has_entity_name": true,
+     "labels": [],
+     "modified_at": "<time>",
+     "name": null,
+     "object_id_base": null,
+     "options": {},
+     "original_device_class": null,
+     "original_icon": null,
+     "original_name": null,
+     "platform": "lifx",
+     "suggested_object_id": null,
+     "supported_features": 36,
+     "translation_key": null,
+     "unique_id": "d0:73:d5:00:00:20",
+     "previous_unique_id": null,
+     "unit_of_measurement": null
+    },
+    {
+     "aliases": [],
+     "aliases_v2": [
+      null
+     ],
+     "area_id": null,
+     "categories": {},
+     "capabilities": {
+      "state_class": "measurement"
+     },
+     "config_entry_id": "<entry:1>",
+     "config_subentry_id": null,
+     "created_at": "<time>",
+     "device_class": null,
+     "device_id": "<device:d0:73:d5:00:00:20>",
+     "disabled_by": "integration",
+     "entity_category": "diagnostic",
+     "entity_id": "sensor.office_desk_lamp_rssi",
+     "hidden_by": null,
+     "icon": null,
+     "id": "<id>",
+     "has_entity_name": true,
+     "labels": [],
+     "modified_at": "<time>",
+     "name": null,
+     "object_id_base": "RSSI",
+     "options": {},
+     "original_device_class": "signal_strength",
+     "original_icon": null,
+     "original_name": "RSSI",
+     "platform": "lifx",
+     "suggested_object_id": null,
+     "supported_features": 0,
+     "translation_key": "rssi",
+     "unique_id": "d0:73:d5:00:00:20_rssi",
+     "previous_unique_id": null,
+     "unit_of_measurement": "dBm"
+    }
+   ],
+   "states": {
+    "button.office_desk_lamp_identify": {
+     "state": "unknown",
+     "attributes": {
+      "device_class": "identify",
+      "friendly_name": "Desk Lamp Identify"
+     }
+    },
+    "button.office_desk_lamp_restart": {
+     "state": "unknown",
+     "attributes": {
+      "device_class": "restart",
+      "friendly_name": "Desk Lamp Restart"
+     }
+    },
+    "light.office_desk_lamp": {
+     "state": "on",
+     "attributes": {
+      "min_color_temp_kelvin": 1500,
+      "max_color_temp_kelvin": 9000,
+      "effect_list": [
+       "effect_colorloop",
+       "effect_pulse",
+       "effect_stop"
+      ],
+      "supported_color_modes": [
+       "color_temp",
+       "hs"
+      ],
+      "effect": null,
+      "color_mode": "color_temp",
+      "brightness": 153,
+      "color_temp_kelvin": 2700,
+      "hs_color": [
+       28.395,
+       65.723
+      ],
+      "rgb_color": [
+       255,
+       167,
+       87
+      ],
+      "xy_color": [
+       0.525,
+       0.388
+      ],
+      "friendly_name": "Desk Lamp",
+      "supported_features": 36
+     }
+    }
+   },
+   "areas": [
+    {
+     "aliases": [],
+     "floor_id": null,
+     "humidity_entity_id": null,
+     "icon": null,
+     "id": "office",
+     "labels": [],
+     "name": "Office",
+     "picture": null,
+     "temperature_entity_id": null,
+     "created_at": "<time>",
+     "modified_at": "<time>"
+    }
+   ]
+  },
+  {
+   "name": "pick",
+   "doc": "No address: discovery lists the colour and the white bulb, the white one is picked, after what the form refuses.",
+   "subscriptions": [
+    {
+     "sub": "entries",
+     "msg": {
+      "type": "config_entries/subscribe"
+     },
+     "first": [
+      {
+       "id": 1,
+       "type": "result",
+       "success": true,
+       "result": null
+      },
+      {
+       "id": 1,
+       "type": "event",
+       "event": []
+      }
+     ]
+    },
+    {
+     "sub": "flows",
+     "msg": {
+      "type": "config_entries/flow/subscribe"
+     },
+     "first": [
+      {
+       "id": 1,
+       "type": "event",
+       "event": []
+      },
+      {
+       "id": 1,
+       "type": "result",
+       "success": true,
+       "result": null
+      }
+     ]
+    }
+   ],
+   "steps": [
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow",
+      "user": "admin",
+      "sent": "{\"handler\": \"lifx\", \"show_advanced_options\": false}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:1>",
+      "handler": "lifx",
+      "data_schema": [
+       {
+        "type": "string",
+        "name": "host",
+        "required": false,
+        "optional": true,
+        "default": ""
+       }
+      ],
+      "errors": {},
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "user"
+     },
+     "events": [],
+     "requests": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin",
+      "sent": "{}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:1>",
+      "handler": "lifx",
+      "data_schema": [
+       {
+        "type": "select",
+        "options": [
+         [
+          "d0:73:d5:00:00:20",
+          "d0:73:d5:00:00:20 (192.0.2.20)"
+         ],
+         [
+          "d0:73:d5:00:00:21",
+          "d0:73:d5:00:00:21 (192.0.2.21)"
+         ]
+        ],
+        "name": "device",
+        "required": true
+       }
+      ],
+      "errors": null,
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "pick_device"
+     },
+     "events": [],
+     "requests": [
+      {
+       "to": "broadcast",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 0,
+       "type": 2,
+       "payload": ""
+      }
+     ]
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin",
+      "sent": "{\"device\": \"nobody\"}"
+     },
+     "status": 400,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "errors": {
+       "device": "value must be one of ['d0:73:d5:00:00:20', 'd0:73:d5:00:00:21']"
+      }
+     },
+     "events": [],
+     "requests": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin",
+      "sent": "{}"
+     },
+     "status": 400,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "errors": {
+       "device": "required key not provided"
+      }
+     },
+     "events": [],
+     "requests": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin",
+      "sent": "{\"device\": \"d0:73:d5:00:00:21\", \"host\": \"192.0.2.21\"}"
+     },
+     "status": 400,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "errors": {
+       "base": [
+        "extra keys not allowed @ data['host']"
+       ]
+      }
+     },
+     "events": [],
+     "requests": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin",
+      "sent": "{\"device\": \"d0:73:d5:00:00:21\"}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "create_entry",
+      "flow_id": "<flow:1>",
+      "handler": "lifx",
+      "description": null,
+      "description_placeholders": null,
+      "title": "Hall Light",
+      "minor_version": 1,
+      "options": {},
+      "subentries": [],
+      "version": 1,
+      "result": {
+       "created_at": "<ts>",
+       "entry_id": "<entry:1>",
+       "domain": "lifx",
+       "modified_at": "<ts>",
+       "title": "Hall Light",
+       "source": "user",
+       "state": "loaded",
+       "supports_options": false,
+       "supports_remove_device": false,
+       "supports_unload": true,
+       "supports_reconfigure": false,
+       "supported_subentry_types": {},
+       "pref_disable_new_entities": false,
+       "pref_disable_polling": false,
+       "disabled_by": null,
+       "reason": null,
+       "error_reason_translation_key": null,
+       "error_reason_translation_placeholders": null,
+       "num_subentries": 0
+      }
+     },
+     "events": [
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "added",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "lifx",
+          "modified_at": "<ts>",
+          "title": "Hall Light",
+          "source": "user",
+          "state": "not_loaded",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": false,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "lifx",
+          "modified_at": "<ts>",
+          "title": "Hall Light",
+          "source": "user",
+          "state": "setup_in_progress",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": false,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "lifx",
+          "modified_at": "<ts>",
+          "title": "Hall Light",
+          "source": "user",
+          "state": "loaded",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": true,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      }
+     ],
+     "requests": [
+      {
+       "to": "192.0.2.21",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 1,
+       "type": 14,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.21",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 2,
+       "type": 32,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.21",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 3,
+       "type": 23,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.21",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 4,
+       "type": 51,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.21",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 1,
+       "type": 14,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.21",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 2,
+       "type": 32,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.21",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 3,
+       "type": 51,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.21",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 4,
+       "type": 101,
+       "payload": ""
+      }
+     ]
+    },
+    {
+     "ws": {
+      "user": "admin",
+      "msg": {
+       "type": "config_entries/get"
+      }
+     },
+     "replies": [
+      {
+       "type": "result",
+       "success": true,
+       "result": [
+        {
+         "created_at": "<ts>",
+         "entry_id": "<entry:1>",
+         "domain": "lifx",
+         "modified_at": "<ts>",
+         "title": "Hall Light",
+         "source": "user",
+         "state": "loaded",
+         "supports_options": false,
+         "supports_remove_device": false,
+         "supports_unload": true,
+         "supports_reconfigure": false,
+         "supported_subentry_types": {},
+         "pref_disable_new_entities": false,
+         "pref_disable_polling": false,
+         "disabled_by": null,
+         "reason": null,
+         "error_reason_translation_key": null,
+         "error_reason_translation_placeholders": null,
+         "num_subentries": 0
+        }
+       ]
+      }
+     ],
+     "events": [],
+     "requests": []
+    }
+   ],
+   "entries": [
+    {
+     "created_at": "<time>",
+     "data": {
+      "host": "192.0.2.21"
+     },
+     "disabled_by": null,
+     "discovery_keys": {},
+     "domain": "lifx",
+     "entry_id": "<entry:1>",
+     "minor_version": 1,
+     "modified_at": "<time>",
+     "options": {},
+     "pref_disable_new_entities": false,
+     "pref_disable_polling": false,
+     "source": "user",
+     "subentries": [],
+     "title": "Hall Light",
+     "unique_id": "d0:73:d5:00:00:21",
+     "version": 1
+    }
+   ],
+   "deleted_devices": 0,
+   "deleted_entities": 0,
+   "devices": [
+    {
+     "area_id": "hallway",
+     "config_entries": [
+      "<entry:1>"
+     ],
+     "config_entries_subentries": {
+      "<entry:1>": [
+       null
+      ]
+     },
+     "configuration_url": null,
+     "connections": [
+      [
+       "mac",
+       "d0:73:d5:00:00:21"
+      ]
+     ],
+     "created_at": "<time>",
+     "disabled_by": null,
+     "entry_type": null,
+     "hw_version": null,
+     "id": "<device:d0:73:d5:00:00:21>",
+     "identifiers": [
+      [
+       "lifx",
+       "d0:73:d5:00:00:21"
+      ]
+     ],
+     "labels": [],
+     "manufacturer": "LIFX",
+     "model": "LIFX Mini White",
+     "model_id": null,
+     "modified_at": "<time>",
+     "name_by_user": null,
+     "name": "Hall Light",
+     "primary_config_entry": "<entry:1>",
+     "serial_number": null,
+     "sw_version": "2.77",
+     "via_device_id": null
+    }
+   ],
+   "entities": [
+    {
+     "aliases": [],
+     "aliases_v2": [
+      null
+     ],
+     "area_id": null,
+     "categories": {},
+     "capabilities": null,
+     "config_entry_id": "<entry:1>",
+     "config_subentry_id": null,
+     "created_at": "<time>",
+     "device_class": null,
+     "device_id": "<device:d0:73:d5:00:00:21>",
+     "disabled_by": null,
+     "entity_category": "config",
+     "entity_id": "button.hallway_hall_light_identify",
+     "hidden_by": null,
+     "icon": null,
+     "id": "<id>",
+     "has_entity_name": true,
+     "labels": [],
+     "modified_at": "<time>",
+     "name": null,
+     "object_id_base": "Identify",
+     "options": {},
+     "original_device_class": "identify",
+     "original_icon": null,
+     "original_name": "Identify",
+     "platform": "lifx",
+     "suggested_object_id": null,
+     "supported_features": 0,
+     "translation_key": null,
+     "unique_id": "d0:73:d5:00:00:21_identify",
+     "previous_unique_id": null,
+     "unit_of_measurement": null
+    },
+    {
+     "aliases": [],
+     "aliases_v2": [
+      null
+     ],
+     "area_id": null,
+     "categories": {},
+     "capabilities": null,
+     "config_entry_id": "<entry:1>",
+     "config_subentry_id": null,
+     "created_at": "<time>",
+     "device_class": null,
+     "device_id": "<device:d0:73:d5:00:00:21>",
+     "disabled_by": null,
+     "entity_category": "config",
+     "entity_id": "button.hallway_hall_light_restart",
+     "hidden_by": null,
+     "icon": null,
+     "id": "<id>",
+     "has_entity_name": true,
+     "labels": [],
+     "modified_at": "<time>",
+     "name": null,
+     "object_id_base": "Restart",
+     "options": {},
+     "original_device_class": "restart",
+     "original_icon": null,
+     "original_name": "Restart",
+     "platform": "lifx",
+     "suggested_object_id": null,
+     "supported_features": 0,
+     "translation_key": null,
+     "unique_id": "d0:73:d5:00:00:21_restart",
+     "previous_unique_id": null,
+     "unit_of_measurement": null
+    },
+    {
+     "aliases": [],
+     "aliases_v2": [
+      null
+     ],
+     "area_id": null,
+     "categories": {},
+     "capabilities": {
+      "effect_list": [
+       "effect_pulse",
+       "effect_stop"
+      ],
+      "supported_color_modes": [
+       "brightness"
+      ]
+     },
+     "config_entry_id": "<entry:1>",
+     "config_subentry_id": null,
+     "created_at": "<time>",
+     "device_class": null,
+     "device_id": "<device:d0:73:d5:00:00:21>",
+     "disabled_by": null,
+     "entity_category": null,
+     "entity_id": "light.hallway_hall_light",
+     "hidden_by": null,
+     "icon": null,
+     "id": "<id>",
+     "has_entity_name": true,
+     "labels": [],
+     "modified_at": "<time>",
+     "name": null,
+     "object_id_base": null,
+     "options": {},
+     "original_device_class": null,
+     "original_icon": null,
+     "original_name": null,
+     "platform": "lifx",
+     "suggested_object_id": null,
+     "supported_features": 36,
+     "translation_key": null,
+     "unique_id": "d0:73:d5:00:00:21",
+     "previous_unique_id": null,
+     "unit_of_measurement": null
+    },
+    {
+     "aliases": [],
+     "aliases_v2": [
+      null
+     ],
+     "area_id": null,
+     "categories": {},
+     "capabilities": {
+      "state_class": "measurement"
+     },
+     "config_entry_id": "<entry:1>",
+     "config_subentry_id": null,
+     "created_at": "<time>",
+     "device_class": null,
+     "device_id": "<device:d0:73:d5:00:00:21>",
+     "disabled_by": "integration",
+     "entity_category": "diagnostic",
+     "entity_id": "sensor.hallway_hall_light_rssi",
+     "hidden_by": null,
+     "icon": null,
+     "id": "<id>",
+     "has_entity_name": true,
+     "labels": [],
+     "modified_at": "<time>",
+     "name": null,
+     "object_id_base": "RSSI",
+     "options": {},
+     "original_device_class": "signal_strength",
+     "original_icon": null,
+     "original_name": "RSSI",
+     "platform": "lifx",
+     "suggested_object_id": null,
+     "supported_features": 0,
+     "translation_key": "rssi",
+     "unique_id": "d0:73:d5:00:00:21_rssi",
+     "previous_unique_id": null,
+     "unit_of_measurement": "dB"
+    }
+   ],
+   "states": {
+    "button.hallway_hall_light_identify": {
+     "state": "unknown",
+     "attributes": {
+      "device_class": "identify",
+      "friendly_name": "Hall Light Identify"
+     }
+    },
+    "button.hallway_hall_light_restart": {
+     "state": "unknown",
+     "attributes": {
+      "device_class": "restart",
+      "friendly_name": "Hall Light Restart"
+     }
+    },
+    "light.hallway_hall_light": {
+     "state": "on",
+     "attributes": {
+      "effect_list": [
+       "effect_pulse",
+       "effect_stop"
+      ],
+      "supported_color_modes": [
+       "brightness"
+      ],
+      "effect": null,
+      "color_mode": "brightness",
+      "brightness": 153,
+      "friendly_name": "Hall Light",
+      "supported_features": 36
+     }
+    }
+   },
+   "areas": [
+    {
+     "aliases": [],
+     "floor_id": null,
+     "humidity_entity_id": null,
+     "icon": null,
+     "id": "hallway",
+     "labels": [],
+     "name": "Hallway",
+     "picture": null,
+     "temperature_entity_id": null,
+     "created_at": "<time>",
+     "modified_at": "<time>"
+    }
+   ]
+  },
+  {
+   "name": "pick_none",
+   "doc": "No address, and no bulb answers discovery.",
+   "subscriptions": [
+    {
+     "sub": "entries",
+     "msg": {
+      "type": "config_entries/subscribe"
+     },
+     "first": [
+      {
+       "id": 1,
+       "type": "result",
+       "success": true,
+       "result": null
+      },
+      {
+       "id": 1,
+       "type": "event",
+       "event": []
+      }
+     ]
+    },
+    {
+     "sub": "flows",
+     "msg": {
+      "type": "config_entries/flow/subscribe"
+     },
+     "first": [
+      {
+       "id": 1,
+       "type": "event",
+       "event": []
+      },
+      {
+       "id": 1,
+       "type": "result",
+       "success": true,
+       "result": null
+      }
+     ]
+    }
+   ],
+   "steps": [
+    {
+     "api": "discovery_none"
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow",
+      "user": "admin",
+      "sent": "{\"handler\": \"lifx\", \"show_advanced_options\": false}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:1>",
+      "handler": "lifx",
+      "data_schema": [
+       {
+        "type": "string",
+        "name": "host",
+        "required": false,
+        "optional": true,
+        "default": ""
+       }
+      ],
+      "errors": {},
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "user"
+     },
+     "events": [],
+     "requests": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin",
+      "sent": "{\"host\": \"\"}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "abort",
+      "flow_id": "<flow:1>",
+      "handler": "lifx",
+      "reason": "no_devices_found",
+      "description_placeholders": null
+     },
+     "events": [],
+     "requests": [
+      {
+       "to": "broadcast",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 0,
+       "type": 2,
+       "payload": ""
+      }
+     ]
+    }
+   ],
+   "entries": [],
+   "deleted_devices": 0,
+   "deleted_entities": 0
+  },
+  {
+   "name": "typed_fails",
+   "doc": "An address where nothing answers, then a LIFX Switch, then what the form refuses.",
+   "subscriptions": [
+    {
+     "sub": "entries",
+     "msg": {
+      "type": "config_entries/subscribe"
+     },
+     "first": [
+      {
+       "id": 1,
+       "type": "result",
+       "success": true,
+       "result": null
+      },
+      {
+       "id": 1,
+       "type": "event",
+       "event": []
+      }
+     ]
+    },
+    {
+     "sub": "flows",
+     "msg": {
+      "type": "config_entries/flow/subscribe"
+     },
+     "first": [
+      {
+       "id": 1,
+       "type": "event",
+       "event": []
+      },
+      {
+       "id": 1,
+       "type": "result",
+       "success": true,
+       "result": null
+      }
+     ]
+    }
+   ],
+   "steps": [
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow",
+      "user": "admin",
+      "sent": "{\"handler\": \"lifx\", \"show_advanced_options\": false}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:1>",
+      "handler": "lifx",
+      "data_schema": [
+       {
+        "type": "string",
+        "name": "host",
+        "required": false,
+        "optional": true,
+        "default": ""
+       }
+      ],
+      "errors": {},
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "user"
+     },
+     "events": [],
+     "requests": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin",
+      "sent": "{\"host\": \"192.0.2.24\"}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:1>",
+      "handler": "lifx",
+      "data_schema": [
+       {
+        "type": "string",
+        "name": "host",
+        "required": false,
+        "optional": true,
+        "default": ""
+       }
+      ],
+      "errors": {
+       "base": "cannot_connect"
+      },
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "user"
+     },
+     "events": [],
+     "requests": [
+      {
+       "to": "192.0.2.24",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 1,
+       "type": 14,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.24",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 2,
+       "type": 32,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.24",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 3,
+       "type": 23,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.24",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 4,
+       "type": 51,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.24",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 1,
+       "type": 14,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.24",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 2,
+       "type": 32,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.24",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 3,
+       "type": 23,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.24",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 4,
+       "type": 51,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.24",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 1,
+       "type": 14,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.24",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 2,
+       "type": 32,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.24",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 3,
+       "type": 23,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.24",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 4,
+       "type": 51,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.24",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 5,
+       "type": 14,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.24",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 6,
+       "type": 32,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.24",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 7,
+       "type": 23,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.24",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 8,
+       "type": 51,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.24",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 5,
+       "type": 14,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.24",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 6,
+       "type": 32,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.24",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 7,
+       "type": 23,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.24",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 8,
+       "type": 51,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.24",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 5,
+       "type": 14,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.24",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 6,
+       "type": 32,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.24",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 7,
+       "type": 23,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.24",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 8,
+       "type": 51,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.24",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 9,
+       "type": 14,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.24",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 10,
+       "type": 32,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.24",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 11,
+       "type": 23,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.24",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 12,
+       "type": 51,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.24",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 9,
+       "type": 14,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.24",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 10,
+       "type": 32,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.24",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 11,
+       "type": 23,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.24",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 12,
+       "type": 51,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.24",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 9,
+       "type": 14,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.24",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 10,
+       "type": 32,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.24",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 11,
+       "type": 23,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.24",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 12,
+       "type": 51,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.24",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 13,
+       "type": 14,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.24",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 14,
+       "type": 32,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.24",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 15,
+       "type": 23,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.24",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 16,
+       "type": 51,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.24",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 13,
+       "type": 14,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.24",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 14,
+       "type": 32,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.24",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 15,
+       "type": 23,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.24",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 16,
+       "type": 51,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.24",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 13,
+       "type": 14,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.24",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 14,
+       "type": 32,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.24",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 15,
+       "type": 23,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.24",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 16,
+       "type": 51,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.24",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 17,
+       "type": 14,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.24",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 18,
+       "type": 32,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.24",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 19,
+       "type": 23,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.24",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 20,
+       "type": 51,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.24",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 17,
+       "type": 14,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.24",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 18,
+       "type": 32,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.24",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 19,
+       "type": 23,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.24",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 20,
+       "type": 51,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.24",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 17,
+       "type": 14,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.24",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 18,
+       "type": 32,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.24",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 19,
+       "type": 23,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.24",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 20,
+       "type": 51,
+       "payload": ""
+      }
+     ]
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin",
+      "sent": "{\"host\": \"192.0.2.23\"}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:1>",
+      "handler": "lifx",
+      "data_schema": [
+       {
+        "type": "string",
+        "name": "host",
+        "required": false,
+        "optional": true,
+        "default": ""
+       }
+      ],
+      "errors": {
+       "base": "cannot_connect"
+      },
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "user"
+     },
+     "events": [],
+     "requests": [
+      {
+       "to": "192.0.2.23",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 1,
+       "type": 14,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.23",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 2,
+       "type": 32,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.23",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 3,
+       "type": 23,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.23",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 4,
+       "type": 51,
+       "payload": ""
+      }
+     ]
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin",
+      "sent": "{\"host\": 5}"
+     },
+     "status": 400,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "errors": {
+       "host": "expected str"
+      }
+     },
+     "events": [],
+     "requests": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin",
+      "sent": "{\"host\": \"192.0.2.20\", \"port\": 1}"
+     },
+     "status": 400,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "errors": {
+       "base": [
+        "extra keys not allowed @ data['port']"
+       ]
+      }
+     },
+     "events": [],
+     "requests": []
+    },
+    {
+     "http": {
+      "method": "DELETE",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "message": "Flow aborted"
+     },
+     "events": [],
+     "requests": []
+    }
+   ],
+   "entries": [],
+   "deleted_devices": 0,
+   "deleted_entities": 0
+  },
+  {
+   "name": "pick_gone",
+   "doc": "A bulb that answers discovery and then nothing more is picked.",
+   "subscriptions": [
+    {
+     "sub": "entries",
+     "msg": {
+      "type": "config_entries/subscribe"
+     },
+     "first": [
+      {
+       "id": 1,
+       "type": "result",
+       "success": true,
+       "result": null
+      },
+      {
+       "id": 1,
+       "type": "event",
+       "event": []
+      }
+     ]
+    },
+    {
+     "sub": "flows",
+     "msg": {
+      "type": "config_entries/flow/subscribe"
+     },
+     "first": [
+      {
+       "id": 1,
+       "type": "event",
+       "event": []
+      },
+      {
+       "id": 1,
+       "type": "result",
+       "success": true,
+       "result": null
+      }
+     ]
+    }
+   ],
+   "steps": [
+    {
+     "api": "discovery_ghost"
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow",
+      "user": "admin",
+      "sent": "{\"handler\": \"lifx\", \"show_advanced_options\": false}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:1>",
+      "handler": "lifx",
+      "data_schema": [
+       {
+        "type": "string",
+        "name": "host",
+        "required": false,
+        "optional": true,
+        "default": ""
+       }
+      ],
+      "errors": {},
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "user"
+     },
+     "events": [],
+     "requests": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin",
+      "sent": "{}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:1>",
+      "handler": "lifx",
+      "data_schema": [
+       {
+        "type": "select",
+        "options": [
+         [
+          "d0:73:d5:00:00:26",
+          "d0:73:d5:00:00:26 (192.0.2.26)"
+         ]
+        ],
+        "name": "device",
+        "required": true
+       }
+      ],
+      "errors": null,
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "pick_device"
+     },
+     "events": [],
+     "requests": [
+      {
+       "to": "broadcast",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 0,
+       "type": 2,
+       "payload": ""
+      }
+     ]
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin",
+      "sent": "{\"device\": \"d0:73:d5:00:00:26\"}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "abort",
+      "flow_id": "<flow:1>",
+      "handler": "lifx",
+      "reason": "cannot_connect",
+      "description_placeholders": null
+     },
+     "events": [],
+     "requests": [
+      {
+       "to": "192.0.2.26",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 1,
+       "type": 14,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.26",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 2,
+       "type": 32,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.26",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 3,
+       "type": 23,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.26",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 4,
+       "type": 51,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.26",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 1,
+       "type": 14,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.26",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 2,
+       "type": 32,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.26",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 3,
+       "type": 23,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.26",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 4,
+       "type": 51,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.26",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 1,
+       "type": 14,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.26",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 2,
+       "type": 32,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.26",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 3,
+       "type": 23,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.26",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 4,
+       "type": 51,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.26",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 5,
+       "type": 14,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.26",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 6,
+       "type": 32,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.26",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 7,
+       "type": 23,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.26",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 8,
+       "type": 51,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.26",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 5,
+       "type": 14,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.26",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 6,
+       "type": 32,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.26",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 7,
+       "type": 23,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.26",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 8,
+       "type": 51,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.26",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 5,
+       "type": 14,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.26",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 6,
+       "type": 32,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.26",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 7,
+       "type": 23,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.26",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 8,
+       "type": 51,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.26",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 9,
+       "type": 14,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.26",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 10,
+       "type": 32,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.26",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 11,
+       "type": 23,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.26",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 12,
+       "type": 51,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.26",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 9,
+       "type": 14,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.26",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 10,
+       "type": 32,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.26",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 11,
+       "type": 23,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.26",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 12,
+       "type": 51,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.26",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 9,
+       "type": 14,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.26",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 10,
+       "type": 32,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.26",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 11,
+       "type": 23,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.26",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 12,
+       "type": 51,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.26",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 13,
+       "type": 14,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.26",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 14,
+       "type": 32,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.26",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 15,
+       "type": 23,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.26",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 16,
+       "type": 51,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.26",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 13,
+       "type": 14,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.26",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 14,
+       "type": 32,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.26",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 15,
+       "type": 23,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.26",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 16,
+       "type": 51,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.26",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 13,
+       "type": 14,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.26",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 14,
+       "type": 32,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.26",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 15,
+       "type": 23,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.26",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 16,
+       "type": 51,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.26",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 17,
+       "type": 14,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.26",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 18,
+       "type": 32,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.26",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 19,
+       "type": 23,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.26",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 20,
+       "type": 51,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.26",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 17,
+       "type": 14,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.26",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 18,
+       "type": 32,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.26",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 19,
+       "type": 23,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.26",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 20,
+       "type": 51,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.26",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 17,
+       "type": 14,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.26",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 18,
+       "type": 32,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.26",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 19,
+       "type": 23,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.26",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 20,
+       "type": 51,
+       "payload": ""
+      }
+     ]
+    }
+   ],
+   "entries": [],
+   "deleted_devices": 0,
+   "deleted_entities": 0
+  },
+  {
+   "name": "configured",
+   "doc": "With the colour bulb set up: its address again; discovery, which leaves it out; then its new address, which moves the entry there.",
+   "subscriptions": [
+    {
+     "sub": "entries",
+     "msg": {
+      "type": "config_entries/subscribe"
+     },
+     "first": [
+      {
+       "id": 1,
+       "type": "result",
+       "success": true,
+       "result": null
+      },
+      {
+       "id": 1,
+       "type": "event",
+       "event": []
+      }
+     ]
+    },
+    {
+     "sub": "flows",
+     "msg": {
+      "type": "config_entries/flow/subscribe"
+     },
+     "first": [
+      {
+       "id": 1,
+       "type": "event",
+       "event": []
+      },
+      {
+       "id": 1,
+       "type": "result",
+       "success": true,
+       "result": null
+      }
+     ]
+    }
+   ],
+   "steps": [
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow",
+      "user": "admin",
+      "sent": "{\"handler\": \"lifx\", \"show_advanced_options\": false}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:1>",
+      "handler": "lifx",
+      "data_schema": [
+       {
+        "type": "string",
+        "name": "host",
+        "required": false,
+        "optional": true,
+        "default": ""
+       }
+      ],
+      "errors": {},
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "user"
+     },
+     "events": [],
+     "requests": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin",
+      "sent": "{\"host\": \"192.0.2.20\"}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "create_entry",
+      "flow_id": "<flow:1>",
+      "handler": "lifx",
+      "description": null,
+      "description_placeholders": null,
+      "title": "Desk Lamp",
+      "minor_version": 1,
+      "options": {},
+      "subentries": [],
+      "version": 1,
+      "result": {
+       "created_at": "<ts>",
+       "entry_id": "<entry:1>",
+       "domain": "lifx",
+       "modified_at": "<ts>",
+       "title": "Desk Lamp",
+       "source": "user",
+       "state": "loaded",
+       "supports_options": false,
+       "supports_remove_device": false,
+       "supports_unload": true,
+       "supports_reconfigure": false,
+       "supported_subentry_types": {},
+       "pref_disable_new_entities": false,
+       "pref_disable_polling": false,
+       "disabled_by": null,
+       "reason": null,
+       "error_reason_translation_key": null,
+       "error_reason_translation_placeholders": null,
+       "num_subentries": 0
+      }
+     },
+     "events": [
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "added",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "lifx",
+          "modified_at": "<ts>",
+          "title": "Desk Lamp",
+          "source": "user",
+          "state": "not_loaded",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": false,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "lifx",
+          "modified_at": "<ts>",
+          "title": "Desk Lamp",
+          "source": "user",
+          "state": "setup_in_progress",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": false,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "lifx",
+          "modified_at": "<ts>",
+          "title": "Desk Lamp",
+          "source": "user",
+          "state": "loaded",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": true,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      }
+     ],
+     "requests": [
+      {
+       "to": "192.0.2.20",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 1,
+       "type": 14,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.20",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 2,
+       "type": 32,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.20",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 3,
+       "type": 23,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.20",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 4,
+       "type": 51,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.20",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 1,
+       "type": 14,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.20",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 2,
+       "type": 32,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.20",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 3,
+       "type": 51,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.20",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 4,
+       "type": 101,
+       "payload": ""
+      }
+     ]
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow",
+      "user": "admin",
+      "sent": "{\"handler\": \"lifx\", \"show_advanced_options\": false}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:2>",
+      "handler": "lifx",
+      "data_schema": [
+       {
+        "type": "string",
+        "name": "host",
+        "required": false,
+        "optional": true,
+        "default": ""
+       }
+      ],
+      "errors": {},
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "user"
+     },
+     "events": [],
+     "requests": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:2>",
+      "user": "admin",
+      "sent": "{\"host\": \"192.0.2.20\"}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "abort",
+      "flow_id": "<flow:2>",
+      "handler": "lifx",
+      "reason": "already_configured",
+      "description_placeholders": null
+     },
+     "events": [],
+     "requests": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow",
+      "user": "admin",
+      "sent": "{\"handler\": \"lifx\", \"show_advanced_options\": false}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:3>",
+      "handler": "lifx",
+      "data_schema": [
+       {
+        "type": "string",
+        "name": "host",
+        "required": false,
+        "optional": true,
+        "default": ""
+       }
+      ],
+      "errors": {},
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "user"
+     },
+     "events": [],
+     "requests": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:3>",
+      "user": "admin",
+      "sent": "{}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:3>",
+      "handler": "lifx",
+      "data_schema": [
+       {
+        "type": "select",
+        "options": [
+         [
+          "d0:73:d5:00:00:21",
+          "d0:73:d5:00:00:21 (192.0.2.21)"
+         ]
+        ],
+        "name": "device",
+        "required": true
+       }
+      ],
+      "errors": null,
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "pick_device"
+     },
+     "events": [],
+     "requests": [
+      {
+       "to": "broadcast",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 0,
+       "type": 2,
+       "payload": ""
+      }
+     ]
+    },
+    {
+     "http": {
+      "method": "DELETE",
+      "path": "/api/config/config_entries/flow/<flow:3>",
+      "user": "admin"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "message": "Flow aborted"
+     },
+     "events": [],
+     "requests": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow",
+      "user": "admin",
+      "sent": "{\"handler\": \"lifx\", \"show_advanced_options\": false}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:4>",
+      "handler": "lifx",
+      "data_schema": [
+       {
+        "type": "string",
+        "name": "host",
+        "required": false,
+        "optional": true,
+        "default": ""
+       }
+      ],
+      "errors": {},
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "user"
+     },
+     "events": [],
+     "requests": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:4>",
+      "user": "admin",
+      "sent": "{\"host\": \"192.0.2.25\"}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "abort",
+      "flow_id": "<flow:4>",
+      "handler": "lifx",
+      "reason": "already_configured",
+      "description_placeholders": null
+     },
+     "events": [
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "lifx",
+          "modified_at": "<ts>",
+          "title": "Desk Lamp",
+          "source": "user",
+          "state": "loaded",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": true,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "lifx",
+          "modified_at": "<ts>",
+          "title": "Desk Lamp",
+          "source": "user",
+          "state": "unload_in_progress",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": true,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "lifx",
+          "modified_at": "<ts>",
+          "title": "Desk Lamp",
+          "source": "user",
+          "state": "not_loaded",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": true,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "lifx",
+          "modified_at": "<ts>",
+          "title": "Desk Lamp",
+          "source": "user",
+          "state": "setup_in_progress",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": true,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "lifx",
+          "modified_at": "<ts>",
+          "title": "Desk Lamp",
+          "source": "user",
+          "state": "loaded",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": true,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      }
+     ],
+     "requests": [
+      {
+       "to": "192.0.2.25",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 1,
+       "type": 14,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.25",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 2,
+       "type": 32,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.25",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 3,
+       "type": 23,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.25",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 4,
+       "type": 51,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.25",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 1,
+       "type": 14,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.25",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 2,
+       "type": 32,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.25",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 3,
+       "type": 51,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.25",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 4,
+       "type": 101,
+       "payload": ""
+      }
+     ]
+    },
+    {
+     "ws": {
+      "user": "admin",
+      "msg": {
+       "type": "config_entries/get"
+      }
+     },
+     "replies": [
+      {
+       "type": "result",
+       "success": true,
+       "result": [
+        {
+         "created_at": "<ts>",
+         "entry_id": "<entry:1>",
+         "domain": "lifx",
+         "modified_at": "<ts>",
+         "title": "Desk Lamp",
+         "source": "user",
+         "state": "loaded",
+         "supports_options": false,
+         "supports_remove_device": false,
+         "supports_unload": true,
+         "supports_reconfigure": false,
+         "supported_subentry_types": {},
+         "pref_disable_new_entities": false,
+         "pref_disable_polling": false,
+         "disabled_by": null,
+         "reason": null,
+         "error_reason_translation_key": null,
+         "error_reason_translation_placeholders": null,
+         "num_subentries": 0
+        }
+       ]
+      }
+     ],
+     "events": [],
+     "requests": []
+    }
+   ],
+   "entries": [
+    {
+     "created_at": "<time>",
+     "data": {
+      "host": "192.0.2.25"
+     },
+     "disabled_by": null,
+     "discovery_keys": {},
+     "domain": "lifx",
+     "entry_id": "<entry:1>",
+     "minor_version": 1,
+     "modified_at": "<time>",
+     "options": {},
+     "pref_disable_new_entities": false,
+     "pref_disable_polling": false,
+     "source": "user",
+     "subentries": [],
+     "title": "Desk Lamp",
+     "unique_id": "d0:73:d5:00:00:20",
+     "version": 1
+    }
+   ],
+   "deleted_devices": 0,
+   "deleted_entities": 0
+  },
+  {
+   "name": "not_ready",
+   "doc": "Once the flow has the colour bulb's label, another bulb answers at its address: the entry waits for a retry, and is removed.",
+   "subscriptions": [
+    {
+     "sub": "entries",
+     "msg": {
+      "type": "config_entries/subscribe"
+     },
+     "first": [
+      {
+       "id": 1,
+       "type": "result",
+       "success": true,
+       "result": null
+      },
+      {
+       "id": 1,
+       "type": "event",
+       "event": []
+      }
+     ]
+    },
+    {
+     "sub": "flows",
+     "msg": {
+      "type": "config_entries/flow/subscribe"
+     },
+     "first": [
+      {
+       "id": 1,
+       "type": "event",
+       "event": []
+      },
+      {
+       "id": 1,
+       "type": "result",
+       "success": true,
+       "result": null
+      }
+     ]
+    }
+   ],
+   "steps": [
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow",
+      "user": "admin",
+      "sent": "{\"handler\": \"lifx\", \"show_advanced_options\": false}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:1>",
+      "handler": "lifx",
+      "data_schema": [
+       {
+        "type": "string",
+        "name": "host",
+        "required": false,
+        "optional": true,
+        "default": ""
+       }
+      ],
+      "errors": {},
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "user"
+     },
+     "events": [],
+     "requests": []
+    },
+    {
+     "api": "colour_swaps"
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin",
+      "sent": "{\"host\": \"192.0.2.20\"}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "create_entry",
+      "flow_id": "<flow:1>",
+      "handler": "lifx",
+      "description": null,
+      "description_placeholders": null,
+      "title": "Desk Lamp",
+      "minor_version": 1,
+      "options": {},
+      "subentries": [],
+      "version": 1,
+      "result": {
+       "created_at": "<ts>",
+       "entry_id": "<entry:1>",
+       "domain": "lifx",
+       "modified_at": "<ts>",
+       "title": "Desk Lamp",
+       "source": "user",
+       "state": "setup_retry",
+       "supports_options": false,
+       "supports_remove_device": false,
+       "supports_unload": true,
+       "supports_reconfigure": false,
+       "supported_subentry_types": {},
+       "pref_disable_new_entities": false,
+       "pref_disable_polling": false,
+       "disabled_by": null,
+       "reason": "Unexpected device found at 192.0.2.20; expected d0:73:d5:00:00:20, found d0:73:d5:00:00:2f",
+       "error_reason_translation_key": null,
+       "error_reason_translation_placeholders": null,
+       "num_subentries": 0
+      }
+     },
+     "events": [
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "added",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "lifx",
+          "modified_at": "<ts>",
+          "title": "Desk Lamp",
+          "source": "user",
+          "state": "not_loaded",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": false,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "lifx",
+          "modified_at": "<ts>",
+          "title": "Desk Lamp",
+          "source": "user",
+          "state": "setup_in_progress",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": false,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "lifx",
+          "modified_at": "<ts>",
+          "title": "Desk Lamp",
+          "source": "user",
+          "state": "setup_retry",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": true,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": "Unexpected device found at 192.0.2.20; expected d0:73:d5:00:00:20, found d0:73:d5:00:00:2f",
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      }
+     ],
+     "requests": [
+      {
+       "to": "192.0.2.20",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 1,
+       "type": 14,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.20",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 2,
+       "type": 32,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.20",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 3,
+       "type": 23,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.20",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 4,
+       "type": 51,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.20",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 1,
+       "type": 14,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.20",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 2,
+       "type": 32,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.20",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 3,
+       "type": 51,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.20",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 4,
+       "type": 101,
+       "payload": ""
+      }
+     ]
+    },
+    {
+     "ws": {
+      "user": "admin",
+      "msg": {
+       "type": "config_entries/get"
+      }
+     },
+     "replies": [
+      {
+       "type": "result",
+       "success": true,
+       "result": [
+        {
+         "created_at": "<ts>",
+         "entry_id": "<entry:1>",
+         "domain": "lifx",
+         "modified_at": "<ts>",
+         "title": "Desk Lamp",
+         "source": "user",
+         "state": "setup_retry",
+         "supports_options": false,
+         "supports_remove_device": false,
+         "supports_unload": true,
+         "supports_reconfigure": false,
+         "supported_subentry_types": {},
+         "pref_disable_new_entities": false,
+         "pref_disable_polling": false,
+         "disabled_by": null,
+         "reason": "Unexpected device found at 192.0.2.20; expected d0:73:d5:00:00:20, found d0:73:d5:00:00:2f",
+         "error_reason_translation_key": null,
+         "error_reason_translation_placeholders": null,
+         "num_subentries": 0
+        }
+       ]
+      }
+     ],
+     "events": [],
+     "requests": []
+    },
+    {
+     "http": {
+      "method": "DELETE",
+      "path": "/api/config/config_entries/entry/<entry:1>",
+      "user": "admin"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "require_restart": false
+     },
+     "events": [
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "lifx",
+          "modified_at": "<ts>",
+          "title": "Desk Lamp",
+          "source": "user",
+          "state": "not_loaded",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": true,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "removed",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "lifx",
+          "modified_at": "<ts>",
+          "title": "Desk Lamp",
+          "source": "user",
+          "state": "not_loaded",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": true,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      }
+     ],
+     "requests": []
+    },
+    {
+     "ws": {
+      "user": "admin",
+      "msg": {
+       "type": "config_entries/get"
+      }
+     },
+     "replies": [
+      {
+       "type": "result",
+       "success": true,
+       "result": []
+      }
+     ],
+     "events": [],
+     "requests": []
+    }
+   ],
+   "entries": [],
+   "deleted_devices": 0,
+   "deleted_entities": 0
+  },
+  {
+   "name": "remove",
+   "doc": "A set-up bulb is removed: its entry, device, entities and states go.",
+   "subscriptions": [
+    {
+     "sub": "entries",
+     "msg": {
+      "type": "config_entries/subscribe"
+     },
+     "first": [
+      {
+       "id": 1,
+       "type": "result",
+       "success": true,
+       "result": null
+      },
+      {
+       "id": 1,
+       "type": "event",
+       "event": []
+      }
+     ]
+    },
+    {
+     "sub": "flows",
+     "msg": {
+      "type": "config_entries/flow/subscribe"
+     },
+     "first": [
+      {
+       "id": 1,
+       "type": "event",
+       "event": []
+      },
+      {
+       "id": 1,
+       "type": "result",
+       "success": true,
+       "result": null
+      }
+     ]
+    }
+   ],
+   "steps": [
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow",
+      "user": "admin",
+      "sent": "{\"handler\": \"lifx\", \"show_advanced_options\": false}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "form",
+      "flow_id": "<flow:1>",
+      "handler": "lifx",
+      "data_schema": [
+       {
+        "type": "string",
+        "name": "host",
+        "required": false,
+        "optional": true,
+        "default": ""
+       }
+      ],
+      "errors": {},
+      "description_placeholders": null,
+      "last_step": null,
+      "preview": null,
+      "step_id": "user"
+     },
+     "events": [],
+     "requests": []
+    },
+    {
+     "http": {
+      "method": "POST",
+      "path": "/api/config/config_entries/flow/<flow:1>",
+      "user": "admin",
+      "sent": "{\"host\": \"192.0.2.20\"}"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "type": "create_entry",
+      "flow_id": "<flow:1>",
+      "handler": "lifx",
+      "description": null,
+      "description_placeholders": null,
+      "title": "Desk Lamp",
+      "minor_version": 1,
+      "options": {},
+      "subentries": [],
+      "version": 1,
+      "result": {
+       "created_at": "<ts>",
+       "entry_id": "<entry:1>",
+       "domain": "lifx",
+       "modified_at": "<ts>",
+       "title": "Desk Lamp",
+       "source": "user",
+       "state": "loaded",
+       "supports_options": false,
+       "supports_remove_device": false,
+       "supports_unload": true,
+       "supports_reconfigure": false,
+       "supported_subentry_types": {},
+       "pref_disable_new_entities": false,
+       "pref_disable_polling": false,
+       "disabled_by": null,
+       "reason": null,
+       "error_reason_translation_key": null,
+       "error_reason_translation_placeholders": null,
+       "num_subentries": 0
+      }
+     },
+     "events": [
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "added",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "lifx",
+          "modified_at": "<ts>",
+          "title": "Desk Lamp",
+          "source": "user",
+          "state": "not_loaded",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": false,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "lifx",
+          "modified_at": "<ts>",
+          "title": "Desk Lamp",
+          "source": "user",
+          "state": "setup_in_progress",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": false,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "lifx",
+          "modified_at": "<ts>",
+          "title": "Desk Lamp",
+          "source": "user",
+          "state": "loaded",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": true,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      }
+     ],
+     "requests": [
+      {
+       "to": "192.0.2.20",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 1,
+       "type": 14,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.20",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 2,
+       "type": 32,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.20",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 3,
+       "type": 23,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.20",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 4,
+       "type": 51,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.20",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 1,
+       "type": 14,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.20",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 2,
+       "type": 32,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.20",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 3,
+       "type": 51,
+       "payload": ""
+      },
+      {
+       "to": "192.0.2.20",
+       "tagged": true,
+       "target": "00:00:00:00:00:00",
+       "ack": false,
+       "res": true,
+       "seq": 4,
+       "type": 101,
+       "payload": ""
+      }
+     ]
+    },
+    {
+     "http": {
+      "method": "DELETE",
+      "path": "/api/config/config_entries/entry/<entry:1>",
+      "user": "admin"
+     },
+     "status": 200,
+     "content_type": "application/json",
+     "allow": null,
+     "json": {
+      "require_restart": false
+     },
+     "events": [
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "lifx",
+          "modified_at": "<ts>",
+          "title": "Desk Lamp",
+          "source": "user",
+          "state": "unload_in_progress",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": true,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "updated",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "lifx",
+          "modified_at": "<ts>",
+          "title": "Desk Lamp",
+          "source": "user",
+          "state": "not_loaded",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": true,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      },
+      {
+       "sub": "entries",
+       "event": [
+        {
+         "type": "removed",
+         "entry": {
+          "created_at": "<ts>",
+          "entry_id": "<entry:1>",
+          "domain": "lifx",
+          "modified_at": "<ts>",
+          "title": "Desk Lamp",
+          "source": "user",
+          "state": "not_loaded",
+          "supports_options": false,
+          "supports_remove_device": false,
+          "supports_unload": true,
+          "supports_reconfigure": false,
+          "supported_subentry_types": {},
+          "pref_disable_new_entities": false,
+          "pref_disable_polling": false,
+          "disabled_by": null,
+          "reason": null,
+          "error_reason_translation_key": null,
+          "error_reason_translation_placeholders": null,
+          "num_subentries": 0
+         }
+        }
+       ]
+      }
+     ],
+     "requests": []
+    },
+    {
+     "ws": {
+      "user": "admin",
+      "msg": {
+       "type": "config_entries/get"
+      }
+     },
+     "replies": [
+      {
+       "type": "result",
+       "success": true,
+       "result": []
+      }
+     ],
+     "events": [],
+     "requests": []
+    }
+   ],
+   "entries": [],
+   "deleted_devices": 1,
+   "deleted_entities": 4
+  }
+ ]
+}
