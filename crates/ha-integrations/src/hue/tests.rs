@@ -923,6 +923,8 @@ fn registering_leaves_has_rows_alone() {
     }
     assert_eq!(rows(&after), rows(&before));
     assert!(events.try_recv().is_err(), "a registry event was fired");
+    // And no copy of the registries was made for it.
+    assert!(Arc::ptr_eq(&before, &after));
 }
 
 /// On an install with no rows, the bridge's set-up makes the devices,

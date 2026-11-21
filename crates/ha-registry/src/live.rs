@@ -281,10 +281,42 @@ fn random_id() -> String {
     format!("{:032x}", rand::random::<u128>())
 }
 
-/// One write: a copy of the registries, and what to publish after it is
-/// swapped in.
+/// The registries during a write: the snapshot itself until the write
+/// changes something, a copy of it from then on. Most of what an
+/// integration asks at each start changes nothing (every row is there and
+/// matches); such a write copies and publishes nothing.
+enum Working {
+    Same(Arc<Registries>),
+    Changed(Registries),
+}
+
+impl std::ops::Deref for Working {
+    type Target = Registries;
+
+    fn deref(&self) -> &Registries {
+        match self {
+            Self::Same(r) => r,
+            Self::Changed(r) => r,
+        }
+    }
+}
+
+impl std::ops::DerefMut for Working {
+    fn deref_mut(&mut self) -> &mut Registries {
+        if let Self::Same(r) = self {
+            *self = Self::Changed((**r).clone());
+        }
+        match self {
+            Self::Changed(r) => r,
+            Self::Same(_) => unreachable!("copied above"),
+        }
+    }
+}
+
+/// One write: the registries (copied when first changed), and what to
+/// publish after the copy is swapped in.
 struct Tx {
-    r: Registries,
+    r: Working,
     events: Vec<(&'static str, Value)>,
     /// Entities given another id: the old id, and the row. A placeholder
     /// state under the old id moves once the events are out.
@@ -474,11 +506,12 @@ impl Registry {
 
     /// One write, start to finish under the writer lock: read and change a
     /// copy, swap it in, then publish its events and schedule the saves, so
-    /// lookups can't race creation and events come in commit order.
+    /// lookups can't race creation and events come in commit order. A
+    /// write that changes nothing makes no copy and swaps nothing in.
     fn write<T>(&self, f: impl FnOnce(&mut Tx) -> T) -> T {
         let _turn = self.writer.lock();
         let mut tx = Tx {
-            r: (*self.snapshot()).clone(),
+            r: Working::Same(self.snapshot()),
             events: Vec::new(),
             renamed: Vec::new(),
             save_entities: false,
@@ -486,7 +519,9 @@ impl Registry {
             save_areas: false,
         };
         let out = f(&mut tx);
-        *self.snap.write() = Arc::new(tx.r);
+        if let Working::Changed(r) = tx.r {
+            *self.snap.write() = Arc::new(r);
+        }
         for (which, save) in [tx.save_entities, tx.save_devices, tx.save_areas]
             .into_iter()
             .enumerate()

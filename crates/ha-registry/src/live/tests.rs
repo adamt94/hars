@@ -1432,3 +1432,66 @@ fn only_old_names_lose_the_device_prefix_in_a_new_id() {
     assert_eq!(make("new", true), "scene.bedroom_bedroom_wake");
     assert_eq!(make("old", false), "scene.bedroom_wake");
 }
+
+/// What an integration asks at every start, when the rows are there and
+/// match, changes nothing: no copy of the registries is made or swapped
+/// in (the snapshot stays the very same one), nothing is fired, nothing
+/// is saved. A row that differs is still changed.
+#[test]
+fn asking_for_rows_that_match_copies_and_publishes_nothing() {
+    let hass = Hass::new();
+    let reg = Registry::in_memory(&hass, Registries::default());
+    let device = || DeviceInfo {
+        config_entry_id: "e".into(),
+        identifiers: vec![json!(["hue", "uuid-1"])],
+        connections: vec![json!(["mac", "AA:BB:CC:00:00:01"])],
+        manufacturer: Some("Signify".into()),
+        model: Some("Lamp".into()),
+        name: Some("Lamp".into()),
+        suggested_area: Some("Den".into()),
+        ..Default::default()
+    };
+    let row = |name: &str| EntityPatch {
+        capabilities: Some(Some(json!({"supported_color_modes": ["xy"]}))),
+        config_entry_id: Some(Some("e".into())),
+        has_entity_name: Some(true),
+        original_name: Some(Some(name.to_owned())),
+        unit_of_measurement: Some(None),
+        pref_disable_new: true,
+        ..Default::default()
+    };
+    let made = reg.get_or_create_device(device());
+    let via = DeviceInfo {
+        identifiers: vec![json!(["hue", "uuid-2"])],
+        connections: Vec::new(),
+        via_device: Some(json!(["hue", "uuid-1"])),
+        ..device()
+    };
+    reg.get_or_create_device(via.clone());
+    let entity = reg.get_or_create_entity("light", "hue", "u1", None, row("Lamp"));
+    let before = reg.snapshot();
+    let mut events = hass.bus().subscribe();
+    assert_eq!(reg.get_or_create_device(device()).id, made.id);
+    reg.get_or_create_device(via);
+    let again = reg.get_or_create_entity("light", "hue", "u1", None, row("Lamp"));
+    assert!(Arc::ptr_eq(&again, &entity));
+    let same = EntityPatch {
+        options: Some(json!({})),
+        ..Default::default()
+    };
+    assert_eq!(reg.update_entity(&entity.entity_id, same), None);
+    assert!(
+        Arc::ptr_eq(&before, &reg.snapshot()),
+        "the registries were copied for a call that changed nothing"
+    );
+    assert!(events.try_recv().is_err(), "something was fired");
+    // One that differs still is.
+    reg.get_or_create_entity("light", "hue", "u1", None, row("Reading lamp"));
+    let after = reg.snapshot();
+    assert!(!Arc::ptr_eq(&before, &after));
+    assert_eq!(
+        after.entities[0].original_name.as_deref(),
+        Some("Reading lamp")
+    );
+    assert!(events.try_recv().is_ok());
+}

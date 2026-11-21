@@ -1117,5 +1117,17 @@ pub async fn run(
     bridge.listen().await;
 }
 
+/// What set-up does about the registries once it has read a bridge's
+/// `resources`: for `benches/hue_register.rs`.
+#[doc(hidden)]
+pub fn register_rows(
+    hass: &Hass,
+    registry: &ha_registry::Registry,
+    entry_id: &str,
+    resources: Vec<Value>,
+) {
+    register::register(hass, registry, entry_id, &Store::new(resources), false);
+}
+
 #[cfg(test)]
 mod tests;

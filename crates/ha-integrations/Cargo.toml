@@ -36,3 +36,7 @@ tokio = { version = "1.54.1", features = ["macros", "rt", "rt-multi-thread", "te
 [[bench]]
 name = "switchbot"
 harness = false
+
+[[bench]]
+name = "hue_register"
+harness = false
