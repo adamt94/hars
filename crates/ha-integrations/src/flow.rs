@@ -19,6 +19,10 @@
 //!   entry and logs that the integration should have aborted.
 //! - The flow leaves the list when its entry is made, before the entry's
 //!   setup ends (HA removes it after).
+//! - A flow deleted while one of its steps runs (a request waiting for a
+//!   device) ends that step there, with what it holds (a socket, a
+//!   timer). HA lets the step run to its end; the request's answer is the
+//!   same (`UnknownFlow`).
 //! - An integration with no way to stop (all but `switchbot_cloud` and
 //!   `mobile_app`) is removed as HA removes one that can't unload: the
 //!   entry and its registry rows go, and its entities stay until a

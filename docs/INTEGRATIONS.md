@@ -190,10 +190,11 @@ Not yet:
 
 - The `lifx.*` services: effects, `lifx.set_state`, and themes.
 - The signal-strength sensor's readings.
-- Saving a bulb's new IP address. hars finds a bulb that moved, but it
-  searches again after a restart. The installer's set-up for Docker Desktop
-  on a Mac or on Windows publishes one port, so hars can't search there.
-  Give each bulb a fixed address.
+- Finding a bulb that moved where hars can't search. hars searches for
+  each of its bulbs 5 seconds after it starts and every 15 minutes, and
+  saves the new address of one that moved, as Home Assistant does. The
+  installer's set-up for Docker Desktop on a Mac or on Windows publishes one
+  port, so hars can't search there. Give each bulb a fixed address.
 
 hars has been checked against one colour bulb.
 
