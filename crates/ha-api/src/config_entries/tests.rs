@@ -1549,6 +1549,107 @@ async fn a_bridge_without_the_v2_api_makes_no_entry() {
     assert_eq!(flows.in_progress(), 0);
 }
 
+/// An install that has the same bridge twice (an import can bring that),
+/// the first entry disabled or ignored: the first is not set up, so it is
+/// not in the second's way, and the second runs the bridge. HA's Hue
+/// set-up looks for another entry only when its own id is stale.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn the_usable_entry_of_a_bridge_listed_twice_is_set_up() {
+    use ha_integrations::config_entries::EntryState;
+    let (base, _api) = FakeApi::start().await;
+    let endpoints = Endpoints {
+        hue_bridge: Some(base),
+        ..Default::default()
+    };
+    for (why, source, disabled_by) in [
+        ("disabled", "user", json!("user")),
+        ("ignored", "ignore", json!(null)),
+    ] {
+        let hass = Hass::new();
+        let entries = ConfigEntries::in_memory(&hass, Vec::new());
+        let mut ids = Vec::new();
+        for (source, disabled_by) in [(source, disabled_by), ("user", json!(null))] {
+            let data = json!({"host": HUE_HOST, "api_key": HUE_KEY, "api_version": 2});
+            let data = data.as_object().unwrap().clone();
+            let mut entry =
+                entries.new_entry("hue", source, "Hue Bridge", Some("c42996000001"), data);
+            entry.insert("disabled_by".into(), disabled_by);
+            ids.push(entry["entry_id"].as_str().unwrap().to_owned());
+            entries.add(entry);
+        }
+        let registry = ha_registry::Registry::in_memory(&hass, Default::default());
+        let lookup = entries.clone();
+        registry.set_entry_lookup(Arc::new(move |id: &str| lookup.info(id)));
+        let stored = entries.list();
+        let _started = ha_integrations::start(
+            &hass,
+            registry.clone().into(),
+            stored.as_deref(),
+            Default::default(),
+            &endpoints,
+            Some(&entries),
+        );
+        hass.setups_done().await;
+        assert_eq!(
+            entries.runtime(&ids[0]),
+            None,
+            "{why}: the first was set up"
+        );
+        assert_eq!(
+            entries.runtime(&ids[1]).map(|r| r.state),
+            Some(EntryState::Loaded),
+            "{why}: the second, usable entry was not set up"
+        );
+        let lamp = ha_core::EntityId::parse("light.living_room_lamp").unwrap();
+        assert!(hass.states().get(&lamp).is_some(), "{why}");
+        let rows = registry.snapshot();
+        assert!(!rows.entities.is_empty());
+        assert!(
+            rows.entities
+                .iter()
+                .all(|e| e.config_entry_id.as_deref() == Some(ids[1].as_str())),
+            "{why}"
+        );
+    }
+}
+
+/// An ignored entry is `not_loaded`, as in HA, though another entry of its
+/// integration is set up and its integration so is loaded; and removing
+/// it needs no restart, since nothing of it runs.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn an_ignored_entry_is_not_loaded_and_goes_without_a_restart() {
+    use ha_integrations::flow::FlowResult;
+    let home = home().await;
+    let flows = home.config.flows.clone().unwrap();
+    home.api.set("pressed");
+    let answers = [Some(json!({"id": "c42996000001"})), Some(json!({}))];
+    let added = hue_flow(&flows, &answers).await;
+    assert!(matches!(added, FlowResult::CreateEntry { .. }), "{added:?}");
+    let ignored = home.entries.new_entry(
+        "hue",
+        "ignore",
+        "Another bridge",
+        Some("c42996000002"),
+        Default::default(),
+    );
+    let id = ignored["entry_id"].as_str().unwrap().to_owned();
+    home.entries.add(ignored);
+    let mut socket = Socket::open(&home, "admin").await;
+    let replies = socket.call(&json!({"type": "config_entries/get"})).await;
+    let listed = replies.last().unwrap()["result"]
+        .as_array()
+        .unwrap()
+        .clone();
+    let state = |source: &str| {
+        let entry = listed.iter().find(|e| e["source"] == source).unwrap();
+        entry["state"].clone()
+    };
+    assert_eq!(state("user"), "loaded");
+    assert_eq!(state("ignore"), "not_loaded");
+    assert_eq!(flows.remove_entry(&id).await, Some(false));
+    assert_eq!(home.entries.list().unwrap().len(), 1);
+}
+
 /// A bridge's whole life on one config directory, each start of `hars` in
 /// a runtime of its own (so the one before has really stopped), against
 /// a bridge that outlives them.

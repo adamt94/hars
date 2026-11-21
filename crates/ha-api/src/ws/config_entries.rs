@@ -223,7 +223,12 @@ pub(crate) fn entry_json_at(
         // HA learns `supports_unload` when it loads the integration for
         // the entry's setup.
         Some(r) => (r.state.as_str(), r.reason, unload && r.integration_loaded),
-        None if !disabled && crate::components(config).contains(&domain) => {
+        // An ignored entry is never set up (`not_loaded` in HA), whatever
+        // other entries of its integration do.
+        None if !disabled
+            && str_of("source") != Some("ignore")
+            && crate::components(config).contains(&domain) =>
+        {
             ("loaded", None, unload)
         }
         None => ("not_loaded", None, unload),

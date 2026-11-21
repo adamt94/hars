@@ -216,10 +216,8 @@ pub fn start(
             .unwrap_or_default()
             .iter()
             .filter(move |e| field(e, "domain").as_deref() == Some(domain))
-            .filter(|e| e.get("disabled_by").is_none_or(Value::is_null))
-            // `ConfigEntry.async_setup`: an ignored entry is never set up.
-            .filter(|e| !config_entries::ignored(e))
-            .filter(|e| !entry_too_new(e))
+            // Not disabled, ignored or of a newer flow version.
+            .filter(|e| config_entries::eligible(e))
     };
     // `ConfigEntry.async_migrate`'s error for an entry no migration reaches.
     for e in entries

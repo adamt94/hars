@@ -213,6 +213,16 @@ pub(crate) fn ignored(entry: &Map<String, Value>) -> bool {
     entry.get("source").and_then(Value::as_str) == Some("ignore")
 }
 
+/// Whether an entry is one that gets set up (`ConfigEntry.async_setup`
+/// and `async_migrate`): not disabled, not ignored, and not written by a
+/// newer version of its config flow than `hars` runs. The rule for
+/// start-up, and for who may be the one entry for a unique id.
+pub(crate) fn eligible(entry: &Map<String, Value>) -> bool {
+    entry.get("disabled_by").is_none_or(Value::is_null)
+        && !ignored(entry)
+        && !crate::entry_too_new(entry)
+}
+
 fn tell(listeners: &mut Vec<(Live, Listener)>, change: Change, entry: &Map<String, Value>) {
     if listeners.is_empty() {
         return;
@@ -496,9 +506,12 @@ impl ConfigEntries {
     /// taken in one step: of two entries that find out at the same moment
     /// that they are for the same thing, one gets it.
     ///
-    /// False if another entry that isn't ignored is the one: it has the
-    /// unique id and this entry doesn't, or both have it and the other is
-    /// listed first. The caller then doesn't start this entry.
+    /// False if another entry that gets set up ([`eligible`]) is the one:
+    /// it has the unique id and this entry doesn't, or both have it and
+    /// the other is listed first. The caller then doesn't start this
+    /// entry. An entry that is disabled or ignored runs nothing, so it
+    /// is in nobody's way: the usable entry of an install that has the
+    /// same bridge twice, once disabled, is set up.
     pub fn claim_unique_id(&self, domain: &str, entry_id: &str, unique_id: &str) -> bool {
         let mut listeners = self.listeners.lock();
         {
@@ -520,7 +533,7 @@ impl ConfigEntries {
             let taken = list
                 .iter()
                 .enumerate()
-                .any(|(i, e)| i != me && has(e) && !ignored(e) && (!mine || i < me));
+                .any(|(i, e)| i != me && has(e) && eligible(e) && (!mine || i < me));
             if taken {
                 return false;
             }
@@ -857,6 +870,21 @@ mod tests {
         }
         assert!(entries.claim_unique_id("hue", "g", "three"));
         assert!(!entries.claim_unique_id("hue", "h", "three"));
+        // A disabled entry that is first with an id is in nobody's way
+        // either, whether the other came with the id or learns it.
+        let mut off = entry("i", "user", json!("five"), json!({}), json!({}));
+        off.insert("disabled_by".into(), json!("user"));
+        entries.add(off);
+        entries.add(entry("j", "user", json!("five"), json!({}), json!({})));
+        entries.add(entry("k", "user", json!(null), json!({}), json!({})));
+        assert!(entries.claim_unique_id("hue", "j", "five"));
+        assert!(!entries.claim_unique_id("hue", "k", "five"), "j has it");
+        // Nor is one of a newer version of its flow, which isn't set up.
+        let mut newer = entry("l", "user", json!("six"), json!({}), json!({}));
+        newer.insert("version".into(), json!(99));
+        entries.add(newer);
+        entries.add(entry("m", "user", json!(null), json!({}), json!({})));
+        assert!(entries.claim_unique_id("hue", "m", "six"));
         assert_eq!(
             entries.find_unique("hue", "three").unwrap()["entry_id"],
             "g"

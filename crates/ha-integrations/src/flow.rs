@@ -858,7 +858,10 @@ impl Manager {
         let app = self.mobile_app.as_ref().filter(|_| {
             entry.get("domain").and_then(Value::as_str) == Some(crate::mobile_app::DOMAIN)
         });
-        let disabled = entry.get("disabled_by").is_some_and(|d| !d.is_null());
+        // A disabled entry runs nothing, and neither does an ignored one:
+        // there is nothing to stop, so no restart is needed.
+        let disabled = entry.get("disabled_by").is_some_and(|d| !d.is_null())
+            || crate::config_entries::ignored(&entry);
         let unloads = !disabled && (task.is_some() || app.is_some());
         // `async_unload`: a loaded entry unloads; one that isn't (its
         // setup failed, or waits to be tried again) only stops.

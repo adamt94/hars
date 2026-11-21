@@ -548,6 +548,15 @@ async fn an_error_that_names_the_key_has_it_replaced() {
         assert!(text.contains("http://[bad/***"), "{text}");
         assert!(!text.contains(KEY), "{text}");
     }
+    // A status error names the request's URL, and with it a resource's
+    // id, which the bridge gave: a service's error would show it.
+    let reply = "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+    let api = Api::at(&answering(reply.to_owned()).await, KEY);
+    let err = api.put("scene", KEY, &json!({})).await.unwrap_err();
+    assert!(matches!(err, ApiError::Status { .. }), "{err:?}");
+    let text = err.service_message().unwrap();
+    assert!(text.contains("/clip/v2/resource/scene/***"), "{text}");
+    assert!(!text.contains(KEY), "{text}");
 }
 
 /// The bridge's device is the one with the `bridge` resource itself among
