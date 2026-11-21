@@ -610,10 +610,49 @@ impl ConfigEntries {
         })
     }
 
+    /// One field of an entry's data, `key`, goes from `was` to `value`, if
+    /// it is still `was`: looked at and changed under one write lock, so a
+    /// newer value written meanwhile (a flow's) is never overwritten. The
+    /// rest of the data stays. `modified_at`, the save and the listeners as
+    /// [`ConfigEntries::update_data`]. `false` if nothing changed.
+    pub fn replace_data_value(&self, entry_id: &str, key: &str, was: &str, value: &str) -> bool {
+        #[cfg(test)]
+        tests::before_write();
+        let mut listeners = self.listeners.lock();
+        {
+            let mut guard = self.entries.write();
+            let Some(entry) = guard
+                .iter_mut()
+                .flatten()
+                .find(|e| e.get("entry_id").and_then(Value::as_str) == Some(entry_id))
+            else {
+                return false;
+            };
+            let Some(Value::Object(data)) = entry.get_mut("data") else {
+                return false;
+            };
+            if data.get(key).and_then(Value::as_str) != Some(was) || was == value {
+                return false;
+            }
+            data.insert(key.to_owned(), Value::String(value.to_owned()));
+            entry.insert(
+                "modified_at".into(),
+                Value::String(ha_core::isoformat(self.hass.clock().now())),
+            );
+        }
+        self.schedule();
+        if let Some(entry) = self.get(entry_id) {
+            tell(&mut listeners, Change::Updated, &entry);
+        }
+        true
+    }
+
     /// `async_update_entry(entry, data=…)`: when the data differs it is
     /// replaced, `modified_at` moves and the save is scheduled. `false`
     /// for no change (or no such entry).
     pub fn update_data(&self, entry_id: &str, data: Map<String, Value>) -> bool {
+        #[cfg(test)]
+        tests::before_write();
         let mut listeners = self.listeners.lock();
         {
             let mut guard = self.entries.write();
@@ -669,8 +708,28 @@ impl ConfigEntries {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
+
+    thread_local! {
+        /// What this thread does at the start of its next write of an
+        /// entry's data, before it looks at the entry: a test makes another
+        /// writer come first there.
+        static BEFORE_WRITE: std::cell::RefCell<Option<Box<dyn FnOnce()>>> =
+            const { std::cell::RefCell::new(None) };
+    }
+
+    pub(crate) fn before_write() {
+        let hook = BEFORE_WRITE.with(|hook| hook.borrow_mut().take());
+        if let Some(hook) = hook {
+            hook();
+        }
+    }
+
+    /// Run `hook` at the start of this thread's next write of entry data.
+    pub(crate) fn set_before_write(hook: impl FnOnce() + 'static) {
+        BEFORE_WRITE.with(|h| *h.borrow_mut() = Some(Box::new(hook)));
+    }
 
     /// HA's own files (the registry-write runs) are written back byte for
     /// byte.

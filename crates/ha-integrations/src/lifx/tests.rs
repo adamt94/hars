@@ -723,3 +723,29 @@ async fn nothing_is_registered_in_a_store_that_cant_be_written() {
     assert_eq!(rssi.disabled_by.as_deref(), Some("integration"));
     assert_eq!(after.entities.len(), 4);
 }
+
+/// Rediscovery found the bulb at B, where its entry had A; a flow writes C
+/// between rediscovery reading the entry and writing it. C stands: the
+/// address is looked at and written in one step, under the entries' lock.
+#[test]
+fn a_newer_host_is_not_overwritten_by_rediscovery() {
+    use crate::config_entries::ConfigEntries;
+    let hass = Hass::new();
+    let host = |h: &str| json!({"host": h}).as_object().unwrap().clone();
+    let entries = ConfigEntries::in_memory(&hass, Vec::new());
+    let mut entry = entries.new_entry("lifx", "user", "Bulb", Some(UID), host("192.0.2.1"));
+    entry.insert("entry_id".into(), json!("e"));
+    entries.add(entry);
+    let flow = entries.clone();
+    crate::config_entries::tests::set_before_write(move || {
+        flow.update_data("e", host("192.0.2.3"));
+    });
+    assert!(!save_host(&entries, "e", "192.0.2.1", "192.0.2.2"));
+    assert_eq!(entries.get("e").unwrap()["data"]["host"], "192.0.2.3");
+    // With no newer address, rediscovery's is saved, and only the host.
+    assert!(save_host(&entries, "e", "192.0.2.3", "192.0.2.2"));
+    assert_eq!(
+        entries.get("e").unwrap()["data"],
+        json!({"host": "192.0.2.2"})
+    );
+}

@@ -790,14 +790,8 @@ pub async fn run(
     // discovery flow writes it. Not if the entry's address changed since
     // this task read it (a flow wrote a newer one): that one stands.
     let save_host = |was: &str, host: &str| {
-        if let Some((entries, id)) = status.entry()
-            && let Some(mut data) = entries
-                .get(id)
-                .and_then(|e| e.get("data")?.as_object().cloned())
-            && data.get("host").and_then(Value::as_str) == Some(was)
-        {
-            data.insert("host".into(), json!(host));
-            entries.update_data(id, data);
+        if let Some((entries, id)) = status.entry() {
+            save_host(entries, id, was, host);
         }
     };
     let (found_tx, mut found_rx) = mpsc::unbounded_channel::<String>();
@@ -906,6 +900,18 @@ pub async fn run(
         components.let_go(&unique_id, &entry_id);
         runs_it.3 = false;
     }
+}
+
+/// A bulb found at `host`, where its entry had `was`: the entry has `host`
+/// from now on, unless its address is no longer `was` (a flow wrote a newer
+/// one: that one stands). Looked at and written in one step.
+pub(crate) fn save_host(
+    entries: &crate::config_entries::ConfigEntries,
+    entry_id: &str,
+    was: &str,
+    host: &str,
+) -> bool {
+    entries.replace_data_value(entry_id, "host", was, host)
 }
 
 /// Broadcast `GetService` every 15 min (and 5 s after start), listening
