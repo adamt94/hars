@@ -25,6 +25,10 @@ It writes, in crates/ha-integrations/src/lifx/vectors/imported/:
   (checked: the same as after the second, so HA itself changes nothing on
   a start), and `states.json`: the entities' states then. A start of
   `hars` on these files must leave them byte for byte;
+- `duplicate.json`: a second entry for the colour bulb, at another of its
+  addresses, added once the first is set up (an imported install can have
+  two): the entries and the device and entity rows after its set-up, the
+  first entry as `<first>` and the second as `<second>`;
 - `restored.json`: rows the user removed come back at the next start,
   once with the colour entry's "new entities start disabled" on and once
   with it off. Before that start the stores are the files above but for
@@ -118,6 +122,42 @@ def remove_rows(hass):
         entities.async_remove(entities.async_get_entity_id(domain, "lifx", unique_id))
 
 
+async def duplicate(fake):
+    """The colour bulb added, then a second entry for it at its other
+    address: the stores after the second's set-up."""
+    from types import MappingProxyType
+
+    from homeassistant.config_entries import ConfigEntry
+
+    tmp = pathlib.Path(tempfile.mkdtemp())
+    try:
+        hass = await hr.boot(tmp, fake)
+        first = await add(hass, lf.COLOUR)
+        second = ConfigEntry(data={"host": lf.ALIAS}, discovery_keys=MappingProxyType({}),
+                             domain="lifx", minor_version=1, options={}, source="user",
+                             subentries_data=None, title="Desk Lamp",
+                             unique_id=lf.COLOUR_SERIAL, version=1)
+        await hass.config_entries.async_add(second)
+        await hr.settle(hass)
+        states = sorted(s.entity_id for s in hass.states.async_all()
+                        if s.entity_id.split(".")[0] in ("light", "button", "sensor"))
+        files = hr.in_order(await hr.stop(hass, tmp))
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    text = {name: files[name].replace(first.entry_id, "<first>")
+            .replace(second.entry_id, "<second>") for name in STORES}
+    normal = hr.Normal()
+    return normal.value({
+        "doc": "A second entry for the colour bulb, at another of its addresses, added"
+               " once the first is set up: the stores after its set-up, and the"
+               " entities that have a state.",
+        "entries": json.loads(text["core.config_entries"])["data"]["entries"],
+        "devices": json.loads(text["core.device_registry"])["data"]["devices"],
+        "entities": json.loads(text["core.entity_registry"])["data"]["entities"],
+        "states": states,
+    })
+
+
 def colour_entry(hass):
     return next(e for e in hass.config_entries.async_entries("lifx")
                 if e.unique_id == lf.COLOUR_SERIAL)
@@ -130,6 +170,7 @@ async def main():
         sys.exit(f"aiolifx is {found}, the vectors are pinned to {lf.AIOLIFX}")
     fake = Fake()
     await fake.start()
+    duplicated = await duplicate(fake)
     tmp = pathlib.Path(tempfile.mkdtemp())
     scratch = []
     try:
@@ -184,6 +225,7 @@ async def main():
     for name in STORES:
         (OUT / name).write_text(normal.text(imported[name]))
     cf.write(OUT / "states.json", normal.value(states))
+    cf.write(OUT / "duplicate.json", duplicated)
     kept = json.loads(imported["core.entity_registry"])["data"]["entities"]
     cases = []
     for disable_new, before, after in restored:

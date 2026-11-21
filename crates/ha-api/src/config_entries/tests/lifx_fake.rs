@@ -42,6 +42,10 @@ struct Bulb {
     ip: &'static str,
     sock: Arc<UdpSocket>,
     state: Arc<Mutex<State>>,
+    /// How long this address takes to answer.
+    delay: Mutex<Duration>,
+    /// Where its last datagram came from.
+    from: Mutex<Option<SocketAddr>>,
 }
 
 pub struct LifxFake {
@@ -212,6 +216,8 @@ impl LifxFake {
                 ip,
                 sock: Arc::new(sock),
                 state,
+                delay: Mutex::new(Duration::ZERO),
+                from: Mutex::new(None),
             });
         }
         let broadcast = Arc::new(UdpSocket::bind("127.0.0.1:0").await.unwrap());
@@ -252,8 +258,13 @@ impl LifxFake {
                 let mut buf = vec![0u8; 1024];
                 while let Ok((n, from)) = bulb.sock.recv_from(&mut buf).await {
                     this.frames.lock().extend(record(bulb.ip, &buf[..n]));
+                    *bulb.from.lock() = Some(from);
                     if !bulb.state.lock().unicast {
                         continue;
+                    }
+                    let delay = *bulb.delay.lock();
+                    if !delay.is_zero() {
+                        tokio::time::sleep(delay).await;
                     }
                     for out in reply(&bulb.state, &buf[..n]) {
                         let _ = bulb.sock.send_to(&out, from).await;
@@ -290,6 +301,25 @@ impl LifxFake {
             _ => return false,
         }
         true
+    }
+
+    /// What is sent to `ip` is answered `delay` later.
+    pub fn set_delay(&self, ip: &str, delay: Duration) {
+        *self.bulbs.iter().find(|b| b.ip == ip).unwrap().delay.lock() = delay;
+    }
+
+    /// Where the last datagram to `ip` came from.
+    pub fn last_from(&self, ip: &str) -> Option<SocketAddr> {
+        *self.bulbs.iter().find(|b| b.ip == ip).unwrap().from.lock()
+    }
+
+    /// How many broadcasts came.
+    pub fn broadcasts(&self) -> usize {
+        self.frames
+            .lock()
+            .iter()
+            .filter(|f| f["to"] == "broadcast")
+            .count()
     }
 
     /// The bulb at `ip` says it is another product.

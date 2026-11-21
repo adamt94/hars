@@ -14,7 +14,11 @@ use ha_registry::{DeviceInfo, EntityPatch, Registry};
 use serde_json::{Value, json};
 
 /// Register the bulb's device, then its entities. `disable_new` is the
-/// entry's `pref_disable_new_entities`.
+/// entry's `pref_disable_new_entities`. `duplicate`: another entry runs the
+/// bulb; as HA's platform refuses an entity whose unique id a running
+/// entity has, a row that is enabled (the other entry runs it) is left as
+/// it is, and the rest (a disabled row) is registered to this entry, as in
+/// HA.
 ///
 /// Nothing is registered when the device or entity store can't be written
 /// (an install imported from an older Home Assistant): rows made now would
@@ -26,6 +30,7 @@ pub(super) fn register(
     entry_id: &str,
     found: &Found,
     disable_new: bool,
+    duplicate: bool,
 ) {
     if registry.read_only().is_some() {
         return;
@@ -44,6 +49,12 @@ pub(super) fn register(
         ..Default::default()
     });
     let device_disabled = device.disabled_by.is_some();
+    let runs_elsewhere = |domain: &str, unique_id: &str| {
+        duplicate
+            && registry
+                .entity_by_unique_id(domain, DOMAIN, unique_id)
+                .is_some_and(|row| row.disabled_by.is_none())
+    };
     let patch = || EntityPatch {
         config_entry_id: Some(Some(entry_id.to_owned())),
         device_id: Some(Some(device.id.clone())),
@@ -76,6 +87,9 @@ pub(super) fn register(
     // `button`: restart, then identify.
     for (key, name) in [("restart", "Restart"), ("identify", "Identify")] {
         let unique_id = format!("{serial}_{key}");
+        if runs_elsewhere("button", &unique_id) {
+            continue;
+        }
         let (original_name, object_id_base) = named("button", &unique_id, name);
         let row = EntityPatch {
             capabilities: Some(None),
@@ -109,8 +123,10 @@ pub(super) fn register(
         unit_of_measurement: Some(None),
         ..patch()
     };
-    let made = registry.get_or_create_entity("light", DOMAIN, &serial, None, row);
-    settle(&made);
+    if !runs_elsewhere("light", &serial) {
+        let made = registry.get_or_create_entity("light", DOMAIN, &serial, None, row);
+        settle(&made);
+    }
 
     // `sensor`: the RSSI, disabled by default.
     let unique_id = format!("{serial}_rssi");
@@ -127,6 +143,8 @@ pub(super) fn register(
         ..patch()
     };
     let disabled = Some("integration".to_owned());
-    let made = registry.get_or_create_entity("sensor", DOMAIN, &unique_id, disabled, row);
-    settle(&made);
+    if !runs_elsewhere("sensor", &unique_id) {
+        let made = registry.get_or_create_entity("sensor", DOMAIN, &unique_id, disabled, row);
+        settle(&made);
+    }
 }

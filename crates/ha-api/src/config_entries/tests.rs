@@ -1836,6 +1836,7 @@ async fn lifx_duplicates_and_ignored_entries_as_hue_s() {
 async fn lifx_home(
     entries: Vec<Map<String, Value>>,
     rows: ha_registry::Registries,
+    prepare: impl FnOnce(&mut Endpoints, &lifx_fake::LifxFake),
 ) -> (
     Hass,
     Arc<ConfigEntries>,
@@ -1850,6 +1851,7 @@ async fn lifx_home(
     };
     // Rediscovery soon after start.
     endpoints.lifx.timing.rediscover_after = std::time::Duration::from_millis(50);
+    prepare(&mut endpoints, &api.lifx);
     let hass = Hass::new();
     let store = ConfigEntries::in_memory(&hass, entries);
     let registry = ha_registry::Registry::in_memory(&hass, rows);
@@ -1944,7 +1946,7 @@ async fn a_lifx_bulbs_rows_move_from_the_old_shared_entry() {
         lifx_entry(&hass, "legacy", None, None),
         lifx_entry(&hass, "bulb", Some(serial), Some(lifx_fake::SILENT)),
     ];
-    let (hass, _store, registry, flows, _api) = lifx_home(entries, rows).await;
+    let (hass, _store, registry, flows, _api) = lifx_home(entries, rows, |_, _| {}).await;
     hass.setups_done().await;
     let r = registry.snapshot();
     assert_eq!(r.devices[0].config_entries, ["bulb"]);
@@ -1972,7 +1974,8 @@ async fn a_lifx_bulb_found_elsewhere_moves_its_entry() {
         Some("d0:73:d5:00:00:20"),
         Some(lifx_fake::SILENT),
     )];
-    let (hass, store, _registry, _flows, _api) = lifx_home(entries, Default::default()).await;
+    let (hass, store, _registry, _flows, _api) =
+        lifx_home(entries, Default::default(), |_, _| {}).await;
     hass.setups_done().await;
     until("set up at the new address", || {
         store.runtime("bulb").map(|r| r.state) == Some(EntryState::Loaded)
@@ -1999,7 +2002,8 @@ async fn the_reachable_entry_of_a_lifx_bulb_listed_twice_runs_it() {
         lifx_entry(&hass, "stale", Some(serial), Some(lifx_fake::SILENT)),
         lifx_entry(&hass, "good", Some(serial), Some(lifx_fake::COLOUR)),
     ];
-    let (hass, store, registry, _flows, api) = lifx_home(entries, Default::default()).await;
+    let (hass, store, registry, _flows, api) =
+        lifx_home(entries, Default::default(), |_, _| {}).await;
     // Rediscovery would move the stale one to the bulb: no broadcast here.
     api.lifx.set("discovery_none");
     drop(api);
@@ -2021,34 +2025,100 @@ async fn the_reachable_entry_of_a_lifx_bulb_listed_twice_runs_it() {
     );
 }
 
-/// Two entries that both reach one bulb: the first to reach it runs it, the
-/// other is set up with no entities (HA sets it up and refuses its
-/// entities, their unique ids being taken), and stays ready for a reload.
+/// Two entries that both reach one bulb, as HA 2026.6.1 has them
+/// (`vectors/imported/duplicate.json`, from `scripts/vectors/lifx_rows.py`):
+/// both are `loaded`; the first to reach the bulb runs it and keeps the
+/// light's and the buttons' rows; the second has the device too (the first
+/// stays its primary entry) and takes the disabled RSSI row. The second then
+/// holds nothing while it waits: its socket is closed and it searches for
+/// nothing.
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn a_second_lifx_entry_for_a_reachable_bulb_loads_without_entities() {
+async fn a_second_lifx_entry_for_a_reachable_bulb_is_as_in_home_assistant() {
     use ha_integrations::config_entries::EntryState;
+    let ha: Value = serde_json::from_str(include_str!(
+        "../../../ha-integrations/src/lifx/vectors/imported/duplicate.json"
+    ))
+    .unwrap();
     let hass = Hass::new();
     let serial = "d0:73:d5:00:00:20";
     let entries = vec![
-        lifx_entry(&hass, "one", Some(serial), Some(lifx_fake::COLOUR)),
-        lifx_entry(&hass, "two", Some(serial), Some(lifx_fake::ALIAS)),
+        lifx_entry(&hass, "<first>", Some(serial), Some(lifx_fake::COLOUR)),
+        lifx_entry(&hass, "<second>", Some(serial), Some(lifx_fake::ALIAS)),
     ];
-    let (hass, store, registry, _flows, _api) = lifx_home(entries, Default::default()).await;
+    let wait = std::time::Duration::from_millis(30);
+    let (hass, store, registry, _flows, api) =
+        lifx_home(entries, Default::default(), |endpoints, lifx| {
+            // The second reaches the bulb once the first runs it; the
+            // first's search comes after that.
+            lifx.set_delay(lifx_fake::ALIAS, wait);
+            endpoints.lifx.timing.rediscover_after = std::time::Duration::from_secs(3);
+        })
+        .await;
     hass.setups_done().await;
     until("both loaded", || {
-        ["one", "two"]
+        ["<first>", "<second>"]
             .iter()
             .all(|id| store.runtime(id).map(|r| r.state) == Some(EntryState::Loaded))
     })
     .await;
-    let owners: std::collections::BTreeSet<String> = registry
-        .snapshot()
-        .entities
-        .iter()
-        .filter_map(|e| e.config_entry_id.clone())
-        .collect();
-    assert_eq!(owners.len(), 1, "one entry has the rows: {owners:?}");
-    assert_eq!(registry.snapshot().entities.len(), 4);
+    let rows = registry.snapshot();
+    let device = &rows.devices[0];
+    let set = |v: &Value| -> std::collections::BTreeSet<String> {
+        v.as_array()
+            .unwrap()
+            .iter()
+            .map(|e| e.as_str().unwrap().to_owned())
+            .collect()
+    };
+    let want = &ha["devices"][0];
+    assert_eq!(
+        set(&json!(device.config_entries)),
+        set(&want["config_entries"])
+    );
+    assert_eq!(
+        json!(device.config_entries_subentries),
+        want["config_entries_subentries"]
+    );
+    assert_eq!(
+        json!(device.primary_config_entry),
+        want["primary_config_entry"]
+    );
+    for want in ha["entities"].as_array().unwrap() {
+        let row = rows
+            .entities
+            .iter()
+            .find(|e| e.unique_id.as_ref() == Some(&want["unique_id"]))
+            .unwrap_or_else(|| panic!("no row {}", want["unique_id"]));
+        assert_eq!(
+            json!(row.config_entry_id),
+            want["config_entry_id"],
+            "{}",
+            want["unique_id"]
+        );
+        assert_eq!(
+            json!(row.disabled_by),
+            want["disabled_by"],
+            "{}",
+            want["unique_id"]
+        );
+        assert_eq!(row.entity_id, want["entity_id"].as_str().unwrap());
+    }
+    assert_eq!(
+        rows.entities.len(),
+        ha["entities"].as_array().unwrap().len()
+    );
+    for id in ha["states"].as_array().unwrap() {
+        let id = ha_core::EntityId::parse(id.as_str().unwrap()).unwrap();
+        assert!(hass.states().get(&id).is_some(), "{id}");
+    }
+    // The second's socket is closed, and only the first searches.
+    let port = api.lifx.last_from(lifx_fake::ALIAS).unwrap().port();
+    until("the second's socket is closed", || {
+        std::net::UdpSocket::bind(("0.0.0.0", port)).is_ok()
+    })
+    .await;
+    tokio::time::sleep(std::time::Duration::from_millis(3600)).await;
+    assert_eq!(api.lifx.broadcasts(), 1, "the waiting entry searched");
 }
 
 /// A LIFX flow deleted while its step waits for a bulb that says nothing

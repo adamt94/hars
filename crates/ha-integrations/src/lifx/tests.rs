@@ -706,13 +706,13 @@ async fn nothing_is_registered_in_a_store_that_cant_be_written() {
     };
     let dir = std::env::temp_dir().join(format!("hars-lifx-read-only-{}", std::process::id()));
     let registry = ha_registry::Registry::new(&hass, &dir, registries);
-    register::register(&hass, &registry, "entry", &found, false);
+    register::register(&hass, &registry, "entry", &found, false, false);
     let after = registry.snapshot();
     assert!(after.devices.is_empty() && after.entities.is_empty() && after.areas.is_empty());
     // And on a store that can be: the device, the light, both buttons and
     // the RSSI sensor, disabled.
     let registry = ha_registry::Registry::in_memory(&hass, Registries::default());
-    register::register(&hass, &registry, "entry", &found, false);
+    register::register(&hass, &registry, "entry", &found, false, false);
     let after = registry.snapshot();
     assert_eq!(after.devices.len(), 1);
     let rssi = after

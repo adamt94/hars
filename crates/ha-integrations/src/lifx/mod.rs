@@ -796,7 +796,7 @@ pub async fn run(
     };
     let (found_tx, mut found_rx) = mpsc::unbounded_channel::<String>();
     // Rediscovery ends with this task.
-    let _discovery = Owned(tokio::spawn(discover(
+    let discovery = Owned(tokio::spawn(discover(
         unique_id.clone(),
         at.clone(),
         found_tx,
@@ -851,6 +851,25 @@ pub async fn run(
                 tracing::error!(
                     "Platform lifx does not generate unique IDs. ID {unique_id} already exists - ignoring the entities of '{title}'"
                 );
+                // HA's set-up still registers the device to this entry, and
+                // the rows no running entity has (a disabled one).
+                if runs(features(found.product))
+                    && let Some(registry) = components.registry()
+                {
+                    let _one = crate::switchbot_cloud::SETUP.lock();
+                    register::register(
+                        components.hass(),
+                        registry,
+                        &entry_id,
+                        &found,
+                        disable_new,
+                        true,
+                    );
+                }
+                // It holds nothing while it waits: no socket, no search.
+                drop(found);
+                drop(discovery);
+                drop(found_rx);
                 status.set(EntryState::Loaded, None);
                 drop(ready.take());
                 return std::future::pending().await;
@@ -871,7 +890,14 @@ pub async fn run(
                 components.registry(),
                 entry.get("entry_id").and_then(Value::as_str),
             ) {
-                register::register(components.hass(), registry, entry_id, &found, disable_new);
+                register::register(
+                    components.hass(),
+                    registry,
+                    entry_id,
+                    &found,
+                    disable_new,
+                    false,
+                );
             }
             let (b, coordinator) = bulb(&components, &title, &host, found, polling, at.timing);
             Stopped(b, coordinator)
