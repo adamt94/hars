@@ -1,6 +1,15 @@
 //! One bulb's UDP connection: aiolifx's request matching (sequence, source
 //! and expected type) under HA's retry layer, where each try is a new
 //! message and a reply to any try completes the request.
+//!
+//! aiolifx also sends each message again on its own ([`Resend`]): 3 times,
+//! 0.5 s apart, when nothing has told it otherwise (HA's config flow); once,
+//! kept for 18 s, once HA's coordinator has set `retry_count` and `timeout`.
+//!
+//! A connection can be stopped ([`Conn::stop`]): a request on its way, or
+//! waiting to be tried again, ends there, and nothing is sent after. A
+//! removed entry's commands, which a service call may still hold, can't
+//! reach the bulb afterwards.
 
 use super::proto::{self, Header, Out, ty};
 use parking_lot::Mutex;
@@ -12,8 +21,29 @@ use tokio::sync::Notify;
 
 pub const PORT: u16 = 56700;
 
-/// aiolifx's per-request timeout as HA sets it.
-const REQUEST_LIFETIME: Duration = Duration::from_secs(18);
+/// How aiolifx sends one message: `sends` times, `every` apart, until it
+/// is answered; after the last it waits `every` once more and forgets the
+/// message (a reply after that doesn't count).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Resend {
+    pub every: Duration,
+    pub sends: u32,
+}
+
+impl Resend {
+    /// As HA's coordinator sets the device (`MESSAGE_TIMEOUT`,
+    /// `MESSAGE_RETRIES`).
+    pub const COORDINATOR: Resend = Resend {
+        every: Duration::from_secs(18),
+        sends: 1,
+    };
+    /// aiolifx's own (`DEFAULT_TIMEOUT`, `DEFAULT_ATTEMPTS`), which HA's
+    /// config flow leaves as they are.
+    pub const LIBRARY: Resend = Resend {
+        every: Duration::from_millis(500),
+        sends: 3,
+    };
+}
 
 /// One request of a multi-request try.
 #[derive(Debug, Clone)]
@@ -64,7 +94,9 @@ pub struct Conn {
     target: Mutex<[u8; 6]>,
     pending: Arc<Mutex<HashMap<u8, Pending>>>,
     reader: tokio::task::JoinHandle<()>,
-    lifetime: Duration,
+    resend: Resend,
+    /// True once stopped.
+    stopped: tokio::sync::watch::Sender<bool>,
 }
 
 impl Drop for Conn {
@@ -74,8 +106,14 @@ impl Drop for Conn {
 }
 
 impl Conn {
-    /// A socket bound to an ephemeral port and connected to the bulb.
+    /// A socket bound to an ephemeral port and connected to the bulb, as
+    /// HA's coordinator uses it.
     pub async fn open(host: &str, port: u16) -> std::io::Result<Self> {
+        Self::open_with(host, port, Resend::COORDINATOR).await
+    }
+
+    /// [`Conn::open`], with aiolifx sending each message as `resend` says.
+    pub async fn open_with(host: &str, port: u16, resend: Resend) -> std::io::Result<Self> {
         let sock = UdpSocket::bind("0.0.0.0:0").await?;
         sock.connect((host, port)).await?;
         let sock = Arc::new(sock);
@@ -90,14 +128,30 @@ impl Conn {
             target: Mutex::new([0; 6]),
             pending,
             reader,
-            lifetime: REQUEST_LIFETIME,
+            resend,
+            stopped: tokio::sync::watch::Sender::new(false),
         })
     }
 
     #[cfg(test)]
     pub(super) fn with_lifetime(mut self, d: Duration) -> Self {
-        self.lifetime = d;
+        self.resend.every = d;
         self
+    }
+
+    /// The entry is stopped: what is on its way ends now, unanswered, and
+    /// nothing is sent from here on.
+    pub fn stop(&self) {
+        self.stopped.send_replace(true);
+    }
+
+    fn is_stopped(&self) -> bool {
+        *self.stopped.borrow()
+    }
+
+    /// The address the socket is connected to.
+    pub fn peer(&self) -> Option<std::net::SocketAddr> {
+        self.sock.peer_addr().ok()
     }
 
     pub fn set_target(&self, serial: [u8; 6]) {
@@ -125,9 +179,30 @@ impl Conn {
     }
 
     /// `async_multi_execute_lifx_with_retries`: each try sends every
-    /// request not yet answered (a new sequence number each), then waits
-    /// `per_try` for all of them. `Err` holds the unanswered indices.
+    /// request not yet answered (a new sequence number each, which aiolifx
+    /// sends as [`Resend`] says), then waits `per_try` for all of them.
+    /// `Err` holds the unanswered indices: all of them once the connection
+    /// is stopped.
     pub async fn execute(
+        &self,
+        ops: &[Op],
+        attempts: u32,
+        per_try: Duration,
+    ) -> Result<Vec<(Header, Vec<u8>)>, Vec<usize>> {
+        let mut stopped = self.stopped.subscribe();
+        let run = self.execute_now(ops, attempts, per_try);
+        let missing = || (0..ops.len()).collect::<Vec<_>>();
+        if self.is_stopped() {
+            return Err(missing());
+        }
+        tokio::select! {
+            biased;
+            _ = stopped.wait_for(|s| *s) => Err(missing()),
+            done = run => done,
+        }
+    }
+
+    async fn execute_now(
         &self,
         ops: &[Op],
         attempts: u32,
@@ -137,41 +212,75 @@ impl Conn {
         let slots: Vec<Slot> = ops.iter().map(|_| Slot::default()).collect();
         let mut seqs = Vec::new();
         let done = |i: usize| slots[i].lock().is_some();
+        let all_done = || (0..ops.len()).all(done);
+        // Woken by any reply; true once every request is answered.
+        let answered = |until: tokio::time::Instant| {
+            let notify = notify.clone();
+            let all_done = &all_done;
+            async move {
+                loop {
+                    let n = notify.notified();
+                    if all_done() {
+                        return true;
+                    }
+                    if tokio::time::timeout_at(until, n).await.is_err() {
+                        return all_done();
+                    }
+                }
+            }
+        };
         for _ in 0..attempts {
+            let start = tokio::time::Instant::now();
+            // This try's messages: (index, sequence, frame).
+            let mut sent = Vec::new();
             for (i, op) in ops.iter().enumerate() {
                 if done(i) {
                     continue;
                 }
                 let seq = self.next_seq();
+                let lifetime = self.resend.every * self.resend.sends;
                 self.pending.lock().insert(
                     seq,
                     Pending {
-                        expires: tokio::time::Instant::now() + self.lifetime,
+                        expires: start + lifetime,
                         expect: op.expect,
                         slot: slots[i].clone(),
                         notify: notify.clone(),
                     },
                 );
                 seqs.push(seq);
-                // A send error is a lost datagram: the try times out.
-                let _ = self.sock.send(&self.frame(op, seq)).await;
+                sent.push((i, seq, self.frame(op, seq)));
             }
-            let all = async {
-                loop {
-                    let n = notify.notified();
-                    if (0..ops.len()).all(done) {
-                        return;
+            // aiolifx's sends of each, `every` apart, while unanswered.
+            let mut finished = false;
+            for k in 0..self.resend.sends {
+                for (i, _, frame) in &sent {
+                    if !done(*i) {
+                        // A send error is a lost datagram: the try times out.
+                        let _ = self.sock.send(frame).await;
                     }
-                    n.await;
                 }
-            };
-            if tokio::time::timeout(per_try, all).await.is_ok() {
+                let next = start + self.resend.every * (k + 1);
+                let until = next.min(start + per_try);
+                if answered(until).await {
+                    finished = true;
+                    break;
+                }
+                if until == start + per_try {
+                    break;
+                }
+            }
+            // aiolifx has given the messages up; HA waits out its try.
+            if !finished && answered(start + per_try).await {
+                finished = true;
+            }
+            // A reply after a message's lifetime doesn't count (see `read`);
+            // one within it does, though HA has gone on to its next try.
+            if finished {
                 break;
             }
         }
         {
-            // Our entries go when the request ends (aiolifx's linger 18 s,
-            // which nothing can observe).
             let mut pending = self.pending.lock();
             for s in seqs {
                 if pending
@@ -195,6 +304,9 @@ impl Conn {
     /// A message nothing answers (`fire_and_forget`: `SetReboot`): seq 0,
     /// neither ack nor response asked for.
     pub async fn fire_and_forget(&self, ty: u16) {
+        if self.is_stopped() {
+            return;
+        }
         let frame = Out {
             source: self.source,
             target: *self.target.lock(),

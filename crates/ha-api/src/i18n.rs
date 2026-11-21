@@ -7,11 +7,18 @@ use crate::i18n_data::{ICONS, TRANSLATIONS};
 
 /// Strings of `hars`'s own, beside HA's for the same `(category,
 /// domain)`: what a flow says where `hars` stops and HA would go on.
-static OWN: &[(&str, &str, &str)] = &[(
-    "config",
-    "hue",
-    r#""component.hue.config.abort.not_v2_bridge":"This bridge only has the first version of the Hue API, which hars can't use. hars needs a bridge with the current Hue software (the square bridge)""#,
-)];
+static OWN: &[(&str, &str, &str)] = &[
+    (
+        "config",
+        "hue",
+        r#""component.hue.config.abort.not_v2_bridge":"This bridge only has the first version of the Hue API, which hars can't use. hars needs a bridge with the current Hue software (the square bridge)""#,
+    ),
+    (
+        "config",
+        "lifx",
+        r#""component.lifx.config.abort.unsupported_device":"hars can't run this LIFX product yet. It runs single-zone bulbs, colour and white: not light strips, tiles, ceilings, the Clean's HEV light or Night Vision's infrared""#,
+    ),
+];
 
 /// The entry for `(category, domain)` in a sorted table.
 fn find(

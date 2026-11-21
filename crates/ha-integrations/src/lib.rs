@@ -74,6 +74,8 @@ pub struct Endpoints {
     /// `https://<host>`). A base URL: every bridge is there instead, for
     /// tests and a debug build's browser run.
     pub hue_bridge: Option<String>,
+    /// Where LIFX bulbs are reached, and where discovery broadcasts.
+    pub lifx: lifx::Where,
 }
 
 impl Default for Endpoints {
@@ -83,6 +85,7 @@ impl Default for Endpoints {
             hue_discovery: hue::config_flow::DISCOVERY.to_owned(),
             hue_discovery_timeout: std::time::Duration::from_secs(5),
             hue_bridge: None,
+            lifx: lifx::Where::default(),
         }
     }
 }
@@ -154,6 +157,24 @@ pub(crate) fn spawn_hue(
         components.clone(),
         entry,
         endpoints.hue_bridge.clone(),
+        components.hass().setup_guard(),
+        status,
+    ))
+}
+
+/// Start a `lifx` entry: at start-up, or when a config flow has made it.
+/// The components exist before the entry's setup.
+pub(crate) fn spawn_lifx(
+    components: &Arc<components::Components>,
+    entry: Map<String, Value>,
+    endpoints: &Endpoints,
+    status: config_entries::Status,
+) -> tokio::task::JoinHandle<()> {
+    let _ = (components.lights(), components.buttons());
+    tokio::spawn(lifx::run(
+        components.clone(),
+        entry,
+        endpoints.lifx.clone(),
         components.hass().setup_guard(),
         status,
     ))
@@ -293,18 +314,18 @@ pub fn start(
         ));
         running.extend(switchbot_cloud::COMPONENTS);
     }
-    let lifx: Vec<Map<String, Value>> = enabled(lifx::DOMAIN).cloned().collect();
-    if !lifx.is_empty() {
-        let _ = (components.lights(), components.buttons());
-        for entry in lifx {
-            tokio::spawn(lifx::run(
-                components.clone(),
-                entry,
-                lifx::conn::PORT,
-                hass.setup_guard(),
-            ));
-        }
-        running.extend(["lifx", "light", "button"]);
+    for entry in enabled(lifx::DOMAIN).cloned().collect::<Vec<_>>() {
+        let entry_id = field(&entry, "entry_id").unwrap_or_default();
+        // Where its set-up is goes to the entries (a bulb that can't be
+        // reached waits for a retry).
+        let status = match store {
+            Some(store) => config_entries::Status::new(store.clone(), &entry_id),
+            None => config_entries::Status::none(),
+        };
+        tasks.push(Running::start(&entry_id, status, |status| {
+            spawn_lifx(&components, entry, endpoints, status)
+        }));
+        running.extend(lifx::COMPONENTS);
     }
     running.sort_unstable();
     running.dedup();

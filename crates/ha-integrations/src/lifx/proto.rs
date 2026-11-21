@@ -9,6 +9,8 @@ pub mod ty {
     pub const STATE_HOST_FIRMWARE: u16 = 15;
     pub const GET_VERSION: u16 = 32;
     pub const STATE_VERSION: u16 = 33;
+    pub const GET_LABEL: u16 = 23;
+    pub const STATE_LABEL: u16 = 25;
     pub const SET_REBOOT: u16 = 38;
     pub const ACK: u16 = 45;
     pub const GET_GROUP: u16 = 51;
@@ -135,6 +137,11 @@ pub fn host_firmware(p: &[u8]) -> Option<String> {
 /// `StateVersion`'s product.
 pub fn product(p: &[u8]) -> Option<u32> {
     u32_at(p, 4)
+}
+
+/// `StateLabel`'s label.
+pub fn state_label(p: &[u8]) -> Option<String> {
+    Some(label(p.get(..32)?))
 }
 
 /// `StateGroup`'s label.

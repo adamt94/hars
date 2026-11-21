@@ -25,6 +25,8 @@ use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tower::ServiceExt;
 
+mod lifx_fake;
+
 const BOT: &str = "AABBCC000001";
 const HUB: &str = "AABBCC000002";
 
@@ -39,6 +41,8 @@ struct FakeApi {
     requests: parking_lot::Mutex<Vec<Value>>,
     /// What the bridge says on its event stream, to whoever listens.
     events: tokio::sync::broadcast::Sender<String>,
+    /// The LIFX bulbs.
+    lifx: Arc<lifx_fake::LifxFake>,
 }
 
 /// `Hue.set` in `hue_flow.py`.
@@ -67,18 +71,23 @@ impl FakeApi {
     /// An `api` step: how SwitchBot's API, the bridge or the discovery
     /// answers from here on.
     fn set(&self, mode: &str) {
+        // A mode both have (`discovery_none`) is set for both.
+        let lifx = self.lifx.set(mode);
         let mut hue = self.hue.lock();
         match mode {
             "pressed" | "not_pressed" => hue.pressed = mode == "pressed",
             m if m.starts_with("discovery_") => hue.discovery = m["discovery_".len()..].into(),
             m if m.starts_with("bridge_") => hue.bridge = m["bridge_".len()..].into(),
+            _ if lifx => {}
             _ => *self.mode.lock() = mode.to_owned(),
         }
     }
 
     /// The requests the bridge and discovery got since the last call.
     fn take(&self) -> Vec<Value> {
-        std::mem::take(&mut *self.requests.lock())
+        let mut taken = std::mem::take(&mut *self.requests.lock());
+        taken.extend(self.lifx.take());
+        taken
     }
 
     fn hue(&self, method: &str, path: &str, key: Option<&str>, body: &[u8]) -> Answer {
@@ -255,6 +264,7 @@ impl FakeApi {
             }),
             requests: parking_lot::Mutex::default(),
             events: tokio::sync::broadcast::channel(16).0,
+            lifx: lifx_fake::LifxFake::start().await,
         });
         let served = api.clone();
         tokio::spawn(async move {
@@ -376,6 +386,7 @@ async fn home_on(hass: Hass, registry: Arc<ha_registry::Registry>) -> Home {
             // HA gives the discovery 5 s; a replay doesn't wait that long.
             hue_discovery_timeout: std::time::Duration::from_millis(400),
             hue_bridge: Some(base),
+            lifx: api.lifx.at.clone(),
         },
         Vec::new(),
         None,
@@ -460,7 +471,9 @@ impl Ids {
             let mut idents: Vec<&str> = d
                 .identifiers
                 .iter()
-                .filter(|i| i[0] == "switchbot_cloud" || i[0] == "hue")
+                .filter(|i| {
+                    ["switchbot_cloud", "hue", "lifx"].contains(&i[0].as_str().unwrap_or_default())
+                })
                 .filter_map(|i| i[1].as_str())
                 .collect();
             idents.sort_unstable();
@@ -610,6 +623,17 @@ fn by_row(event: &Value) -> String {
         .to_owned()
 }
 
+/// A scenario of `lifx_flow.py`: its requests are datagrams.
+fn name_is_lifx(scenario: &Value) -> bool {
+    scenario["steps"].as_array().is_some_and(|steps| {
+        steps.iter().any(|s| {
+            s["requests"]
+                .as_array()
+                .is_some_and(|r| r.iter().any(|r| r.get("to").is_some()))
+        })
+    })
+}
+
 async fn replay(scenario: &Value) {
     replay_slowly(scenario, std::time::Duration::ZERO).await;
 }
@@ -705,7 +729,7 @@ async fn replay_slowly(scenario: &Value, pause: std::time::Duration) {
                 let listed: Vec<String> = serde_json::from_str(&body).unwrap();
                 let want: &[&str] = match query {
                     "?type=helper" => &[],
-                    _ => &["hue", "switchbot_cloud"],
+                    _ => &["hue", "lifx", "switchbot_cloud"],
                 };
                 assert_eq!(listed, want, "{at}");
                 let known = step["known"].as_array().unwrap();
@@ -764,7 +788,7 @@ async fn replay_slowly(scenario: &Value, pause: std::time::Duration) {
             assert_eq!(allow, step["allow"], "{at}");
             if let Some(known) = step.get("known") {
                 let listed: Vec<String> = serde_json::from_str(&body).unwrap();
-                assert_eq!(listed, ["hue", "switchbot_cloud"], "{at}");
+                assert_eq!(listed, ["hue", "lifx", "switchbot_cloud"], "{at}");
                 assert!(
                     known
                         .as_array()
@@ -783,7 +807,19 @@ async fn replay_slowly(scenario: &Value, pause: std::time::Duration) {
         // asked them. After a set-up `hars` reads the resources once more
         // (its event stream's reconnect rule), at a moment of its own:
         // those requests are only counted on.
-        if let Some(want) = step.get("requests") {
+        // What the bulbs and the broadcast got, datagram by datagram.
+        if let Some(want) = step.get("requests").filter(|_| name_is_lifx(scenario)) {
+            // As many as HA sent: what an entry's reload sends comes after
+            // the reply.
+            let want = want.as_array().unwrap();
+            let mut got = home.api.take();
+            let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(5);
+            while got.len() < want.len() && tokio::time::Instant::now() < deadline {
+                tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+                got.extend(home.api.take());
+            }
+            assert_eq!(json!(got), json!(want), "{at}: datagrams");
+        } else if let Some(want) = step.get("requests") {
             let shape = |all: &[Value]| -> Vec<Value> {
                 all.iter()
                     .map(|r| {
@@ -1011,6 +1047,76 @@ async fn a_hue_bridge_is_added_as_in_home_assistant() {
     }
 }
 
+/// LIFX's flow as HA 2026.6.1 has it with aiolifx 1.2.1
+/// (`vectors/lifx_flow.json`, from `scripts/vectors/lifx_flow.py`): a bulb
+/// added by its address and picked from a broadcast, a broadcast nobody
+/// answers, an address where nothing answers and a LIFX Switch, a bulb
+/// that is set up already and one that moved, a bulb that becomes another
+/// once the entry is made, and removal. For each step: the reply, the
+/// subscriptions' events, and every datagram the bulbs and the broadcast
+/// got, in order (aiolifx's own resends among them). For the bulbs added:
+/// the rows and states HA had.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_lifx_bulb_is_added_as_in_home_assistant() {
+    let all: Value = serde_json::from_str(include_str!("vectors/lifx_flow.json")).unwrap();
+    let scenarios = all["scenarios"].as_array().unwrap();
+    assert_eq!(scenarios.len(), 8);
+    for scenario in scenarios {
+        replay(scenario).await;
+    }
+}
+
+/// A LIFX product `hars` doesn't run as HA does ends the flow with its
+/// own reason, typed in or picked, and no entry is made; HA would make one.
+/// Each is asked what HA's flow asks first.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_lifx_product_hars_cant_run_makes_no_entry() {
+    use ha_integrations::flow::FlowResult;
+    let home = home().await;
+    let flows = home.config.flows.clone().unwrap();
+    for product in [32, 55, 90, 29] {
+        home.api.lifx.set_product(lifx_fake::WHITE, product);
+        for answers in [
+            vec![json!({"host": lifx_fake::WHITE})],
+            vec![json!({}), json!({"device": "d0:73:d5:00:00:21"})],
+        ] {
+            let FlowResult::Form { mut flow_id, .. } = flows
+                .init("lifx", ha_integrations::flow::SOURCE_USER)
+                .await
+                .unwrap()
+            else {
+                panic!("no form");
+            };
+            let mut result = None;
+            for answer in answers {
+                let input = answer.as_object().unwrap().clone().into_iter().collect();
+                let r = flows.configure(&flow_id, Some(input)).await.unwrap();
+                if let FlowResult::Form { flow_id: id, .. } = &r {
+                    flow_id.clone_from(id);
+                }
+                result = Some(r);
+            }
+            let Some(FlowResult::Abort { reason, .. }) = result else {
+                panic!("{product}: {result:?}");
+            };
+            assert_eq!(reason, "unsupported_device", "{product}");
+        }
+    }
+    assert_eq!(home.entries.list(), Some(Vec::new()));
+    let sent: Vec<u64> = home
+        .api
+        .take()
+        .iter()
+        .filter(|f| f["to"] == lifx_fake::WHITE)
+        .map(|f| f["type"].as_u64().unwrap())
+        .collect();
+    assert_eq!(&sent[..4], [14, 32, 23, 51], "HA's flow's questions");
+    assert!(
+        sent.iter().all(|t| [14, 32, 23, 51].contains(t)),
+        "{sent:?}"
+    );
+}
+
 /// A replay's sockets wait their turn for longer than the server's
 /// heartbeat allows a silent client (200 ms in test builds, dropped after
 /// two) whenever the machine is slow: CI lost one that way, with a broken
@@ -1078,6 +1184,7 @@ async fn the_dialog_lists_what_can_be_added() {
     assert_eq!(
         result["core"]["integration"],
         json!({"hue": ha["known"]["hue"]["description"],
+               "lifx": ha["known"]["lifx"]["description"],
                "switchbot_cloud": ha["known"]["switchbot_cloud"]["description"]})
     );
     assert_eq!(result["core"]["helper"], json!({}));
@@ -1099,6 +1206,7 @@ async fn the_dialog_lists_what_can_be_added() {
     assert_eq!(
         reply[0]["result"]["resources"],
         json!({"component.hue.title": "Philips Hue",
+               "component.lifx.title": "LIFX",
                "component.switchbot_cloud.title": "SwitchBot Cloud"})
     );
     // The form's labels and errors, as the dialog asks for them.
@@ -1138,7 +1246,7 @@ async fn the_dialog_lists_what_can_be_added() {
     let reply = admin.call(&titles).await;
     assert_eq!(
         reply[0]["result"]["resources"],
-        json!({"component.hue.title": "Philips Hue"})
+        json!({"component.hue.title": "Philips Hue", "component.lifx.title": "LIFX"})
     );
     // Hue's dialog: HA's words, and `hars`'s own for a bridge it can't run.
     let hue = json!({"type": "frontend/get_translations", "language": "en",
@@ -1152,6 +1260,16 @@ async fn the_dialog_lists_what_can_be_added() {
     assert_eq!(config["component.hue.config.step.link.title"], "Link Hub");
     let own = config["component.hue.config.abort.not_v2_bridge"].as_str();
     assert!(own.is_some_and(|text| text.contains("first version of the Hue API")));
+    let lifx = json!({"type": "frontend/get_translations", "language": "en",
+                      "category": "config", "integration": ["lifx"]});
+    let reply = admin.call(&lifx).await;
+    let config = &reply[0]["result"]["resources"];
+    let own = config["component.lifx.config.abort.unsupported_device"].as_str();
+    assert!(own.is_some_and(|text| text.contains("single-zone bulbs")));
+    assert_eq!(
+        config["component.lifx.config.abort.no_devices_found"],
+        "No devices found on the network"
+    );
     let reply = admin.call(&json!({"type": "get_config"})).await;
     let components = reply[0]["result"]["components"].as_array().unwrap();
     for domain in ["switchbot_cloud", "button", "climate", "sensor", "switch"] {
@@ -1294,7 +1412,7 @@ async fn an_unwritable_store_is_said_where_the_user_tries() {
         send("GET", &format!("{}_handlers", super::FLOW), "")
             .await
             .2,
-        r#"["hue","switchbot_cloud"]"#
+        r#"["hue","lifx","switchbot_cloud"]"#
     );
     let mut ws = Client::authed(&server, &admin).await;
     ws.send(json!({"id": 1, "type": "integration/descriptions"}))

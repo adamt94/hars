@@ -258,11 +258,7 @@ impl HueFlow {
         options.push((MANUAL.into(), "Manually add a Hue Bridge".into()));
         Step::Form {
             step_id: "init",
-            schema: Some(vec![Field {
-                name: "id",
-                required: true,
-                kind: Kind::Select(options),
-            }]),
+            schema: Some(vec![Field::required("id", Kind::Select(options))]),
             errors: None,
             description_placeholders: None,
         }

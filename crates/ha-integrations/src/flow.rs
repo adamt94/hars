@@ -65,6 +65,7 @@ pub const EXPIRES: Duration = Duration::from_secs(60 * 60);
 /// The flow handlers, by domain (`HANDLERS` in `config_entries.py`).
 pub const HANDLERS: &[&Handler] = &[
     &crate::hue::config_flow::HANDLER,
+    &crate::lifx::config_flow::HANDLER,
     &switchbot_cloud::config_flow::HANDLER,
 ];
 
@@ -110,6 +111,9 @@ pub struct Cx<'a> {
     entries: &'a ConfigEntries,
     domain: &'static str,
     unique_id: &'a mut Option<String>,
+    /// An entry to reload once the step has answered
+    /// (`async_schedule_reload`).
+    reload: &'a mut Option<String>,
 }
 
 impl Cx<'_> {
@@ -135,6 +139,57 @@ impl Cx<'_> {
         self.entries.has_data(self.domain, key, value)
     }
 
+    /// `_async_current_entries()` of a user's flow: each entry of this
+    /// integration that isn't ignored, as (its unique id, `data[key]`).
+    pub fn current_entries(&self, key: &str) -> Vec<(Option<String>, Option<String>)> {
+        self.entries
+            .list()
+            .unwrap_or_default()
+            .iter()
+            .filter(|e| e.get("domain").and_then(Value::as_str) == Some(self.domain))
+            .filter(|e| !crate::config_entries::ignored(e))
+            .map(|e| {
+                let text = |v: Option<&Value>| v.and_then(Value::as_str).map(str::to_owned);
+                (
+                    text(e.get("unique_id")),
+                    text(e.get("data").and_then(|d| d.get(key))),
+                )
+            })
+            .collect()
+    }
+
+    /// `_abort_if_unique_id_configured(updates={key: value})`: an entry of
+    /// this integration with the flow's unique id has `value` put in its
+    /// data, and is reloaded once the step has answered if that changed it
+    /// while it was set up or waiting for a retry; then the flow aborts.
+    /// An ignored entry gets the value too, and is not in the way of a flow
+    /// the user started.
+    pub fn abort_if_unique_id_configured_updating(
+        &mut self,
+        key: &str,
+        value: &str,
+    ) -> Option<Step> {
+        let unique_id = self.unique_id.as_deref()?;
+        let entry = self.entries.find_unique(self.domain, unique_id)?;
+        let entry_id = entry.get("entry_id").and_then(Value::as_str)?.to_owned();
+        let mut data = entry
+            .get("data")
+            .and_then(Value::as_object)
+            .cloned()
+            .unwrap_or_default();
+        data.insert(key.to_owned(), Value::String(value.to_owned()));
+        let state = self.entries.runtime(&entry_id).map(|r| r.state);
+        if self.entries.update_data(&entry_id, data)
+            && matches!(state, Some(EntryState::Loaded | EntryState::SetupRetry))
+        {
+            *self.reload = Some(entry_id);
+        }
+        if crate::config_entries::ignored(&entry) {
+            return None;
+        }
+        Some(Step::abort("already_configured"))
+    }
+
     /// `_abort_if_unique_id_configured`: the abort, if an entry of this
     /// integration has the flow's unique id. An ignored entry is not in
     /// the way of a flow the user started.
@@ -154,6 +209,8 @@ pub struct Field {
     /// `vol.Required` (else `vol.Optional`).
     pub required: bool,
     pub kind: Kind,
+    /// `vol.Optional(name, default=…)`: what a form sent without it gets.
+    pub default: Option<&'static str>,
 }
 
 /// What a field accepts. A flow that needs a choice (`vol.In`) adds its
@@ -169,23 +226,46 @@ pub enum Kind {
 impl Field {
     /// `vol.Required(name): str`.
     pub const fn required_str(name: &'static str) -> Self {
+        Self::required(name, Kind::Str)
+    }
+
+    /// `vol.Required(name): kind`.
+    pub const fn required(name: &'static str, kind: Kind) -> Self {
         Self {
             name,
             required: true,
+            kind,
+            default: None,
+        }
+    }
+
+    /// `vol.Optional(name, default=default): str`.
+    pub const fn optional_str(name: &'static str, default: &'static str) -> Self {
+        Self {
+            name,
+            required: false,
             kind: Kind::Str,
+            default: Some(default),
         }
     }
 
     /// `voluptuous_serialize.convert` of the field.
     fn json(&self) -> Value {
-        match &self.kind {
+        let mut field = match &self.kind {
             Kind::Str => json!({"type": "string", "name": self.name, "required": self.required}),
             Kind::Select(options) => {
                 let options: Vec<Value> = options.iter().map(|(v, l)| json!([v, l])).collect();
                 json!({"type": "select", "options": options, "name": self.name,
                        "required": self.required})
             }
+        };
+        if !self.required {
+            field["optional"] = json!(true);
         }
+        if let Some(default) = self.default {
+            field["default"] = json!(default);
+        }
+        field
     }
 
     /// The field's check of a value: its error message.
@@ -244,8 +324,13 @@ fn validate(
             None => base.push(json!(format!("extra keys not allowed @ data['{key}']"))),
         }
     }
-    for field in schema.iter().filter(|f| f.required) {
-        if !values.contains_key(field.name) && !errors.contains_key(field.name) {
+    for field in schema {
+        if values.contains_key(field.name) || errors.contains_key(field.name) {
+            continue;
+        }
+        if let Some(default) = field.default {
+            values.insert(field.name.into(), json!(default));
+        } else if field.required {
             errors.insert(field.name.into(), json!("required key not provided"));
         }
     }
@@ -628,6 +713,7 @@ impl Manager {
             (Input::Answer(input), None) => Some(input.into_iter().collect()),
             (Input::Show, _) => None,
         };
+        let mut reload = None;
         let step = {
             let mut cx = Cx {
                 hass: &self.hass,
@@ -635,9 +721,14 @@ impl Manager {
                 entries: &self.entries,
                 domain: handler.domain,
                 unique_id: &mut unique_id,
+                reload: &mut reload,
             };
             flow.step(&mut cx, step_id, input).await
         };
+        if let Some(entry_id) = reload {
+            let this = self.clone();
+            tokio::spawn(async move { this.reload(&entry_id).await });
+        }
         let domain = handler.domain;
         let abort = |reason| FlowResult::Abort {
             flow_id: flow_id.to_owned(),
@@ -816,6 +907,12 @@ impl Manager {
                 }),
                 crate::hue::COMPONENTS,
             ),
+            Some(crate::lifx::DOMAIN) => (
+                Running::start_told(entry_id, status, attempted, |status| {
+                    crate::spawn_lifx(&self.components, entry.clone(), &self.endpoints, status)
+                }),
+                crate::lifx::COMPONENTS,
+            ),
             _ => return false,
         };
         self.tasks.lock().push(running);
@@ -844,11 +941,12 @@ impl Manager {
             .flatten()
     }
 
-    async fn remove(&self, entry_id: &str) -> Option<bool> {
-        // `_async_remove` takes the entry's setup lock: an entry whose
-        // first setup attempt is running is removed once it has ended, and
-        // whoever added it has its answer.
-        let _removing = loop {
+    /// The entry's turn: no other entry is added or removed, and the
+    /// entry's first setup attempt has ended (HA's `setup_lock`). An entry
+    /// whose first attempt is running is waited for without holding up
+    /// the others.
+    async fn turn(&self, entry_id: &str) -> tokio::sync::MutexGuard<'_, ()> {
+        loop {
             let removing = self.lifecycle.lock().await;
             let setup = {
                 let tasks = self.tasks.lock();
@@ -864,9 +962,50 @@ impl Manager {
                     drop(removing);
                     drop(setup.lock().await);
                 }
-                _ => break removing,
+                _ => return removing,
             }
+        }
+    }
+
+    /// `async_reload` of an entry whose data a flow changed: its
+    /// integration stops, its entities and states going with it, and
+    /// starts again from the entry as it is now. An entry with nothing
+    /// running here is left as it is.
+    pub async fn reload(self: &Arc<Self>, entry_id: &str) {
+        let _turn = self.turn(entry_id).await;
+        let Some(entry) = self.entries.get(entry_id) else {
+            return;
         };
+        let task = {
+            let mut tasks = self.tasks.lock();
+            let i = tasks.iter().position(|r| r.entry_id == entry_id);
+            i.map(|i| tasks.swap_remove(i).task)
+        };
+        let Some(task) = task else {
+            return;
+        };
+        let loaded = self
+            .entries
+            .runtime(entry_id)
+            .is_some_and(|r| r.state == EntryState::Loaded);
+        if loaded {
+            self.entries
+                .set_state(entry_id, EntryState::UnloadInProgress, None);
+        }
+        task.abort();
+        let _ = task.await;
+        self.entries
+            .set_state(entry_id, EntryState::NotLoaded, None);
+        // HA's subscribers hear no `setup_in_progress` for a reload's set-up.
+        let (attempted, _) = tokio::sync::oneshot::channel();
+        self.setup_entry(&entry, attempted);
+    }
+
+    async fn remove(&self, entry_id: &str) -> Option<bool> {
+        // `_async_remove` takes the entry's setup lock: an entry whose
+        // first setup attempt is running is removed once it has ended, and
+        // whoever added it has its answer.
+        let _removing = self.turn(entry_id).await;
         let entry = self.entries.get(entry_id)?;
         let task = {
             let mut tasks = self.tasks.lock();

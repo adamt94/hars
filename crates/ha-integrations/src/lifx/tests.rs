@@ -142,7 +142,9 @@ fn timing(fast_fail: bool) -> Timing {
 async fn setup(f: &FakeBulb, t: Timing) -> (Hass, Arc<Bulb>, Arc<Components>) {
     let hass = Hass::new();
     let components = Components::new(&hass, Arc::new(registries()), Profiles::default());
-    let found = connect("127.0.0.1", f.port, UID, t).await.unwrap();
+    let found = connect("127.0.0.1", ("127.0.0.1", f.port), UID, t)
+        .await
+        .unwrap();
     let (b, _) = bulb(&components, "Kitchen Light", "127.0.0.1", found, true, t);
     (hass, b, components)
 }
@@ -189,20 +191,25 @@ async fn sets_up_as_ha() {
 #[tokio::test]
 async fn serial_mismatch_retries() {
     let f = fake_bulb(65535, [0, 0, 39321, 2700]).await;
-    let r = connect("127.0.0.1", f.port, "d0:73:d5:00:00:01", timing(false)).await;
+    let at = ("127.0.0.1", f.port);
+    let r = connect("192.0.2.30", at, "d0:73:d5:00:00:01", timing(false)).await;
+    let why = "Unexpected device found at 192.0.2.30; expected d0:73:d5:00:00:01, found d0:73:d5:01:02:03";
     assert_eq!(
         r.err(),
-        Some(SetupError::Retry(
-            "Unexpected device found at 127.0.0.1; expected d0:73:d5:00:00:01, found d0:73:d5:01:02:03".into()
-        ))
+        Some(SetupError::Retry {
+            reason: Some(why.into()),
+            log: why.into()
+        })
     );
     f.silent.store(true, Ordering::Relaxed);
-    let r = connect("127.0.0.1", f.port, UID, timing(true)).await;
+    let r = connect("127.0.0.1", at, UID, timing(true)).await;
+    // A refresh that times out is HA's `ConfigEntryNotReady()`: no reason.
     assert_eq!(
         r.err(),
-        Some(SetupError::Retry(
-            "get_hostfirmware, get_version, get_group timed out after 5 attempts".into()
-        ))
+        Some(SetupError::Retry {
+            reason: None,
+            log: "get_hostfirmware, get_version, get_group timed out after 5 attempts".into()
+        })
     );
     // Five tries of all three, each a new message.
     assert_eq!(f.got.lock().iter().filter(|g| g.0 == 14).count(), 6);

@@ -1,39 +1,75 @@
-//! A Color 1000's light: HA's state from the bulb's HSBK and power, and
-//! `find_hsbk` from a call's parameters.
+//! A single-zone bulb's light: HA's `LIFXColor` or `LIFXWhite`, its state
+//! from the bulb's HSBK and power, and `find_hsbk` from a call's
+//! parameters.
 
+use super::products::{COLOR, Product};
 use crate::light::{Capabilities, ColorMode, LightState, Modes, Params, color};
 
-pub const MIN_KELVIN: i64 = 2500;
-pub const MAX_KELVIN: i64 = 9000;
 /// `TRANSITION | EFFECT`.
 pub const FEATURES: u32 = 36;
-pub const EFFECTS: &[&str] = &["effect_colorloop", "effect_pulse", "effect_stop"];
+const COLOUR_EFFECTS: &[&str] = &["effect_colorloop", "effect_pulse", "effect_stop"];
+const WHITE_EFFECTS: &[&str] = &["effect_pulse", "effect_stop"];
 
-pub fn capabilities() -> Capabilities {
+/// What HA's light makes of a product (`lifx_features`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Model {
+    /// `LIFXColor` (else `LIFXWhite`).
+    pub color: bool,
+    pub min_kelvin: i64,
+    pub max_kelvin: i64,
+}
+
+impl Model {
+    /// The model of a product, from its features.
+    pub fn of(product: &Product) -> Self {
+        let (min, max) = product.kelvin.unwrap_or((0, 0));
+        Self {
+            color: product.flags & COLOR != 0,
+            min_kelvin: i64::from(min),
+            max_kelvin: i64::from(max),
+        }
+    }
+
+    /// A white light's one mode: colour temperature, or only brightness
+    /// for a bulb with one temperature.
+    fn white_mode(self) -> ColorMode {
+        match self.min_kelvin != self.max_kelvin {
+            true => ColorMode::ColorTemp,
+            false => ColorMode::Brightness,
+        }
+    }
+}
+
+pub fn capabilities(model: Model) -> Capabilities {
+    let (modes, effects) = match model.color {
+        true => (vec![ColorMode::ColorTemp, ColorMode::Hs], COLOUR_EFFECTS),
+        false => (vec![model.white_mode()], WHITE_EFFECTS),
+    };
     Capabilities {
-        modes: Modes::new(vec![ColorMode::ColorTemp, ColorMode::Hs]),
+        modes: Modes::new(modes),
         features: FEATURES,
-        effect_list: Some(EFFECTS.iter().map(|e| (*e).to_owned()).collect()),
+        effect_list: Some(effects.iter().map(|e| (*e).to_owned()).collect()),
     }
 }
 
 /// HA's entity properties for a bulb's `power` and `[H, S, B, K]`.
-pub fn state(power: u16, c: [u16; 4], effect: Option<&str>) -> LightState {
+pub fn state(model: Model, power: u16, c: [u16; 4], effect: Option<&str>) -> LightState {
     let [h, s, b, k] = c;
     // `(int(P / 65535 * B)) >> 8`, in Python's float order.
     let brightness = ((power as f64 / 65535.0 * b as f64) as i64) >> 8;
+    let colour = model.color && s != 0;
     LightState {
         on: power != 0,
-        color_mode: Some(if s != 0 {
-            ColorMode::Hs
-        } else {
-            ColorMode::ColorTemp
+        color_mode: Some(match (model.color, colour) {
+            (true, true) => ColorMode::Hs,
+            (true, false) => ColorMode::ColorTemp,
+            (false, _) => model.white_mode(),
         }),
         brightness: Some(brightness),
         color_temp_kelvin: Some(k as i64),
-        min_color_temp_kelvin: MIN_KELVIN,
-        max_color_temp_kelvin: MAX_KELVIN,
-        hs_color: (s != 0).then(|| (h as f64 / 65535.0 * 360.0, s as f64 / 65535.0 * 100.0)),
+        min_color_temp_kelvin: model.min_kelvin,
+        max_color_temp_kelvin: model.max_kelvin,
+        hs_color: colour.then(|| (h as f64 / 65535.0 * 360.0, s as f64 / 65535.0 * 100.0)),
         effect: effect.map(str::to_owned),
         ..Default::default()
     }
@@ -132,8 +168,15 @@ mod tests {
         assert_eq!(p(|_| {}), None);
     }
 
+    const COLOUR_1000: Model = Model {
+        color: true,
+        min_kelvin: 2500,
+        max_kelvin: 9000,
+    };
+
     #[test]
     fn state_as_ha() {
+        let state = |p, c, e| state(COLOUR_1000, p, c, e);
         let s = state(65535, [0, 0, 39321, 2700], None);
         assert_eq!((s.on, s.brightness), (true, Some(153)));
         assert_eq!(s.color_mode, Some(ColorMode::ColorTemp));
