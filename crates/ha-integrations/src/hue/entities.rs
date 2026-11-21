@@ -365,11 +365,19 @@ impl HueEntity {
             }
             Kind::Temperature => {
                 measurement(&mut a);
+                // In the unit the sensor component settles on (the
+                // user's, the one kept for the row, or the unit
+                // system's), converted from the bridge's °C.
+                let mut rows = bridge.registries.entities.iter();
+                let row = rows.find(|e| e.entity_id == self.entity_id.as_str());
+                let unit = crate::sensor::state_unit(&bridge.hass, row.map(|row| &**row));
                 let t = reading(r, "temperature", "temperature").and_then(number);
                 let s = t.map_or("unknown".into(), |t| {
-                    crate::sun::py_float(crate::num::round(t, 1))
+                    // `_stringify_state` of a float: 15 significant digits.
+                    let shown = crate::sensor::from_celsius(crate::num::round(t, 1), unit);
+                    crate::num::py_format(shown, 15)
                 });
-                (s, Some("°C"), "temperature")
+                (s, Some(unit), "temperature")
             }
             Kind::LightLevel | Kind::GroupedLightLevel => {
                 measurement(&mut a);

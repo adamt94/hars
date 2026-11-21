@@ -1,0 +1,102 @@
+{
+ "doc": "The temperature sensors of the imported install after a start set to US customary units: their rows and states.",
+ "entities": [
+  {
+   "aliases": [],
+   "aliases_v2": [
+    null
+   ],
+   "area_id": null,
+   "categories": {},
+   "capabilities": {
+    "state_class": "measurement"
+   },
+   "config_entry_id": "01J00000000000000000000001",
+   "config_subentry_id": null,
+   "created_at": "2026-06-01T12:00:00.000000+00:00",
+   "device_class": null,
+   "device_id": "0000000000000000000000000000000d",
+   "disabled_by": null,
+   "entity_category": null,
+   "entity_id": "sensor.bedroom_bedroom_temperature",
+   "hidden_by": null,
+   "icon": null,
+   "id": "00000000000000000000000000000029",
+   "has_entity_name": true,
+   "labels": [],
+   "modified_at": "2026-06-01T12:00:00.000000+00:00",
+   "name": null,
+   "object_id_base": "Temperature",
+   "options": {
+    "sensor": {
+     "unit_of_measurement": "°F",
+     "display_precision": 2,
+     "suggested_display_precision": 1
+    }
+   },
+   "original_device_class": "temperature",
+   "original_icon": null,
+   "original_name": "Temperature",
+   "platform": "hue",
+   "suggested_object_id": null,
+   "supported_features": 0,
+   "translation_key": null,
+   "unique_id": "0cfa6b7f-fdc8-490a-9261-6e721a4afc58",
+   "previous_unique_id": null,
+   "unit_of_measurement": "°F"
+  },
+  {
+   "aliases": [],
+   "aliases_v2": [
+    null
+   ],
+   "area_id": null,
+   "categories": {},
+   "capabilities": {
+    "state_class": "measurement"
+   },
+   "config_entry_id": "01J00000000000000000000001",
+   "config_subentry_id": null,
+   "created_at": "2026-06-01T12:00:00.000000+00:00",
+   "device_class": null,
+   "device_id": "00000000000000000000000000000009",
+   "disabled_by": "integration",
+   "entity_category": null,
+   "entity_id": "sensor.new_room_new_sensor_temperature",
+   "hidden_by": null,
+   "icon": null,
+   "id": "00000000000000000000000000000035",
+   "has_entity_name": true,
+   "labels": [],
+   "modified_at": "2026-06-01T12:00:00.000000+00:00",
+   "name": null,
+   "object_id_base": "Temperature",
+   "options": {
+    "sensor.private": {
+     "suggested_unit_of_measurement": "°C"
+    }
+   },
+   "original_device_class": "temperature",
+   "original_icon": null,
+   "original_name": "Temperature",
+   "platform": "hue",
+   "suggested_object_id": null,
+   "supported_features": 0,
+   "translation_key": null,
+   "unique_id": "b0031e2b-c147-5889-b532-84b1a5ad68ce",
+   "previous_unique_id": null,
+   "unit_of_measurement": "°C"
+  }
+ ],
+ "states": {
+  "sensor.bedroom_bedroom_temperature": {
+   "state": "69.44",
+   "attributes": {
+    "state_class": "measurement",
+    "unit_of_measurement": "°F",
+    "device_class": "temperature",
+    "friendly_name": "Bedroom Temperature"
+   }
+  }
+ }
+}

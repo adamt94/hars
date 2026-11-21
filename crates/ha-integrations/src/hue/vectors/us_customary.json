@@ -1,0 +1,503 @@
+{
+ "doc": "The sensors after the `add` scenario on an install set to US customary units: their rows and states.",
+ "entities": [
+  {
+   "aliases": [],
+   "aliases_v2": [
+    null
+   ],
+   "area_id": null,
+   "categories": {},
+   "capabilities": {
+    "state_class": "measurement"
+   },
+   "config_entry_id": "<entry:1>",
+   "config_subentry_id": null,
+   "created_at": "<time>",
+   "device_class": null,
+   "device_id": "<device:df9083a4-75b9-46a1-9575-133f738d893d>",
+   "disabled_by": null,
+   "entity_category": "diagnostic",
+   "entity_id": "sensor.bedroom_bedroom_battery",
+   "hidden_by": null,
+   "icon": null,
+   "id": "<id>",
+   "has_entity_name": true,
+   "labels": [],
+   "modified_at": "<time>",
+   "name": null,
+   "object_id_base": "Battery",
+   "options": {},
+   "original_device_class": "battery",
+   "original_icon": null,
+   "original_name": "Battery",
+   "platform": "hue",
+   "suggested_object_id": null,
+   "supported_features": 0,
+   "translation_key": null,
+   "unique_id": "53720b51-8b79-4fda-aae9-dc929426d6b1",
+   "previous_unique_id": null,
+   "unit_of_measurement": "%"
+  },
+  {
+   "aliases": [],
+   "aliases_v2": [
+    null
+   ],
+   "area_id": null,
+   "categories": {},
+   "capabilities": {
+    "state_class": "measurement"
+   },
+   "config_entry_id": "<entry:1>",
+   "config_subentry_id": null,
+   "created_at": "<time>",
+   "device_class": null,
+   "device_id": "<device:df9083a4-75b9-46a1-9575-133f738d893d>",
+   "disabled_by": null,
+   "entity_category": null,
+   "entity_id": "sensor.bedroom_bedroom_illuminance",
+   "hidden_by": null,
+   "icon": null,
+   "id": "<id>",
+   "has_entity_name": true,
+   "labels": [],
+   "modified_at": "<time>",
+   "name": null,
+   "object_id_base": "Illuminance",
+   "options": {},
+   "original_device_class": "illuminance",
+   "original_icon": null,
+   "original_name": "Illuminance",
+   "platform": "hue",
+   "suggested_object_id": null,
+   "supported_features": 0,
+   "translation_key": null,
+   "unique_id": "6c54c53d-e571-4c40-a27f-dad2e763ae40",
+   "previous_unique_id": null,
+   "unit_of_measurement": "lx"
+  },
+  {
+   "aliases": [],
+   "aliases_v2": [
+    null
+   ],
+   "area_id": null,
+   "categories": {},
+   "capabilities": {
+    "state_class": "measurement"
+   },
+   "config_entry_id": "<entry:1>",
+   "config_subentry_id": null,
+   "created_at": "<time>",
+   "device_class": null,
+   "device_id": "<device:cb21f2c5-e722-494b-9d90-6bd3b26dcf10>",
+   "disabled_by": null,
+   "entity_category": null,
+   "entity_id": "sensor.bedroom_bedroom_illuminance_2",
+   "hidden_by": null,
+   "icon": null,
+   "id": "<id>",
+   "has_entity_name": true,
+   "labels": [],
+   "modified_at": "<time>",
+   "name": null,
+   "object_id_base": "Illuminance",
+   "options": {},
+   "original_device_class": "illuminance",
+   "original_icon": null,
+   "original_name": "Illuminance",
+   "platform": "hue",
+   "suggested_object_id": null,
+   "supported_features": 0,
+   "translation_key": null,
+   "unique_id": "b2ed1e39-c18f-419e-b56d-bdd20dcb10e7",
+   "previous_unique_id": null,
+   "unit_of_measurement": "lx"
+  },
+  {
+   "aliases": [],
+   "aliases_v2": [
+    null
+   ],
+   "area_id": null,
+   "categories": {},
+   "capabilities": {
+    "state_class": "measurement"
+   },
+   "config_entry_id": "<entry:1>",
+   "config_subentry_id": null,
+   "created_at": "<time>",
+   "device_class": null,
+   "device_id": "<device:df9083a4-75b9-46a1-9575-133f738d893d>",
+   "disabled_by": null,
+   "entity_category": null,
+   "entity_id": "sensor.bedroom_bedroom_temperature",
+   "hidden_by": null,
+   "icon": null,
+   "id": "<id>",
+   "has_entity_name": true,
+   "labels": [],
+   "modified_at": "<time>",
+   "name": null,
+   "object_id_base": "Temperature",
+   "options": {
+    "sensor": {
+     "suggested_display_precision": 1
+    }
+   },
+   "original_device_class": "temperature",
+   "original_icon": null,
+   "original_name": "Temperature",
+   "platform": "hue",
+   "suggested_object_id": null,
+   "supported_features": 0,
+   "translation_key": null,
+   "unique_id": "0cfa6b7f-fdc8-490a-9261-6e721a4afc58",
+   "previous_unique_id": null,
+   "unit_of_measurement": "°F"
+  },
+  {
+   "aliases": [],
+   "aliases_v2": [
+    null
+   ],
+   "area_id": null,
+   "categories": {},
+   "capabilities": {
+    "options": [
+     "connected",
+     "disconnected",
+     "connectivity_issue",
+     "unidirectional_incoming"
+    ]
+   },
+   "config_entry_id": "<entry:1>",
+   "config_subentry_id": null,
+   "created_at": "<time>",
+   "device_class": null,
+   "device_id": "<device:df9083a4-75b9-46a1-9575-133f738d893d>",
+   "disabled_by": "integration",
+   "entity_category": "diagnostic",
+   "entity_id": "sensor.bedroom_bedroom_zigbee_connectivity",
+   "hidden_by": null,
+   "icon": null,
+   "id": "<id>",
+   "has_entity_name": true,
+   "labels": [],
+   "modified_at": "<time>",
+   "name": null,
+   "object_id_base": "Zigbee connectivity",
+   "options": {},
+   "original_device_class": "enum",
+   "original_icon": null,
+   "original_name": "Zigbee connectivity",
+   "platform": "hue",
+   "suggested_object_id": null,
+   "supported_features": 0,
+   "translation_key": "zigbee_connectivity",
+   "unique_id": "0a8892fe-e99f-4e3c-aad8-1db9a952ff97",
+   "previous_unique_id": null,
+   "unit_of_measurement": null
+  },
+  {
+   "aliases": [],
+   "aliases_v2": [
+    null
+   ],
+   "area_id": null,
+   "categories": {},
+   "capabilities": {
+    "options": [
+     "connected",
+     "disconnected",
+     "connectivity_issue",
+     "unidirectional_incoming"
+    ]
+   },
+   "config_entry_id": "<entry:1>",
+   "config_subentry_id": null,
+   "created_at": "<time>",
+   "device_class": null,
+   "device_id": "<device:19f631d2-af86-4307-a089-f5a46a2e4b55>",
+   "disabled_by": "integration",
+   "entity_category": "diagnostic",
+   "entity_id": "sensor.bedroom_light_bulb_zigbee_connectivity",
+   "hidden_by": null,
+   "icon": null,
+   "id": "<id>",
+   "has_entity_name": true,
+   "labels": [],
+   "modified_at": "<time>",
+   "name": null,
+   "object_id_base": "Zigbee connectivity",
+   "options": {},
+   "original_device_class": "enum",
+   "original_icon": null,
+   "original_name": "Zigbee connectivity",
+   "platform": "hue",
+   "suggested_object_id": null,
+   "supported_features": 0,
+   "translation_key": "zigbee_connectivity",
+   "unique_id": "4ecb1a35-e484-424f-8453-6e21c51cc146",
+   "previous_unique_id": null,
+   "unit_of_measurement": null
+  },
+  {
+   "aliases": [],
+   "aliases_v2": [
+    null
+   ],
+   "area_id": null,
+   "categories": {},
+   "capabilities": {
+    "options": [
+     "connected",
+     "disconnected",
+     "connectivity_issue",
+     "unidirectional_incoming"
+    ]
+   },
+   "config_entry_id": "<entry:1>",
+   "config_subentry_id": null,
+   "created_at": "<time>",
+   "device_class": null,
+   "device_id": "<device:ba10f1f5-48d5-46f7-b795-3594af125d94>",
+   "disabled_by": "integration",
+   "entity_category": "diagnostic",
+   "entity_id": "sensor.hallway_hue_filament_bulb_1_zigbee_connectivity",
+   "hidden_by": null,
+   "icon": null,
+   "id": "<id>",
+   "has_entity_name": true,
+   "labels": [],
+   "modified_at": "<time>",
+   "name": null,
+   "object_id_base": "Zigbee connectivity",
+   "options": {},
+   "original_device_class": "enum",
+   "original_icon": null,
+   "original_name": "Zigbee connectivity",
+   "platform": "hue",
+   "suggested_object_id": null,
+   "supported_features": 0,
+   "translation_key": "zigbee_connectivity",
+   "unique_id": "3d2bb09c-493d-4c70-9fec-200fcd6387f2",
+   "previous_unique_id": null,
+   "unit_of_measurement": null
+  },
+  {
+   "aliases": [],
+   "aliases_v2": [
+    null
+   ],
+   "area_id": null,
+   "categories": {},
+   "capabilities": {
+    "options": [
+     "connected",
+     "disconnected",
+     "connectivity_issue",
+     "unidirectional_incoming"
+    ]
+   },
+   "config_entry_id": "<entry:1>",
+   "config_subentry_id": null,
+   "created_at": "<time>",
+   "device_class": null,
+   "device_id": "<device:dac0d5e2-8c2a-4912-8a4d-c863b6e00716>",
+   "disabled_by": "integration",
+   "entity_category": "diagnostic",
+   "entity_id": "sensor.hallway_hue_filament_bulb_2_zigbee_connectivity",
+   "hidden_by": null,
+   "icon": null,
+   "id": "<id>",
+   "has_entity_name": true,
+   "labels": [],
+   "modified_at": "<time>",
+   "name": null,
+   "object_id_base": "Zigbee connectivity",
+   "options": {},
+   "original_device_class": "enum",
+   "original_icon": null,
+   "original_name": "Zigbee connectivity",
+   "platform": "hue",
+   "suggested_object_id": null,
+   "supported_features": 0,
+   "translation_key": "zigbee_connectivity",
+   "unique_id": "fb064991-0c0f-448f-a2b0-cceec4bfa90a",
+   "previous_unique_id": null,
+   "unit_of_measurement": null
+  },
+  {
+   "aliases": [],
+   "aliases_v2": [
+    null
+   ],
+   "area_id": null,
+   "categories": {},
+   "capabilities": {
+    "options": [
+     "connected",
+     "disconnected",
+     "connectivity_issue",
+     "unidirectional_incoming"
+    ]
+   },
+   "config_entry_id": "<entry:1>",
+   "config_subentry_id": null,
+   "created_at": "<time>",
+   "device_class": null,
+   "device_id": "<device:3d3751a8-aff0-4d9d-815f-e52bf7e8efde>",
+   "disabled_by": "integration",
+   "entity_category": "diagnostic",
+   "entity_id": "sensor.hallway_hue_filament_bulb_3_zigbee_connectivity",
+   "hidden_by": null,
+   "icon": null,
+   "id": "<id>",
+   "has_entity_name": true,
+   "labels": [],
+   "modified_at": "<time>",
+   "name": null,
+   "object_id_base": "Zigbee connectivity",
+   "options": {},
+   "original_device_class": "enum",
+   "original_icon": null,
+   "original_name": "Zigbee connectivity",
+   "platform": "hue",
+   "suggested_object_id": null,
+   "supported_features": 0,
+   "translation_key": "zigbee_connectivity",
+   "unique_id": "e71377f6-d67c-4bd9-8953-8d032b3cc845",
+   "previous_unique_id": null,
+   "unit_of_measurement": null
+  },
+  {
+   "aliases": [],
+   "aliases_v2": [
+    null
+   ],
+   "area_id": null,
+   "categories": {},
+   "capabilities": {
+    "options": [
+     "connected",
+     "disconnected",
+     "connectivity_issue",
+     "unidirectional_incoming"
+    ]
+   },
+   "config_entry_id": "<entry:1>",
+   "config_subentry_id": null,
+   "created_at": "<time>",
+   "device_class": null,
+   "device_id": "<device:375f4b1e-5632-44d2-bafd-7bf40e2571d3>",
+   "disabled_by": "integration",
+   "entity_category": "diagnostic",
+   "entity_id": "sensor.hue_bridge_zigbee_connectivity",
+   "hidden_by": null,
+   "icon": null,
+   "id": "<id>",
+   "has_entity_name": true,
+   "labels": [],
+   "modified_at": "<time>",
+   "name": null,
+   "object_id_base": "Zigbee connectivity",
+   "options": {},
+   "original_device_class": "enum",
+   "original_icon": null,
+   "original_name": "Zigbee connectivity",
+   "platform": "hue",
+   "suggested_object_id": null,
+   "supported_features": 0,
+   "translation_key": "zigbee_connectivity",
+   "unique_id": "4f8826ef-0ff5-46ed-81bb-ef285c72dbe2",
+   "previous_unique_id": null,
+   "unit_of_measurement": null
+  },
+  {
+   "aliases": [],
+   "aliases_v2": [
+    null
+   ],
+   "area_id": null,
+   "categories": {},
+   "capabilities": {
+    "options": [
+     "connected",
+     "disconnected",
+     "connectivity_issue",
+     "unidirectional_incoming"
+    ]
+   },
+   "config_entry_id": "<entry:1>",
+   "config_subentry_id": null,
+   "created_at": "<time>",
+   "device_class": null,
+   "device_id": "<device:13592c33-2ede-42f1-8e4a-c0e241bf29c4>",
+   "disabled_by": "integration",
+   "entity_category": "diagnostic",
+   "entity_id": "sensor.living_room_lamp_zigbee_connectivity",
+   "hidden_by": null,
+   "icon": null,
+   "id": "<id>",
+   "has_entity_name": true,
+   "labels": [],
+   "modified_at": "<time>",
+   "name": null,
+   "object_id_base": "Zigbee connectivity",
+   "options": {},
+   "original_device_class": "enum",
+   "original_icon": null,
+   "original_name": "Zigbee connectivity",
+   "platform": "hue",
+   "suggested_object_id": null,
+   "supported_features": 0,
+   "translation_key": "zigbee_connectivity",
+   "unique_id": "37abe652-fb57-4d4d-aac0-3fb28d2f01f0",
+   "previous_unique_id": null,
+   "unit_of_measurement": null
+  }
+ ],
+ "states": {
+  "sensor.bedroom_bedroom_battery": {
+   "state": "100",
+   "attributes": {
+    "state_class": "measurement",
+    "battery_state": "normal",
+    "unit_of_measurement": "%",
+    "device_class": "battery",
+    "friendly_name": "Bedroom Battery"
+   }
+  },
+  "sensor.bedroom_bedroom_illuminance": {
+   "state": "14",
+   "attributes": {
+    "state_class": "measurement",
+    "light_level": 11640,
+    "unit_of_measurement": "lx",
+    "device_class": "illuminance",
+    "friendly_name": "Bedroom Illuminance"
+   }
+  },
+  "sensor.bedroom_bedroom_illuminance_2": {
+   "state": "14",
+   "attributes": {
+    "state_class": "measurement",
+    "light_level": 11640,
+    "unit_of_measurement": "lx",
+    "device_class": "illuminance",
+    "friendly_name": "Bedroom Illuminance"
+   }
+  },
+  "sensor.bedroom_bedroom_temperature": {
+   "state": "69.44",
+   "attributes": {
+    "state_class": "measurement",
+    "unit_of_measurement": "°F",
+    "device_class": "temperature",
+    "friendly_name": "Bedroom Temperature"
+   }
+  }
+ }
+}

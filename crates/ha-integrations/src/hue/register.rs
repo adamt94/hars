@@ -15,7 +15,7 @@ use super::store::Store;
 use crate::light::Light;
 use ha_core::EntityId;
 use ha_registry::{DeviceInfo, EntityPatch, Registry};
-use serde_json::{Map, Value, json};
+use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::sync::Weak;
 
@@ -41,7 +41,13 @@ fn bridge_mac(bridge_id: &str) -> Option<String> {
 /// (an install imported from an older Home Assistant): rows made now would
 /// be gone after a restart while rows that point at them were saved. The
 /// entities then run on the rows there are, as before `hars` made rows.
-pub(super) fn register(registry: &Registry, entry_id: &str, store: &Store, disable_new: bool) {
+pub(super) fn register(
+    hass: &ha_core::Hass,
+    registry: &Registry,
+    entry_id: &str,
+    store: &Store,
+    disable_new: bool,
+) {
     if registry.read_only().is_some() {
         return;
     }
@@ -136,13 +142,14 @@ pub(super) fn register(registry: &Registry, entry_id: &str, store: &Store, disab
         rows.get(id).map(|(row, _)| row.clone())
     };
     // How a row made now starts: disabled by the integration if HA's
-    // entity is (`entity_registry_enabled_default`) or the entry says new
-    // entities start disabled (`pref_disable_new_entities`). A row that
-    // exists keeps what it has.
-    let starts =
-        |enabled_default: bool| (!enabled_default || disable_new).then(|| "integration".to_owned());
+    // entity is (`entity_registry_enabled_default`). The entry's
+    // `pref_disable_new_entities` is the registry's to apply, after a
+    // deleted row's own setting has come back. A row that exists keeps
+    // what it has.
+    let starts = |enabled_default: bool| (!enabled_default).then(|| "integration".to_owned());
     // Then `EntityPlatform._async_add_entity`: a row that is enabled, made
     // now or not, on a device that is disabled is disabled with it.
+    // Whether the entity then runs.
     let settle = |made: &ha_registry::Entity, hue: Option<&Value>| {
         let device_disabled = hue
             .and_then(|d| d["id"].as_str())
@@ -155,6 +162,7 @@ pub(super) fn register(registry: &Registry, entry_id: &str, store: &Store, disab
             };
             registry.update_entity(&made.entity_id, disabled);
         }
+        made.disabled_by.is_none() && !device_disabled
     };
     let patch = |device: Option<&Value>| EntityPatch {
         config_entry_id: Some(Some(entry_id.to_owned())),
@@ -167,6 +175,7 @@ pub(super) fn register(registry: &Registry, entry_id: &str, store: &Store, disab
         original_name: Some(None),
         translation_key: Some(None),
         unit_of_measurement: Some(None),
+        pref_disable_new: disable_new,
         ..Default::default()
     };
 
@@ -239,16 +248,31 @@ pub(super) fn register(registry: &Registry, entry_id: &str, store: &Store, disab
         };
         let name = kind.name(r);
         let device = HueEntity::device(kind, rid, r, store);
-        // What HA derives from the install (a name in its language, a
-        // unit in its unit system) is written only to a row made now, in
-        // English and metric: a row HA made keeps HA's. A name that is
-        // the resource's own (a scene's) follows the resource.
-        let exists = registry
-            .entity_by_unique_id(kind.domain(), DOMAIN, rid)
-            .is_some();
-        let (name, unit) = match exists && !kind.named_by_resource() {
-            true => (None, None),
-            false => (Some(name), Some(kind.unit().map(str::to_owned))),
+        // What HA derives from the install's language (a name) is written
+        // only to a row made now, in English: a row HA made keeps HA's. A
+        // name that is the resource's own (a scene's) follows the
+        // resource.
+        let existing = registry.entity_by_unique_id(kind.domain(), DOMAIN, rid);
+        let name = match existing.is_some() && !kind.named_by_resource() {
+            true => None,
+            false => Some(name),
+        };
+        // A temperature's unit is the sensor component's to settle
+        // (`add_to_platform_start`), which may first note in the row's
+        // options the unit the row had.
+        let unit = match kind {
+            Kind::Temperature => {
+                let settled = crate::sensor::when_registered(hass, existing.as_deref());
+                if let (Some(row), Some(options)) = (&existing, settled.options) {
+                    let options = EntityPatch {
+                        options: Some(options),
+                        ..Default::default()
+                    };
+                    registry.update_entity(&row.entity_id, options);
+                }
+                Some(settled.unit)
+            }
+            _ => kind.unit(),
         };
         let row = EntityPatch {
             capabilities: Some(kind.capabilities()),
@@ -259,24 +283,21 @@ pub(super) fn register(registry: &Registry, entry_id: &str, store: &Store, disab
             original_name: name,
             supported_features: Some(0),
             translation_key: Some(kind.translation_key().map(str::to_owned)),
-            unit_of_measurement: unit.filter(|_| !exists),
+            unit_of_measurement: Some(unit.map(str::to_owned)),
             ..patch(device)
         };
         let disabled = starts(kind.enabled_default());
         let made = registry.get_or_create_entity(kind.domain(), DOMAIN, rid, disabled, row);
-        settle(&made, device);
-        // The sensor's suggested precision goes beside the options the row
-        // has (`async_update_entity_options`), as a change of its own.
-        if let Some(precision) = kind.suggested_precision() {
-            let mut options = made.options.object();
-            let mut sensor = match options.remove("sensor") {
-                Some(Value::Object(o)) => o,
-                _ => Map::new(),
-            };
-            sensor.insert("suggested_display_precision".into(), json!(precision));
-            options.insert("sensor".into(), Value::Object(sensor));
+        let runs = settle(&made, device);
+        // The sensor's suggested precision goes beside the options the
+        // row has (`async_update_entity_options`), as a change of its
+        // own, when the entity is added to HA: a disabled one never is,
+        // and its row stays without.
+        if let (true, Some(precision)) = (runs, kind.suggested_precision())
+            && let Some(options) = crate::sensor::with_precision(&made, i64::from(precision))
+        {
             let options = EntityPatch {
-                options: Some(Value::Object(options)),
+                options: Some(options),
                 ..Default::default()
             };
             registry.update_entity(&made.entity_id, options);

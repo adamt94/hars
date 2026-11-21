@@ -495,7 +495,9 @@ class SwitchBot:
         return None
 
 
-async def run(subscriptions, steps, backend=None):
+async def run(subscriptions, steps, backend=None, units=None):
+    """`units`: "us_customary" for an install set to US customary units
+    (HA's default is metric)."""
     from homeassistant import bootstrap, core, loader
     from homeassistant.auth import auth_manager_from_config
     from homeassistant.config_entries import ConfigEntries
@@ -512,6 +514,10 @@ async def run(subscriptions, steps, backend=None):
         hass = core.HomeAssistant(str(tmp))
         hass.config.skip_pip = True
         await hass.config.async_load()
+        if units == "us_customary":
+            from homeassistant.util.unit_system import US_CUSTOMARY_SYSTEM
+
+            hass.config.units = US_CUSTOMARY_SYSTEM
         loader.async_setup(hass)
         hass.config_entries = ConfigEntries(hass, {})
         await hass.config_entries.async_initialize()
@@ -779,6 +785,18 @@ async def main():
         result.pop("areas")
         if name == "add":
             write(SWITCHBOT / "fresh_setup.json", rows)
+            # The same on an install set to US customary units: what its
+            # sensors' rows and states are then.
+            us = await run([], json.loads(json.dumps(steps)), units="us_customary")
+            sensors = {
+                "doc": "The Hub 2's and the Bot's sensors after the `add` scenario on an"
+                       " install set to US customary units: their rows and states.",
+                "entities": [e for e in us["entities"]
+                             if e["entity_id"].startswith("sensor.")],
+                "states": {k: v for k, v in us["states"].items()
+                           if k.startswith("sensor.")},
+            }
+            write(SWITCHBOT / "us_customary.json", sensors)
         if name == "duplicate":
             # Two accounts that list the same devices.
             write(SWITCHBOT / "two_accounts.json", rows)

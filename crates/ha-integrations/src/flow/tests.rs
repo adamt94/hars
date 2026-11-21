@@ -425,6 +425,40 @@ async fn one_entry_per_account() {
     assert_eq!(home.flows.in_progress(), 0);
 }
 
+/// An account added on an install set to US customary units: the Hub 2's
+/// temperature is in °F, in the row and in the state, as HA has it
+/// (`switchbot_cloud/vectors/us_customary.json`); its humidity and the
+/// Bot's battery are as on a metric install.
+#[tokio::test]
+async fn an_account_added_on_a_us_install_shows_fahrenheit() {
+    let home = home().await;
+    let mut config = (*home.hass.config()).clone();
+    config.unit_system_v2 = "us_customary".into();
+    home.hass.set_config(config);
+    entry_id(&add(&home, TOKEN).await);
+    let ha: Value =
+        serde_json::from_str(include_str!("../switchbot_cloud/vectors/us_customary.json")).unwrap();
+    let rows = home.registry.snapshot();
+    for want in ha["entities"].as_array().unwrap() {
+        let id = want["entity_id"].as_str().unwrap();
+        let row = rows.entities.iter().find(|e| e.entity_id == id);
+        let row = serde_json::to_value(&**row.unwrap_or_else(|| panic!("no row {id}"))).unwrap();
+        for field in [
+            "unit_of_measurement",
+            "options",
+            "capabilities",
+            "disabled_by",
+        ] {
+            assert_eq!(row[field], want[field], "{id}: {field}");
+        }
+    }
+    let states = ha["states"].as_object().unwrap();
+    assert_eq!(states["sensor.hub_2_9d_temperature"]["state"], "71.06");
+    for (id, want) in states {
+        assert_eq!(state(&home.hass, id), *want, "{id}");
+    }
+}
+
 /// An entry the user ignored is not in a flow's way (HA's
 /// `async_finish_flow`): the flow's entry replaces it. It leaves the list
 /// before the new entry is added; a row that still named it goes, and its

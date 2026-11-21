@@ -1,0 +1,152 @@
+{
+ "doc": "The Hub 2's and the Bot's sensors after the `add` scenario on an install set to US customary units: their rows and states.",
+ "entities": [
+  {
+   "aliases": [],
+   "aliases_v2": [
+    null
+   ],
+   "area_id": null,
+   "categories": {},
+   "capabilities": {
+    "state_class": "measurement"
+   },
+   "config_entry_id": "<entry:1>",
+   "config_subentry_id": null,
+   "created_at": "<time>",
+   "device_class": null,
+   "device_id": "<device:AABBCC000002>",
+   "disabled_by": null,
+   "entity_category": null,
+   "entity_id": "sensor.hub_2_9d_humidity",
+   "hidden_by": null,
+   "icon": null,
+   "id": "<id>",
+   "has_entity_name": true,
+   "labels": [],
+   "modified_at": "<time>",
+   "name": null,
+   "object_id_base": "Humidity",
+   "options": {},
+   "original_device_class": "humidity",
+   "original_icon": null,
+   "original_name": "Humidity",
+   "platform": "switchbot_cloud",
+   "suggested_object_id": null,
+   "supported_features": 0,
+   "translation_key": null,
+   "unique_id": "AABBCC000002_humidity",
+   "previous_unique_id": null,
+   "unit_of_measurement": "%"
+  },
+  {
+   "aliases": [],
+   "aliases_v2": [
+    null
+   ],
+   "area_id": null,
+   "categories": {},
+   "capabilities": {
+    "state_class": "measurement"
+   },
+   "config_entry_id": "<entry:1>",
+   "config_subentry_id": null,
+   "created_at": "<time>",
+   "device_class": null,
+   "device_id": "<device:AABBCC000002>",
+   "disabled_by": null,
+   "entity_category": null,
+   "entity_id": "sensor.hub_2_9d_temperature",
+   "hidden_by": null,
+   "icon": null,
+   "id": "<id>",
+   "has_entity_name": true,
+   "labels": [],
+   "modified_at": "<time>",
+   "name": null,
+   "object_id_base": "Temperature",
+   "options": {
+    "sensor": {
+     "suggested_display_precision": 1
+    }
+   },
+   "original_device_class": "temperature",
+   "original_icon": null,
+   "original_name": "Temperature",
+   "platform": "switchbot_cloud",
+   "suggested_object_id": null,
+   "supported_features": 0,
+   "translation_key": null,
+   "unique_id": "AABBCC000002_temperature",
+   "previous_unique_id": null,
+   "unit_of_measurement": "°F"
+  },
+  {
+   "aliases": [],
+   "aliases_v2": [
+    null
+   ],
+   "area_id": null,
+   "categories": {},
+   "capabilities": {
+    "state_class": "measurement"
+   },
+   "config_entry_id": "<entry:1>",
+   "config_subentry_id": null,
+   "created_at": "<time>",
+   "device_class": null,
+   "device_id": "<device:AABBCC000001>",
+   "disabled_by": null,
+   "entity_category": null,
+   "entity_id": "sensor.towel_switch_battery",
+   "hidden_by": null,
+   "icon": null,
+   "id": "<id>",
+   "has_entity_name": true,
+   "labels": [],
+   "modified_at": "<time>",
+   "name": null,
+   "object_id_base": "Battery",
+   "options": {},
+   "original_device_class": "battery",
+   "original_icon": null,
+   "original_name": "Battery",
+   "platform": "switchbot_cloud",
+   "suggested_object_id": null,
+   "supported_features": 0,
+   "translation_key": null,
+   "unique_id": "AABBCC000001_battery",
+   "previous_unique_id": null,
+   "unit_of_measurement": "%"
+  }
+ ],
+ "states": {
+  "sensor.hub_2_9d_humidity": {
+   "state": "49",
+   "attributes": {
+    "state_class": "measurement",
+    "unit_of_measurement": "%",
+    "device_class": "humidity",
+    "friendly_name": "Hub 2 9D Humidity"
+   }
+  },
+  "sensor.hub_2_9d_temperature": {
+   "state": "71.06",
+   "attributes": {
+    "state_class": "measurement",
+    "unit_of_measurement": "°F",
+    "device_class": "temperature",
+    "friendly_name": "Hub 2 9D Temperature"
+   }
+  },
+  "sensor.towel_switch_battery": {
+   "state": "100",
+   "attributes": {
+    "state_class": "measurement",
+    "unit_of_measurement": "%",
+    "device_class": "battery",
+    "friendly_name": "Towel switch Battery"
+   }
+  }
+ }
+}

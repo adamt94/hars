@@ -170,6 +170,11 @@ impl FakeApi {
                 let resources =
                     include_str!("../../../ha-integrations/src/hue/vectors/resource.json");
                 match hue.bridge.as_str() {
+                    // The bridge of `scripts/vectors/hue_rows.py`'s
+                    // install, as it is from its second start on.
+                    "imported" => {
+                        Answer::Reply(200, "application/json", IMPORTED_RESOURCES.to_owned())
+                    }
                     // Not said to be JSON; said to be and isn't.
                     "html" => Answer::Reply(200, "text/html", resources.to_owned()),
                     "garbled" => Answer::Reply(200, "application/json", "<html>".into()),
@@ -1648,6 +1653,314 @@ async fn an_ignored_entry_is_not_loaded_and_goes_without_a_restart() {
     assert_eq!(state("ignore"), "not_loaded");
     assert_eq!(flows.remove_entry(&id).await, Some(false));
     assert_eq!(home.entries.list().unwrap().len(), 1);
+}
+
+/// A bridge added on an install set to US customary units: its
+/// temperature is in °F, in the row and in the state, as HA has it
+/// (`hue/vectors/us_customary.json`); the other sensors are as on a metric
+/// install.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_bridge_added_on_a_us_install_shows_fahrenheit() {
+    use ha_integrations::flow::FlowResult;
+    let hass = Hass::new();
+    let mut config = (*hass.config()).clone();
+    config.unit_system_v2 = "us_customary".into();
+    hass.set_config(config);
+    let registry = ha_registry::Registry::in_memory(&hass, Default::default());
+    let home = home_on(hass.clone(), registry).await;
+    let flows = home.config.flows.clone().unwrap();
+    home.api.set("pressed");
+    let answers = [Some(json!({"id": "c42996000001"})), Some(json!({}))];
+    let added = hue_flow(&flows, &answers).await;
+    assert!(matches!(added, FlowResult::CreateEntry { .. }), "{added:?}");
+    let ha: Value = serde_json::from_str(include_str!(
+        "../../../ha-integrations/src/hue/vectors/us_customary.json"
+    ))
+    .unwrap();
+    let rows = home.registry.snapshot();
+    for want in ha["entities"].as_array().unwrap() {
+        let id = want["entity_id"].as_str().unwrap();
+        let row = rows.entities.iter().find(|e| e.entity_id == id);
+        let row = serde_json::to_value(&**row.unwrap_or_else(|| panic!("no row {id}"))).unwrap();
+        for field in [
+            "unit_of_measurement",
+            "options",
+            "capabilities",
+            "disabled_by",
+        ] {
+            assert_eq!(row[field], want[field], "{id}: {field}");
+        }
+    }
+    let states = ha["states"].as_object().unwrap();
+    assert_eq!(
+        states["sensor.bedroom_bedroom_temperature"]["state"],
+        "69.44"
+    );
+    for (id, want) in states {
+        let state = hass.states().get(&ha_core::EntityId::parse(id).unwrap());
+        let state = state.unwrap_or_else(|| panic!("no state {id}"));
+        let got = json!({"state": state.state, "attributes": state.attributes});
+        assert_eq!(got, *want, "{id}");
+    }
+}
+
+/// What the bridge of the imported install has
+/// (`scripts/vectors/hue_rows.py`).
+const IMPORTED_RESOURCES: &str =
+    include_str!("../../../ha-integrations/src/hue/vectors/imported/resource.json");
+
+/// The store files Home Assistant 2026.6.1 left of an install with a Hue
+/// bridge after years of use, in miniature (`scripts/vectors/hue_rows.py`):
+/// entities of every kind that the user disabled, hid, renamed, moved,
+/// gave another id, another unit; rows that never ran; rows whose
+/// resources are gone; removed rows and devices.
+const IMPORTED: [(&str, &str); 4] = [
+    (
+        "core.config_entries",
+        include_str!("../../../ha-integrations/src/hue/vectors/imported/core.config_entries"),
+    ),
+    (
+        "core.device_registry",
+        include_str!("../../../ha-integrations/src/hue/vectors/imported/core.device_registry"),
+    ),
+    (
+        "core.entity_registry",
+        include_str!("../../../ha-integrations/src/hue/vectors/imported/core.entity_registry"),
+    ),
+    (
+        "core.area_registry",
+        include_str!("../../../ha-integrations/src/hue/vectors/imported/core.area_registry"),
+    ),
+];
+
+fn imported(name: &str) -> Value {
+    let text = match name {
+        "states" => include_str!("../../../ha-integrations/src/hue/vectors/imported/states.json"),
+        "restored" => {
+            include_str!("../../../ha-integrations/src/hue/vectors/imported/restored.json")
+        }
+        _ => include_str!("../../../ha-integrations/src/hue/vectors/imported/us_customary.json"),
+    };
+    serde_json::from_str(text).unwrap()
+}
+
+/// `hars` after one start on a config directory.
+struct OnDisk {
+    hass: Hass,
+    registry: Arc<ha_registry::Registry>,
+    dir: std::path::PathBuf,
+}
+
+impl OnDisk {
+    /// Start `hars` on a directory holding these store files, as `main`
+    /// does (the registries, the entries, the integrations, then the
+    /// placeholder states), against the imported install's bridge, and
+    /// write whatever the start changed. `us`: the install is set to US
+    /// customary units.
+    async fn start(name: &str, files: &[(&str, String)], us: bool) -> Self {
+        let dir = std::env::temp_dir().join(format!("hars-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join(".storage")).unwrap();
+        for (file, text) in files {
+            std::fs::write(dir.join(".storage").join(file), text).unwrap();
+        }
+        let (base, api) = FakeApi::start().await;
+        api.set("bridge_imported");
+        let endpoints = Endpoints {
+            hue_bridge: Some(base),
+            ..Default::default()
+        };
+        let hass = Hass::new();
+        if us {
+            let mut config = (*hass.config()).clone();
+            config.unit_system_v2 = "us_customary".into();
+            hass.set_config(config);
+        }
+        let loaded = ha_registry::Registries::load(&dir).unwrap();
+        let registry = ha_registry::Registry::new(&hass, &dir, loaded);
+        let entries = ConfigEntries::load(&hass, &dir);
+        let lookup = entries.clone();
+        registry.set_entry_lookup(Arc::new(move |id: &str| lookup.info(id)));
+        let stored = entries.list();
+        let _started = ha_integrations::start(
+            &hass,
+            registry.clone().into(),
+            stored.as_deref(),
+            Default::default(),
+            &endpoints,
+            Some(&entries),
+        );
+        hass.setups_done().await;
+        registry.write_unavailable_states(&hass);
+        entries.flush().await;
+        registry.flush().await;
+        Self {
+            hass,
+            registry,
+            dir,
+        }
+    }
+
+    fn file(&self, name: &str) -> String {
+        std::fs::read_to_string(self.dir.join(".storage").join(name)).unwrap()
+    }
+
+    /// A state as the generator writes HA's (a group's scenes and members
+    /// are sets in HA: sorted).
+    fn state(&self, entity_id: &str) -> Option<Value> {
+        let id = ha_core::EntityId::parse(entity_id).ok()?;
+        let state = self.hass.states().get(&id)?;
+        let mut attributes = state.attributes.clone();
+        for key in ["hue_scenes", "lights", "entity_id"] {
+            if let Some(Value::Array(set)) = attributes.get_mut(key) {
+                set.sort_by_key(Value::to_string);
+            }
+        }
+        Some(json!({"state": state.state, "attributes": attributes}))
+    }
+
+    /// A registry row as HA stores it, but for when it was last changed.
+    fn row(&self, id: &str) -> Option<Value> {
+        let rows = self.registry.snapshot();
+        let row = rows.entities.iter().find(|e| e.id.as_deref() == Some(id))?;
+        let mut row = serde_json::to_value(&**row).unwrap();
+        row.as_object_mut().unwrap().remove("modified_at");
+        Some(row)
+    }
+}
+
+impl Drop for OnDisk {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.dir);
+    }
+}
+
+/// A row of a vector, but for when it was last changed.
+fn unchanged(row: &Value) -> Value {
+    let mut row = row.clone();
+    row.as_object_mut().unwrap().remove("modified_at");
+    row
+}
+
+/// A start of `hars` on the files Home Assistant left changes none of
+/// them, byte for byte: not the entries, not a device, not an entity
+/// (disabled, hidden, renamed, moved, with another unit, never run, or
+/// with nothing behind it any more), not a removed row, not an area. HA
+/// itself changes nothing on such a start. And the states are HA's.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_start_on_an_imported_install_changes_no_file() {
+    let files: Vec<(&str, String)> = IMPORTED
+        .iter()
+        .map(|(f, t)| (*f, (*t).to_owned()))
+        .collect();
+    let home = OnDisk::start("hue-imported", &files, false).await;
+    for (name, before) in IMPORTED {
+        let after = home.file(name);
+        if after != before {
+            let changed = before.lines().zip(after.lines()).find(|(b, a)| b != a);
+            panic!("{name} was changed by the start: {changed:#?}");
+        }
+    }
+    let want = imported("states");
+    let want = want.as_object().unwrap();
+    let wrong: Vec<(&String, Option<Value>, &Value)> = want
+        .iter()
+        .map(|(entity_id, state)| (entity_id, home.state(entity_id), state))
+        .filter(|(_, got, want)| got.as_ref() != Some(*want))
+        .collect();
+    assert!(
+        wrong.is_empty(),
+        "states that aren't HA's (got, HA's): {wrong:#?}"
+    );
+    let extra: Vec<String> = home
+        .hass
+        .states()
+        .all()
+        .iter()
+        .map(|s| s.entity_id.to_string())
+        .filter(|id| !want.contains_key(id))
+        .collect();
+    assert_eq!(extra, Vec::<String>::new(), "states HA doesn't have");
+}
+
+/// Rows the user removed, of entities the bridge still has, come back at
+/// the next start as they come back in HA: with the user's name, area,
+/// options and id, hidden as they were, disabled as they were, and then
+/// disabled by the integration if they were enabled and the entry says
+/// new entities start disabled. A temperature that comes back has the
+/// unit system's unit in its row whatever its options say (HA reads the
+/// options of a row that is there when the entity is added, and this one
+/// wasn't).
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn removed_rows_come_back_as_in_home_assistant() {
+    let vector = imported("restored");
+    for case in vector["cases"].as_array().unwrap() {
+        let disable_new = case["pref_disable_new_entities"].as_bool().unwrap();
+        let after = case["after"].as_array().unwrap();
+        let back: Vec<&str> = after.iter().map(|e| e["id"].as_str().unwrap()).collect();
+        let files: Vec<(&str, String)> = IMPORTED
+            .iter()
+            .map(|(name, text)| {
+                let mut doc: Value = serde_json::from_str(text).unwrap();
+                let data = &mut doc["data"];
+                match *name {
+                    "core.config_entries" => {
+                        data["entries"][0]["pref_disable_new_entities"] = json!(disable_new);
+                    }
+                    "core.entity_registry" => {
+                        let rows = data["entities"].as_array_mut().unwrap();
+                        rows.retain(|e| !back.contains(&e["id"].as_str().unwrap()));
+                        data["deleted_entities"] = case["deleted_entities"].clone();
+                    }
+                    _ => {}
+                }
+                (*name, doc.to_string())
+            })
+            .collect();
+        let name = format!("hue-restored-{disable_new}");
+        let home = OnDisk::start(&name, &files, false).await;
+        for want in after {
+            let id = want["id"].as_str().unwrap();
+            let got = home.row(id);
+            assert_eq!(
+                got.as_ref(),
+                Some(&unchanged(want)),
+                "new entities start disabled: {disable_new}, {}",
+                want["entity_id"]
+            );
+        }
+        let stored: Value = serde_json::from_str(&home.file("core.entity_registry")).unwrap();
+        let left = stored["data"]["deleted_entities"].as_array().unwrap().len();
+        let had = case["deleted_entities"].as_array().unwrap().len();
+        assert_eq!(left, had - after.len(), "the removed rows that came back");
+    }
+}
+
+/// The same install set to US customary units: a temperature whose row
+/// was made in °C goes on showing °C, and its row now says why
+/// (`sensor.private`); one the user gave another unit keeps the user's.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn an_imported_temperature_keeps_its_unit_when_the_unit_system_changes() {
+    let files: Vec<(&str, String)> = IMPORTED
+        .iter()
+        .map(|(f, t)| (*f, (*t).to_owned()))
+        .collect();
+    let home = OnDisk::start("hue-imported-us", &files, true).await;
+    let vector = imported("us_customary");
+    let rows = vector["entities"].as_array().unwrap();
+    assert_eq!(rows.len(), 2);
+    for want in rows {
+        let got = home.row(want["id"].as_str().unwrap());
+        assert_eq!(
+            got.as_ref(),
+            Some(&unchanged(want)),
+            "{}",
+            want["entity_id"]
+        );
+    }
+    for (entity_id, state) in vector["states"].as_object().unwrap() {
+        assert_eq!(home.state(entity_id).as_ref(), Some(state), "{entity_id}");
+    }
 }
 
 /// A bridge's whole life on one config directory, each start of `hars` in

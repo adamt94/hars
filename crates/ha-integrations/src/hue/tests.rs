@@ -912,7 +912,7 @@ fn registering_leaves_has_rows_alone() {
     let before = registry.snapshot();
     let mut events = hass.bus().subscribe();
     let resources = fixture("resource")["data"].as_array().unwrap().clone();
-    register::register(&registry, &entry_id, &Store::new(resources), false);
+    register::register(&hass, &registry, &entry_id, &Store::new(resources), false);
     let after = registry.snapshot();
     let rows = |r: &Registries| json!([r.devices, r.entities, r.areas]);
     for (n, (was, is)) in before.devices.iter().zip(&after.devices).enumerate() {
@@ -934,7 +934,7 @@ fn registering_makes_has_rows() {
     let hass = Hass::new();
     let registry = ha_registry::Registry::in_memory(&hass, Registries::default());
     let resources = fixture("resource")["data"].as_array().unwrap().clone();
-    register::register(&registry, "entry", &Store::new(resources), false);
+    register::register(&hass, &registry, "entry", &Store::new(resources), false);
     let made = registry.snapshot();
     let mut ids: Vec<&str> = made.entities.iter().map(|e| e.entity_id.as_str()).collect();
     ids.sort_unstable();
@@ -957,12 +957,14 @@ fn registering_makes_has_rows() {
     // A second set-up is the first again.
     let mut events = hass.bus().subscribe();
     let resources = fixture("resource")["data"].as_array().unwrap().clone();
-    register::register(&registry, "entry", &Store::new(resources), false);
+    register::register(&hass, &registry, "entry", &Store::new(resources), false);
     assert!(events.try_recv().is_err(), "a second set-up changed a row");
 }
 
 /// What HA derived from the install it ran on stays in a row it made: a
-/// unit of another unit system, a name in another language. A name that
+/// name in another language, and a temperature's unit of another unit
+/// system, which the row's options then say is kept (HA's `sensor`
+/// does that when the unit system changes under a row). A name that
 /// is the resource's own (a scene's) follows the resource. A row made
 /// now starts disabled if the entry says so; an enabled row, made now or
 /// not, on a disabled device is disabled with it (HA's order: the
@@ -1011,10 +1013,14 @@ fn registering_keeps_what_ha_derived_and_obeys_the_disabling() {
     let registry = ha_registry::Registry::in_memory(&hass, install());
     let resources = fixture("resource")["data"].as_array().unwrap().clone();
     let store = Store::new(resources);
-    register::register(&registry, &entry_id, &store, true);
+    register::register(&hass, &registry, &entry_id, &store, true);
     let after = registry.snapshot();
     let row = |id: &str| after.entities.iter().find(|e| unique(e, id)).unwrap();
     assert_eq!(row(TEMPERATURE).unit_of_measurement.as_deref(), Some("°F"));
+    assert_eq!(
+        row(TEMPERATURE).options.object()["sensor.private"],
+        json!({"suggested_unit_of_measurement": "°F"})
+    );
     assert_eq!(
         row(TEMPERATURE).original_name.as_deref(),
         Some("Temperatur")
@@ -1027,7 +1033,7 @@ fn registering_keeps_what_ha_derived_and_obeys_the_disabling() {
     assert_eq!(row(ROOM_LIGHT).disabled_by.as_deref(), Some("device"));
     // And without the preference a new row on a disabled device is too.
     let registry = ha_registry::Registry::in_memory(&hass, install());
-    register::register(&registry, &entry_id, &store, false);
+    register::register(&hass, &registry, &entry_id, &store, false);
     let after = registry.snapshot();
     let row = |id: &str| after.entities.iter().find(|e| unique(e, id)).unwrap();
     assert_eq!(row(LAMP).disabled_by.as_deref(), Some("device"));
@@ -1057,7 +1063,7 @@ async fn nothing_is_registered_in_a_store_that_cant_be_written() {
     let dir = std::env::temp_dir().join(format!("hars-hue-read-only-{}", std::process::id()));
     let registry = ha_registry::Registry::new(&hass, &dir, registries);
     let resources = fixture("resource")["data"].as_array().unwrap().clone();
-    register::register(&registry, "entry", &Store::new(resources), false);
+    register::register(&hass, &registry, "entry", &Store::new(resources), false);
     let after = registry.snapshot();
     assert!(after.devices.is_empty() && after.entities.is_empty() && after.areas.is_empty());
 }

@@ -1,0 +1,311 @@
+{
+ "binary_sensor.bedroom_bedroom_motion": {
+  "state": "off",
+  "attributes": {
+   "device_class": "motion",
+   "friendly_name": "Someone in the bedroom"
+  }
+ },
+ "light.bedroom_bedroom": {
+  "state": "off",
+  "attributes": {
+   "min_color_temp_kelvin": 2000,
+   "max_color_temp_kelvin": 6535,
+   "supported_color_modes": [
+    "color_temp",
+    "xy"
+   ],
+   "color_mode": null,
+   "brightness": null,
+   "color_temp_kelvin": null,
+   "hs_color": null,
+   "rgb_color": null,
+   "xy_color": null,
+   "is_hue_group": true,
+   "hue_scenes": [
+    "Bright",
+    "Dimmed",
+    "Honolulu"
+   ],
+   "hue_type": "room",
+   "lights": [
+    "Light bulb"
+   ],
+   "entity_id": [
+    "light.bedroom_light_bulb"
+   ],
+   "dynamics": false,
+   "friendly_name": "Bedroom",
+   "supported_features": 40
+  }
+ },
+ "light.bedroom_light_bulb": {
+  "state": "off",
+  "attributes": {
+   "min_color_temp_kelvin": 2000,
+   "max_color_temp_kelvin": 6535,
+   "effect_list": [
+    "off",
+    "candle",
+    "fire",
+    "prism",
+    "sparkle",
+    "opal",
+    "glisten",
+    "underwater",
+    "cosmos",
+    "sunbeam",
+    "enchant",
+    "sunrise",
+    "sunset"
+   ],
+   "supported_color_modes": [
+    "color_temp",
+    "xy"
+   ],
+   "effect": null,
+   "color_mode": null,
+   "brightness": null,
+   "color_temp_kelvin": null,
+   "hs_color": null,
+   "rgb_color": null,
+   "xy_color": null,
+   "mode": "normal",
+   "dynamics": "none",
+   "friendly_name": "Light bulb",
+   "supported_features": 44
+  }
+ },
+ "light.hallway_hallway": {
+  "state": "on",
+  "attributes": {
+   "min_color_temp_kelvin": 2202,
+   "max_color_temp_kelvin": 4504,
+   "supported_color_modes": [
+    "color_temp"
+   ],
+   "color_mode": "color_temp",
+   "brightness": 89,
+   "color_temp_kelvin": 2702,
+   "hs_color": [
+    28.391,
+    65.659
+   ],
+   "rgb_color": [
+    255,
+    167,
+    88
+   ],
+   "xy_color": [
+    0.524,
+    0.388
+   ],
+   "is_hue_group": true,
+   "hue_scenes": [
+    "New scene",
+    "Nightlight"
+   ],
+   "hue_type": "room",
+   "lights": [
+    "Hue filament bulb 1",
+    "Hue filament bulb 2",
+    "Hue filament bulb 3"
+   ],
+   "entity_id": [
+    "light.hallway_hue_filament_bulb_1",
+    "light.hallway_hue_filament_bulb_2",
+    "light.hallway_hue_filament_bulb_3"
+   ],
+   "dynamics": false,
+   "friendly_name": "All of the hallway",
+   "supported_features": 40
+  }
+ },
+ "light.hallway_hue_filament_bulb_3": {
+  "state": "on",
+  "attributes": {
+   "min_color_temp_kelvin": 2202,
+   "max_color_temp_kelvin": 4504,
+   "effect_list": [
+    "off",
+    "candle",
+    "sparkle",
+    "glisten",
+    "sunrise",
+    "sunset"
+   ],
+   "supported_color_modes": [
+    "color_temp"
+   ],
+   "effect": "off",
+   "color_mode": "color_temp",
+   "brightness": 89,
+   "color_temp_kelvin": 2702,
+   "hs_color": [
+    28.391,
+    65.659
+   ],
+   "rgb_color": [
+    255,
+    167,
+    88
+   ],
+   "xy_color": [
+    0.524,
+    0.388
+   ],
+   "mode": "normal",
+   "dynamics": "none",
+   "friendly_name": "Hue filament bulb 3",
+   "supported_features": 44
+  }
+ },
+ "light.reading": {
+  "state": "off",
+  "attributes": {
+   "min_color_temp_kelvin": 2000,
+   "max_color_temp_kelvin": 6535,
+   "effect_list": [
+    "off",
+    "candle",
+    "fire",
+    "prism",
+    "sparkle",
+    "opal",
+    "glisten",
+    "underwater",
+    "cosmos",
+    "sunbeam",
+    "enchant",
+    "sunrise",
+    "sunset"
+   ],
+   "supported_color_modes": [
+    "color_temp",
+    "xy"
+   ],
+   "effect": null,
+   "color_mode": null,
+   "brightness": null,
+   "color_temp_kelvin": null,
+   "hs_color": null,
+   "rgb_color": null,
+   "xy_color": null,
+   "mode": "normal",
+   "dynamics": "none",
+   "icon": "mdi:lamp",
+   "friendly_name": "Reading light",
+   "supported_features": 44
+  }
+ },
+ "scene.bedroom_bedroom_dimmed": {
+  "state": "unknown",
+  "attributes": {
+   "group_name": "Bedroom",
+   "group_type": "room",
+   "name": "Dimmed",
+   "speed": 0.603,
+   "brightness": 76,
+   "is_dynamic": false,
+   "friendly_name": "Bedroom Dimmed"
+  }
+ },
+ "scene.hallway_hallway_nightlight": {
+  "state": "unknown",
+  "attributes": {
+   "group_name": "Hallway",
+   "group_type": "room",
+   "name": "Nightlight",
+   "speed": 0.603,
+   "brightness": 0,
+   "is_dynamic": false,
+   "friendly_name": "Hallway Nightlight"
+  }
+ },
+ "scene.hallway_hallway_old_scene": {
+  "state": "unavailable",
+  "attributes": {
+   "restored": true,
+   "friendly_name": "Old scene",
+   "supported_features": 0
+  }
+ },
+ "scene.holiday": {
+  "state": "unknown",
+  "attributes": {
+   "group_name": "Bedroom",
+   "group_type": "room",
+   "name": "Honolulu",
+   "speed": 0.6031746,
+   "brightness": 99,
+   "is_dynamic": true,
+   "friendly_name": "Holiday"
+  }
+ },
+ "sensor.bedroom_bedroom_illuminance": {
+  "state": "14",
+  "attributes": {
+   "state_class": "measurement",
+   "light_level": 11640,
+   "unit_of_measurement": "lx",
+   "device_class": "illuminance",
+   "friendly_name": "Bedroom Illuminance"
+  }
+ },
+ "sensor.bedroom_bedroom_illuminance_2": {
+  "state": "14",
+  "attributes": {
+   "state_class": "measurement",
+   "light_level": 11640,
+   "unit_of_measurement": "lx",
+   "device_class": "illuminance",
+   "friendly_name": "Bedroom brightness"
+  }
+ },
+ "sensor.bedroom_bedroom_temperature": {
+  "state": "69.44",
+  "attributes": {
+   "state_class": "measurement",
+   "unit_of_measurement": "°F",
+   "device_class": "temperature",
+   "friendly_name": "Bedroom Temperature"
+  }
+ },
+ "sensor.living_room_lamp_zigbee_connectivity": {
+  "state": "connected",
+  "attributes": {
+   "options": [
+    "connected",
+    "disconnected",
+    "connectivity_issue",
+    "unidirectional_incoming"
+   ],
+   "mac_address": "00:17:88:01:00:00:00:06",
+   "device_class": "enum",
+   "friendly_name": "Desk lamp Zigbee connectivity"
+  }
+ },
+ "switch.bedroom_bedroom_motion_sensor_enabled": {
+  "state": "on",
+  "attributes": {
+   "device_class": "switch",
+   "friendly_name": "Bedroom Motion sensor enabled"
+  }
+ },
+ "switch.bedtime": {
+  "state": "off",
+  "attributes": {
+   "device_class": "switch",
+   "friendly_name": "Bedtime"
+  }
+ },
+ "switch.hue_bridge_automation_old_routine": {
+  "state": "unavailable",
+  "attributes": {
+   "restored": true,
+   "device_class": "switch",
+   "friendly_name": "Automation: Old routine",
+   "supported_features": 0
+  }
+ }
+}

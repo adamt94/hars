@@ -71,6 +71,9 @@ class Hue:
         self.runners = []
         self.ports = {}
         self.original = None
+        # The resources as JSON text, if not the recorded ones
+        # (`hue_rows.py` adds to them).
+        self.resources = None
 
     def set(self, mode):
         """`pressed` / `not_pressed`: the link button. `bridge_ok`,
@@ -200,8 +203,9 @@ class Hue:
             if self.bridge == "resources_down":
                 request.transport.close()
                 return web.Response()
-            return web.Response(text=(HUE / "resource.json").read_text(),
-                                content_type="application/json")
+            return web.Response(
+                text=self.resources or (HUE / "resource.json").read_text(),
+                content_type="application/json")
         if path == "/eventstream/clip/v2":
             stream = web.StreamResponse(headers={"Content-Type": "text/event-stream"})
             await stream.prepare(request)
@@ -315,6 +319,18 @@ async def main():
                     state["attributes"][key].sort()
         if name == "add":
             cf.write(HUE / "fresh_setup.json", {"entries": result["entries"], **rows})
+            # The same on an install set to US customary units: what its
+            # sensors' rows and states are then.
+            us = await cf.run([], json.loads(json.dumps(steps)), Hue(),
+                              units="us_customary")
+            cf.write(HUE / "us_customary.json", {
+                "doc": "The sensors after the `add` scenario on an install set to US"
+                       " customary units: their rows and states.",
+                "entities": [e for e in us["entities"]
+                             if e["entity_id"].startswith("sensor.")],
+                "states": {k: v for k, v in us["states"].items()
+                           if k.startswith("sensor.")},
+            })
             # The first scenario keeps its rows and states, for the replay.
             result.update(rows)
         scenarios.append({"name": name, "doc": doc, **result})

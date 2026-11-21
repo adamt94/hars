@@ -15,6 +15,7 @@ pub mod naming;
 pub mod num;
 pub mod onboarding;
 pub mod scene;
+pub(crate) mod sensor;
 pub mod sun;
 pub mod switch;
 pub mod switchbot_cloud;

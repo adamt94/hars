@@ -142,7 +142,8 @@ impl Bridge {
     }
 
     /// `friendly_name`: the registry's name if the user set one, else the
-    /// device's name joined with the entity's.
+    /// device's name joined with the entity's. And the icon the user gave
+    /// the entity, if any.
     fn tail(
         &self,
         a: &mut Map<String, Value>,
@@ -150,12 +151,12 @@ impl Bridge {
         device: Option<&Value>,
         name: Option<&str>,
     ) {
-        let user = self
-            .registries
-            .entities
-            .iter()
-            .find(|e| e.entity_id == id.as_str())
-            .and_then(|e| e.name.clone());
+        let mut rows = self.registries.entities.iter();
+        let row = rows.find(|e| e.entity_id == id.as_str());
+        if let Some(icon) = row.and_then(|e| e.icon.as_ref()) {
+            a.insert("icon".into(), json!(icon));
+        }
+        let user = row.and_then(|e| e.name.clone());
         let friendly = user.or_else(|| {
             let device = device.and_then(|d| self.device_name(d));
             match (device, name) {
@@ -1082,7 +1083,7 @@ pub async fn run(
                 .get("pref_disable_new_entities")
                 .and_then(Value::as_bool)
                 == Some(true);
-            register::register(registry, entry_id, &store, disable_new);
+            register::register(&hass, registry, entry_id, &store, disable_new);
         }
         let bridge = Arc::new(Bridge {
             hass,

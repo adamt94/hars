@@ -620,6 +620,24 @@ fn register(
         });
         for row in rows {
             let text = |s: Option<&str>| Some(s.map(str::to_owned));
+            // A temperature's unit is the sensor component's to settle
+            // (`add_to_platform_start`), which may first note in the
+            // row's options the unit the row had.
+            let unit = match row.device_class {
+                Some("temperature") => {
+                    let existing = registry.entity_by_unique_id(row.domain, DOMAIN, &row.unique_id);
+                    let settled = crate::sensor::when_registered(hass, existing.as_deref());
+                    if let (Some(existing), Some(options)) = (&existing, settled.options) {
+                        let options = EntityPatch {
+                            options: Some(options),
+                            ..Default::default()
+                        };
+                        registry.update_entity(&existing.entity_id, options);
+                    }
+                    Some(settled.unit)
+                }
+                _ => row.unit,
+            };
             let patch = EntityPatch {
                 capabilities: Some(row.capabilities),
                 config_entry_id: Some(Some(entry_id.to_owned())),
@@ -632,31 +650,24 @@ fn register(
                 original_name: text(row.name),
                 supported_features: Some(row.supported_features),
                 translation_key: Some(None),
-                unit_of_measurement: text(row.unit),
+                unit_of_measurement: text(unit),
+                // The registry's to apply, after a deleted row's own
+                // setting has come back.
+                pref_disable_new: disable_new,
                 ..Default::default()
             };
-            let disabled_by = disable_new.then(|| "integration".to_owned());
-            let made = registry.get_or_create_entity(
-                row.domain,
-                DOMAIN,
-                &row.unique_id,
-                disabled_by,
-                patch,
-            );
+            let made =
+                registry.get_or_create_entity(row.domain, DOMAIN, &row.unique_id, None, patch);
             // The sensor's option goes beside the options the row has
             // (`async_update_entity_options` for the `sensor` domain): a
             // change of its own, after the row is made or has come back
-            // with what the user had set.
-            if let Some(precision) = row.precision {
-                let mut options = made.options.object();
-                let mut sensor = match options.remove("sensor") {
-                    Some(Value::Object(o)) => o,
-                    _ => Map::new(),
-                };
-                sensor.insert("suggested_display_precision".into(), json!(precision));
-                options.insert("sensor".into(), Value::Object(sensor));
+            // with what the user had set, when the entity is added to
+            // HA. A disabled one never is: its row stays without.
+            if let (None, Some(precision)) = (&made.disabled_by, row.precision)
+                && let Some(options) = crate::sensor::with_precision(&made, precision)
+            {
                 let options = EntityPatch {
-                    options: Some(Value::Object(options)),
+                    options: Some(options),
                     ..Default::default()
                 };
                 registry.update_entity(&made.entity_id, options);
@@ -714,13 +725,24 @@ fn build(
                 return None;
             }
             let ident = ident("sensor", &unique_id, Some(name))?;
-            let attrs = json!({"state_class": "measurement", "unit_of_measurement": unit,
-                "device_class": class});
+            // A temperature is shown in the unit the sensor component
+            // settles on (the user's, the one kept for the row, or the
+            // unit system's).
+            let shown = (class == "temperature").then(|| {
+                let row = registries.entities.iter().find(|e| {
+                    e.platform == DOMAIN
+                        && e.unique_id.as_ref().and_then(Value::as_str) == Some(&unique_id)
+                });
+                crate::sensor::state_unit(hass, row.map(|row| &**row))
+            });
+            let attrs = json!({"state_class": "measurement",
+                "unit_of_measurement": shown.unwrap_or(unit), "device_class": class});
             Some(Sensor {
                 shared: shared.clone(),
                 device: d.id.clone(),
                 key,
                 ident,
+                celsius_as: shown.filter(|unit| *unit != "°C"),
                 attrs: attrs.as_object().cloned().unwrap_or_default(),
             })
         };
@@ -971,6 +993,9 @@ struct Sensor {
     device: String,
     key: &'static str,
     ident: Arc<Ident>,
+    /// The unit a temperature is converted to from the API's °C, if not
+    /// shown in °C.
+    celsius_as: Option<&'static str>,
     /// All but the friendly name.
     attrs: Attributes,
 }
@@ -985,7 +1010,14 @@ impl Sensor {
                     Some(p) if p.ok => p
                         .data
                         .get(self.key)
-                        .and_then(sensor_state)
+                        .and_then(|value| match (self.celsius_as, value.as_f64()) {
+                            // `TemperatureConverter`, then a float's state.
+                            (Some(unit), Some(celsius)) => {
+                                let shown = crate::sensor::from_celsius(celsius, unit);
+                                Some(crate::num::py_format(shown, 15))
+                            }
+                            _ => sensor_state(value),
+                        })
                         .unwrap_or_else(|| "unknown".into()),
                     _ => "unavailable".into(),
                 };

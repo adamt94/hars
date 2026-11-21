@@ -106,6 +106,11 @@ pub struct EntityPatch {
     pub supported_features: Option<i64>,
     pub translation_key: Option<Option<String>>,
     pub unit_of_measurement: Option<Option<String>>,
+    /// The entry's `pref_disable_new_entities`, for
+    /// [`Registry::get_or_create_entity`]: a row that is made, or comes
+    /// back from the deleted ones, enabled is disabled by the
+    /// integration. An existing row is not touched by it.
+    pub pref_disable_new: bool,
 }
 
 /// What the user changes of a device (`config/device_registry/update`):
@@ -778,8 +783,11 @@ impl Registry {
     }
 
     /// `async_get_or_create`: the existing row, updated with `patch`, or a
-    /// new one (`disabled_by` applies only to a new row). Fires
-    /// `entity_registry_updated` and schedules the save.
+    /// new one. `disabled_by` applies only to a new row; a deleted row
+    /// that comes back brings its own; then, in HA's order, the entry's
+    /// preference ([`EntityPatch::pref_disable_new`]) disables a row that
+    /// is still enabled. Fires `entity_registry_updated` and schedules
+    /// the save.
     pub fn get_or_create_entity(
         &self,
         domain: &str,
@@ -909,6 +917,17 @@ impl Registry {
                     }
                     Arc::new(r)
                 }
+            };
+            // After the deleted row's own setting, as in HA: a row the
+            // user removed while it was enabled comes back disabled when
+            // the entry says new entities start that way.
+            let row = match row.disabled_by.is_none() && patch.pref_disable_new {
+                true => {
+                    let mut r = (*row).clone();
+                    r.disabled_by = Some("integration".into());
+                    Arc::new(r)
+                }
+                false => row,
             };
             tracing::info!(
                 "Registered new {domain}.{platform} entity: {}",
