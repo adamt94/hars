@@ -1,0 +1,95 @@
+{
+ "button.blink": {
+  "state": "unknown",
+  "attributes": {
+   "device_class": "identify",
+   "friendly_name": "Blink"
+  }
+ },
+ "button.garden_porch_identify": {
+  "state": "unavailable",
+  "attributes": {
+   "restored": true,
+   "device_class": "identify",
+   "friendly_name": "Identify",
+   "supported_features": 0
+  }
+ },
+ "button.garden_porch_restart": {
+  "state": "unavailable",
+  "attributes": {
+   "restored": true,
+   "device_class": "restart",
+   "friendly_name": "Restart",
+   "supported_features": 0
+  }
+ },
+ "button.hallway_hall_light_restart": {
+  "state": "unknown",
+  "attributes": {
+   "device_class": "restart",
+   "friendly_name": "Hall Light Restart"
+  }
+ },
+ "button.office_desk_lamp_restart": {
+  "state": "unknown",
+  "attributes": {
+   "device_class": "restart",
+   "friendly_name": "Desk Restart"
+  }
+ },
+ "light.garden_porch": {
+  "state": "unavailable",
+  "attributes": {
+   "restored": true,
+   "min_color_temp_kelvin": 1500,
+   "max_color_temp_kelvin": 9000,
+   "effect_list": [
+    "effect_colorloop",
+    "effect_pulse",
+    "effect_stop"
+   ],
+   "supported_color_modes": [
+    "color_temp",
+    "hs"
+   ],
+   "supported_features": 36
+  }
+ },
+ "light.reading": {
+  "state": "on",
+  "attributes": {
+   "min_color_temp_kelvin": 1500,
+   "max_color_temp_kelvin": 9000,
+   "effect_list": [
+    "effect_colorloop",
+    "effect_pulse",
+    "effect_stop"
+   ],
+   "supported_color_modes": [
+    "color_temp",
+    "hs"
+   ],
+   "effect": null,
+   "color_mode": "color_temp",
+   "brightness": 153,
+   "color_temp_kelvin": 2700,
+   "hs_color": [
+    28.395,
+    65.723
+   ],
+   "rgb_color": [
+    255,
+    167,
+    87
+   ],
+   "xy_color": [
+    0.525,
+    0.388
+   ],
+   "icon": "mdi:lamp",
+   "friendly_name": "Reading light",
+   "supported_features": 36
+  }
+ }
+}

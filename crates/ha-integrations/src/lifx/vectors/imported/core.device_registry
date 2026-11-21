@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "minor_version": 12,
+  "key": "core.device_registry",
+  "data": {
+    "devices": [
+      {"area_id":"den","config_entries":["01J00000000000000000000001"],"config_entries_subentries":{"01J00000000000000000000001":[null]},"configuration_url":null,"connections":[["mac","d0:73:d5:00:00:21"]],"created_at":"2026-06-01T12:00:00.000000+00:00","disabled_by":null,"entry_type":null,"hw_version":null,"id":"00000000000000000000000000000001","identifiers":[["lifx","d0:73:d5:00:00:20"]],"labels":[],"manufacturer":"LIFX","model":"LIFX Color","model_id":null,"modified_at":"2026-06-01T12:00:00.000000+00:00","name_by_user":"Desk","name":"Desk Lamp","primary_config_entry":"01J00000000000000000000001","serial_number":null,"sw_version":"3.70","via_device_id":null},
+      {"area_id":"garden","config_entries":["01J00000000000000000000003"],"config_entries_subentries":{"01J00000000000000000000003":[null]},"configuration_url":null,"connections":[["mac","d0:73:d5:00:00:28"]],"created_at":"2026-06-01T12:00:00.000000+00:00","disabled_by":null,"entry_type":null,"hw_version":null,"id":"00000000000000000000000000000002","identifiers":[["lifx","d0:73:d5:00:00:27"]],"labels":[],"manufacturer":"LIFX","model":"LIFX Color","model_id":null,"modified_at":"2026-06-01T12:00:00.000000+00:00","name_by_user":null,"name":"Porch","primary_config_entry":"01J00000000000000000000003","serial_number":null,"sw_version":"3.70","via_device_id":null},
+      {"area_id":"hallway","config_entries":["01J00000000000000000000002"],"config_entries_subentries":{"01J00000000000000000000002":[null]},"configuration_url":null,"connections":[["mac","d0:73:d5:00:00:41"]],"created_at":"2026-06-01T12:00:00.000000+00:00","disabled_by":null,"entry_type":null,"hw_version":null,"id":"00000000000000000000000000000003","identifiers":[["lifx","d0:73:d5:00:00:41"]],"labels":[],"manufacturer":"LIFX","model":"LIFX Mini White","model_id":null,"modified_at":"2026-06-01T12:00:00.000000+00:00","name_by_user":null,"name":"Hall Light","primary_config_entry":"01J00000000000000000000002","serial_number":null,"sw_version":"2.77","via_device_id":null}
+    ],
+    "deleted_devices": []
+  }
+}

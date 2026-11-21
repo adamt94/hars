@@ -17,6 +17,8 @@ pub const SILENT: &str = "192.0.2.24";
 /// The colour bulb's new address.
 pub const ALIAS: &str = "192.0.2.25";
 pub const GHOST: &str = "192.0.2.26";
+/// A bulb of `lifx_rows.py`'s install that no longer answers.
+pub const PORCH: &str = "192.0.2.27";
 const OTHER_SERIAL: [u8; 6] = [0xd0, 0x73, 0xd5, 0, 0, 0x2f];
 
 /// A bulb's state, shared by the addresses that reach it.
@@ -192,13 +194,16 @@ impl LifxFake {
         ghost.lock().unicast = false;
         let silent = bulb(0x24, "Nobody", "Office", 91, (3, 70));
         silent.lock().silent = true;
+        let porch = bulb(0x27, "Porch", "Garden", 91, (3, 70));
+        porch.lock().silent = true;
         let states = [
             (COLOUR, colour.clone()),
-            (WHITE, bulb(0x21, "Hall Light", "Hallway", 51, (2, 77))),
+            (WHITE, bulb(0x41, "Hall Light", "Hallway", 51, (2, 77))),
             (SWITCH, bulb(0x23, "Wall Switch", "Office", 70, (3, 70))),
             (SILENT, silent),
             (ALIAS, colour),
             (GHOST, ghost),
+            (PORCH, porch),
         ];
         let mut bulbs = Vec::new();
         for (ip, state) in states {
@@ -229,6 +234,12 @@ impl LifxFake {
                     },
                     per_try: Duration::from_millis(150),
                     discovery: Duration::from_millis(300),
+                },
+                // A bulb that doesn't answer fails its set-up in 0.2 s.
+                timing: lifx::Timing {
+                    command_try: Duration::from_millis(40),
+                    poll_try: Duration::from_millis(40),
+                    ..lifx::Timing::HA
                 },
             },
         });

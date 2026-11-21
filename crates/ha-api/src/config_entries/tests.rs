@@ -1078,7 +1078,7 @@ async fn a_lifx_product_hars_cant_run_makes_no_entry() {
         home.api.lifx.set_product(lifx_fake::WHITE, product);
         for answers in [
             vec![json!({"host": lifx_fake::WHITE})],
-            vec![json!({}), json!({"device": "d0:73:d5:00:00:21"})],
+            vec![json!({}), json!({"device": "d0:73:d5:00:00:41"})],
         ] {
             let FlowResult::Form { mut flow_id, .. } = flows
                 .init("lifx", ha_integrations::flow::SOURCE_USER)
@@ -1886,6 +1886,7 @@ impl OnDisk {
         api.set("bridge_imported");
         let endpoints = Endpoints {
             hue_bridge: Some(base),
+            lifx: api.lifx.at.clone(),
             ..Default::default()
         };
         let hass = Hass::new();
@@ -2078,6 +2079,124 @@ async fn an_imported_temperature_keeps_its_unit_when_the_unit_system_changes() {
     }
     for (entity_id, state) in vector["states"].as_object().unwrap() {
         assert_eq!(home.state(entity_id).as_ref(), Some(state), "{entity_id}");
+    }
+}
+
+/// The store files Home Assistant 2026.6.1 left of an install with LIFX
+/// bulbs (`scripts/vectors/lifx_rows.py`): a light renamed, given another
+/// id, an icon and an area, its device renamed and moved, buttons disabled,
+/// hidden and renamed, the RSSI sensor renamed while disabled, a white
+/// light disabled, an entry that disables new entities, and a bulb that no
+/// longer answers.
+const LIFX_IMPORTED: [(&str, &str); 4] = [
+    (
+        "core.config_entries",
+        include_str!("../../../ha-integrations/src/lifx/vectors/imported/core.config_entries"),
+    ),
+    (
+        "core.device_registry",
+        include_str!("../../../ha-integrations/src/lifx/vectors/imported/core.device_registry"),
+    ),
+    (
+        "core.entity_registry",
+        include_str!("../../../ha-integrations/src/lifx/vectors/imported/core.entity_registry"),
+    ),
+    (
+        "core.area_registry",
+        include_str!("../../../ha-integrations/src/lifx/vectors/imported/core.area_registry"),
+    ),
+];
+
+/// A start of `hars` on the LIFX install's files changes none of them,
+/// byte for byte, and the states are HA's: the bulb that no longer answers
+/// has HA's placeholders.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_start_on_an_imported_lifx_install_changes_no_file() {
+    let files: Vec<(&str, String)> = LIFX_IMPORTED
+        .iter()
+        .map(|(f, t)| (*f, (*t).to_owned()))
+        .collect();
+    let home = OnDisk::start("lifx-imported", &files, false).await;
+    for (name, before) in LIFX_IMPORTED {
+        let after = home.file(name);
+        if after != before {
+            let changed = before.lines().zip(after.lines()).find(|(b, a)| b != a);
+            panic!("{name} was changed by the start: {changed:#?}");
+        }
+    }
+    let want: Value = serde_json::from_str(include_str!(
+        "../../../ha-integrations/src/lifx/vectors/imported/states.json"
+    ))
+    .unwrap();
+    let want = want.as_object().unwrap();
+    let wrong: Vec<(&String, Option<Value>, &Value)> = want
+        .iter()
+        .map(|(entity_id, state)| (entity_id, home.state(entity_id), state))
+        .filter(|(_, got, want)| got.as_ref() != Some(*want))
+        .collect();
+    assert!(
+        wrong.is_empty(),
+        "states that aren't HA's (got, HA's): {wrong:#?}"
+    );
+    let extra: Vec<String> = home
+        .hass
+        .states()
+        .all()
+        .iter()
+        .map(|s| s.entity_id.to_string())
+        .filter(|id| !want.contains_key(id))
+        .collect();
+    assert_eq!(extra, Vec::<String>::new(), "states HA doesn't have");
+}
+
+/// LIFX rows the user removed come back at the next start as in HA: with
+/// what the user had set, disabled as they were, and then disabled by the
+/// integration if they were enabled and the entry says new entities start
+/// disabled.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn removed_lifx_rows_come_back_as_in_home_assistant() {
+    let vector: Value = serde_json::from_str(include_str!(
+        "../../../ha-integrations/src/lifx/vectors/imported/restored.json"
+    ))
+    .unwrap();
+    for case in vector["cases"].as_array().unwrap() {
+        let disable_new = case["pref_disable_new_entities"].as_bool().unwrap();
+        let after = case["after"].as_array().unwrap();
+        let back: Vec<&str> = after.iter().map(|e| e["id"].as_str().unwrap()).collect();
+        let files: Vec<(&str, String)> = LIFX_IMPORTED
+            .iter()
+            .map(|(name, text)| {
+                let mut doc: Value = serde_json::from_str(text).unwrap();
+                let data = &mut doc["data"];
+                match *name {
+                    "core.config_entries" => {
+                        for entry in data["entries"].as_array_mut().unwrap() {
+                            if entry["unique_id"] == "d0:73:d5:00:00:20" {
+                                entry["pref_disable_new_entities"] = json!(disable_new);
+                            }
+                        }
+                    }
+                    "core.entity_registry" => {
+                        let rows = data["entities"].as_array_mut().unwrap();
+                        rows.retain(|e| !back.contains(&e["id"].as_str().unwrap()));
+                        data["deleted_entities"] = case["deleted_entities"].clone();
+                    }
+                    _ => {}
+                }
+                (*name, doc.to_string())
+            })
+            .collect();
+        let name = format!("lifx-restored-{disable_new}");
+        let home = OnDisk::start(&name, &files, false).await;
+        for want in after {
+            let got = home.row(want["id"].as_str().unwrap());
+            assert_eq!(
+                got.as_ref(),
+                Some(&unchanged(want)),
+                "new entities start disabled: {disable_new}, {}",
+                want["entity_id"]
+            );
+        }
     }
 }
 

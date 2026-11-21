@@ -71,8 +71,10 @@ BROADCAST = "255.255.255.255"
 
 COLOUR, WHITE, SWITCH, SILENT, ALIAS, GHOST = (
     "192.0.2.20", "192.0.2.21", "192.0.2.23", "192.0.2.24", "192.0.2.25", "192.0.2.26")
+# A bulb's MAC address is its serial, one up from firmware 3.70: no fake
+# bulb's serial is another's MAC.
 COLOUR_SERIAL = "d0:73:d5:00:00:20"
-WHITE_SERIAL = "d0:73:d5:00:00:21"
+WHITE_SERIAL = "d0:73:d5:00:00:41"
 GHOST_SERIAL = "d0:73:d5:00:00:26"
 OTHER_SERIAL = "d0:73:d5:00:00:2f"
 

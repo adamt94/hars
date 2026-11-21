@@ -142,6 +142,8 @@ enum Ctl {
 struct ButtonInfo {
     entity_id: EntityId,
     friendly: String,
+    /// The icon the user gave it.
+    icon: Option<String>,
     class: &'static str,
     last: Mutex<Option<String>>,
 }
@@ -159,6 +161,8 @@ pub struct Bulb {
     timing: Timing,
     model: light::Model,
     light: Option<(EntityId, String)>,
+    /// The icon the user gave the light.
+    light_icon: Option<String>,
     buttons: Vec<ButtonInfo>,
     /// False once the entry is stopped: nothing of it writes a state after.
     /// Held for every state write.
@@ -214,6 +218,9 @@ impl Bulb {
         let ok = self.ok.load(Ordering::Relaxed);
         let s = self.light_state();
         let mut a = crate::light::attributes(&light::capabilities(self.model), &s, ok);
+        if let Some(icon) = &self.light_icon {
+            a.insert("icon".into(), json!(icon));
+        }
         a.insert("friendly_name".into(), json!(friendly));
         a.insert("supported_features".into(), json!(light::FEATURES));
         let state = match (ok, s.on) {
@@ -231,6 +238,9 @@ impl Bulb {
         };
         let mut a = Map::new();
         a.insert("device_class".into(), json!(b.class));
+        if let Some(icon) = &b.icon {
+            a.insert("icon".into(), json!(icon));
+        }
         a.insert("friendly_name".into(), json!(b.friendly));
         self.write(&b.entity_id, &state, a, context);
     }
@@ -588,6 +598,19 @@ pub fn bulb(
     let label = found.cached.label.clone();
     let model = light::Model::of(features(found.product));
     let light = names.entity("light", &serial, &serial, &label, None);
+    // The icon the user gave an entity is in its state.
+    let icon = |domain: &str, unique_id: &str| {
+        registries
+            .entities
+            .iter()
+            .find(|e| {
+                e.platform == DOMAIN
+                    && e.entity_id.split('.').next() == Some(domain)
+                    && e.unique_id.as_ref().and_then(Value::as_str) == Some(unique_id)
+            })
+            .and_then(|e| e.icon.clone())
+    };
+    let light_icon = icon("light", &serial);
     let buttons = [("restart", "Restart"), ("identify", "Identify")]
         .into_iter()
         .filter_map(|(class, name)| {
@@ -602,6 +625,7 @@ pub fn bulb(
             Some(ButtonInfo {
                 entity_id,
                 friendly,
+                icon: icon("button", &format!("{serial}_{class}")),
                 class,
                 last: Mutex::new(last),
             })
@@ -618,6 +642,7 @@ pub fn bulb(
         timing,
         model,
         light,
+        light_icon,
         buttons,
         alive: Mutex::new(true),
         components: components.clone(),
@@ -643,6 +668,8 @@ pub struct Where {
     pub stand_ins: Vec<(String, std::net::SocketAddr)>,
     /// The config flow's waits.
     pub flow: config_flow::Timing,
+    /// An entry's waits.
+    pub timing: Timing,
 }
 
 impl Default for Where {
@@ -651,6 +678,7 @@ impl Default for Where {
             broadcast: std::net::SocketAddr::from(([255, 255, 255, 255], conn::PORT)),
             stand_ins: Vec::new(),
             flow: config_flow::Timing::HA,
+            timing: Timing::HA,
         }
     }
 }
@@ -747,7 +775,7 @@ pub async fn run(
     loop {
         let found = loop {
             let (ip, port) = at.addr(&host);
-            match connect(&host, (&ip, port), &unique_id, Timing::HA).await {
+            match connect(&host, (&ip, port), &unique_id, at.timing).await {
                 Ok(f) => break f,
                 Err(SetupError::Retry { reason, log }) => {
                     status.set(EntryState::SetupRetry, reason);
@@ -785,7 +813,7 @@ pub async fn run(
             ) {
                 register::register(components.hass(), registry, entry_id, &found, disable_new);
             }
-            let (b, coordinator) = bulb(&components, &title, &host, found, polling, Timing::HA);
+            let (b, coordinator) = bulb(&components, &title, &host, found, polling, at.timing);
             Stopped(b, coordinator)
         };
         if !loaded {

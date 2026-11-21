@@ -803,8 +803,8 @@
           "d0:73:d5:00:00:20 (192.0.2.20)"
          ],
          [
-          "d0:73:d5:00:00:21",
-          "d0:73:d5:00:00:21 (192.0.2.21)"
+          "d0:73:d5:00:00:41",
+          "d0:73:d5:00:00:41 (192.0.2.21)"
          ]
         ],
         "name": "device",
@@ -843,7 +843,7 @@
      "allow": null,
      "json": {
       "errors": {
-       "device": "value must be one of ['d0:73:d5:00:00:20', 'd0:73:d5:00:00:21']"
+       "device": "value must be one of ['d0:73:d5:00:00:20', 'd0:73:d5:00:00:41']"
       }
      },
      "events": [],
@@ -872,7 +872,7 @@
       "method": "POST",
       "path": "/api/config/config_entries/flow/<flow:1>",
       "user": "admin",
-      "sent": "{\"device\": \"d0:73:d5:00:00:21\", \"host\": \"192.0.2.21\"}"
+      "sent": "{\"device\": \"d0:73:d5:00:00:41\", \"host\": \"192.0.2.21\"}"
      },
      "status": 400,
      "content_type": "application/json",
@@ -892,7 +892,7 @@
       "method": "POST",
       "path": "/api/config/config_entries/flow/<flow:1>",
       "user": "admin",
-      "sent": "{\"device\": \"d0:73:d5:00:00:21\"}"
+      "sent": "{\"device\": \"d0:73:d5:00:00:41\"}"
      },
      "status": 200,
      "content_type": "application/json",
@@ -1160,7 +1160,7 @@
      "source": "user",
      "subentries": [],
      "title": "Hall Light",
-     "unique_id": "d0:73:d5:00:00:21",
+     "unique_id": "d0:73:d5:00:00:41",
      "version": 1
     }
    ],
@@ -1181,18 +1181,18 @@
      "connections": [
       [
        "mac",
-       "d0:73:d5:00:00:21"
+       "d0:73:d5:00:00:41"
       ]
      ],
      "created_at": "<time>",
      "disabled_by": null,
      "entry_type": null,
      "hw_version": null,
-     "id": "<device:d0:73:d5:00:00:21>",
+     "id": "<device:d0:73:d5:00:00:41>",
      "identifiers": [
       [
        "lifx",
-       "d0:73:d5:00:00:21"
+       "d0:73:d5:00:00:41"
       ]
      ],
      "labels": [],
@@ -1221,7 +1221,7 @@
      "config_subentry_id": null,
      "created_at": "<time>",
      "device_class": null,
-     "device_id": "<device:d0:73:d5:00:00:21>",
+     "device_id": "<device:d0:73:d5:00:00:41>",
      "disabled_by": null,
      "entity_category": "config",
      "entity_id": "button.hallway_hall_light_identify",
@@ -1241,7 +1241,7 @@
      "suggested_object_id": null,
      "supported_features": 0,
      "translation_key": null,
-     "unique_id": "d0:73:d5:00:00:21_identify",
+     "unique_id": "d0:73:d5:00:00:41_identify",
      "previous_unique_id": null,
      "unit_of_measurement": null
     },
@@ -1257,7 +1257,7 @@
      "config_subentry_id": null,
      "created_at": "<time>",
      "device_class": null,
-     "device_id": "<device:d0:73:d5:00:00:21>",
+     "device_id": "<device:d0:73:d5:00:00:41>",
      "disabled_by": null,
      "entity_category": "config",
      "entity_id": "button.hallway_hall_light_restart",
@@ -1277,7 +1277,7 @@
      "suggested_object_id": null,
      "supported_features": 0,
      "translation_key": null,
-     "unique_id": "d0:73:d5:00:00:21_restart",
+     "unique_id": "d0:73:d5:00:00:41_restart",
      "previous_unique_id": null,
      "unit_of_measurement": null
     },
@@ -1301,7 +1301,7 @@
      "config_subentry_id": null,
      "created_at": "<time>",
      "device_class": null,
-     "device_id": "<device:d0:73:d5:00:00:21>",
+     "device_id": "<device:d0:73:d5:00:00:41>",
      "disabled_by": null,
      "entity_category": null,
      "entity_id": "light.hallway_hall_light",
@@ -1321,7 +1321,7 @@
      "suggested_object_id": null,
      "supported_features": 36,
      "translation_key": null,
-     "unique_id": "d0:73:d5:00:00:21",
+     "unique_id": "d0:73:d5:00:00:41",
      "previous_unique_id": null,
      "unit_of_measurement": null
     },
@@ -1339,7 +1339,7 @@
      "config_subentry_id": null,
      "created_at": "<time>",
      "device_class": null,
-     "device_id": "<device:d0:73:d5:00:00:21>",
+     "device_id": "<device:d0:73:d5:00:00:41>",
      "disabled_by": "integration",
      "entity_category": "diagnostic",
      "entity_id": "sensor.hallway_hall_light_rssi",
@@ -1359,7 +1359,7 @@
      "suggested_object_id": null,
      "supported_features": 0,
      "translation_key": "rssi",
-     "unique_id": "d0:73:d5:00:00:21_rssi",
+     "unique_id": "d0:73:d5:00:00:41_rssi",
      "previous_unique_id": null,
      "unit_of_measurement": "dB"
     }
@@ -3518,8 +3518,8 @@
         "type": "select",
         "options": [
          [
-          "d0:73:d5:00:00:21",
-          "d0:73:d5:00:00:21 (192.0.2.21)"
+          "d0:73:d5:00:00:41",
+          "d0:73:d5:00:00:41 (192.0.2.21)"
          ]
         ],
         "name": "device",
