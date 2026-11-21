@@ -331,12 +331,21 @@ pub(crate) struct Busy {
 }
 
 impl Busy {
-    /// The connection is gone: stop sending, and stop any render not yet
-    /// started.
-    pub(crate) fn abort(self) {
+    /// The connection is gone (`why`: what ended it): stop sending, and
+    /// stop any render not yet started.
+    pub(crate) fn abort(self, why: &'static str) {
         self.task.abort();
+        // A test learns why, once the task has stopped.
         #[cfg(test)]
-        tests::note("cancelled", &self.source);
+        {
+            let (task, source) = (self.task, self.source);
+            tokio::spawn(async move {
+                let _ = task.await;
+                tests::note(&format!("cancelled:{why}"), &source);
+            });
+        }
+        #[cfg(not(test))]
+        let _ = why;
     }
 }
 
@@ -449,11 +458,10 @@ pub(crate) mod tests {
     /// template: `started` (its render began on a render thread) and
     /// `cancelled` (its connection went and it was stopped). A test names
     /// its template uniquely and looks for its own.
-    static EVENTS: parking_lot::Mutex<Vec<(&'static str, String)>> =
-        parking_lot::Mutex::new(Vec::new());
+    static EVENTS: parking_lot::Mutex<Vec<(String, String)>> = parking_lot::Mutex::new(Vec::new());
 
-    pub(crate) fn note(what: &'static str, source: &str) {
-        EVENTS.lock().push((what, source.to_owned()));
+    pub(crate) fn note(what: &str, source: &str) {
+        EVENTS.lock().push((what.to_owned(), source.to_owned()));
     }
 
     /// Whether `what` happened to the render of `source`.

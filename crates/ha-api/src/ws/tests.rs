@@ -3200,9 +3200,15 @@ async fn a_client_that_closes_while_its_render_waits_drops_it() {
     tokio::time::sleep(Duration::from_millis(20)).await;
     c.ws.close(None).await.unwrap();
     drop(c);
-    // The server reads the close and stops the waiting render.
+    // The server reads the close frame, which is what stops the waiting
+    // render (not a missed heartbeat later), and the render's task has
+    // ended by the time this is told.
     let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
-    while !happened("cancelled", heavy) {
+    while !happened("cancelled:close", heavy) {
+        assert!(
+            !happened("cancelled:heartbeat", heavy),
+            "the close wasn't read: a missed heartbeat ended the connection"
+        );
         assert!(
             tokio::time::Instant::now() < deadline,
             "the server never stopped the render"
