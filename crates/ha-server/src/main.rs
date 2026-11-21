@@ -167,7 +167,7 @@ async fn run(thp_disabled: std::io::Result<bool>) -> anyhow::Result<()> {
         tokio::task::spawn_blocking(move || ha_integrations::light::Profiles::load(&dir)).await?
     };
     let endpoints = endpoints();
-    let started = ha_integrations::start(
+    let mut started = ha_integrations::start(
         &hass,
         registry.clone().into(),
         entries.as_deref(),
@@ -175,7 +175,21 @@ async fn run(thp_disabled: std::io::Result<bool>) -> anyhow::Result<()> {
         &endpoints,
         Some(&config_entries),
     );
+    let plugins = {
+        let dir = config_dir.clone();
+        tokio::task::spawn_blocking(move || ha_integrations::plugin::PluginManager::load(&dir))
+            .await?
+    };
+    let plugin_domains = ha_integrations::start_plugin_entries(
+        &plugins,
+        &started.components,
+        entries.as_deref(),
+        Some(&config_entries),
+        &mut started.tasks,
+    );
     api_config.integrations = started.running;
+    api_config.plugin_integrations = plugin_domains;
+    api_config.plugins = Some(plugins.clone());
     // The apps' registrations, before the listener serves their webhooks:
     // an unknown id makes the app register again.
     let mobile_app = {
@@ -208,7 +222,10 @@ async fn run(thp_disabled: std::io::Result<bool>) -> anyhow::Result<()> {
         started.tasks,
         api_config.mobile_app.clone(),
     ) {
-        Ok(flows) => api_config.flows = Some(flows),
+        Ok(flows) => {
+            flows.set_plugins(plugins.clone());
+            api_config.flows = Some(flows);
+        }
         Err(why) => api_config.flows_unavailable = Some(why.to_string().into()),
     }
     // `configuration.yaml`'s automations (written now; triggers attach at
@@ -384,6 +401,7 @@ async fn run(thp_disabled: std::io::Result<bool>) -> anyhow::Result<()> {
             server.abort();
         }
     }
+    plugins.shutdown_all().await;
     if auth.needs_save() {
         let auth = auth.clone();
         if let Err(e) = tokio::task::spawn_blocking(move || auth.save()).await? {
@@ -522,7 +540,11 @@ const USAGE: &str = "usage: hars                              run the server
        hars auth add USERNAME PASSWORD  add a login (the first one becomes the owner)
        hars import HA_CONFIG_DIR [--dry-run] [--force]
                                         take over a Home Assistant 2026.6 config
-                                        (a copy, with HA stopped)";
+                                        (a copy, with HA stopped)
+       hars plugin list                 list installed plugins
+       hars plugin install SOURCE [--catalog URL]
+                                        install a plugin from a catalog name, bundle URL, or folder
+       hars plugin remove DOMAIN        remove an installed plugin";
 
 /// Offline commands, like HA's `hass --script auth`. Run them with the
 /// server stopped: the server keeps its own copy of the auth state.
@@ -563,6 +585,37 @@ fn cli(args: &[String]) -> anyhow::Result<()> {
             print!("{}", import::summary(&report, &opts.dest));
             Ok(())
         }
+        ["plugin", "list"] => {
+            let dir = config_dir()?;
+            let plugins = ha_integrations::plugin::PluginManager::load(&dir);
+            let list = plugins.list();
+            if list.is_empty() {
+                println!(
+                    "no plugins installed in {}",
+                    plugins.plugins_dir().display()
+                );
+            } else {
+                for p in list {
+                    println!("{}  {}  {}  ({})", p.domain, p.version, p.name, p.transport);
+                }
+            }
+            Ok(())
+        }
+        ["plugin", "install", source] => plugin_install(source, None),
+        ["plugin", "install", source, "--catalog", catalog] => {
+            plugin_install(source, Some(catalog))
+        }
+        ["plugin", "remove", domain] => {
+            let dir = config_dir()?;
+            let removed =
+                ha_integrations::plugin::store::remove_from_dir(&dir.join("plugins"), domain)?;
+            if removed {
+                println!("removed plugin {domain:?}");
+            } else {
+                println!("plugin {domain:?} was not installed");
+            }
+            Ok(())
+        }
         ["--help" | "-h" | "help"] => {
             println!("{USAGE}");
             Ok(())
@@ -570,6 +623,67 @@ fn cli(args: &[String]) -> anyhow::Result<()> {
         _ => {
             eprintln!("{USAGE}");
             std::process::exit(2);
+        }
+    }
+}
+
+fn plugin_install(source: &str, catalog_override: Option<&str>) -> anyhow::Result<()> {
+    use ha_integrations::plugin::store::{
+        self, DEFAULT_CATALOG_URL, InstallSource, current_target,
+    };
+    let dir = config_dir()?;
+    let plugins_dir = dir.join("plugins");
+    match InstallSource::parse(source) {
+        InstallSource::LocalDir(path) => {
+            let installed = store::install_from_dir(&path, &plugins_dir)?;
+            println!(
+                "installed plugin {} ({}) from {}",
+                installed.domain(),
+                installed.manifest.version,
+                path.display()
+            );
+            Ok(())
+        }
+        InstallSource::BundleUrl(url) => {
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()?;
+            let installed = rt.block_on(store::install_from_bundle_url(
+                &url,
+                &plugins_dir,
+                &current_target(),
+            ))?;
+            println!(
+                "installed plugin {} ({}) from {url}",
+                installed.domain(),
+                installed.manifest.version
+            );
+            Ok(())
+        }
+        InstallSource::CatalogDomain(domain) => {
+            let catalog_url = catalog_override
+                .map(str::to_owned)
+                .or_else(|| std::env::var("HARS_PLUGIN_CATALOG").ok())
+                .filter(|s| !s.is_empty())
+                .unwrap_or_else(|| DEFAULT_CATALOG_URL.to_owned());
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()?;
+            let installed = rt.block_on(async {
+                let catalog = store::fetch_catalog(&catalog_url).await?;
+                let entry = catalog
+                    .plugins
+                    .iter()
+                    .find(|p| p.domain == domain)
+                    .ok_or_else(|| store::StoreError::NotFound(domain.clone()))?;
+                store::install_catalog_plugin(entry, &plugins_dir, &current_target()).await
+            })?;
+            println!(
+                "installed plugin {} ({}) from catalog",
+                installed.domain(),
+                installed.manifest.version
+            );
+            Ok(())
         }
     }
 }

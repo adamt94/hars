@@ -45,14 +45,37 @@ fn unique<'a>(domains: &[&'a str]) -> Vec<&'a str> {
 
 /// `{"resources": {flattened key: string}}` for `category` across
 /// `domains`, as HA's translation cache merges them.
+#[cfg_attr(not(test), allow(dead_code))]
 pub(crate) fn translations(category: &str, domains: &[&str]) -> String {
+    translations_with_plugins(category, domains, None)
+}
+
+/// Like [`translations`], also merging strings from `hars_plugins` and any
+/// installed plugins.
+pub(crate) fn translations_with_plugins(
+    category: &str,
+    domains: &[&str],
+    plugins: Option<&ha_integrations::plugin::PluginManager>,
+) -> String {
     let mut out = String::from(r#"{"resources":{"#);
     let mut first = true;
     for d in unique(domains) {
         let own = OWN.iter().find(|(c, o, _)| *c == category && o == &d);
-        for body in [find(TRANSLATIONS, category, d), own.map(|o| o.2)]
-            .into_iter()
-            .flatten()
+        let store = (d == ha_integrations::plugin::STORE_DOMAIN && plugins.is_some())
+            .then(|| ha_integrations::plugin::store::store_translations(category))
+            .flatten();
+        let plugin_loaded = plugins.and_then(|p| p.get(d));
+        let plugin_str = plugin_loaded
+            .as_ref()
+            .and_then(|p| p.translations_for(category));
+        for body in [
+            find(TRANSLATIONS, category, d),
+            own.map(|o| o.2),
+            store,
+            plugin_str,
+        ]
+        .into_iter()
+        .flatten()
         {
             if !first {
                 out.push(',');
@@ -66,11 +89,24 @@ pub(crate) fn translations(category: &str, domains: &[&str]) -> String {
 }
 
 /// `{"resources": {domain: icons}}` for `category` across `domains`.
+#[cfg_attr(not(test), allow(dead_code))]
 pub(crate) fn icons(category: &str, domains: &[&str]) -> String {
+    icons_with_plugins(category, domains, None)
+}
+
+/// Like [`icons`], also merging icon trees from installed plugins.
+pub(crate) fn icons_with_plugins(
+    category: &str,
+    domains: &[&str],
+    plugins: Option<&ha_integrations::plugin::PluginManager>,
+) -> String {
     let mut out = String::from(r#"{"resources":{"#);
     let mut first = true;
     for d in unique(domains) {
-        if let Some(tree) = find(ICONS, category, d) {
+        let plugin_loaded = plugins.and_then(|p| p.get(d));
+        let tree = find(ICONS, category, d)
+            .or_else(|| plugin_loaded.as_ref().and_then(|p| p.icons_for(category)));
+        if let Some(tree) = tree {
             if !first {
                 out.push(',');
             }

@@ -9,9 +9,12 @@
 //! SwitchBot Bluetooth, SwitchBot Cloud and Matter).
 
 use super::{Conn, Invalid};
+use crate::ApiConfig;
 use crate::manifests_data::{DESCRIPTIONS, MANIFESTS};
 use ha_auth::Permission;
+use ha_integrations::plugin::{STORE_DOMAIN, store};
 use serde_json::{Map, Value, json};
+use std::borrow::Cow;
 
 fn manifest(domain: &str) -> Option<&'static str> {
     MANIFESTS
@@ -20,10 +23,25 @@ fn manifest(domain: &str) -> Option<&'static str> {
         .map(|i| MANIFESTS[i].1)
 }
 
+fn manifest_for(config: &ApiConfig, domain: &str) -> Option<Cow<'static, str>> {
+    if let Some(m) = manifest(domain) {
+        return Some(Cow::Borrowed(m));
+    }
+    if domain == STORE_DOMAIN && config.plugins.is_some() {
+        return Some(Cow::Owned(store::store_manifest_json()));
+    }
+    config
+        .plugins
+        .as_ref()
+        .and_then(|p| p.get(domain))
+        .map(|p| Cow::Owned(p.manifest_json()))
+}
+
 /// `Integration.integration_type` (`hub` when the manifest doesn't say),
-/// for integrations with an embedded manifest.
-pub(crate) fn integration_type(domain: &str) -> Option<String> {
-    let manifest: Value = serde_json::from_str(manifest(domain)?).ok()?;
+/// for integrations with an embedded manifest or an installed plugin.
+pub(crate) fn integration_type_for(config: &ApiConfig, domain: &str) -> Option<String> {
+    let raw = manifest_for(config, domain)?;
+    let manifest: Value = serde_json::from_str(&raw).ok()?;
     Some(
         manifest
             .get("integration_type")
@@ -78,6 +96,7 @@ pub(super) fn dispatch(
         // The asked-for integrations (deduplicated, in order), or every
         // loaded one; ones without a manifest are logged and left out.
         "manifest/list" => check(msg, "integrations").map(|()| {
+            let loaded = crate::components(&conn.shared.config);
             let asked: Vec<String> = msg
                 .get("integrations")
                 .and_then(Value::as_array)
@@ -87,26 +106,20 @@ pub(super) fn dispatch(
                         .filter_map(|v| v.as_str().map(str::to_owned))
                         .collect()
                 })
-                .unwrap_or_else(|| {
-                    crate::components(&conn.shared.config)
-                        .into_iter()
-                        .map(str::to_owned)
-                        .collect()
-                });
+                .unwrap_or_else(|| loaded.iter().map(|c| c.as_ref().to_owned()).collect());
             // `async_get_integrations`: the ones already loaded (cached)
             // first, then the rest, each in the order asked.
-            let loaded = crate::components(&conn.shared.config);
             let (mut asked, rest): (Vec<String>, Vec<String>) = asked
                 .into_iter()
-                .partition(|d| loaded.contains(&d.as_str()));
+                .partition(|d| loaded.iter().any(|c| c.as_ref() == d));
             asked.extend(rest);
             let mut seen = Vec::new();
-            let mut parts = Vec::new();
+            let mut parts: Vec<Cow<'static, str>> = Vec::new();
             for d in asked {
                 if seen.contains(&d) {
                     continue;
                 }
-                match manifest(&d) {
+                match manifest_for(&conn.shared.config, &d) {
                     Some(m) => parts.push(m),
                     None => tracing::error!(
                         "Unable to get manifest for integration {d}: Integration '{d}' not found."
@@ -117,39 +130,66 @@ pub(super) fn dispatch(
             conn.out.result_raw(id, &format!("[{}]", parts.join(",")));
         }),
         // `require_admin`. `loader.async_get_integration_descriptions`,
-        // with no custom integrations.
+        // including installed custom plugins under `custom.integration`.
         "integration/descriptions" => super::only_keys(msg, &[]).map(|()| {
             if conn.principal.permission < Permission::Admin {
                 conn.out.error(json!(id), "unauthorized", "Unauthorized");
                 return;
             }
             let handlers = crate::config_entries::handlers_of(&conn.shared.config);
-            let described = || {
-                handlers.iter().filter_map(|h| {
-                    DESCRIPTIONS.iter().find(|(domain, ..)| *domain == h.domain)
+            let mut integrations: Vec<String> = handlers
+                .iter()
+                .filter_map(|h| {
+                    DESCRIPTIONS
+                        .iter()
+                        .find(|(domain, ..)| *domain == h.as_ref())
+                        .map(|(domain, description, _)| format!("\"{domain}\":{description}"))
                 })
-            };
-            let integrations: Vec<String> = described()
-                .map(|(domain, description, _)| format!("\"{domain}\":{description}"))
                 .collect();
-            let translated: Vec<String> = described()
-                .filter(|(.., translated)| *translated)
-                .map(|(domain, ..)| format!("\"{domain}\""))
+            let mut translated: Vec<String> = handlers
+                .iter()
+                .filter_map(|h| {
+                    DESCRIPTIONS
+                        .iter()
+                        .find(|(domain, ..)| *domain == h.as_ref())
+                        .filter(|(.., is_translated)| *is_translated)
+                        .map(|(domain, ..)| format!("\"{domain}\""))
+                })
                 .collect();
+            let mut custom_integrations: Vec<String> = Vec::new();
+            if let Some(plugins) = &conn.shared.config.plugins {
+                if handlers.iter().any(|h| h.as_ref() == STORE_DOMAIN) {
+                    integrations.push(format!(
+                        "\"{STORE_DOMAIN}\":{}",
+                        store::store_description_json()
+                    ));
+                    translated.push(format!("\"{STORE_DOMAIN}\""));
+                }
+                for plugin in plugins.installed() {
+                    if plugin.manifest.config_flow {
+                        custom_integrations.push(format!(
+                            "\"{}\":{}",
+                            plugin.domain(),
+                            plugin.description_json()
+                        ));
+                    }
+                }
+            }
             conn.out.result_raw(
                 id,
                 &format!(
-                    r#"{{"core":{{"integration":{{{}}},"helper":{{}},"translated_name":[{}]}},"custom":{{"integration":{{}},"helper":{{}}}}}}"#,
+                    r#"{{"core":{{"integration":{{{}}},"helper":{{}},"translated_name":[{}]}},"custom":{{"integration":{{{}}},"helper":{{}}}}}}"#,
                     integrations.join(","),
-                    translated.join(",")
+                    translated.join(","),
+                    custom_integrations.join(",")
                 ),
             );
         }),
         "manifest/get" => check(msg, "integration").map(|()| {
             let d = msg["integration"].as_str().unwrap_or_default();
-            match manifest(d) {
+            match manifest_for(&conn.shared.config, d) {
                 Some(m) => {
-                    conn.out.result_raw(id, m);
+                    conn.out.result_raw(id, &m);
                 }
                 None => {
                     conn.out

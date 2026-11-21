@@ -192,6 +192,7 @@ fn valid_domain(d: &str) -> bool {
 struct BrandsState {
     brands: Arc<Brands>,
     auth: Auth,
+    plugins: Option<Arc<ha_integrations::plugin::PluginManager>>,
 }
 
 /// A bearer access token (checked against the client's address, as
@@ -222,6 +223,16 @@ async fn integration(
     }
     if !valid_domain(&domain) || !ALLOWED_IMAGES.contains(&image.as_str()) {
         return StatusCode::NOT_FOUND.into_response();
+    }
+    if let Some(plugin) = s.plugins.as_ref().and_then(|p| p.get(&domain))
+        && plugin.brand_image_candidate(&image).is_some()
+    {
+        let img = image.clone();
+        if let Ok(Some(bytes)) =
+            tokio::task::spawn_blocking(move || plugin.read_brand_image(&img)).await
+        {
+            return ([(header::CONTENT_TYPE, "image/png")], bytes).into_response();
+        }
     }
     let placeholder = q.get("placeholder").map(String::as_str) != Some("no");
     s.brands
@@ -260,11 +271,19 @@ async fn hardware(
     s.brands.serve(sub.clone(), sub, true).await
 }
 
-pub(crate) fn routes(brands: Arc<Brands>, auth: Auth) -> Router {
+pub(crate) fn routes(
+    brands: Arc<Brands>,
+    auth: Auth,
+    plugins: Option<Arc<ha_integrations::plugin::PluginManager>>,
+) -> Router {
     Router::new()
         .route("/api/brands/integration/{domain}/{image}", get(integration))
         .route("/api/brands/hardware/{category}/{*image}", get(hardware))
-        .with_state(BrandsState { brands, auth })
+        .with_state(BrandsState {
+            brands,
+            auth,
+            plugins,
+        })
 }
 
 #[cfg(test)]
@@ -327,7 +346,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
         let brands = Brands::new(&dir, &base).unwrap();
         let auth = crate::test_util::auth(true);
-        let router = routes(brands.clone(), auth.clone());
+        let router = routes(brands.clone(), auth.clone(), None);
         let token = brands.token();
         assert!(!token.starts_with('0') && token.len() <= 64);
 
@@ -420,6 +439,40 @@ mod tests {
         assert_eq!(
             get(&router, &url("hue", "icon.png")).await.0,
             StatusCode::UNAUTHORIZED
+        );
+
+        // Local plugin icon is served directly without hitting the CDN.
+        let plugin_dir = dir.join("plugins/my_plug");
+        std::fs::create_dir_all(&plugin_dir).unwrap();
+        std::fs::write(
+            plugin_dir.join("plugin.json"),
+            serde_json::json!({
+                "schema_version": 1,
+                "domain": "my_plug",
+                "name": "My Plug",
+                "version": "0.1.0",
+                "transport": { "type": "stdio", "command": "bin/my_plug" },
+                "capabilities": { "entity_domains": ["switch"] }
+            })
+            .to_string(),
+        )
+        .unwrap();
+        std::fs::write(plugin_dir.join("icon.png"), b"PLUGINPNG").unwrap();
+        let plugins = ha_integrations::plugin::PluginManager::load(&dir);
+        let plugin_router = routes(brands.clone(), auth.clone(), Some(plugins));
+        let token = brands.token();
+        let before_hits = hits.load(std::sync::atomic::Ordering::Relaxed);
+        let (st, body) = get(
+            &plugin_router,
+            &format!("/api/brands/integration/my_plug/icon.png?token={token}"),
+        )
+        .await;
+        assert_eq!(st, StatusCode::OK);
+        assert_eq!(body, b"PLUGINPNG");
+        assert_eq!(
+            hits.load(std::sync::atomic::Ordering::Relaxed),
+            before_hits,
+            "local plugin icon should not hit CDN"
         );
         let _ = std::fs::remove_dir_all(&dir);
     }

@@ -90,11 +90,9 @@ pub(super) fn dispatch(
                 conn.out.error(json!(id), "unauthorized", "Unauthorized");
                 return;
             }
-            let r = conn
-                .shared
-                .config
-                .labs
-                .list(&crate::components(&conn.shared.config));
+            let loaded = crate::components(&conn.shared.config);
+            let loaded_refs: Vec<&str> = loaded.iter().map(|c| c.as_ref()).collect();
+            let r = conn.shared.config.labs.list(&loaded_refs);
             conn.out.result(id, r);
         }),
         "labs/subscribe" => labs_subscribe(conn, id, msg),
@@ -153,22 +151,31 @@ fn get_translations(conn: &mut Conn, id: u64, msg: &Map<String, Value>) -> Resul
         Some(Value::Bool(b)) => *b,
         Some(_) => return Err("expected bool for dictionary value @ data['config_flow']".into()),
     };
-    let mut loaded = crate::components(&conn.shared.config);
-    let domains: &[&str] = match &integrations {
-        Some(list) => list,
+    let loaded_owned: Vec<std::borrow::Cow<'static, str>>;
+    let domains: Vec<&str> = match &integrations {
+        Some(list) => list.clone(),
         None => {
+            let loaded = crate::components(&conn.shared.config);
             if config_flow {
-                loaded = crate::config_entries::handlers_of(&conn.shared.config)
-                    .iter()
-                    .map(|h| h.domain)
-                    .filter(|d| !loaded.contains(d))
+                loaded_owned = crate::config_entries::handlers_of(&conn.shared.config)
+                    .into_iter()
+                    .filter(|d| !loaded.iter().any(|c| c.as_ref() == d.as_ref()))
                     .collect();
+                loaded_owned.iter().map(|d| d.as_ref()).collect()
+            } else {
+                loaded_owned = loaded;
+                loaded_owned.iter().map(|d| d.as_ref()).collect()
             }
-            &loaded
         }
     };
-    conn.out
-        .result_raw(id, &crate::i18n::translations(category, domains));
+    conn.out.result_raw(
+        id,
+        &crate::i18n::translations_with_plugins(
+            category,
+            &domains,
+            conn.shared.config.plugins.as_deref(),
+        ),
+    );
     Ok(())
 }
 
@@ -189,19 +196,18 @@ fn get_icons(conn: &mut Conn, id: u64, msg: &Map<String, Value>) -> Result<(), I
             return Err("value must be one of ['conditions', 'entity', 'entity_component', 'services', 'triggers'] for dictionary value @ data['category']".into());
         }
     };
-    let loaded;
-    let domains: &[&str] = match integrations(msg)? {
-        Some(list) if !list.is_empty() => {
-            loaded = list;
-            &loaded
-        }
+    let loaded_owned: Vec<std::borrow::Cow<'static, str>>;
+    let domains: Vec<&str> = match integrations(msg)? {
+        Some(list) if !list.is_empty() => list,
         _ => {
-            loaded = crate::components(&conn.shared.config);
-            &loaded
+            loaded_owned = crate::components(&conn.shared.config);
+            loaded_owned.iter().map(|d| d.as_ref()).collect()
         }
     };
-    conn.out
-        .result_raw(id, &crate::i18n::icons(category, domains));
+    conn.out.result_raw(
+        id,
+        &crate::i18n::icons_with_plugins(category, &domains, conn.shared.config.plugins.as_deref()),
+    );
     Ok(())
 }
 

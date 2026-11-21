@@ -414,7 +414,9 @@ async fn wait(State(v): State<Views>, body: Bytes) -> Response {
         Ok(f) => f[0],
         Err(e) => return e,
     };
-    let loaded = crate::components(&v.0.shared.config).contains(&domain);
+    let loaded = crate::components(&v.0.shared.config)
+        .iter()
+        .any(|c| c.as_ref() == domain);
     Json(json!({ "integration_loaded": loaded })).into_response()
 }
 

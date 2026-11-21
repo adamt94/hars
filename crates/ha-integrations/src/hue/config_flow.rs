@@ -257,7 +257,7 @@ impl HueFlow {
             .collect();
         options.push((MANUAL.into(), "Manually add a Hue Bridge".into()));
         Step::Form {
-            step_id: "init",
+            step_id: "init".into(),
             schema: Some(vec![Field::required("id", Kind::Select(options))]),
             errors: None,
             description_placeholders: None,
@@ -268,7 +268,7 @@ impl HueFlow {
     async fn manual(&mut self, cx: &mut Cx<'_>, input: Option<Map<String, Value>>) -> Step {
         let Some(host) = input.as_ref().and_then(|i| i["host"].as_str()) else {
             return Step::Form {
-                step_id: "manual",
+                step_id: "manual".into(),
                 schema: Some(vec![Field::required_str("host")]),
                 errors: None,
                 description_placeholders: None,
@@ -299,9 +299,9 @@ impl HueFlow {
 
     fn link_form(error: Option<&'static str>) -> Step {
         Step::Form {
-            step_id: "link",
+            step_id: "link".into(),
             schema: None,
-            errors: error.map(|e| vec![("base", e)]),
+            errors: error.map(|e| vec![("base".into(), e.into())]),
             description_placeholders: None,
         }
     }

@@ -17,6 +17,7 @@ supersedes the old one; don't rewrite history.
 | [0008](0008-vectors-from-home-assistant.md) | Expected values come from running Home Assistant's code | 2026-11-15 |
 | [0009](0009-mvp-reference-install.md) | The MVP is a reference install; cutover after a shadow week | 2026-11-13 |
 | [0010](0010-map-tiles-from-osm.md) | Map tiles from OpenStreetMap, relayed by hars | 2026-11-17 |
+| [0011](0011-plugin-system.md) | Out-of-process plugins over NDJSON JSON-RPC | 2026-11-21 |
 
 Template for a new record (`NNNN-short-name.md`):
 
