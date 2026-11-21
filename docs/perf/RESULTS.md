@@ -427,16 +427,30 @@ open and no Hue entry: no timer, no task, no socket (`hars` does not
 listen for bridges that announce themselves; the user starts the dialog,
 and discovery is one request then). An install with a Hue entry runs what
 it ran before (the bridge's event stream), plus one lock per bridge that
-a state write takes. At each start its set-up now goes over the bridge's
-registry rows (one registry write per device and entity, each a copy of
-the row pointers, under the set-up lock): not measured on a large
-registry. Every install holds one more short string from start (the
-discovery service's address).
+a state write takes. Every install holds one more short string from start
+(the discovery service's address).
+
+At each start a Hue entry's set-up now goes over the bridge's registry
+rows, one registry call per device and entity under the set-up lock. Each
+call used to copy the registry snapshot and swap the copy in even when
+the row was there and matched; a write that changes nothing now copies
+and swaps nothing, for every caller of the registry.
+`crates/ha-integrations/benches/hue_register.rs`, a bridge with 97
+devices and 344 entities in a registry that also holds 300 devices and
+3,000 entities of other integrations (criterion, an Apple-silicon Mac):
+
+| | before | after |
+|---|---|---|
+| `hue_register/rows_that_match` (any start but the first) | 32.26 ms | 19.02 ms (−40 %) |
+| `hue_register/rows_made` (the first start) | 34.55 ms | 32.84 ms (−5 %) |
+
+What is left is the look-up of each row among the others (a scan, where
+HA has an index): about 40 µs a row here, once per start.
 
 Release binary (macOS arm64, stripped, `cargo build --release -p
-ha-server`): main (176d942) 9,535,472 bytes, branch 9,667,728
-(+132,256): the flow, the discovery and key requests, and the row
-registration.
+ha-server`): main (176d942) 9,535,472 bytes, branch 9,684,288
+(+148,816): the flow, the discovery and key requests, the row
+registration and the sensors' units.
 
 Idle, a fresh install with no Hue entry. The Linux gate
 (`scripts/perf-docker.sh`) was not run for this change: Docker was not
@@ -447,8 +461,8 @@ time read at both ends, `ps` for RSS):
 
 | | idle wake-ups in 60 s | CPU time in 60 s | RSS | threads |
 |---|---|---|---|---|
-| main (176d942) | 0 | 0.00 s | 8,448 KiB | 12 |
-| branch | 0 | 0.00 s | 8,528 KiB | 12 |
+| main (176d942) | 0 | 0.00 s | 8,592 KiB | 12 |
+| branch | 0 | 0.00 s | 8,448 KiB | 12 |
 
 CI's resource step runs the Linux gate on the pull request.
 
