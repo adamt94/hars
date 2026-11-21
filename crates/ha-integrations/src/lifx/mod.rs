@@ -777,23 +777,23 @@ pub async fn run(
             registry.move_devices_to_entry(&json!([DOMAIN, unique_id]), &legacy, &entry_id);
         }
     }
-    // The host as the entry has it now: a flow may have changed it while
-    // the set-up waited for a retry.
-    let current_host = |fallback: &str| {
+    // The host as the entry has it now, with its data's revision: a flow
+    // may have changed it while the set-up waited for a retry.
+    let current_host = |fallback: &str, revision: u64| {
         status
             .entry()
-            .and_then(|(entries, id)| entries.get(id))
-            .and_then(|e| e.get("data")?.get("host")?.as_str().map(str::to_owned))
-            .unwrap_or_else(|| fallback.to_owned())
+            .and_then(|(entries, id)| entries.data_value(id, "host"))
+            .unwrap_or_else(|| (fallback.to_owned(), revision))
     };
     // A bulb found at a new address: the entry has it from now on, as HA's
-    // discovery flow writes it. Not if the entry's address changed since
-    // this task read it (a flow wrote a newer one): that one stands.
-    let save_host = |was: &str, host: &str| {
+    // discovery flow writes it. Not if the entry's data changed since this
+    // task read it (a flow wrote a newer address): that one stands.
+    let save_host = |revision: u64, host: &str| {
         if let Some((entries, id)) = status.entry() {
-            save_host(entries, id, was, host);
+            save_host(entries, id, revision, host);
         }
     };
+    let mut revision = 0;
     let (found_tx, mut found_rx) = mpsc::unbounded_channel::<String>();
     // Rediscovery ends with this task.
     let discovery = Owned(tokio::spawn(discover(
@@ -816,7 +816,7 @@ pub async fn run(
     let mut loaded = false;
     loop {
         let found = loop {
-            host = current_host(&host);
+            (host, revision) = current_host(&host, revision);
             let (ip, port) = at.addr(&host);
             match connect(&host, (&ip, port), &unique_id, at.timing).await {
                 Ok(f) => break f,
@@ -835,7 +835,7 @@ pub async fn run(
                     // Discovery of the bulb retries at once.
                     tokio::select! {
                         () = components.hass().setup_retry_wait(Duration::from_secs(wait) + jitter) => {}
-                        Some(found) = found_rx.recv() => save_host(&host, &found),
+                        Some(found) = found_rx.recv() => save_host(revision, &found),
                     }
                     status.set(EntryState::SetupInProgress, None);
                 }
@@ -913,7 +913,7 @@ pub async fn run(
             match found_rx.recv().await {
                 Some(found) if found != host => {
                     tracing::info!("lifx: {title} moved from {host} to {found}; reconnecting");
-                    save_host(&host, &found);
+                    save_host(revision, &found);
                     host = found;
                     break;
                 }
@@ -928,16 +928,17 @@ pub async fn run(
     }
 }
 
-/// A bulb found at `host`, where its entry had `was`: the entry has `host`
-/// from now on, unless its address is no longer `was` (a flow wrote a newer
-/// one: that one stands). Looked at and written in one step.
+/// A bulb found at `host`: the entry has `host` from now on, unless its
+/// data changed since it was read at `revision` (a flow wrote a newer
+/// address, even the same one again: that one stands). Looked at and
+/// written in one step.
 pub(crate) fn save_host(
     entries: &crate::config_entries::ConfigEntries,
     entry_id: &str,
-    was: &str,
+    revision: u64,
     host: &str,
 ) -> bool {
-    entries.replace_data_value(entry_id, "host", was, host)
+    entries.replace_data_value(entry_id, "host", revision, host)
 }
 
 /// Broadcast `GetService` every 15 min (and 5 s after start), listening

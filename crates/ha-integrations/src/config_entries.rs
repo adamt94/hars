@@ -186,6 +186,11 @@ pub struct ConfigEntries {
     runtime: parking_lot::Mutex<Vec<(String, Runtime)>>,
     /// `config_entries/subscribe`rs. Empty while nobody subscribes.
     listeners: parking_lot::Mutex<Vec<(Live, Listener)>>,
+    /// How many times each entry's data has been changed here, by entry
+    /// id: a value read with its revision is still the one written last
+    /// only while the revision is the same. Changed with the entries'
+    /// write lock held. Empty until an entry's data changes.
+    revisions: parking_lot::Mutex<Vec<(String, u64)>>,
 }
 
 impl std::fmt::Debug for ConfigEntries {
@@ -264,6 +269,7 @@ impl ConfigEntries {
                 read_only: !writable,
                 runtime: Default::default(),
                 listeners: Default::default(),
+                revisions: Default::default(),
             }
         })
     }
@@ -277,6 +283,7 @@ impl ConfigEntries {
             read_only: false,
             runtime: Default::default(),
             listeners: Default::default(),
+            revisions: Default::default(),
         })
     }
 
@@ -610,12 +617,49 @@ impl ConfigEntries {
         })
     }
 
-    /// One field of an entry's data, `key`, goes from `was` to `value`, if
-    /// it is still `was`: looked at and changed under one write lock, so a
-    /// newer value written meanwhile (a flow's) is never overwritten. The
-    /// rest of the data stays. `modified_at`, the save and the listeners as
-    /// [`ConfigEntries::update_data`]. `false` if nothing changed.
-    pub fn replace_data_value(&self, entry_id: &str, key: &str, was: &str, value: &str) -> bool {
+    /// An entry's data revision: changed with each change of its data.
+    fn revision(&self, entry_id: &str) -> u64 {
+        let revisions = self.revisions.lock();
+        revisions
+            .iter()
+            .find(|(id, _)| id == entry_id)
+            .map_or(0, |(_, r)| *r)
+    }
+
+    /// The entry's data changed (called with the entries' write lock held).
+    fn bump(&self, entry_id: &str) {
+        let mut revisions = self.revisions.lock();
+        match revisions.iter_mut().find(|(id, _)| id == entry_id) {
+            Some((_, r)) => *r += 1,
+            None => revisions.push((entry_id.to_owned(), 1)),
+        }
+    }
+
+    /// `data[key]` of an entry, with the data's revision, read together.
+    pub fn data_value(&self, entry_id: &str, key: &str) -> Option<(String, u64)> {
+        let guard = self.entries.read();
+        let entry = guard
+            .iter()
+            .flatten()
+            .find(|e| e.get("entry_id").and_then(Value::as_str) == Some(entry_id))?;
+        let value = entry.get("data")?.get(key)?.as_str()?.to_owned();
+        Some((value, self.revision(entry_id)))
+    }
+
+    /// One field of an entry's data, `key`, becomes `value`, if the data is
+    /// still at `revision` (as [`ConfigEntries::data_value`] read it): looked
+    /// at and changed under one write lock, so data written meanwhile (a
+    /// flow's address, even one changed back to what it was) is never
+    /// overwritten. The rest of the data stays. `modified_at`, the save and
+    /// the listeners as [`ConfigEntries::update_data`]. `false` if nothing
+    /// changed.
+    pub fn replace_data_value(
+        &self,
+        entry_id: &str,
+        key: &str,
+        revision: u64,
+        value: &str,
+    ) -> bool {
         #[cfg(test)]
         tests::before_write();
         let mut listeners = self.listeners.lock();
@@ -631,7 +675,9 @@ impl ConfigEntries {
             let Some(Value::Object(data)) = entry.get_mut("data") else {
                 return false;
             };
-            if data.get(key).and_then(Value::as_str) != Some(was) || was == value {
+            if self.revision(entry_id) != revision
+                || data.get(key).and_then(Value::as_str) == Some(value)
+            {
                 return false;
             }
             data.insert(key.to_owned(), Value::String(value.to_owned()));
@@ -639,6 +685,7 @@ impl ConfigEntries {
                 "modified_at".into(),
                 Value::String(ha_core::isoformat(self.hass.clock().now())),
             );
+            self.bump(entry_id);
         }
         self.schedule();
         if let Some(entry) = self.get(entry_id) {
@@ -671,6 +718,7 @@ impl ConfigEntries {
                 "modified_at".into(),
                 Value::String(ha_core::isoformat(self.hass.clock().now())),
             );
+            self.bump(entry_id);
         }
         self.schedule();
         if let Some(entry) = self.get(entry_id) {
