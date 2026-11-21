@@ -1736,6 +1736,102 @@ async fn the_usable_entry_of_a_bridge_listed_twice_is_set_up() {
     }
 }
 
+/// LIFX's turn of the cases the Hue review found. A bulb listed twice, the
+/// first entry disabled or ignored: the second runs it. An entry the user
+/// ignored for a bulb: the flow for that bulb replaces it, as in HA, and
+/// the bulb is set up; the ignored entry is never set up before.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn lifx_duplicates_and_ignored_entries_as_hue_s() {
+    use ha_integrations::config_entries::EntryState;
+    use ha_integrations::flow::FlowResult;
+    let (_base, api) = FakeApi::start().await;
+    let endpoints = Endpoints {
+        lifx: api.lifx.at.clone(),
+        ..Default::default()
+    };
+    let serial = "d0:73:d5:00:00:20";
+    for (why, source, disabled_by) in [
+        ("disabled", "user", json!("user")),
+        ("ignored", "ignore", json!(null)),
+    ] {
+        let hass = Hass::new();
+        let entries = ConfigEntries::in_memory(&hass, Vec::new());
+        let mut ids = Vec::new();
+        for (source, disabled_by) in [(source, disabled_by), ("user", json!(null))] {
+            let data = json!({"host": lifx_fake::COLOUR})
+                .as_object()
+                .unwrap()
+                .clone();
+            let mut entry = entries.new_entry("lifx", source, "Desk Lamp", Some(serial), data);
+            entry.insert("disabled_by".into(), disabled_by);
+            ids.push(entry["entry_id"].as_str().unwrap().to_owned());
+            entries.add(entry);
+        }
+        let registry = ha_registry::Registry::in_memory(&hass, Default::default());
+        let lookup = entries.clone();
+        registry.set_entry_lookup(Arc::new(move |id: &str| lookup.info(id)));
+        let stored = entries.list();
+        let _started = ha_integrations::start(
+            &hass,
+            registry.clone().into(),
+            stored.as_deref(),
+            Default::default(),
+            &endpoints,
+            Some(&entries),
+        );
+        hass.setups_done().await;
+        assert_eq!(
+            entries.runtime(&ids[0]),
+            None,
+            "{why}: the first was set up"
+        );
+        assert_eq!(
+            entries.runtime(&ids[1]).map(|r| r.state),
+            Some(EntryState::Loaded),
+            "{why}"
+        );
+        let light = ha_core::EntityId::parse("light.office_desk_lamp").unwrap();
+        assert!(hass.states().get(&light).is_some(), "{why}");
+        let rows = registry.snapshot();
+        assert_eq!(rows.entities.len(), 4, "{why}");
+        assert!(
+            rows.entities
+                .iter()
+                .all(|e| e.config_entry_id.as_deref() == Some(ids[1].as_str())),
+            "{why}"
+        );
+    }
+    // An ignored entry for the bulb, and the flow for it.
+    let home = home().await;
+    let ignored = home.entries.new_entry(
+        "lifx",
+        "ignore",
+        "Desk Lamp",
+        Some(serial),
+        Default::default(),
+    );
+    let ignored_id = ignored["entry_id"].as_str().unwrap().to_owned();
+    home.entries.add(ignored);
+    let flows = home.config.flows.clone().unwrap();
+    let FlowResult::Form { flow_id, .. } = flows
+        .init("lifx", ha_integrations::flow::SOURCE_USER)
+        .await
+        .unwrap()
+    else {
+        panic!("no form");
+    };
+    let input = vec![("host".to_owned(), json!(lifx_fake::COLOUR))];
+    let added = flows.configure(&flow_id, Some(input)).await.unwrap();
+    let FlowResult::CreateEntry { entry, .. } = added else {
+        panic!("{added:?}");
+    };
+    let listed = home.entries.list().unwrap();
+    assert_eq!(listed.len(), 1);
+    assert_eq!(listed[0]["entry_id"], entry["entry_id"]);
+    assert_ne!(listed[0]["entry_id"], json!(ignored_id));
+    assert_eq!(listed[0]["unique_id"], serial);
+}
+
 /// An ignored entry is `not_loaded`, as in HA, though another entry of its
 /// integration is set up and its integration so is loaded; and removing
 /// it needs no restart, since nothing of it runs.

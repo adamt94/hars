@@ -587,3 +587,46 @@ async fn a_flows_sockets_are_gone_when_its_step_answers() {
     // Its port is free again.
     assert!(std::net::UdpSocket::bind(("0.0.0.0", from.port())).is_ok());
 }
+
+/// With a device or entity store that can't be written (an install from an
+/// older Home Assistant), no row is made: rows made now would be gone after
+/// a restart while rows that point at them were saved.
+#[tokio::test]
+async fn nothing_is_registered_in_a_store_that_cant_be_written() {
+    let f = fake_bulb(65535, [0, 0, 39321, 2700]).await;
+    let found = connect("127.0.0.1", ("127.0.0.1", f.port), UID, timing(false))
+        .await
+        .unwrap();
+    let hass = Hass::new();
+    let older = ha_registry::STORES
+        .iter()
+        .find(|s| s.0 == ha_registry::DEVICE_KEY)
+        .unwrap()
+        .2
+        - 1;
+    let registries = Registries {
+        device_file: ha_registry::FileRest {
+            minor: older,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let dir = std::env::temp_dir().join(format!("hars-lifx-read-only-{}", std::process::id()));
+    let registry = ha_registry::Registry::new(&hass, &dir, registries);
+    register::register(&hass, &registry, "entry", &found, false);
+    let after = registry.snapshot();
+    assert!(after.devices.is_empty() && after.entities.is_empty() && after.areas.is_empty());
+    // And on a store that can be: the device, the light, both buttons and
+    // the RSSI sensor, disabled.
+    let registry = ha_registry::Registry::in_memory(&hass, Registries::default());
+    register::register(&hass, &registry, "entry", &found, false);
+    let after = registry.snapshot();
+    assert_eq!(after.devices.len(), 1);
+    let rssi = after
+        .entities
+        .iter()
+        .find(|e| e.entity_id.ends_with("_rssi"))
+        .unwrap();
+    assert_eq!(rssi.disabled_by.as_deref(), Some("integration"));
+    assert_eq!(after.entities.len(), 4);
+}
