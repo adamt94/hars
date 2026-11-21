@@ -3182,40 +3182,44 @@ async fn long_templates_are_not_kept() {
 /// A client that sends a render and goes away while every render permit
 /// is taken: the connection still reads the close (it reads while busy),
 /// so the waiting render is dropped and never runs once permits come back.
+/// The permits are held until the server has stopped this render, and what
+/// is watched is this render's own start, so another test's render, or
+/// this one starting late, can't hide or fake the answer.
 #[tokio::test(flavor = "multi_thread")]
 async fn a_client_that_closes_while_its_render_waits_drops_it() {
+    use super::template::tests::happened;
     let _alone = RENDER_PERMITS.lock().await;
     let s = server().await;
     let held = super::template::take_all_renders().await;
     let mut c = Client::authed(&s, &token(&s.auth).0).await;
-    // Runs to its fuel budget, holding a permit, if it ever starts.
-    let heavy = "{% for i in range(100000) %}{% for j in range(100000) %}{% endfor %}{% endfor %}";
+    // Runs to its fuel budget, holding a permit, if it ever starts. Its
+    // comment names it among every test's renders.
+    let heavy = "{# closed connection #}{% for i in range(100000) %}{% for j in range(100000) %}{% endfor %}{% endfor %}";
     c.send(json!({"id": 2, "type": "render_template", "template": heavy}))
         .await;
     tokio::time::sleep(Duration::from_millis(20)).await;
     c.ws.close(None).await.unwrap();
     drop(c);
-    // Well before a missed heartbeat (400 ms in tests) would end it anyway.
-    tokio::time::sleep(Duration::from_millis(50)).await;
-    drop(held);
-    let until = tokio::time::Instant::now() + Duration::from_millis(500);
-    // The heavy render, had it started, would hold its permit for its whole
-    // fuel budget (about 175 ms in a debug build here). A render of another
-    // test running alongside holds one for a moment (a millisecond or two),
-    // which isn't this render.
-    let mut held_since = None;
-    while tokio::time::Instant::now() < until {
-        let now = tokio::time::Instant::now();
-        held_since = match super::template::renders_free() == super::template::RENDERS_AT_ONCE {
-            true => None,
-            false => held_since.or(Some(now)),
-        };
+    // The server reads the close and stops the waiting render.
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+    while !happened("cancelled", heavy) {
         assert!(
-            held_since.is_none_or(|since| now - since < Duration::from_millis(20)),
-            "the render of a closed connection started"
+            tokio::time::Instant::now() < deadline,
+            "the server never stopped the render"
         );
-        tokio::time::sleep(Duration::from_millis(1)).await;
+        tokio::time::sleep(Duration::from_millis(5)).await;
     }
+    assert!(
+        !happened("started", heavy),
+        "it started while every permit was held"
+    );
+    drop(held);
+    // Permits are free now: a render that was still waiting would start.
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    assert!(
+        !happened("started", heavy),
+        "the render of a closed connection started"
+    );
 }
 
 /// A connection waiting for a render still answers heartbeats, so it isn't

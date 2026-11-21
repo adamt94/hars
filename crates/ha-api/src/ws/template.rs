@@ -189,6 +189,10 @@ fn render_template(conn: &mut Conn, id: u64, msg: &Map<String, Value>) -> Result
     let timeout = args.timeout.filter(|t| *t != 0.0 && !template.is_static());
     let out = conn.out.clone();
     let home = Arc::new(home(&conn.shared));
+    #[cfg(test)]
+    let source = args.template.clone();
+    #[cfg(test)]
+    let started = source.clone();
     let task = tokio::spawn(async move {
         let variables = args.variables.map(Arc::new);
         let (strict, report) = (args.strict, args.report_errors);
@@ -222,6 +226,8 @@ fn render_template(conn: &mut Conn, id: u64, msg: &Map<String, Value>) -> Result
         // `report_errors` (where only the second is seen) it renders once.
         let t = template.clone();
         let (setup, refresh) = blocking(move || {
+            #[cfg(test)]
+            tests::note("started", &started);
             let setup = t.render_in(Some(&home), variables.as_deref(), strict);
             let refresh = report.then(|| t.render_in(Some(&home), variables.as_deref(), strict));
             (setup, refresh)
@@ -242,7 +248,11 @@ fn render_template(conn: &mut Conn, id: u64, msg: &Map<String, Value>) -> Result
         reply.send(&template, setup, refresh);
         Some(id)
     });
-    conn.busy = Some(Busy { task });
+    conn.busy = Some(Busy {
+        task,
+        #[cfg(test)]
+        source,
+    });
     Ok(())
 }
 
@@ -315,6 +325,9 @@ async fn timed(
 /// The `render_template` a connection is waiting on.
 pub(crate) struct Busy {
     task: JoinHandle<Option<u64>>,
+    /// Its template, for tests.
+    #[cfg(test)]
+    source: String,
 }
 
 impl Busy {
@@ -322,6 +335,8 @@ impl Busy {
     /// started.
     pub(crate) fn abort(self) {
         self.task.abort();
+        #[cfg(test)]
+        tests::note("cancelled", &self.source);
     }
 }
 
@@ -427,8 +442,24 @@ fn send_log(out: &Outbox, id: u64, log: &Log) {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
+
+    /// What happened to each `render_template` in this process, by its
+    /// template: `started` (its render began on a render thread) and
+    /// `cancelled` (its connection went and it was stopped). A test names
+    /// its template uniquely and looks for its own.
+    static EVENTS: parking_lot::Mutex<Vec<(&'static str, String)>> =
+        parking_lot::Mutex::new(Vec::new());
+
+    pub(crate) fn note(what: &'static str, source: &str) {
+        EVENTS.lock().push((what, source.to_owned()));
+    }
+
+    /// Whether `what` happened to the render of `source`.
+    pub(crate) fn happened(what: &str, source: &str) -> bool {
+        EVENTS.lock().iter().any(|(w, s)| *w == what && s == source)
+    }
 
     /// At most 128 templates, the least recently used going first.
     #[test]
