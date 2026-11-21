@@ -285,6 +285,11 @@ fn random_id() -> String {
 /// changes something, a copy of it from then on. Most of what an
 /// integration asks at each start changes nothing (every row is there and
 /// matches); such a write copies and publishes nothing.
+///
+/// One of these is on the stack for the length of a write: boxing the copy
+/// to make the variants alike would add an allocation to every write that
+/// changes something.
+#[allow(clippy::large_enum_variant)]
 enum Working {
     Same(Arc<Registries>),
     Changed(Registries),
