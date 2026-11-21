@@ -5,20 +5,25 @@ pub mod button;
 pub mod climate;
 pub mod components;
 pub mod config_entries;
+pub mod fan;
 pub mod flow;
 pub mod hue;
+pub mod humidifier;
 pub mod lifx;
 pub mod light;
 pub mod met;
 pub mod mobile_app;
 pub mod naming;
 pub mod num;
+pub mod number;
 pub mod onboarding;
 pub mod scene;
+pub mod select;
 pub(crate) mod sensor;
 pub mod sun;
 pub mod switch;
 pub mod switchbot_cloud;
+pub mod tuya;
 pub mod weather;
 
 use ha_core::Hass;
@@ -33,6 +38,7 @@ pub const SUPPORTED: &[&str] = &[
     hue::DOMAIN,
     switchbot_cloud::DOMAIN,
     lifx::DOMAIN,
+    tuya::DOMAIN,
 ];
 
 /// The config flow `VERSION` of every integration `hars` runs (and of
@@ -76,6 +82,9 @@ pub struct Endpoints {
     pub hue_bridge: Option<String>,
     /// Where LIFX bulbs are reached, and where discovery broadcasts.
     pub lifx: lifx::Where,
+    /// `None`: Tuya's API is at the address its entry names. A base URL:
+    /// every Tuya entry talks to it instead (tests).
+    pub tuya: Option<String>,
 }
 
 impl Default for Endpoints {
@@ -86,6 +95,7 @@ impl Default for Endpoints {
             hue_discovery_timeout: std::time::Duration::from_secs(5),
             hue_bridge: None,
             lifx: lifx::Where::default(),
+            tuya: None,
         }
     }
 }
@@ -198,6 +208,32 @@ pub(crate) fn spawn_switchbot(
         components.clone(),
         entry,
         endpoints.switchbot.clone(),
+        components.hass().setup_guard(),
+        status,
+    ))
+}
+
+/// Start a `tuya` entry. Its components exist before its setup, so their
+/// services do even while Tuya's cloud can't be reached.
+pub(crate) fn spawn_tuya(
+    components: &Arc<components::Components>,
+    entry: Map<String, Value>,
+    endpoints: &Endpoints,
+    store: Option<Arc<config_entries::ConfigEntries>>,
+    status: config_entries::Status,
+) -> tokio::task::JoinHandle<()> {
+    let _ = (
+        components.switches(),
+        components.humidifiers(),
+        components.fans(),
+        components.numbers(),
+        components.selects(),
+    );
+    tokio::spawn(tuya::run(
+        components.clone(),
+        entry,
+        store,
+        endpoints.tuya.clone(),
         components.hass().setup_guard(),
         status,
     ))
@@ -326,6 +362,17 @@ pub fn start(
             spawn_lifx(&components, entry, endpoints, status)
         }));
         running.extend(lifx::COMPONENTS);
+    }
+    for entry in enabled(tuya::DOMAIN).cloned().collect::<Vec<_>>() {
+        let entry_id = field(&entry, "entry_id").unwrap_or_default();
+        let status = match store {
+            Some(store) => config_entries::Status::new(store.clone(), &entry_id),
+            None => config_entries::Status::none(),
+        };
+        tasks.push(Running::start(&entry_id, status, |status| {
+            spawn_tuya(&components, entry, endpoints, store.cloned(), status)
+        }));
+        running.extend(tuya::COMPONENTS);
     }
     running.sort_unstable();
     running.dedup();

@@ -1,0 +1,21 @@
+{
+ "body": "BB",
+ "encrypt": {
+  "nonce": "ABCDEFGHJKMN",
+  "out": "QUJDREVGR0hKS01OMWmHcNmu1s8B5JI+3j9duRJohSsTY/5YOvnl9H/1Gw==",
+  "plain": "{\"homeId\":\"42\"}"
+ },
+ "hash_key": "2f7fe36b7eba60cbd7414a7af3eab191",
+ "headers": {
+  "X-appKey": "HA_3y9q4ak7g4ephrvke",
+  "X-requestId": "11111111-2222-4333-8444-555555555555",
+  "X-sid": "",
+  "X-time": "123",
+  "X-token": "TOK"
+ },
+ "query": "QQ",
+ "refresh_token": "REFRESH",
+ "rid": "11111111-2222-4333-8444-555555555555",
+ "secret": "f32d29d3ebbe30bd",
+ "sign": "e31a9bdce906b4dc674f57bb2bb9ad30b2f0d47f13f0ec4ff3a8e551b652c9fc"
+}

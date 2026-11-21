@@ -173,6 +173,7 @@ The [roadmap](docs/ROADMAP.md) tracks every item.
 | Philips Hue (`hue`) | Lights, rooms and zones, scenes, and motion, temperature, light-level, and battery sensors | **Settings > Devices & services > Add integration**, or import |
 | LIFX (`lifx`) | Colour and white bulbs, with identify and restart buttons | **Settings > Devices & services > Add integration**, or import |
 | SwitchBot Cloud (`switchbot_cloud`) | Bot, Hub 2 temperature and humidity, and an infrared air conditioner | **Settings > Devices & services > Add integration**, or import |
+| Tuya (`tuya`) | Dehumidifiers and pet feeders: humidifier, fan, switches, selects, numbers, sensors and problem sensors, pushed over MQTT | Import |
 | Weather (`met`) | The forecast for your home from met.no | Set during setup |
 | Sun (`sun`) | Sunrise, sunset, and the sun's position | On by default |
 | Companion app (`mobile_app`) | Your iPhone's sensors and location, and notifications to it | Log in from the app |

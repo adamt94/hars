@@ -1,0 +1,376 @@
+{
+ "devices": [
+  {
+   "active_time": 1700000000,
+   "asset_id": "1",
+   "category": "cs",
+   "create_time": 1700000000,
+   "icon": "",
+   "id": "dev_dehumidifier",
+   "ip": "192.0.2.60",
+   "local_key": "fake-local-key",
+   "name": "Dry",
+   "online": true,
+   "product_id": "fakepidcs",
+   "product_name": "Dry model",
+   "status": [
+    {
+     "code": "switch",
+     "value": true
+    },
+    {
+     "code": "dehumidify_set_value",
+     "value": 55
+    },
+    {
+     "code": "child_lock",
+     "value": false
+    },
+    {
+     "code": "humidity_indoor",
+     "value": 72
+    },
+    {
+     "code": "countdown_set",
+     "value": "cancel"
+    },
+    {
+     "code": "countdown_left",
+     "value": 0
+    },
+    {
+     "code": "fault",
+     "value": 1
+    }
+   ],
+   "sub": false,
+   "time_zone": "+00:00",
+   "update_time": 1700000000,
+   "uuid": "fake-uuid-cs"
+  },
+  {
+   "active_time": 1700000000,
+   "asset_id": "1",
+   "category": "cwwsq",
+   "create_time": 1700000000,
+   "icon": "",
+   "id": "dev_feeder",
+   "ip": "192.0.2.60",
+   "local_key": "fake-local-key",
+   "name": "Feeder",
+   "online": true,
+   "product_id": "fakepidcwwsq",
+   "product_name": "Feeder model",
+   "status": [
+    {
+     "code": "meal_plan",
+     "value": "AA=="
+    },
+    {
+     "code": "manual_feed",
+     "value": 4
+    },
+    {
+     "code": "feed_state",
+     "value": "standby"
+    },
+    {
+     "code": "battery_percentage",
+     "value": 100
+    },
+    {
+     "code": "charge_state",
+     "value": false
+    },
+    {
+     "code": "feed_report",
+     "value": 4
+    }
+   ],
+   "sub": false,
+   "time_zone": "+00:00",
+   "update_time": 1700000000,
+   "uuid": "fake-uuid-cwwsq"
+  }
+ ],
+ "homes": [
+  {
+   "name": "Home",
+   "ownerId": 42
+  }
+ ],
+ "mqtt": {
+  "clientId": "fake-client",
+  "expireTime": 7200,
+  "password": "fake-pass",
+  "topic": {
+   "devId": {
+    "sub": "cloud/device/{devId}/in/fakehash"
+   },
+   "ownerId": {
+    "sub": "cloud/group/{ownerId}/in"
+   }
+  },
+  "url": "ssl://mqtt.example.invalid:8883",
+  "username": "fake-user"
+ },
+ "report_types": {
+  "dev_feeder": [
+   {
+    "dp_code": "feed_report",
+    "report_type": "minux"
+   }
+  ]
+ },
+ "specifications": {
+  "dev_dehumidifier": {
+   "category": "cs",
+   "functions": [
+    {
+     "code": "switch",
+     "desc": "",
+     "name": "switch",
+     "type": "Boolean",
+     "values": "{}"
+    },
+    {
+     "code": "dehumidify_set_value",
+     "desc": "",
+     "name": "dehumidify_set_value",
+     "type": "Integer",
+     "values": "{\"unit\":\"%\",\"min\":35,\"max\":70,\"scale\":0,\"step\":5}"
+    },
+    {
+     "code": "child_lock",
+     "desc": "",
+     "name": "child_lock",
+     "type": "Boolean",
+     "values": "{}"
+    },
+    {
+     "code": "countdown_set",
+     "desc": "",
+     "name": "countdown_set",
+     "type": "Enum",
+     "values": "{\"range\":[\"cancel\",\"1h\",\"2h\",\"3h\"]}"
+    }
+   ],
+   "status": [
+    {
+     "code": "switch",
+     "desc": "",
+     "name": "switch",
+     "type": "Boolean",
+     "values": "{}"
+    },
+    {
+     "code": "dehumidify_set_value",
+     "desc": "",
+     "name": "dehumidify_set_value",
+     "type": "Integer",
+     "values": "{\"unit\":\"%\",\"min\":35,\"max\":70,\"scale\":0,\"step\":5}"
+    },
+    {
+     "code": "child_lock",
+     "desc": "",
+     "name": "child_lock",
+     "type": "Boolean",
+     "values": "{}"
+    },
+    {
+     "code": "humidity_indoor",
+     "desc": "",
+     "name": "humidity_indoor",
+     "type": "Integer",
+     "values": "{\"unit\":\"%\",\"min\":0,\"max\":100,\"scale\":0,\"step\":1}"
+    },
+    {
+     "code": "countdown_set",
+     "desc": "",
+     "name": "countdown_set",
+     "type": "Enum",
+     "values": "{\"range\":[\"cancel\",\"1h\",\"2h\",\"3h\"]}"
+    },
+    {
+     "code": "countdown_left",
+     "desc": "",
+     "name": "countdown_left",
+     "type": "Integer",
+     "values": "{\"unit\":\"h\",\"min\":0,\"max\":24,\"scale\":0,\"step\":1}"
+    },
+    {
+     "code": "fault",
+     "desc": "",
+     "name": "fault",
+     "type": "Bitmap",
+     "values": "{\"label\":[\"tankfull\",\"defrost\",\"E1\",\"E2\",\"L2\",\"L3\",\"L4\",\"wet\"]}"
+    }
+   ]
+  },
+  "dev_feeder": {
+   "category": "cwwsq",
+   "functions": [
+    {
+     "code": "meal_plan",
+     "desc": "",
+     "name": "meal_plan",
+     "type": "Raw",
+     "values": "{}"
+    },
+    {
+     "code": "manual_feed",
+     "desc": "",
+     "name": "manual_feed",
+     "type": "Integer",
+     "values": "{\"unit\":\"\",\"min\":1,\"max\":20,\"scale\":0,\"step\":1}"
+    }
+   ],
+   "status": [
+    {
+     "code": "meal_plan",
+     "desc": "",
+     "name": "meal_plan",
+     "type": "Raw",
+     "values": "{}"
+    },
+    {
+     "code": "manual_feed",
+     "desc": "",
+     "name": "manual_feed",
+     "type": "Integer",
+     "values": "{\"unit\":\"\",\"min\":1,\"max\":20,\"scale\":0,\"step\":1}"
+    },
+    {
+     "code": "feed_state",
+     "desc": "",
+     "name": "feed_state",
+     "type": "Enum",
+     "values": "{\"range\":[\"standby\",\"feeding\",\"done\"]}"
+    },
+    {
+     "code": "battery_percentage",
+     "desc": "",
+     "name": "battery_percentage",
+     "type": "Integer",
+     "values": "{\"unit\":\"%\",\"min\":0,\"max\":100,\"scale\":0,\"step\":1}"
+    },
+    {
+     "code": "charge_state",
+     "desc": "",
+     "name": "charge_state",
+     "type": "Boolean",
+     "values": "{}"
+    },
+    {
+     "code": "feed_report",
+     "desc": "",
+     "name": "feed_report",
+     "type": "Integer",
+     "values": "{\"unit\":\"\",\"min\":0,\"max\":20,\"scale\":0,\"step\":1}"
+    }
+   ]
+  }
+ },
+ "status": {
+  "dev_dehumidifier": {
+   "dpStatusRelationDTOS": [
+    {
+     "dpId": 1,
+     "enumMappingMap": {},
+     "statusCode": "switch",
+     "statusFormat": "{\"switch\": \"$\"}",
+     "supportLocal": true,
+     "valueConvert": "default",
+     "valueDesc": "{}",
+     "valueType": "Integer"
+    },
+    {
+     "dpId": 2,
+     "enumMappingMap": {},
+     "statusCode": "dehumidify_set_value",
+     "statusFormat": "{\"dehumidify_set_value\": \"$\"}",
+     "supportLocal": true,
+     "valueConvert": "default",
+     "valueDesc": "{}",
+     "valueType": "Integer"
+    },
+    {
+     "dpId": 14,
+     "enumMappingMap": {},
+     "statusCode": "child_lock",
+     "statusFormat": "{\"child_lock\": \"$\"}",
+     "supportLocal": true,
+     "valueConvert": "default",
+     "valueDesc": "{}",
+     "valueType": "Integer"
+    },
+    {
+     "dpId": 16,
+     "enumMappingMap": {},
+     "statusCode": "humidity_indoor",
+     "statusFormat": "{\"humidity_indoor\": \"$\"}",
+     "supportLocal": true,
+     "valueConvert": "default",
+     "valueDesc": "{}",
+     "valueType": "Integer"
+    },
+    {
+     "dpId": 17,
+     "enumMappingMap": {},
+     "statusCode": "countdown_set",
+     "statusFormat": "{\"countdown_set\": \"$\"}",
+     "supportLocal": true,
+     "valueConvert": "default",
+     "valueDesc": "{}",
+     "valueType": "Integer"
+    },
+    {
+     "dpId": 18,
+     "enumMappingMap": {},
+     "statusCode": "countdown_left",
+     "statusFormat": "{\"countdown_left\": \"$\"}",
+     "supportLocal": true,
+     "valueConvert": "default",
+     "valueDesc": "{}",
+     "valueType": "Integer"
+    },
+    {
+     "dpId": 20,
+     "enumMappingMap": {},
+     "statusCode": "fault",
+     "statusFormat": "{\"fault\": \"$\"}",
+     "supportLocal": true,
+     "valueConvert": "default",
+     "valueDesc": "{}",
+     "valueType": "Integer"
+    }
+   ],
+   "productKey": "fakepidcs"
+  },
+  "dev_feeder": {
+   "dpStatusRelationDTOS": [
+    {
+     "dpId": 3,
+     "enumMappingMap": {},
+     "statusCode": "manual_feed",
+     "statusFormat": "{\"manual_feed\": \"$\"}",
+     "supportLocal": true,
+     "valueConvert": "default",
+     "valueDesc": "{}",
+     "valueType": "Integer"
+    },
+    {
+     "dpId": 4,
+     "enumMappingMap": {},
+     "statusCode": "feed_state",
+     "statusFormat": "{\"feed_state\": \"$\"}",
+     "supportLocal": false,
+     "valueConvert": "default",
+     "valueDesc": "{}",
+     "valueType": "Integer"
+    }
+   ],
+   "productKey": "fakepidcwwsq"
+  }
+ }
+}

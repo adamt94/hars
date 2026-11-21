@@ -881,6 +881,11 @@ impl Bridge {
                 continue;
             }
             for item in event["data"].as_array().into_iter().flatten() {
+                tracing::debug!(
+                    "hue: event {kind} {} {}",
+                    item["type"].as_str().unwrap_or_default(),
+                    item["id"].as_str().unwrap_or_default()
+                );
                 self.handle(kind, item);
             }
         }

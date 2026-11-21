@@ -1,0 +1,219 @@
+[
+ {
+  "call": [
+   "humidifier",
+   "turn_off",
+   {
+    "entity_id": "humidifier.dry"
+   }
+  ],
+  "error": null,
+  "sent": [
+   [
+    {
+     "code": "switch",
+     "value": false
+    }
+   ]
+  ]
+ },
+ {
+  "call": [
+   "humidifier",
+   "set_humidity",
+   {
+    "entity_id": "humidifier.dry",
+    "humidity": 60
+   }
+  ],
+  "error": null,
+  "sent": [
+   [
+    {
+     "code": "dehumidify_set_value",
+     "value": 60
+    }
+   ]
+  ]
+ },
+ {
+  "call": [
+   "humidifier",
+   "set_humidity",
+   {
+    "entity_id": "humidifier.dry",
+    "humidity": 80
+   }
+  ],
+  "error": {
+   "class": "ServiceValidationError",
+   "message": "Provided humidity 80 is not valid. Accepted range is 35 to 70",
+   "translation_key": "humidity_out_of_range",
+   "translation_placeholders": {
+    "humidity": "80",
+    "max_humidity": "70",
+    "min_humidity": "35"
+   }
+  },
+  "sent": []
+ },
+ {
+  "call": [
+   "humidifier",
+   "set_mode",
+   {
+    "entity_id": "humidifier.dry",
+    "mode": "auto"
+   }
+  ],
+  "error": {
+   "class": "ServiceNotSupported",
+   "message": "Entity humidifier.dry does not support action humidifier.set_mode",
+   "translation_key": "service_not_supported",
+   "translation_placeholders": {
+    "domain": "humidifier",
+    "entity_id": "humidifier.dry",
+    "service": "set_mode"
+   }
+  },
+  "sent": []
+ },
+ {
+  "call": [
+   "fan",
+   "turn_on",
+   {
+    "entity_id": "fan.dry"
+   }
+  ],
+  "error": null,
+  "sent": [
+   [
+    {
+     "code": "switch",
+     "value": true
+    }
+   ]
+  ]
+ },
+ {
+  "call": [
+   "fan",
+   "set_percentage",
+   {
+    "entity_id": "fan.dry",
+    "percentage": 50
+   }
+  ],
+  "error": {
+   "class": "ServiceNotSupported",
+   "message": "Entity fan.dry does not support action fan.set_percentage",
+   "translation_key": "service_not_supported",
+   "translation_placeholders": {
+    "domain": "fan",
+    "entity_id": "fan.dry",
+    "service": "set_percentage"
+   }
+  },
+  "sent": []
+ },
+ {
+  "call": [
+   "switch",
+   "turn_on",
+   {
+    "entity_id": "switch.dry_child_lock"
+   }
+  ],
+  "error": null,
+  "sent": [
+   [
+    {
+     "code": "child_lock",
+     "value": true
+    }
+   ]
+  ]
+ },
+ {
+  "call": [
+   "select",
+   "select_option",
+   {
+    "entity_id": "select.dry_countdown",
+    "option": "2h"
+   }
+  ],
+  "error": null,
+  "sent": [
+   [
+    {
+     "code": "countdown_set",
+     "value": "2h"
+    }
+   ]
+  ]
+ },
+ {
+  "call": [
+   "select",
+   "select_option",
+   {
+    "entity_id": "select.dry_countdown",
+    "option": "9h"
+   }
+  ],
+  "error": {
+   "class": "ServiceValidationError",
+   "message": "Option 9h is not valid for entity select.dry_countdown, valid options are: cancel, 1h, 2h, 3h",
+   "translation_key": "not_valid_option",
+   "translation_placeholders": {
+    "entity_id": "select.dry_countdown",
+    "option": "9h",
+    "options": "cancel, 1h, 2h, 3h"
+   }
+  },
+  "sent": []
+ },
+ {
+  "call": [
+   "number",
+   "set_value",
+   {
+    "entity_id": "number.feeder_feed",
+    "value": 3
+   }
+  ],
+  "error": null,
+  "sent": [
+   [
+    {
+     "code": "manual_feed",
+     "value": 3
+    }
+   ]
+  ]
+ },
+ {
+  "call": [
+   "number",
+   "set_value",
+   {
+    "entity_id": "number.feeder_feed",
+    "value": 25
+   }
+  ],
+  "error": {
+   "class": "ServiceValidationError",
+   "message": "Value 25.0 for number.feeder_feed is outside valid range 1.0 - 20.0",
+   "translation_key": "out_of_range",
+   "translation_placeholders": {
+    "entity_id": "number.feeder_feed",
+    "max_value": "20.0",
+    "min_value": "1.0",
+    "value": 25.0
+   }
+  },
+  "sent": []
+ }
+]

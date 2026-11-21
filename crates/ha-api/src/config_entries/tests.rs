@@ -387,6 +387,7 @@ async fn home_on(hass: Hass, registry: Arc<ha_registry::Registry>) -> Home {
             hue_discovery_timeout: std::time::Duration::from_millis(400),
             hue_bridge: Some(base),
             lifx: api.lifx.at.clone(),
+            tuya: None,
         },
         Vec::new(),
         None,

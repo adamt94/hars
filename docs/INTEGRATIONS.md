@@ -18,6 +18,7 @@ memory and wakeup cost is measured before it merges.
 | [Philips Hue](#philips-hue) | `hue` | Local, pushed by the bridge | The UI, or import |
 | [LIFX](#lifx) | `lifx` | Local, polled every 10 s | The UI, or import |
 | [SwitchBot Cloud](#switchbot-cloud) | `switchbot_cloud` | Cloud, polled every 600 s | The UI, or import |
+| [Tuya](#tuya) | `tuya` | Cloud, pushed over MQTT | Import only |
 | [Weather](#weather) | `met` | Cloud, fetched about once an hour | Onboarding |
 | [Sun](#sun) | `sun` | None, calculated | On by default |
 | [Companion app](#companion-app) | `mobile_app` | The app calls hars | Log in from the app |
@@ -220,6 +221,32 @@ Not yet:
 - SwitchBot webhooks. They need a public URL, and hars has no remote access
   yet. Home Assistant stops its polls of a Bot once a webhook is set. hars
   keeps the polls.
+
+### Tuya
+
+hars uses the Tuya / Smart Life device-sharing cloud API that Home
+Assistant's integration uses (`tuya-device-sharing-sdk`): the device list
+and specifications at setup, then state pushed over Tuya's MQTT channel,
+renewed every two hours. Commands go to the cloud. The refreshed token is
+saved to the config entry, since Tuya rotates the refresh token.
+
+- **Dehumidifier (`cs`):** a `humidifier` (power, target and current
+  humidity, modes when the device has them), a `fan` (on and off), the
+  countdown and target-humidity selects, the ionizer, child lock and filter
+  reset switches, temperature and humidity sensors, and the fault bitmap's
+  problem binary sensors.
+- **Pet feeder (`cwwsq`):** the feed and voice-times numbers, the slow-feed
+  switch, battery and last-amount sensors, and feeding and charging binary
+  sensors.
+
+Not yet:
+
+- The QR-code config flow: an entry only comes from an import.
+- Every other Tuya category, and fan speed, oscillation and direction.
+- Tuya's tap-to-run scenes (HA makes `scene` entities of them).
+- A device renamed in the Smart Life app keeps its old name until the entry
+  is set up again.
+- Value conversions other than the SDK's `default` in local-format pushes.
 
 ### Weather
 

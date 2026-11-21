@@ -1,0 +1,435 @@
+{
+ "devices": [
+  {
+   "identifiers": [
+    [
+     "tuya",
+     "dev_dehumidifier"
+    ]
+   ],
+   "manufacturer": "Tuya",
+   "model": "Dry model",
+   "model_id": "fakepidcs",
+   "name": "Dry"
+  },
+  {
+   "identifiers": [
+    [
+     "tuya",
+     "dev_feeder"
+    ]
+   ],
+   "manufacturer": "Tuya",
+   "model": "Feeder model",
+   "model_id": "fakepidcwwsq",
+   "name": "Feeder"
+  }
+ ],
+ "entities": [
+  {
+   "capabilities": {},
+   "disabled_by": null,
+   "entity_category": null,
+   "entity_id": "fan.dry",
+   "has_entity_name": true,
+   "original_device_class": null,
+   "original_icon": null,
+   "original_name": null,
+   "platform": "tuya",
+   "supported_features": 48,
+   "translation_key": null,
+   "unique_id": "tuya.dev_dehumidifier",
+   "unit_of_measurement": null
+  },
+  {
+   "capabilities": null,
+   "disabled_by": null,
+   "entity_category": "config",
+   "entity_id": "switch.dry_child_lock",
+   "has_entity_name": true,
+   "original_device_class": null,
+   "original_icon": "mdi:account-lock",
+   "original_name": "Child lock",
+   "platform": "tuya",
+   "supported_features": 0,
+   "translation_key": "child_lock",
+   "unique_id": "tuya.dev_dehumidifierchild_lock",
+   "unit_of_measurement": null
+  },
+  {
+   "capabilities": {
+    "options": [
+     "cancel",
+     "1h",
+     "2h",
+     "3h"
+    ]
+   },
+   "disabled_by": null,
+   "entity_category": "config",
+   "entity_id": "select.dry_countdown",
+   "has_entity_name": true,
+   "original_device_class": null,
+   "original_icon": null,
+   "original_name": "Countdown",
+   "platform": "tuya",
+   "supported_features": 0,
+   "translation_key": "countdown",
+   "unique_id": "tuya.dev_dehumidifiercountdown_set",
+   "unit_of_measurement": null
+  },
+  {
+   "capabilities": null,
+   "disabled_by": null,
+   "entity_category": "diagnostic",
+   "entity_id": "binary_sensor.dry_defrost",
+   "has_entity_name": true,
+   "original_device_class": "problem",
+   "original_icon": null,
+   "original_name": "Defrost",
+   "platform": "tuya",
+   "supported_features": 0,
+   "translation_key": "defrost",
+   "unique_id": "tuya.dev_dehumidifierdefrost",
+   "unit_of_measurement": null
+  },
+  {
+   "capabilities": null,
+   "disabled_by": null,
+   "entity_category": "diagnostic",
+   "entity_id": "binary_sensor.dry_temperature_error",
+   "has_entity_name": true,
+   "original_device_class": "problem",
+   "original_icon": null,
+   "original_name": "Temperature error",
+   "platform": "tuya",
+   "supported_features": 0,
+   "translation_key": "temp_error",
+   "unique_id": "tuya.dev_dehumidifierfault_E1",
+   "unit_of_measurement": null
+  },
+  {
+   "capabilities": {
+    "state_class": "measurement"
+   },
+   "disabled_by": null,
+   "entity_category": null,
+   "entity_id": "sensor.dry_humidity",
+   "has_entity_name": true,
+   "original_device_class": "humidity",
+   "original_icon": null,
+   "original_name": "Humidity",
+   "platform": "tuya",
+   "supported_features": 0,
+   "translation_key": "humidity",
+   "unique_id": "tuya.dev_dehumidifierhumidity_indoor",
+   "unit_of_measurement": "%"
+  },
+  {
+   "capabilities": {
+    "max_humidity": 70,
+    "min_humidity": 35
+   },
+   "disabled_by": null,
+   "entity_category": null,
+   "entity_id": "humidifier.dry",
+   "has_entity_name": true,
+   "original_device_class": "dehumidifier",
+   "original_icon": null,
+   "original_name": null,
+   "platform": "tuya",
+   "supported_features": 0,
+   "translation_key": null,
+   "unique_id": "tuya.dev_dehumidifierswitch",
+   "unit_of_measurement": null
+  },
+  {
+   "capabilities": null,
+   "disabled_by": null,
+   "entity_category": "diagnostic",
+   "entity_id": "binary_sensor.dry_tank_full",
+   "has_entity_name": true,
+   "original_device_class": "problem",
+   "original_icon": null,
+   "original_name": "Tank full",
+   "platform": "tuya",
+   "supported_features": 0,
+   "translation_key": "tankfull",
+   "unique_id": "tuya.dev_dehumidifiertankfull",
+   "unit_of_measurement": null
+  },
+  {
+   "capabilities": null,
+   "disabled_by": null,
+   "entity_category": "diagnostic",
+   "entity_id": "binary_sensor.dry_wet",
+   "has_entity_name": true,
+   "original_device_class": "problem",
+   "original_icon": null,
+   "original_name": "Wet",
+   "platform": "tuya",
+   "supported_features": 0,
+   "translation_key": "wet",
+   "unique_id": "tuya.dev_dehumidifierwet",
+   "unit_of_measurement": null
+  },
+  {
+   "capabilities": {
+    "state_class": "measurement"
+   },
+   "disabled_by": null,
+   "entity_category": "diagnostic",
+   "entity_id": "sensor.feeder_battery",
+   "has_entity_name": true,
+   "original_device_class": "battery",
+   "original_icon": null,
+   "original_name": "Battery",
+   "platform": "tuya",
+   "supported_features": 0,
+   "translation_key": "battery",
+   "unique_id": "tuya.dev_feederbattery_percentage",
+   "unit_of_measurement": "%"
+  },
+  {
+   "capabilities": null,
+   "disabled_by": null,
+   "entity_category": "diagnostic",
+   "entity_id": "binary_sensor.feeder_charging",
+   "has_entity_name": true,
+   "original_device_class": "battery_charging",
+   "original_icon": null,
+   "original_name": "Charging",
+   "platform": "tuya",
+   "supported_features": 0,
+   "translation_key": null,
+   "unique_id": "tuya.dev_feedercharge_state",
+   "unit_of_measurement": null
+  },
+  {
+   "capabilities": {
+    "state_class": "measurement"
+   },
+   "disabled_by": null,
+   "entity_category": null,
+   "entity_id": "sensor.feeder_last_amount",
+   "has_entity_name": true,
+   "original_device_class": null,
+   "original_icon": null,
+   "original_name": "Last amount",
+   "platform": "tuya",
+   "supported_features": 0,
+   "translation_key": "last_amount",
+   "unique_id": "tuya.dev_feederfeed_report",
+   "unit_of_measurement": ""
+  },
+  {
+   "capabilities": null,
+   "disabled_by": null,
+   "entity_category": null,
+   "entity_id": "binary_sensor.feeder_feeding",
+   "has_entity_name": true,
+   "original_device_class": null,
+   "original_icon": null,
+   "original_name": "Feeding",
+   "platform": "tuya",
+   "supported_features": 0,
+   "translation_key": "feeding",
+   "unique_id": "tuya.dev_feederfeed_state",
+   "unit_of_measurement": null
+  },
+  {
+   "capabilities": {
+    "max": 20.0,
+    "min": 1.0,
+    "mode": "auto",
+    "step": 1.0
+   },
+   "disabled_by": null,
+   "entity_category": null,
+   "entity_id": "number.feeder_feed",
+   "has_entity_name": true,
+   "original_device_class": null,
+   "original_icon": null,
+   "original_name": "Feed",
+   "platform": "tuya",
+   "supported_features": 0,
+   "translation_key": "feed",
+   "unique_id": "tuya.dev_feedermanual_feed",
+   "unit_of_measurement": ""
+  }
+ ],
+ "requests": [
+  {
+   "method": "GET",
+   "path": "/v1.0/m/life/users/homes",
+   "query": null
+  },
+  {
+   "method": "GET",
+   "path": "/v1.0/m/life/ha/home/devices",
+   "query": {
+    "homeId": "42"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/v1.1/m/life/dev_dehumidifier/specifications",
+   "query": null
+  },
+  {
+   "method": "GET",
+   "path": "/v1.0/m/life/devices/dev_dehumidifier/status",
+   "query": null
+  },
+  {
+   "method": "GET",
+   "path": "/v1.0/m/life/ha/dev_dehumidifier/dp-report-types",
+   "query": null
+  },
+  {
+   "method": "GET",
+   "path": "/v1.1/m/life/dev_feeder/specifications",
+   "query": null
+  },
+  {
+   "method": "GET",
+   "path": "/v1.0/m/life/devices/dev_feeder/status",
+   "query": null
+  },
+  {
+   "method": "GET",
+   "path": "/v1.0/m/life/ha/dev_feeder/dp-report-types",
+   "query": null
+  },
+  {
+   "method": "GET",
+   "path": "/v1.0/m/scene/ha/home/scenes",
+   "query": {
+    "homeId": "42"
+   }
+  }
+ ],
+ "states": {
+  "binary_sensor.dry_defrost": {
+   "attributes": {
+    "device_class": "problem",
+    "friendly_name": "Dry Defrost"
+   },
+   "state": "off"
+  },
+  "binary_sensor.dry_tank_full": {
+   "attributes": {
+    "device_class": "problem",
+    "friendly_name": "Dry Tank full"
+   },
+   "state": "on"
+  },
+  "binary_sensor.dry_temperature_error": {
+   "attributes": {
+    "device_class": "problem",
+    "friendly_name": "Dry Temperature error"
+   },
+   "state": "off"
+  },
+  "binary_sensor.dry_wet": {
+   "attributes": {
+    "device_class": "problem",
+    "friendly_name": "Dry Wet"
+   },
+   "state": "off"
+  },
+  "binary_sensor.feeder_charging": {
+   "attributes": {
+    "device_class": "battery_charging",
+    "friendly_name": "Feeder Charging"
+   },
+   "state": "off"
+  },
+  "binary_sensor.feeder_feeding": {
+   "attributes": {
+    "friendly_name": "Feeder Feeding"
+   },
+   "state": "off"
+  },
+  "fan.dry": {
+   "attributes": {
+    "friendly_name": "Dry",
+    "supported_features": 48
+   },
+   "state": "on"
+  },
+  "humidifier.dry": {
+   "attributes": {
+    "current_humidity": 72,
+    "device_class": "dehumidifier",
+    "friendly_name": "Dry",
+    "humidity": 55,
+    "max_humidity": 70,
+    "min_humidity": 35,
+    "supported_features": 0
+   },
+   "state": "on"
+  },
+  "number.feeder_feed": {
+   "attributes": {
+    "friendly_name": "Feeder Feed",
+    "max": 20.0,
+    "min": 1.0,
+    "mode": "auto",
+    "step": 1.0,
+    "unit_of_measurement": ""
+   },
+   "state": "4.0"
+  },
+  "select.dry_countdown": {
+   "attributes": {
+    "friendly_name": "Dry Countdown",
+    "options": [
+     "cancel",
+     "1h",
+     "2h",
+     "3h"
+    ]
+   },
+   "state": "cancel"
+  },
+  "sensor.dry_humidity": {
+   "attributes": {
+    "device_class": "humidity",
+    "friendly_name": "Dry Humidity",
+    "state_class": "measurement",
+    "unit_of_measurement": "%"
+   },
+   "state": "72.0"
+  },
+  "sensor.feeder_battery": {
+   "attributes": {
+    "device_class": "battery",
+    "friendly_name": "Feeder Battery",
+    "state_class": "measurement",
+    "unit_of_measurement": "%"
+   },
+   "state": "100.0"
+  },
+  "sensor.feeder_last_amount": {
+   "attributes": {
+    "friendly_name": "Feeder Last amount",
+    "state_class": "measurement",
+    "unit_of_measurement": ""
+   },
+   "state": "4.0"
+  },
+  "switch.dry_child_lock": {
+   "attributes": {
+    "friendly_name": "Dry Child lock",
+    "icon": "mdi:account-lock"
+   },
+   "state": "off"
+  }
+ },
+ "topics": [
+  "cloud/group/42/in",
+  "cloud/device/dev_dehumidifier/in/fakehash/pen",
+  "cloud/device/dev_feeder/in/fakehash/sta"
+ ]
+}

@@ -7,6 +7,7 @@
 //! (`text/event-stream`) are read line by line as they arrive.
 
 mod sse;
+pub mod stream;
 mod tls;
 
 pub use sse::{EventStream, Line};

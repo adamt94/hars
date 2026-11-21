@@ -19,10 +19,10 @@ Home Assistant Core 2026.6.1
   Apache License 2.0. Copyright Home Assistant Core authors.
   hars reproduces the behaviour, storage formats, HTTP and WebSocket API,
   and service schemas of Home Assistant's core and of these components:
-  api, auth, automation, brands, button, climate, config, frontend, history,
-  hue, lifx, light, logbook, lovelace, met, mobile_app, notify, onboarding,
-  person, recorder, scene, sun, switch, switchbot_cloud, system_log,
-  weather, websocket_api, and zone. The translations, icons, manifests, and
+  api, auth, automation, brands, button, climate, config, fan, frontend,
+  history, hue, humidifier, lifx, light, logbook, lovelace, met, mobile_app,
+  notify, number, onboarding, person, recorder, scene, select, sun, switch,
+  switchbot_cloud, system_log, tuya, weather, websocket_api, and zone. The translations, icons, manifests, and
   the country, currency, language, unit, and light-profile tables that hars
   compiles in are generated from Home Assistant's release files. The test
   vectors under each crate's `vectors` directory are the output of Home
@@ -54,6 +54,19 @@ aiolifx 1.2.1
   Copyright (c) 2022 Michael Farrell.
   The LIFX LAN protocol framing and message matching in
   crates/ha-integrations/src/lifx are a port.
+
+tuya-device-sharing-sdk 0.2.8
+  https://github.com/tuya/tuya-device-sharing-sdk
+  MIT License. Copyright (c) 2023 Tuya.
+  The request signing and encryption, the token refresh, the device fetch
+  and the MQTT push handling in crates/ha-integrations/src/tuya are a port.
+
+tuya-device-handlers 0.0.22
+  https://github.com/home-assistant-libs/tuya-device-handlers
+  MIT License. Copyright (c) 2020 epenet.
+  The choice of data points for the fan and humidifier entities, and the
+  rounded and scaled integer readings, in crates/ha-integrations/src/tuya
+  are a port.
 
 switchbot-api 2.11.0
   https://github.com/SeraphicCorp/py-switchbot-api

@@ -1080,6 +1080,10 @@ impl Manager {
                     match id.domain() {
                         "button" => self.components.buttons().remove(id),
                         "climate" => self.components.climates().remove(id),
+                        "fan" => self.components.fans().remove(id),
+                        "humidifier" => self.components.humidifiers().remove(id),
+                        "number" => self.components.numbers().remove(id),
+                        "select" => self.components.selects().remove(id),
                         "light" => self.components.lights().remove(id),
                         "scene" => self.components.scenes().remove(id),
                         "switch" => self.components.switches().remove(id),

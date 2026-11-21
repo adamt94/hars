@@ -1,0 +1,658 @@
+[
+ {
+  "message": {
+   "data": {
+    "devId": "dev_dehumidifier",
+    "status": [
+     {
+      "dpId": 16,
+      "t": 1,
+      "value": 60
+     }
+    ]
+   },
+   "protocol": 4
+  },
+  "states": {
+   "binary_sensor.dry_defrost": {
+    "attributes": {
+     "device_class": "problem",
+     "friendly_name": "Dry Defrost"
+    },
+    "state": "off"
+   },
+   "binary_sensor.dry_tank_full": {
+    "attributes": {
+     "device_class": "problem",
+     "friendly_name": "Dry Tank full"
+    },
+    "state": "on"
+   },
+   "binary_sensor.dry_temperature_error": {
+    "attributes": {
+     "device_class": "problem",
+     "friendly_name": "Dry Temperature error"
+    },
+    "state": "off"
+   },
+   "binary_sensor.dry_wet": {
+    "attributes": {
+     "device_class": "problem",
+     "friendly_name": "Dry Wet"
+    },
+    "state": "off"
+   },
+   "binary_sensor.feeder_charging": {
+    "attributes": {
+     "device_class": "battery_charging",
+     "friendly_name": "Feeder Charging"
+    },
+    "state": "off"
+   },
+   "binary_sensor.feeder_feeding": {
+    "attributes": {
+     "friendly_name": "Feeder Feeding"
+    },
+    "state": "off"
+   },
+   "fan.dry": {
+    "attributes": {
+     "friendly_name": "Dry",
+     "supported_features": 48
+    },
+    "state": "on"
+   },
+   "humidifier.dry": {
+    "attributes": {
+     "current_humidity": 60,
+     "device_class": "dehumidifier",
+     "friendly_name": "Dry",
+     "humidity": 55,
+     "max_humidity": 70,
+     "min_humidity": 35,
+     "supported_features": 0
+    },
+    "state": "on"
+   },
+   "number.feeder_feed": {
+    "attributes": {
+     "friendly_name": "Feeder Feed",
+     "max": 20.0,
+     "min": 1.0,
+     "mode": "auto",
+     "step": 1.0,
+     "unit_of_measurement": ""
+    },
+    "state": "4.0"
+   },
+   "select.dry_countdown": {
+    "attributes": {
+     "friendly_name": "Dry Countdown",
+     "options": [
+      "cancel",
+      "1h",
+      "2h",
+      "3h"
+     ]
+    },
+    "state": "cancel"
+   },
+   "sensor.dry_humidity": {
+    "attributes": {
+     "device_class": "humidity",
+     "friendly_name": "Dry Humidity",
+     "state_class": "measurement",
+     "unit_of_measurement": "%"
+    },
+    "state": "60.0"
+   },
+   "sensor.feeder_battery": {
+    "attributes": {
+     "device_class": "battery",
+     "friendly_name": "Feeder Battery",
+     "state_class": "measurement",
+     "unit_of_measurement": "%"
+    },
+    "state": "100.0"
+   },
+   "sensor.feeder_last_amount": {
+    "attributes": {
+     "friendly_name": "Feeder Last amount",
+     "state_class": "measurement",
+     "unit_of_measurement": ""
+    },
+    "state": "4.0"
+   },
+   "switch.dry_child_lock": {
+    "attributes": {
+     "friendly_name": "Dry Child lock",
+     "icon": "mdi:account-lock"
+    },
+    "state": "off"
+   }
+  }
+ },
+ {
+  "message": {
+   "data": {
+    "devId": "dev_dehumidifier",
+    "status": [
+     {
+      "dpId": 20,
+      "t": 2,
+      "value": 0
+     }
+    ]
+   },
+   "protocol": 4
+  },
+  "states": {
+   "binary_sensor.dry_defrost": {
+    "attributes": {
+     "device_class": "problem",
+     "friendly_name": "Dry Defrost"
+    },
+    "state": "off"
+   },
+   "binary_sensor.dry_tank_full": {
+    "attributes": {
+     "device_class": "problem",
+     "friendly_name": "Dry Tank full"
+    },
+    "state": "off"
+   },
+   "binary_sensor.dry_temperature_error": {
+    "attributes": {
+     "device_class": "problem",
+     "friendly_name": "Dry Temperature error"
+    },
+    "state": "off"
+   },
+   "binary_sensor.dry_wet": {
+    "attributes": {
+     "device_class": "problem",
+     "friendly_name": "Dry Wet"
+    },
+    "state": "off"
+   },
+   "binary_sensor.feeder_charging": {
+    "attributes": {
+     "device_class": "battery_charging",
+     "friendly_name": "Feeder Charging"
+    },
+    "state": "off"
+   },
+   "binary_sensor.feeder_feeding": {
+    "attributes": {
+     "friendly_name": "Feeder Feeding"
+    },
+    "state": "off"
+   },
+   "fan.dry": {
+    "attributes": {
+     "friendly_name": "Dry",
+     "supported_features": 48
+    },
+    "state": "on"
+   },
+   "humidifier.dry": {
+    "attributes": {
+     "current_humidity": 60,
+     "device_class": "dehumidifier",
+     "friendly_name": "Dry",
+     "humidity": 55,
+     "max_humidity": 70,
+     "min_humidity": 35,
+     "supported_features": 0
+    },
+    "state": "on"
+   },
+   "number.feeder_feed": {
+    "attributes": {
+     "friendly_name": "Feeder Feed",
+     "max": 20.0,
+     "min": 1.0,
+     "mode": "auto",
+     "step": 1.0,
+     "unit_of_measurement": ""
+    },
+    "state": "4.0"
+   },
+   "select.dry_countdown": {
+    "attributes": {
+     "friendly_name": "Dry Countdown",
+     "options": [
+      "cancel",
+      "1h",
+      "2h",
+      "3h"
+     ]
+    },
+    "state": "cancel"
+   },
+   "sensor.dry_humidity": {
+    "attributes": {
+     "device_class": "humidity",
+     "friendly_name": "Dry Humidity",
+     "state_class": "measurement",
+     "unit_of_measurement": "%"
+    },
+    "state": "60.0"
+   },
+   "sensor.feeder_battery": {
+    "attributes": {
+     "device_class": "battery",
+     "friendly_name": "Feeder Battery",
+     "state_class": "measurement",
+     "unit_of_measurement": "%"
+    },
+    "state": "100.0"
+   },
+   "sensor.feeder_last_amount": {
+    "attributes": {
+     "friendly_name": "Feeder Last amount",
+     "state_class": "measurement",
+     "unit_of_measurement": ""
+    },
+    "state": "4.0"
+   },
+   "switch.dry_child_lock": {
+    "attributes": {
+     "friendly_name": "Dry Child lock",
+     "icon": "mdi:account-lock"
+    },
+    "state": "off"
+   }
+  }
+ },
+ {
+  "message": {
+   "data": {
+    "devId": "dev_feeder",
+    "status": [
+     {
+      "code": "feed_state",
+      "value": "feeding"
+     }
+    ]
+   },
+   "protocol": 4
+  },
+  "states": {
+   "binary_sensor.dry_defrost": {
+    "attributes": {
+     "device_class": "problem",
+     "friendly_name": "Dry Defrost"
+    },
+    "state": "off"
+   },
+   "binary_sensor.dry_tank_full": {
+    "attributes": {
+     "device_class": "problem",
+     "friendly_name": "Dry Tank full"
+    },
+    "state": "off"
+   },
+   "binary_sensor.dry_temperature_error": {
+    "attributes": {
+     "device_class": "problem",
+     "friendly_name": "Dry Temperature error"
+    },
+    "state": "off"
+   },
+   "binary_sensor.dry_wet": {
+    "attributes": {
+     "device_class": "problem",
+     "friendly_name": "Dry Wet"
+    },
+    "state": "off"
+   },
+   "binary_sensor.feeder_charging": {
+    "attributes": {
+     "device_class": "battery_charging",
+     "friendly_name": "Feeder Charging"
+    },
+    "state": "off"
+   },
+   "binary_sensor.feeder_feeding": {
+    "attributes": {
+     "friendly_name": "Feeder Feeding"
+    },
+    "state": "on"
+   },
+   "fan.dry": {
+    "attributes": {
+     "friendly_name": "Dry",
+     "supported_features": 48
+    },
+    "state": "on"
+   },
+   "humidifier.dry": {
+    "attributes": {
+     "current_humidity": 60,
+     "device_class": "dehumidifier",
+     "friendly_name": "Dry",
+     "humidity": 55,
+     "max_humidity": 70,
+     "min_humidity": 35,
+     "supported_features": 0
+    },
+    "state": "on"
+   },
+   "number.feeder_feed": {
+    "attributes": {
+     "friendly_name": "Feeder Feed",
+     "max": 20.0,
+     "min": 1.0,
+     "mode": "auto",
+     "step": 1.0,
+     "unit_of_measurement": ""
+    },
+    "state": "4.0"
+   },
+   "select.dry_countdown": {
+    "attributes": {
+     "friendly_name": "Dry Countdown",
+     "options": [
+      "cancel",
+      "1h",
+      "2h",
+      "3h"
+     ]
+    },
+    "state": "cancel"
+   },
+   "sensor.dry_humidity": {
+    "attributes": {
+     "device_class": "humidity",
+     "friendly_name": "Dry Humidity",
+     "state_class": "measurement",
+     "unit_of_measurement": "%"
+    },
+    "state": "60.0"
+   },
+   "sensor.feeder_battery": {
+    "attributes": {
+     "device_class": "battery",
+     "friendly_name": "Feeder Battery",
+     "state_class": "measurement",
+     "unit_of_measurement": "%"
+    },
+    "state": "100.0"
+   },
+   "sensor.feeder_last_amount": {
+    "attributes": {
+     "friendly_name": "Feeder Last amount",
+     "state_class": "measurement",
+     "unit_of_measurement": ""
+    },
+    "state": "4.0"
+   },
+   "switch.dry_child_lock": {
+    "attributes": {
+     "friendly_name": "Dry Child lock",
+     "icon": "mdi:account-lock"
+    },
+    "state": "off"
+   }
+  }
+ },
+ {
+  "message": {
+   "data": {
+    "bizCode": "offline",
+    "bizData": {
+     "devId": "dev_feeder"
+    }
+   },
+   "protocol": 20
+  },
+  "states": {
+   "binary_sensor.dry_defrost": {
+    "attributes": {
+     "device_class": "problem",
+     "friendly_name": "Dry Defrost"
+    },
+    "state": "off"
+   },
+   "binary_sensor.dry_tank_full": {
+    "attributes": {
+     "device_class": "problem",
+     "friendly_name": "Dry Tank full"
+    },
+    "state": "off"
+   },
+   "binary_sensor.dry_temperature_error": {
+    "attributes": {
+     "device_class": "problem",
+     "friendly_name": "Dry Temperature error"
+    },
+    "state": "off"
+   },
+   "binary_sensor.dry_wet": {
+    "attributes": {
+     "device_class": "problem",
+     "friendly_name": "Dry Wet"
+    },
+    "state": "off"
+   },
+   "binary_sensor.feeder_charging": {
+    "attributes": {
+     "device_class": "battery_charging",
+     "friendly_name": "Feeder Charging"
+    },
+    "state": "unavailable"
+   },
+   "binary_sensor.feeder_feeding": {
+    "attributes": {
+     "friendly_name": "Feeder Feeding"
+    },
+    "state": "unavailable"
+   },
+   "fan.dry": {
+    "attributes": {
+     "friendly_name": "Dry",
+     "supported_features": 48
+    },
+    "state": "on"
+   },
+   "humidifier.dry": {
+    "attributes": {
+     "current_humidity": 60,
+     "device_class": "dehumidifier",
+     "friendly_name": "Dry",
+     "humidity": 55,
+     "max_humidity": 70,
+     "min_humidity": 35,
+     "supported_features": 0
+    },
+    "state": "on"
+   },
+   "number.feeder_feed": {
+    "attributes": {
+     "friendly_name": "Feeder Feed",
+     "max": 20.0,
+     "min": 1.0,
+     "mode": "auto",
+     "step": 1.0,
+     "unit_of_measurement": ""
+    },
+    "state": "unavailable"
+   },
+   "select.dry_countdown": {
+    "attributes": {
+     "friendly_name": "Dry Countdown",
+     "options": [
+      "cancel",
+      "1h",
+      "2h",
+      "3h"
+     ]
+    },
+    "state": "cancel"
+   },
+   "sensor.dry_humidity": {
+    "attributes": {
+     "device_class": "humidity",
+     "friendly_name": "Dry Humidity",
+     "state_class": "measurement",
+     "unit_of_measurement": "%"
+    },
+    "state": "60.0"
+   },
+   "sensor.feeder_battery": {
+    "attributes": {
+     "device_class": "battery",
+     "friendly_name": "Feeder Battery",
+     "state_class": "measurement",
+     "unit_of_measurement": "%"
+    },
+    "state": "unavailable"
+   },
+   "sensor.feeder_last_amount": {
+    "attributes": {
+     "friendly_name": "Feeder Last amount",
+     "state_class": "measurement",
+     "unit_of_measurement": ""
+    },
+    "state": "unavailable"
+   },
+   "switch.dry_child_lock": {
+    "attributes": {
+     "friendly_name": "Dry Child lock",
+     "icon": "mdi:account-lock"
+    },
+    "state": "off"
+   }
+  }
+ },
+ {
+  "message": {
+   "data": {
+    "bizCode": "online",
+    "bizData": {
+     "devId": "dev_feeder"
+    }
+   },
+   "protocol": 20
+  },
+  "states": {
+   "binary_sensor.dry_defrost": {
+    "attributes": {
+     "device_class": "problem",
+     "friendly_name": "Dry Defrost"
+    },
+    "state": "off"
+   },
+   "binary_sensor.dry_tank_full": {
+    "attributes": {
+     "device_class": "problem",
+     "friendly_name": "Dry Tank full"
+    },
+    "state": "off"
+   },
+   "binary_sensor.dry_temperature_error": {
+    "attributes": {
+     "device_class": "problem",
+     "friendly_name": "Dry Temperature error"
+    },
+    "state": "off"
+   },
+   "binary_sensor.dry_wet": {
+    "attributes": {
+     "device_class": "problem",
+     "friendly_name": "Dry Wet"
+    },
+    "state": "off"
+   },
+   "binary_sensor.feeder_charging": {
+    "attributes": {
+     "device_class": "battery_charging",
+     "friendly_name": "Feeder Charging"
+    },
+    "state": "off"
+   },
+   "binary_sensor.feeder_feeding": {
+    "attributes": {
+     "friendly_name": "Feeder Feeding"
+    },
+    "state": "on"
+   },
+   "fan.dry": {
+    "attributes": {
+     "friendly_name": "Dry",
+     "supported_features": 48
+    },
+    "state": "on"
+   },
+   "humidifier.dry": {
+    "attributes": {
+     "current_humidity": 60,
+     "device_class": "dehumidifier",
+     "friendly_name": "Dry",
+     "humidity": 55,
+     "max_humidity": 70,
+     "min_humidity": 35,
+     "supported_features": 0
+    },
+    "state": "on"
+   },
+   "number.feeder_feed": {
+    "attributes": {
+     "friendly_name": "Feeder Feed",
+     "max": 20.0,
+     "min": 1.0,
+     "mode": "auto",
+     "step": 1.0,
+     "unit_of_measurement": ""
+    },
+    "state": "4.0"
+   },
+   "select.dry_countdown": {
+    "attributes": {
+     "friendly_name": "Dry Countdown",
+     "options": [
+      "cancel",
+      "1h",
+      "2h",
+      "3h"
+     ]
+    },
+    "state": "cancel"
+   },
+   "sensor.dry_humidity": {
+    "attributes": {
+     "device_class": "humidity",
+     "friendly_name": "Dry Humidity",
+     "state_class": "measurement",
+     "unit_of_measurement": "%"
+    },
+    "state": "60.0"
+   },
+   "sensor.feeder_battery": {
+    "attributes": {
+     "device_class": "battery",
+     "friendly_name": "Feeder Battery",
+     "state_class": "measurement",
+     "unit_of_measurement": "%"
+    },
+    "state": "100.0"
+   },
+   "sensor.feeder_last_amount": {
+    "attributes": {
+     "friendly_name": "Feeder Last amount",
+     "state_class": "measurement",
+     "unit_of_measurement": ""
+    },
+    "state": "4.0"
+   },
+   "switch.dry_child_lock": {
+    "attributes": {
+     "friendly_name": "Dry Child lock",
+     "icon": "mdi:account-lock"
+    },
+    "state": "off"
+   }
+  }
+ }
+]

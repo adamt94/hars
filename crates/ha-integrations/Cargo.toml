@@ -18,6 +18,8 @@ ha-core.workspace = true
 ha-http.workspace = true
 ha-registry.workspace = true
 hmac = "0.12"
+md5 = { package = "md-5", version = "0.10" }
+ring = "0.17"
 jiff = { version = "0.2.43", features = ["serde"] }
 parking_lot = "0.12.5"
 rand = "0.9.5"
@@ -25,7 +27,7 @@ serde = { version = "1.0.229", features = ["derive"] }
 serde_json = { version = "1.0.154", features = ["float_roundtrip"] }
 sha2 = "0.10"
 thiserror = "2.0.21"
-tokio = { version = "1.54.1", features = ["time", "rt", "sync", "net", "macros"] }
+tokio = { version = "1.54.1", features = ["time", "rt", "sync", "net", "macros", "io-util"] }
 tracing = "0.1.44"
 
 [dev-dependencies]
