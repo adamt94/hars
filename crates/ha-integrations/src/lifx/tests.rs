@@ -815,8 +815,17 @@ async fn the_entry_that_claims_a_bulb_sets_it_up_before_another() {
     let (go_tx, go_rx) = std::sync::mpsc::channel::<()>();
     let go_rx = parking_lot::Mutex::new(go_rx);
     let claimed_tx = parking_lot::Mutex::new(claimed_tx);
+    // Whether the set-up lock was held at the claim: with it, no other
+    // entry's set-up can come between the claim and the rows, however the
+    // tasks are scheduled.
+    let held = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let held_at_claim = held.clone();
     *CLAIMED.lock() = Some(Arc::new(move |entry_id: &str| {
         if entry_id == "dup-first" {
+            held_at_claim.store(
+                crate::switchbot_cloud::SETUP.is_locked(),
+                std::sync::atomic::Ordering::SeqCst,
+            );
             let _ = claimed_tx.lock().send(());
             tokio::task::block_in_place(|| {
                 let _ = go_rx.lock().recv_timeout(Duration::from_secs(5));
@@ -838,6 +847,10 @@ async fn the_entry_that_claims_a_bulb_sets_it_up_before_another() {
         .await
         .unwrap()
         .unwrap();
+    assert!(
+        held.load(std::sync::atomic::Ordering::SeqCst),
+        "the bulb was claimed outside the set-up lock"
+    );
     let second = start("dup-second");
     // The second gets as far as it can while the first is held (a sleep on
     // the blocking pool: the paused tasks hold worker threads).

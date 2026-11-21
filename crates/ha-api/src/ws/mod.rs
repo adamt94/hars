@@ -258,7 +258,9 @@ async fn run(mut socket: WebSocket, shared: Shared, ip: Option<IpAddr>) {
     let mut awaiting_pong = false;
     // The command at work, moved out of `conn` so the loop can wait on it.
     let mut busy = None;
-    // What ended the connection, for a busy command's cancellation.
+    // What ended the connection, for a test of a busy command's
+    // cancellation. Test builds only: it would live across every await.
+    #[cfg(test)]
     let mut ended = "gone";
     let writer_done = loop {
         if busy.is_none() {
@@ -284,7 +286,10 @@ async fn run(mut socket: WebSocket, shared: Shared, ip: Option<IpAddr>) {
                 Some(Ok(Message::Pong(_))) => awaiting_pong = false,
                 Some(Ok(Message::Ping(_))) => {}
                 Some(Ok(Message::Close(_))) => {
-                    ended = "close";
+                    #[cfg(test)]
+                    {
+                        ended = "close";
+                    }
                     break false;
                 }
                 // An error, or a binary frame (no binary handlers exist).
@@ -293,7 +298,10 @@ async fn run(mut socket: WebSocket, shared: Shared, ip: Option<IpAddr>) {
             _ = heartbeat.tick() => {
                 if awaiting_pong {
                     tracing::debug!("websocket client missed a heartbeat; disconnecting");
-                    ended = "heartbeat";
+                    #[cfg(test)]
+                    {
+                        ended = "heartbeat";
+                    }
                     break false;
                 }
                 if !conn.out.queue(Frame::Ping) {
@@ -319,7 +327,10 @@ async fn run(mut socket: WebSocket, shared: Shared, ip: Option<IpAddr>) {
         }
     };
     if let Some(busy) = busy {
+        #[cfg(test)]
         busy.abort(ended);
+        #[cfg(not(test))]
+        busy.abort("gone");
     }
     conn.close();
     if !writer_done {

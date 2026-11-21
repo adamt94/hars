@@ -354,6 +354,7 @@ impl ConfigEntries {
             let i = list
                 .iter()
                 .position(|e| e.get("entry_id").and_then(Value::as_str) == Some(entry_id))?;
+            self.forget_revision(entry_id);
             list.remove(i)
         };
         self.schedule();
@@ -381,6 +382,7 @@ impl ConfigEntries {
             let i = list
                 .iter()
                 .position(|e| e.get("entry_id").and_then(Value::as_str) == Some(entry_id))?;
+            self.forget_revision(entry_id);
             list.remove(i)
         };
         self.schedule();
@@ -635,6 +637,22 @@ impl ConfigEntries {
         }
     }
 
+    /// The entry left the list (called with the entries' write lock held):
+    /// its revision goes with it, and the list's memory once it is empty.
+    fn forget_revision(&self, entry_id: &str) {
+        let mut revisions = self.revisions.lock();
+        revisions.retain(|(id, _)| id != entry_id);
+        if revisions.is_empty() {
+            *revisions = Vec::new();
+        }
+    }
+
+    /// Test access to how many entries have a revision.
+    #[cfg(test)]
+    pub(crate) fn revision_count(&self) -> usize {
+        self.revisions.lock().len()
+    }
+
     /// `data[key]` of an entry, with the data's revision, read together.
     pub fn data_value(&self, entry_id: &str, key: &str) -> Option<(String, u64)> {
         let guard = self.entries.read();
@@ -831,6 +849,30 @@ pub(crate) mod tests {
         assert!(saved.contains(r#""x":25.096823722419074"#), "{saved}");
         assert!(saved.contains(r#""z":12345678901234567890"#), "{saved}");
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// Review regression: a removed or replaced entry's data revision goes
+    /// with it, so adding, changing and removing entries leaves nothing.
+    #[tokio::test]
+    async fn a_removed_entry_leaves_no_revision() {
+        let entry = |id: &str| {
+            let mut e = Map::new();
+            e.insert("entry_id".into(), Value::from(id));
+            e.insert("data".into(), Value::Object(Map::new()));
+            e
+        };
+        let entries = ConfigEntries::in_memory(&Hass::new(), vec![entry("one"), entry("two")]);
+        for id in ["one", "two"] {
+            let mut data = Map::new();
+            data.insert("host".into(), Value::from("192.0.2.1"));
+            assert!(entries.update_data(id, data));
+        }
+        assert_eq!(entries.revision_count(), 2);
+        assert!(entries.remove("one").is_some());
+        assert_eq!(entries.revision_count(), 1);
+        assert!(entries.take("two").is_some());
+        assert_eq!(entries.revision_count(), 0);
+        assert_eq!(entries.revisions.lock().capacity(), 0);
     }
 
     /// A subscriber's first look and the changes after it never overlap,
