@@ -433,8 +433,11 @@ set-up goes over the bulb's five rows; a row that matches costs no copy of
 the registries (the change measured for Hue, 2026-11-21).
 
 Release binary (macOS arm64, stripped, `cargo build --release -p
-ha-server`): main (44c84a9) 9,684,288 bytes, branch 9,734,016 (+49,728):
-the flow, the broadcast, the product table and the row registration.
+ha-server`): main (44c84a9) 9,684,288 bytes, branch 9,750,592 (+66,304):
+the flow, the broadcast, the product table, the row registration and the
+stop hook. A bulb's connection holds two descriptors for its one UDP
+endpoint (a std socket to send, which a stop closes at once, and tokio's to
+read), where HA's transport holds one; not measured with a LIFX entry.
 
 Idle, a fresh install with no LIFX entry. The Linux gate
 (`scripts/perf-docker.sh`) was not run: Docker was not running on the
