@@ -30,6 +30,8 @@ sends its steps over real HTTP and a real WebSocket. It writes
   waits 6.5 s of real time for HA's retry; disabled_account.json: the
   entries and registry rows as stored after an account is disabled, and
   after a second account that lists the same devices is added;
+  us_customary.json: the sensors' rows and states after the first
+  scenario on an install set to US customary units;
 - crates/ha-api/src/ws/vectors/integration_descriptions.json:
   `integration/descriptions`' entries for the integrations in `KNOWN`
   (looked up inside their brand), and the reply's other keys.

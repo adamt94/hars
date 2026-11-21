@@ -159,7 +159,11 @@ Criterion prints the change and whether it is significant. Add a bench to
 (`cargo bench -p ha-integrations`) has
 `switchbot_report/remote_unchanged`: what a SwitchBot Cloud entry writes
 at a refresh for an infrared remote (its climate and switch, unchanged),
-entity code included.
+entity code included. `benches/hue_register.rs` has
+`hue_register/rows_that_match` and `hue_register/rows_made`: what a Hue
+entry's set-up does about the registries at a start (about 100 devices
+and 400 entities among 3,300 rows of other integrations), when its rows
+are there and when they are not.
 
 ### Binary size
 

@@ -28,7 +28,10 @@ It writes
   the rows and states below;
 - crates/ha-integrations/src/hue/vectors/fresh_setup.json: the entry, the
   device and entity registry rows and the states HA has after the first
-  scenario's entry is set up: what a fresh set-up must create.
+  scenario's entry is set up: what a fresh set-up must create;
+- crates/ha-integrations/src/hue/vectors/us_customary.json: the sensors'
+  rows and states after the same scenario on an install set to US
+  customary units.
 
 Placeholders are `config_flow.py`'s. A light group's `hue_scenes`, `lights`
 and `entity_id` attributes are sorted (sets in HA). The application key the fake bridge

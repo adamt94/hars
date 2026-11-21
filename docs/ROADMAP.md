@@ -650,16 +650,24 @@ ids, addresses, names and coordinates replaced with fake ones
       left behind by a crash between two store writes don't stay
 - [x] Config flow: Philips Hue. The bridges Philips' discovery service
       lists (aiohue's `discover_nupnp`, in HA's 5 s) or a host typed in,
-      then the link button; the entry is set up before the reply, with
-      the devices, areas, entities and entity ids of a fresh HA for the
-      resources `hars` runs entities for (lights, grouped lights, scenes,
-      the sensors, binary sensors and switches listed in
-      docs/INTEGRATIONS.md; not buttons, dials or doorbells, and a device
-      gone from the bridge is not taken out of the registry at set-up as
-      HA takes it), and is removed with no restart. An imported
-      install's rows come through a set-up unchanged, keeping what HA
-      derived from that install (names in its language, its units), and
-      nothing is registered when the registry files can't be written.
+      then the link button; the entry is set up before the reply and is
+      removed with no restart. Its devices, areas, entities and entity
+      ids are a fresh HA's for the recorded bridge, which has lights,
+      rooms as lights, scenes, motion and grouped motion, light level
+      and grouped light level, temperature, battery, zigbee connectivity,
+      the motion and light sensors' switches and an automation's switch,
+      on a metric install and (the sensors) on a US customary one. The
+      other kinds `hars` runs (smart scenes, contact, tamper, camera
+      motion, entertainment areas, zones) get their rows from the same
+      code, written from HA's source, with no vector from HA yet.
+      Buttons, dials and doorbells get no rows, and a device gone from
+      the bridge is not taken out of the registry at set-up as HA takes
+      it. A start of `hars` on the files HA left of an install that was
+      used (`scripts/vectors/hue_rows.py`: rows of each of those kinds
+      disabled, hidden, renamed, moved, never run or with nothing behind
+      them, and removed rows) leaves them byte for byte, and rows the
+      user removed come back as in HA. Nothing is registered when the
+      registry files can't be written.
       An ignored entry is never set up, and a flow's entry for the same
       thing replaces it (SwitchBot's too).
       All 9 scenarios of `scripts/vectors/hue_flow.py` match HA 2026.6.1

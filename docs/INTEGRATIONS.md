@@ -35,11 +35,13 @@ An integration reaches hars in one of four ways:
   integration**, and pick the integration. Today the list holds Philips
   Hue and SwitchBot Cloud. hars checks what you type before it saves anything, starts the
   integration at once, and shows the devices that it found. In that last
-  step you can give each device a name and an area, or make a new area
-  there. A device that you name gets entity ids to match, as in Home
-  Assistant: a Bot called "Coffee machine" in the Kitchen has
-  `button.kitchen_coffee_machine`. History that was recorded under the old
-  id stays under it. To undo the integration, open it and delete its entry.
+  step you can give each device an area, or make a new area there. You can
+  also give a SwitchBot Cloud device a name there. A Philips Hue device
+  can't be named in hars yet: only its area can be set. A device that you
+  name gets entity ids to match, as in Home Assistant: a Bot called
+  "Coffee machine" in the Kitchen has `button.kitchen_coffee_machine`.
+  History that was recorded under the old id stays under it. To undo the
+  integration, open it and delete its entry.
 
   A rename does not rewrite entity ids that you typed into a dashboard or
   an automation, as in Home Assistant: change those by hand.
@@ -116,6 +118,11 @@ Home Assistant, so only add a bridge on a network you trust.
   `hue.activate_scene`. `hue.hue_activate_scene` works for scenes, but not
   for smart scenes.
 - **Sensors:** temperature, light level, battery, and Zigbee connectivity.
+  A temperature is in °C or °F to match the unit system of the install
+  when the sensor is first added. As in Home Assistant, a sensor keeps its
+  unit if you change the unit system later, and a unit that you chose for
+  it in Home Assistant before an import is kept. You can't choose a unit
+  for a sensor in hars yet.
 - **Binary sensors:** motion, grouped motion, camera motion, contact,
   tamper, and entertainment.
 - **Switches:** the enable switch of each motion and light sensor, and the
@@ -133,9 +140,9 @@ Not yet:
   the Hue app works at once and is listed with its device after the next
   start.
 - Two entries for one bridge. If an imported install has the same bridge
-  twice, hars starts the first and marks the second as failed; delete the
-  second. A bridge that you ignored in Home Assistant stays ignored: hars
-  does not start it. When you add that bridge from the UI, the new entry
+  twice, hars starts the first one that is not disabled or ignored and
+  marks any other as failed; delete that one. A bridge that you ignored in
+  Home Assistant stays ignored: hars does not start it. When you add that bridge from the UI, the new entry
   replaces the ignored one, as in Home Assistant.
 - Pairing again when the bridge rejects its key (after a factory reset,
   say). Home Assistant opens the link dialog by itself; in hars, delete the
@@ -172,7 +179,8 @@ asks for the state of the Bot and of the Hub 2 every 600 seconds, which is
 Home Assistant's interval.
 
 - **Bot:** a button that presses the Bot, and a battery sensor.
-- **Hub 2:** temperature and humidity.
+- **Hub 2:** temperature and humidity. The temperature follows the same
+  rule for its unit as [Hue's](#philips-hue).
 - **Infrared air conditioner:** a `climate` entity and a power switch. An
   infrared device can't report its state, so hars shows the last command.
 
