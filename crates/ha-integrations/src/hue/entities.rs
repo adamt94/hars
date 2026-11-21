@@ -274,6 +274,10 @@ pub struct HueEntity {
     pub(super) entity_id: EntityId,
     /// A scene's last activation by HA (its state).
     activated: Mutex<Option<String>>,
+    /// The bridge no longer has this entity (its resource was deleted):
+    /// set and read under the bridge's write guard ([`Bridge::remove`]),
+    /// so a state rendered before the removal isn't written after it.
+    pub(super) gone: std::sync::atomic::AtomicBool,
 }
 
 impl HueEntity {
@@ -285,6 +289,7 @@ impl HueEntity {
             rid: rid.to_owned(),
             entity_id,
             activated: Mutex::new(None),
+            gone: std::sync::atomic::AtomicBool::new(false),
         }
     }
 

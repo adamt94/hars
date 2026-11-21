@@ -68,7 +68,8 @@ pub struct Bridge {
     platforms: Arc<Platforms>,
     /// False once the entry is stopped ([`run`] ended): nothing of it
     /// writes a state after (a command still in flight when its entry is
-    /// removed must not bring one back).
+    /// removed must not bring one back). Held for every state write, and
+    /// while an entity is marked as gone: the one guard for both.
     alive: parking_lot::Mutex<bool>,
 }
 
@@ -341,6 +342,9 @@ impl Bridge {
     /// service call that still holds an entity (a scene writes the time
     /// it was activated) then can't put back a state taken away here.
     fn stop(self: &Arc<Self>) {
+        // A command on its way, or waiting to be sent again, ends; none
+        // is sent after.
+        self.api.stop();
         *self.alive.lock() = false;
         self.platforms
             .bridges
@@ -366,10 +370,20 @@ impl Bridge {
         }
     }
 
+    /// Write an entity's state, unless the entry was stopped or the
+    /// entity removed since the state was made: a service call renders a
+    /// scene's activation on its own task, and the event stream may take
+    /// the scene away in between. A scene that came after set-up has no
+    /// registry row, so nothing else would ever remove that state.
     fn write_entity(&self, e: &HueEntity) {
         let rendered = e.render(self, &self.store.read());
+        #[cfg(test)]
+        tests::after_render();
         if let Some((state, attrs)) = rendered {
-            self.write(&e.entity_id, state, attrs);
+            let alive = self.alive.lock();
+            if *alive && !e.gone.load(std::sync::atomic::Ordering::Relaxed) {
+                self.hass.set_state(e.entity_id.clone(), state, attrs);
+            }
         }
     }
 
@@ -422,6 +436,13 @@ impl Bridge {
 
     /// Drop entities: their states, and their place as service targets.
     fn remove(&self, gone: &Gone) {
+        {
+            // A write that is being made ends first; none comes after.
+            let _writes = self.alive.lock();
+            for e in &gone.others {
+                e.gone.store(true, std::sync::atomic::Ordering::Relaxed);
+            }
+        }
         self.lights
             .write()
             .retain(|l| !gone.lights.iter().any(|g| g.rid == l.rid));

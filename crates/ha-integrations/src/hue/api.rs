@@ -34,6 +34,9 @@ pub enum ApiError {
     /// does not retry).
     #[error("{0}")]
     Decode(String),
+    /// The bridge's entry was removed ([`Api::stop`]): nothing is sent.
+    #[error("the Hue bridge's entry was removed")]
+    Stopped,
 }
 
 impl ApiError {
@@ -45,7 +48,7 @@ impl ApiError {
             Self::Unauthorized | Self::Busy | Self::Bridge(_) => {
                 Some(format!("Request failed: {self}"))
             }
-            Self::Status { .. } | Self::Connection(_) | Self::Decode(_) => {
+            Self::Status { .. } | Self::Connection(_) | Self::Decode(_) | Self::Stopped => {
                 Some(format!("Request failed due connection error: {self}"))
             }
         }
@@ -57,6 +60,8 @@ pub struct Api {
     /// `https://<host>`.
     base: String,
     key: String,
+    /// True once the entry is stopped: see [`Api::stop`].
+    stopped: tokio::sync::watch::Sender<bool>,
 }
 
 impl Api {
@@ -73,6 +78,7 @@ impl Api {
             client,
             base: base.to_owned(),
             key: key.to_owned(),
+            stopped: tokio::sync::watch::Sender::new(false),
         })
     }
 
@@ -86,6 +92,29 @@ impl Api {
                 .unwrap(),
             base: base.to_owned(),
             key: key.to_owned(),
+            stopped: tokio::sync::watch::Sender::new(false),
+        }
+    }
+
+    /// The bridge's entry is stopped: a request that is on its way, or
+    /// waiting to be tried again, ends now with [`ApiError::Stopped`]
+    /// (its connection and its timer are dropped), and none is sent
+    /// after. A service call that still holds the bridge when its entry
+    /// is removed then can't reach the bridge any more.
+    pub fn stop(&self) {
+        self.stopped.send_replace(true);
+    }
+
+    /// `work`, unless the entry is stopped before it is done.
+    async fn unless_stopped<T>(
+        &self,
+        work: impl Future<Output = Result<T, ApiError>>,
+    ) -> Result<T, ApiError> {
+        let mut stopped = self.stopped.subscribe();
+        tokio::select! {
+            biased;
+            _ = stopped.wait_for(|stopped| *stopped) => Err(ApiError::Stopped),
+            done = work => done,
         }
     }
 
@@ -110,8 +139,13 @@ impl Api {
     }
 
     /// aiohue's `request`: retry 429/503 (sleeping 0.25·n s before attempt
-    /// n), then map errors; returns the `data`.
+    /// n), then map errors; returns the `data`. Ends when the entry is
+    /// stopped.
     async fn request(&self, path: &str, body: Option<&Value>) -> Result<Value, ApiError> {
+        self.unless_stopped(self.request_now(path, body)).await
+    }
+
+    async fn request_now(&self, path: &str, body: Option<&Value>) -> Result<Value, ApiError> {
         let url = self.url(path);
         for attempt in 1..=MAX_RETRIES {
             if attempt > 1 {
@@ -129,7 +163,9 @@ impl Api {
                     return Err(ApiError::Status {
                         status: s.as_u16(),
                         reason: s.canonical_reason().unwrap_or_default().to_owned(),
-                        url,
+                        // The path can name a resource by an id the
+                        // bridge gave.
+                        url: self.scrub(url),
                     });
                 }
                 _ => {}
@@ -181,9 +217,11 @@ impl Api {
                 id.trim().to_owned(),
             ));
         }
-        self.client
-            .stream(&self.url("eventstream/clip/v2"), &headers)
-            .await
-            .map_err(|e| ApiError::Connection(self.scrub(e.to_string())))
+        let url = self.url("eventstream/clip/v2");
+        let stream = async {
+            let stream = self.client.stream(&url, &headers).await;
+            stream.map_err(|e| ApiError::Connection(self.scrub(e.to_string())))
+        };
+        self.unless_stopped(stream).await
     }
 }

@@ -6,6 +6,20 @@ use crate::light::Profiles;
 use serde_json::json;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
+thread_local! {
+    /// What this thread does between an entity's state being made and
+    /// being written ([`Bridge::write_entity`]), once.
+    static AFTER_RENDER: std::cell::RefCell<Option<Box<dyn FnOnce()>>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+pub(super) fn after_render() {
+    let hook = AFTER_RENDER.with(|hook| hook.borrow_mut().take());
+    if let Some(hook) = hook {
+        hook();
+    }
+}
+
 fn fixture(name: &str) -> Value {
     let text = match name {
         "resource" => include_str!("vectors/resource.json"),
@@ -172,6 +186,17 @@ async fn fake_bridge() -> (
     String,
     Arc<parking_lot::Mutex<Vec<(String, String, Value)>>>,
 ) {
+    fake_bridge_with(|_| 200).await
+}
+
+/// [`fake_bridge`], answering a request with the status `status` gives
+/// for its body.
+async fn fake_bridge_with(
+    status: fn(&Value) -> u16,
+) -> (
+    String,
+    Arc<parking_lot::Mutex<Vec<(String, String, Value)>>>,
+) {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let base = format!("http://{}", listener.local_addr().unwrap());
     let seen = Arc::new(parking_lot::Mutex::new(Vec::new()));
@@ -212,12 +237,13 @@ async fn fake_bridge() -> (
                             first.next().unwrap().to_owned(),
                             first.next().unwrap().to_owned(),
                         );
+                        let status = status(&body);
                         log.lock()
                             .push((method, path.trim_start_matches('/').to_owned(), body));
                         buf.drain(..end + 4 + len);
                         let reply = r#"{"data":[],"errors":[]}"#;
                         let res = format!(
-                            "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{reply}",
+                            "HTTP/1.1 {status} X\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{reply}",
                             reply.len()
                         );
                         if s.write_all(res.as_bytes()).await.is_err() {
@@ -577,10 +603,12 @@ async fn a_stopped_bridge_writes_nothing() {
         all.iter().map(|s| s.entity_id.to_string()).collect()
     };
     assert_eq!(left(&b), Vec::<String>::new());
-    // After: an activation writes no time, and the service finds nothing.
-    scenes[0].activate(None, false, None, None).await.unwrap();
+    // After: an activation writes no time and sends nothing, and the
+    // service finds no bridge.
+    let late = scenes[0].activate(None, false, None, None).await;
+    assert!(late.is_err(), "{late:?}");
     assert_eq!(left(&b), Vec::<String>::new());
-    seen.lock().clear();
+    assert!(seen.lock().is_empty(), "{:?}", seen.lock());
     let data = json!({"group_name": "bedroom", "scene_name": "dimmed"});
     let Value::Object(data) = data else { panic!() };
     let _ = b
@@ -588,6 +616,74 @@ async fn a_stopped_bridge_writes_nothing() {
         .call_service("hue", "hue_activate_scene", data, None, false, None)
         .await;
     assert!(seen.lock().is_empty(), "{:?}", seen.lock());
+}
+
+/// A command that is waiting to be sent again when its entry is removed
+/// ends there: the service call holds the bridge and its HTTP client
+/// itself, and would go on trying (aiohue's 25 attempts) and then send
+/// what follows. Here a scene is activated with a speed, the bridge is
+/// busy (503), and the entry is stopped during the wait.
+#[tokio::test]
+async fn a_command_ends_when_its_entry_is_removed() {
+    let busy = |body: &Value| match body.get("speed") {
+        Some(_) => 503,
+        None => 200,
+    };
+    let (base, seen) = fake_bridge_with(busy).await;
+    let b = bridge(Api::at(&base, "key"));
+    let scene = b
+        .others
+        .read()
+        .iter()
+        .find(|e| e.entity_id.as_str() == "scene.bedroom_bedroom_dimmed")
+        .cloned()
+        .unwrap();
+    let call = tokio::spawn(async move { scene.activate(None, true, Some(50), None).await });
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+    while seen.lock().is_empty() {
+        assert!(tokio::time::Instant::now() < deadline, "nothing was sent");
+        tokio::time::sleep(Duration::from_millis(5)).await;
+    }
+    b.stop();
+    // The call ends at once, not after its next attempt (0.5 s later).
+    let ended = tokio::time::timeout(Duration::from_millis(250), call).await;
+    assert!(matches!(ended, Ok(Ok(Err(_)))), "{ended:?}");
+    // And neither the speed again nor the recall is ever sent.
+    tokio::time::sleep(Duration::from_millis(1500)).await;
+    let seen = seen.lock();
+    assert_eq!(seen.len(), 1, "{seen:?}");
+    assert_eq!(seen[0].2, json!({"speed": 0.5}));
+}
+
+/// A scene's state is made on the service call's task and written after.
+/// If the event stream takes the scene away in between, the state is not
+/// written: a scene that came after set-up has no registry row, so the
+/// state would outlive the entry.
+#[tokio::test]
+async fn a_scene_deleted_while_it_is_activated_leaves_no_state() {
+    let b = bridge(offline());
+    let id = "scene.bedroom_bedroom_dimmed";
+    let scene = b
+        .others
+        .read()
+        .iter()
+        .find(|e| e.entity_id.as_str() == id)
+        .cloned()
+        .unwrap();
+    assert!(state_json(&b.hass, id).is_some());
+    let deleted = json!([{"creationtime": "2026-01-01T00:00:00Z", "id": "gone", "type": "delete",
+                          "data": [{"id": scene.rid, "type": "scene"}]}]);
+    let stream = b.clone();
+    AFTER_RENDER.with(|hook| {
+        *hook.borrow_mut() = Some(Box::new(move || stream.handle_data(&deleted.to_string())));
+    });
+    let _ = scene.activate(None, false, None, None).await;
+    assert!(
+        AFTER_RENDER.with(|hook| hook.borrow().is_none()),
+        "not reached"
+    );
+    assert_eq!(state_json(&b.hass, id), None);
+    assert!(b.others.read().iter().all(|e| e.entity_id.as_str() != id));
 }
 
 /// A second bridge, sharing the first's hass and services.
