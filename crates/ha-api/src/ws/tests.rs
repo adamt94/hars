@@ -3517,3 +3517,143 @@ async fn entity_registry_commands_match_ha() {
         json!({"code": "not_supported", "message": "hars can't change an entity's name yet"})
     );
 }
+
+#[tokio::test]
+async fn plugins_appear_in_descriptions_manifests_translations_and_icons() {
+    let dir = std::env::temp_dir().join(format!("hars-api-plugin-ws-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let plugin_dir = dir.join("plugins/acme_plug");
+    std::fs::create_dir_all(plugin_dir.join("translations")).unwrap();
+    std::fs::write(
+        plugin_dir.join("plugin.json"),
+        json!({
+            "schema_version": 1,
+            "domain": "acme_plug",
+            "name": "Acme Smart Plug",
+            "version": "1.2.3",
+            "iot_class": "local_push",
+            "config_flow": true,
+            "transport": { "type": "stdio", "command": "bin/acme" },
+            "capabilities": { "entity_domains": ["switch"] }
+        })
+        .to_string(),
+    )
+    .unwrap();
+    std::fs::write(
+        plugin_dir.join("translations/en.json"),
+        json!({
+            "config": {
+                "step": { "user": { "title": "Set up Acme Plug", "data": { "host": "IP" } } }
+            }
+        })
+        .to_string(),
+    )
+    .unwrap();
+    std::fs::write(
+        plugin_dir.join("icons.json"),
+        json!({ "entity": { "switch": { "power": { "default": "mdi:power-plug" } } } }).to_string(),
+    )
+    .unwrap();
+
+    let hass = Hass::new();
+    let entries = ha_integrations::config_entries::ConfigEntries::load(&hass, &dir);
+    let components = ha_integrations::components::Components::new(
+        &hass,
+        std::sync::Arc::new(ha_registry::Registries::default()),
+        Default::default(),
+    );
+    let plugins = ha_integrations::plugin::PluginManager::load(&dir);
+    let flows = ha_integrations::flow::Manager::new(
+        &hass,
+        entries,
+        components,
+        Default::default(),
+        Vec::new(),
+        None,
+    )
+    .unwrap();
+    flows.set_plugins(plugins.clone());
+
+    let s = server_on(
+        hass,
+        crate::ApiConfig {
+            config_dir: dir.display().to_string(),
+            flows: Some(flows),
+            plugins: Some(plugins),
+            ..Default::default()
+        },
+    )
+    .await;
+    let (tok, _) = token(&s.auth);
+    let mut c = Client::authed(&s, &tok).await;
+
+    // 1. `integration/descriptions` lists `hars_plugins` in core and `acme_plug` in custom
+    //    using HA 2026.6.1's exact row shape (`integration_type`, no `iot_standards`).
+    let desc = c
+        .call(json!({"id": 1, "type": "integration/descriptions"}))
+        .await;
+    assert_eq!(desc["success"], true);
+    let store_desc = &desc["result"]["core"]["integration"]["hars_plugins"];
+    assert_eq!(store_desc["name"], "Hars Plugins");
+    assert_eq!(store_desc["integration_type"], "service");
+    assert_eq!(store_desc["config_flow"], true);
+    assert!(store_desc.get("iot_standards").is_none());
+
+    let custom_desc = &desc["result"]["custom"]["integration"]["acme_plug"];
+    assert_eq!(custom_desc["name"], "Acme Smart Plug");
+    assert_eq!(custom_desc["integration_type"], "hub");
+    assert_eq!(custom_desc["config_flow"], true);
+    assert_eq!(custom_desc["single_config_entry"], false);
+    assert_eq!(custom_desc["overwrites_built_in"], false);
+    assert!(custom_desc.get("iot_standards").is_none());
+
+    // 2. `manifest/get` returns both `hars_plugins` and `acme_plug` (`is_built_in: false`).
+    let m = c
+        .call(json!({"id": 2, "type": "manifest/get", "integration": "acme_plug"}))
+        .await;
+    assert_eq!(m["result"]["domain"], "acme_plug");
+    assert_eq!(m["result"]["version"], "1.2.3");
+    assert_eq!(m["result"]["is_built_in"], false);
+    assert_eq!(m["result"]["overwrites_built_in"], false);
+
+    let store_m = c
+        .call(json!({"id": 3, "type": "manifest/get", "integration": "hars_plugins"}))
+        .await;
+    assert_eq!(store_m["result"]["name"], "Hars Plugins");
+    assert_eq!(store_m["result"]["is_built_in"], true);
+
+    // 3. `frontend/get_translations` merges plugin + store strings.
+    let tr = c
+        .call(json!({
+            "id": 4,
+            "type": "frontend/get_translations",
+            "language": "en",
+            "category": "config",
+            "integration": ["acme_plug", "hars_plugins"]
+        }))
+        .await;
+    assert_eq!(
+        tr["result"]["resources"]["component.acme_plug.config.step.user.title"],
+        "Set up Acme Plug"
+    );
+    assert_eq!(
+        tr["result"]["resources"]["component.hars_plugins.config.step.user.title"],
+        "Hars Plugin Manager"
+    );
+
+    // 4. `frontend/get_icons` returns the plugin's icon tree.
+    let ic = c
+        .call(json!({
+            "id": 5,
+            "type": "frontend/get_icons",
+            "category": "entity",
+            "integration": ["acme_plug"]
+        }))
+        .await;
+    assert_eq!(
+        ic["result"]["resources"]["acme_plug"]["switch"]["power"]["default"],
+        "mdi:power-plug"
+    );
+
+    let _ = std::fs::remove_dir_all(&dir);
+}

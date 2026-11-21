@@ -87,6 +87,10 @@ pub struct ApiConfig {
     pub components: Arc<ha_components::Components>,
     /// Integrations running (`sun`, `sensor`, ...), for `components`.
     pub integrations: Vec<&'static str>,
+    /// Plugin domains running at start-up, for `components`.
+    pub plugin_integrations: Vec<String>,
+    /// Installed out-of-process plugins (`<config>/plugins`).
+    pub plugins: Option<Arc<ha_integrations::plugin::PluginManager>>,
     /// Weather entities' forecasts.
     pub weather: Arc<ha_integrations::weather::Weather>,
     /// Brand images and their access tokens.
@@ -127,8 +131,9 @@ pub(crate) struct Shared {
 /// The integrations `hars` implements, by HA domain: `get_config`'s
 /// `components`. The frontend gates features on this list, so it only names
 /// what really works.
-pub(crate) fn components(config: &ApiConfig) -> Vec<&'static str> {
-    let mut c = vec![
+pub(crate) fn components(config: &ApiConfig) -> Vec<std::borrow::Cow<'static, str>> {
+    use std::borrow::Cow;
+    let mut c: Vec<Cow<'static, str>> = [
         "api",
         "auth",
         "http",
@@ -140,21 +145,32 @@ pub(crate) fn components(config: &ApiConfig) -> Vec<&'static str> {
         "repairs",
         "websocket_api",
         "zone",
-    ];
+    ]
+    .into_iter()
+    .map(Cow::Borrowed)
+    .collect();
     if config.frontend.is_some() {
-        c.push("frontend");
+        c.push(Cow::Borrowed("frontend"));
     }
     if config.brands.is_some() {
-        c.push("brands");
+        c.push(Cow::Borrowed("brands"));
     }
     // The frontend draws its history graphs, the Map's trail and the logbook
     // only when these are listed (`isComponentLoaded`).
     if config.recorder.is_some() {
-        c.extend(["recorder", "history", "logbook"]);
+        c.extend(
+            ["recorder", "history", "logbook"]
+                .into_iter()
+                .map(Cow::Borrowed),
+        );
     }
-    c.extend(&config.integrations);
+    if config.plugins.is_some() {
+        c.push(Cow::Borrowed(ha_integrations::plugin::STORE_DOMAIN));
+    }
+    c.extend(config.integrations.iter().copied().map(Cow::Borrowed));
+    c.extend(config.plugin_integrations.iter().cloned().map(Cow::Owned));
     if let Some(o) = &config.onboarding {
-        c.extend(o.started());
+        c.extend(o.started().into_iter().map(Cow::Borrowed));
     }
     if let Some(f) = &config.flows {
         c.extend(f.started());
@@ -252,7 +268,11 @@ pub fn router(hass: Hass, auth: Auth, config: &ApiConfig) -> Router {
         .merge(mobile_app::routes(shared.clone()))
         .merge(ws::routes(shared));
     if let Some(b) = &config.brands {
-        router = router.merge(brands::routes(b.clone(), auth.clone()));
+        router = router.merge(brands::routes(
+            b.clone(),
+            auth.clone(),
+            config.plugins.clone(),
+        ));
     }
     if let Some(t) = &config.map_tiles {
         router = router.merge(map_tiles::routes(t.clone()));

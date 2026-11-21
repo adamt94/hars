@@ -38,11 +38,20 @@ struct Views {
 
 /// The integrations a flow can add, for the dialog's list: also when
 /// adding is off for now, so that choosing one says why.
-pub(crate) fn handlers_of(config: &crate::ApiConfig) -> &'static [&'static flow::Handler] {
-    match config.flows.is_some() || config.flows_unavailable.is_some() {
-        true => flow::HANDLERS,
-        false => &[],
+pub(crate) fn handlers_of(config: &crate::ApiConfig) -> Vec<std::borrow::Cow<'static, str>> {
+    use std::borrow::Cow;
+    if config.flows.is_none() && config.flows_unavailable.is_none() {
+        return Vec::new();
     }
+    let mut domains: Vec<Cow<'static, str>> = flow::HANDLERS
+        .iter()
+        .map(|h| Cow::Borrowed(h.domain))
+        .collect();
+    if let Some(plugins) = &config.plugins {
+        domains.push(Cow::Borrowed(ha_integrations::plugin::STORE_DOMAIN));
+        domains.extend(plugins.flow_domains().into_iter().map(Cow::Owned));
+    }
+    domains
 }
 
 /// The views, when `hars` runs config flows (HA registers them with its
@@ -145,7 +154,7 @@ fn result_json(views: &Views, result: FlowResult) -> Value {
             let errors: Option<Map<String, Value>> = errors.map(|errors| {
                 errors
                     .into_iter()
-                    .map(|(field, error)| (field.to_owned(), json!(error)))
+                    .map(|(field, error)| (field.into_owned(), json!(error)))
                     .collect()
             });
             json!({
@@ -365,21 +374,27 @@ async fn abort(State(views): State<Views>, Path(flow_id): Path<String>) -> Respo
 /// `ConfigManagerAvailableFlowView`: the integrations with a flow, all or
 /// of one of HA's two lists (`integration`, `helper`). Another `type` is a
 /// `KeyError` in HA's view.
-async fn handlers(Query(query): Query<Vec<(String, String)>>) -> Response {
+async fn handlers(
+    State(views): State<Views>,
+    Query(query): Query<Vec<(String, String)>>,
+) -> Response {
     let kind = query.iter().find(|(k, _)| k == "type").map(|(_, v)| &**v);
-    let helper =
-        |domain: &str| crate::ws::manifest::integration_type(domain).as_deref() == Some("helper");
-    let domains: Vec<&str> = match kind {
-        None => flow::HANDLERS.iter().map(|h| h.domain).collect(),
-        Some("integration") => flow::HANDLERS
-            .iter()
-            .map(|h| h.domain)
+    let helper = |domain: &str| {
+        crate::ws::manifest::integration_type_for(&views.shared.config, domain).as_deref()
+            == Some("helper")
+    };
+    let all = handlers_of(&views.shared.config);
+    let domains: Vec<String> = match kind {
+        None => all.into_iter().map(|d| d.into_owned()).collect(),
+        Some("integration") => all
+            .into_iter()
             .filter(|d| !helper(d))
+            .map(|d| d.into_owned())
             .collect(),
-        Some("helper") => flow::HANDLERS
-            .iter()
-            .map(|h| h.domain)
+        Some("helper") => all
+            .into_iter()
             .filter(|d| helper(d))
+            .map(|d| d.into_owned())
             .collect(),
         Some(_) => return crate::internal_error(),
     };

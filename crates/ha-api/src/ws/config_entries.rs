@@ -110,7 +110,7 @@ fn matching(config: &ApiConfig, filter: &[&str], domain: Option<&str>) -> Vec<Va
             domain
                 .is_none_or(|d| d.is_empty() || e.get("domain").and_then(Value::as_str) == Some(d))
         })
-        .filter(|e| matches_filter(e, filter))
+        .filter(|e| matches_filter(config, e, filter))
         .map(|e| entry_json(config, e))
         .collect()
 }
@@ -161,7 +161,7 @@ fn subscribe(conn: &mut Conn, id: u64, msg: &Map<String, Value>) -> Result<(), I
                 return false;
             }
             let filter: Vec<&str> = filter.iter().map(String::as_str).collect();
-            if !matches_filter(entry, &filter) {
+            if !matches_filter(&config, entry, &filter) {
                 return true;
             }
             out.event(
@@ -183,12 +183,12 @@ fn subscribe(conn: &mut Conn, id: u64, msg: &Map<String, Value>) -> Result<(), I
 /// `_async_matching_config_entries_json_fragments`: an entry whose
 /// integration's type is in the filter; one of an integration `hars`
 /// doesn't know passes too, unless only helpers are asked for.
-fn matches_filter(entry: &Map<String, Value>, filter: &[&str]) -> bool {
+fn matches_filter(config: &ApiConfig, entry: &Map<String, Value>, filter: &[&str]) -> bool {
     if filter.is_empty() {
         return true;
     }
     let domain = entry.get("domain").and_then(Value::as_str).unwrap_or("");
-    match super::manifest::integration_type(domain) {
+    match super::manifest::integration_type_for(config, domain) {
         Some(t) => filter.contains(&t.as_str()),
         None => filter != ["helper"],
     }
@@ -214,10 +214,15 @@ pub(crate) fn entry_json_at(
     let str_of = |k: &str| e.get(k).and_then(Value::as_str);
     let domain = str_of("domain").unwrap_or("");
     let disabled = e.get("disabled_by").is_some_and(|d| !d.is_null());
+    let is_plugin = config
+        .plugins
+        .as_ref()
+        .and_then(|p| p.get(domain))
+        .is_some();
     let (options, unload) = HANDLERS
         .iter()
         .find(|(d, ..)| *d == domain)
-        .map_or((false, false), |&(_, o, u)| (o, u));
+        .map_or((false, is_plugin), |&(_, o, u)| (o, u));
     // Where its setup is, if the setup says; else whether it runs.
     let (state, reason, unload) = match runtime {
         // HA learns `supports_unload` when it loads the integration for
@@ -227,7 +232,9 @@ pub(crate) fn entry_json_at(
         // other entries of its integration do.
         None if !disabled
             && str_of("source") != Some("ignore")
-            && crate::components(config).contains(&domain) =>
+            && crate::components(config)
+                .iter()
+                .any(|c| c.as_ref() == domain) =>
         {
             ("loaded", None, unload)
         }
