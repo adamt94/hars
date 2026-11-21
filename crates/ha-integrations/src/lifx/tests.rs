@@ -925,7 +925,7 @@ async fn a_moved_button_takes_what_was_kept_under_its_new_id() {
     hass.restore().unregister(&hass, new.as_str());
     hass.remove_state(&new);
     *b.buttons[0].last.lock() = Some("2026-01-01T00:00:00+00:00".into());
-    b.write_button(0, None);
+    b.write_all();
     let moved = edited(&hass, |r| {
         for e in &mut r.entities {
             if e.entity_id == "button.kitchen_kitchen_light_restart" {

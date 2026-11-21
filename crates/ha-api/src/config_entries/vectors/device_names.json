@@ -2,7 +2,7 @@
  "scenarios": [
   {
    "name": "hue",
-   "doc": "The dialog's last step after a Hue bridge is added: an area is made, the lamp is named and put in it, then the bedroom (a room: its light group, scenes and sensors) and the bridge are named, and each named device's entities take the ids that follow. Then the motion sensor is named on its device page (its entities keep their ids), named back, named again and given an empty name (its own counts again).",
+   "doc": "The dialog's last step after a Hue bridge is added: an area is made, the lamp is named and put in it, then the bedroom (a room: its light group, scenes and sensors) and the bridge are named, and each named device's entities take the ids that follow. Then the motion sensor is named on its device page (its entities keep their ids), named back, named again and given an empty name (its own counts again); and the bridge is given its automation switch's whole name.",
    "subscriptions": [
     {
      "sub": "devices",
@@ -3743,6 +3743,119 @@
      "ws": {
       "user": "admin",
       "msg": {
+       "type": "config/device_registry/update",
+       "device_id": "<device:375f4b1e-5632-44d2-bafd-7bf40e2571d3>",
+       "name_by_user": "Automation: Go to sleep"
+      }
+     },
+     "replies": [
+      {
+       "type": "result",
+       "success": true,
+       "result": {
+        "area_id": null,
+        "configuration_url": null,
+        "config_entries": [
+         "<entry:1>"
+        ],
+        "config_entries_subentries": {
+         "<entry:1>": [
+          null
+         ]
+        },
+        "connections": [
+         [
+          "mac",
+          "00:17:88:01:00:00:00:05"
+         ],
+         [
+          "mac",
+          "c4:29:96:00:00:01"
+         ]
+        ],
+        "created_at": "<ts>",
+        "disabled_by": null,
+        "entry_type": null,
+        "hw_version": null,
+        "id": "<device:375f4b1e-5632-44d2-bafd-7bf40e2571d3>",
+        "identifiers": [
+         [
+          "hue",
+          "375f4b1e-5632-44d2-bafd-7bf40e2571d3"
+         ],
+         [
+          "hue",
+          "c42996fffe000001"
+         ]
+        ],
+        "labels": [],
+        "manufacturer": "Signify Netherlands B.V.",
+        "model": "Hue Bridge",
+        "model_id": "BSB003",
+        "modified_at": "<ts>",
+        "name_by_user": "Automation: Go to sleep",
+        "name": "Hue Bridge",
+        "primary_config_entry": "<entry:1>",
+        "serial_number": null,
+        "sw_version": "6.3.2071556020",
+        "via_device_id": null
+       }
+      }
+     ],
+     "events": [
+      {
+       "sub": "devices",
+       "event": {
+        "event_type": "device_registry_updated",
+        "data": {
+         "action": "update",
+         "device_id": "<device:375f4b1e-5632-44d2-bafd-7bf40e2571d3>",
+         "changes": {
+          "name_by_user": "Hub"
+         }
+        }
+       }
+      },
+      {
+       "sub": "entities",
+       "event": {
+        "event_type": "entity_registry_updated",
+        "data": {
+         "action": "update",
+         "entity_id": "switch.hub_automation_go_to_sleep",
+         "changes": {}
+        }
+       }
+      },
+      {
+       "sub": "states",
+       "event": {
+        "event_type": "state_changed",
+        "data": {
+         "entity_id": "switch.hub_automation_go_to_sleep",
+         "old_state": {
+          "state": "off",
+          "attributes": {
+           "device_class": "switch",
+           "friendly_name": "Hub Automation: Go to sleep"
+          }
+         },
+         "new_state": {
+          "state": "off",
+          "attributes": {
+           "device_class": "switch",
+           "friendly_name": "Automation: Go to sleep"
+          }
+         }
+        }
+       }
+      }
+     ]
+    },
+    {
+     "ws": {
+      "user": "admin",
+      "msg": {
        "type": "config/device_registry/list"
       }
      },
@@ -3907,7 +4020,7 @@
          "model": "Hue Bridge",
          "model_id": "BSB003",
          "modified_at": "<ts>",
-         "name_by_user": "Hub",
+         "name_by_user": "Automation: Go to sleep",
          "name": "Hue Bridge",
          "primary_config_entry": "<entry:1>",
          "serial_number": null,
@@ -4873,7 +4986,7 @@
          "modified_at": "<ts>",
          "name": null,
          "options": {},
-         "original_name": "Automation: Go to sleep",
+         "original_name": "",
          "platform": "hue",
          "translation_key": null,
          "unique_id": "eb9a4b7a-240f-4143-8d71-08b91593e58d"
@@ -5065,7 +5178,7 @@
      "model": "Hue Bridge",
      "model_id": "BSB003",
      "modified_at": "<time>",
-     "name_by_user": "Hub",
+     "name_by_user": "Automation: Go to sleep",
      "name": "Hue Bridge",
      "primary_config_entry": "<entry:1>",
      "serial_number": null,
@@ -6897,7 +7010,7 @@
      "state": "off",
      "attributes": {
       "device_class": "switch",
-      "friendly_name": "Hub Automation: Go to sleep"
+      "friendly_name": "Automation: Go to sleep"
      }
     }
    },
@@ -7374,7 +7487,7 @@
      "state": "off",
      "attributes": {
       "device_class": "switch",
-      "friendly_name": "Hub Automation: Go to sleep"
+      "friendly_name": "Automation: Go to sleep"
      }
     }
    }

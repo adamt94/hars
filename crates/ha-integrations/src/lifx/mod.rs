@@ -251,10 +251,15 @@ impl Bulb {
             .set_state_with_context(l.entity_id.clone(), state, a, None);
     }
 
-    fn write_button(&self, i: usize, context: Option<ha_core::Context>) {
+    /// Button `i` pressed at `at`: taken and written under the write
+    /// guard, so a move ([`Bulb::follow`]) comes before both or after both
+    /// (it neither restores over the press nor writes it without its
+    /// context).
+    fn pressed(&self, i: usize, at: String, context: &ha_core::Context) {
         let now = self.now.lock();
+        *self.buttons[i].last.lock() = Some(at);
         if now.alive {
-            self.put_button(&now, i, context);
+            self.put_button(&now, i, Some(context.clone()));
         }
     }
 
@@ -1241,8 +1246,7 @@ impl Button for LifxButton {
     }
 
     fn pressed(&self, at: String, context: &ha_core::Context) {
-        *self.0.buttons[self.1].last.lock() = Some(at);
-        self.0.write_button(self.1, Some(context.clone()));
+        self.0.pressed(self.1, at, context);
     }
 
     fn press(&self) -> BoxFuture<'_> {

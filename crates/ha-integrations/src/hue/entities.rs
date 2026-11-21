@@ -275,7 +275,8 @@ pub struct HueEntity {
     /// A scene's last activation by HA (its state).
     /// Shared with the same entity under another id ([`HueEntity::moved`]):
     /// an activation that began under the old id lands on it there.
-    activated: std::sync::Arc<Mutex<Option<String>>>,
+    /// A scene's only (`None` for other kinds).
+    activated: Option<std::sync::Arc<Mutex<Option<String>>>>,
     /// The bridge no longer has this entity (its resource was deleted):
     /// set and read under the bridge's write guard ([`Bridge::remove`]),
     /// so a state rendered before the removal isn't written after it.
@@ -290,7 +291,7 @@ impl HueEntity {
             order: kind.order(ty),
             rid: rid.to_owned(),
             entity_id,
-            activated: Default::default(),
+            activated: matches!(kind, Kind::Scene | Kind::SmartScene).then(Default::default),
             gone: std::sync::atomic::AtomicBool::new(false),
         }
     }
@@ -310,6 +311,13 @@ impl HueEntity {
         }
     }
 
+    /// A scene's last activation by HA, now.
+    pub(super) fn set_activated(&self, at: String) {
+        if let Some(activated) = &self.activated {
+            *activated.lock() = Some(at);
+        }
+    }
+
     /// A scene restores its last activation (`BaseScene`, a RestoreEntity):
     /// any stored state but `unavailable`, and it's dumped from now on.
     pub(super) fn restore(&self, hass: &ha_core::Hass) {
@@ -322,7 +330,9 @@ impl HueEntity {
             .and_then(|s| s["state"].as_str().map(str::to_owned))
             .filter(|s| s != "unavailable")
         {
-            *self.activated.lock() = Some(state);
+            if let Some(activated) = &self.activated {
+                *activated.lock() = Some(state);
+            }
         }
         restore.register(self.entity_id.as_str(), None);
     }
@@ -453,8 +463,8 @@ impl HueEntity {
                 }
                 let state = self
                     .activated
-                    .lock()
-                    .clone()
+                    .as_ref()
+                    .and_then(|a| a.lock().clone())
                     .unwrap_or_else(|| "unknown".into());
                 let device = Self::device(self.kind, &self.rid, r, store);
                 bridge.tail(
@@ -515,8 +525,7 @@ impl HueEntity {
         let Some(bridge) = self.bridge.upgrade() else {
             return Ok(());
         };
-        *self.activated.lock() = Some(ha_core::isoformat(bridge.hass.clock().now()));
-        bridge.write_entity(self);
+        bridge.activated(self, ha_core::isoformat(bridge.hass.clock().now()));
         if self.kind == Kind::SmartScene {
             return self.put(json!({"recall": {"action": "activate"}})).await;
         }

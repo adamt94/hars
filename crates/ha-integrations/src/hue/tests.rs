@@ -856,6 +856,72 @@ async fn a_scene_activated_under_its_old_id_shows_it_under_the_new() {
     assert_ne!(state, "unknown", "the activation was lost");
 }
 
+/// What a light command keeps (the brightness a fading turn-off restores)
+/// is the entity's: one that began under the old id is there under the
+/// new one.
+#[tokio::test]
+async fn what_a_command_keeps_follows_a_light_to_its_new_id() {
+    let b = bridge(offline());
+    let light = b.lights.read()[0].clone();
+    let old = light.entity_id.to_string();
+    let moved = changed(
+        &b,
+        |_| {},
+        |e| {
+            if e.entity_id == old {
+                e.entity_id = "light.moved_away".into();
+            }
+        },
+    );
+    b.follow(moved);
+    let now = b
+        .lights
+        .read()
+        .iter()
+        .find(|l| l.rid == light.rid)
+        .cloned()
+        .unwrap();
+    assert_eq!(now.entity_id.as_str(), "light.moved_away");
+    *light.last_brightness.lock() = Some(42.0);
+    assert_eq!(*now.last_brightness.lock(), Some(42.0));
+}
+
+/// A scene activated while a rename moves it to an id under which
+/// `unknown` was kept: the move's restore comes before the activation,
+/// not over it.
+#[tokio::test]
+async fn an_activation_is_not_restored_over_by_a_move() {
+    let b = bridge(offline());
+    let (old, new) = ("scene.bedroom_bedroom_dimmed", "scene.bedroom_dimmed");
+    let kept = EntityId::parse(new).unwrap();
+    b.hass
+        .set_state(kept.clone(), "unknown", Default::default());
+    b.hass.restore().register(new, None);
+    b.hass.restore().unregister(&b.hass, new);
+    b.hass.remove_state(&kept);
+    let (scene, _) = scene_and_room(&b, old);
+    let moved = changed(
+        &b,
+        |_| {},
+        |e| {
+            if e.entity_id == old {
+                e.entity_id = new.into();
+            }
+        },
+    );
+    let follower = b.clone();
+    AFTER_RENDER.with(|hook| {
+        *hook.borrow_mut() = Some(Box::new(move || follower.follow(moved)));
+    });
+    let _ = scene.activate(None, false, None, None).await;
+    assert!(
+        AFTER_RENDER.with(|hook| hook.borrow().is_none()),
+        "not reached"
+    );
+    let (state, _) = state_json(&b.hass, new).unwrap();
+    assert_ne!(state, "unknown", "the move restored over the activation");
+}
+
 /// A second bridge, sharing the first's hass and services.
 fn second_bridge(first: &Arc<Bridge>, api: Api) -> Arc<Bridge> {
     let resources = fixture("resource")["data"].as_array().unwrap().clone();

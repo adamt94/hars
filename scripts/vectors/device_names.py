@@ -68,7 +68,8 @@ SCENARIOS = [
      " scenes and sensors) and the bridge are named, and each named device's"
      " entities take the ids that follow. Then the motion sensor is named on"
      " its device page (its entities keep their ids), named back, named again"
-     " and given an empty name (its own counts again).",
+     " and given an empty name (its own counts again); and the bridge is given"
+     " its automation switch's whole name.",
      hf.Hue,
      [*hf.ADD,
       area(name="Study", **ds.BLANK),
@@ -96,6 +97,8 @@ SCENARIOS = [
       device(SENSOR, name_by_user=None),
       device(SENSOR, name_by_user="Bed sensor"),
       device(SENSOR, name_by_user=""),
+      # The bridge's switch's own name, whole: its own part is empty.
+      device(BRIDGE, name_by_user="Automation: Go to sleep"),
       *LISTS]),
     ("lifx",
      "The dialog's last step after a LIFX bulb is added: an area is made, the"

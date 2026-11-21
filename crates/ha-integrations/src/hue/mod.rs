@@ -167,12 +167,14 @@ impl Bridge {
         }
         let user = row.and_then(|e| e.name.clone());
         let friendly = user.or_else(|| {
+            // `_async_get_full_entity_name`: the parts that aren't empty.
             let device = device.and_then(|d| device_name(&r, d));
-            match (device, name) {
-                (Some(d), Some(n)) => Some(format!("{d} {n}")),
-                (Some(d), None) => Some(d.to_owned()),
-                (None, n) => n.map(str::to_owned),
-            }
+            let parts: Vec<&str> = [device, name]
+                .into_iter()
+                .flatten()
+                .filter(|part| !part.is_empty())
+                .collect();
+            Some(parts.join(" "))
         });
         if let Some(f) = friendly.filter(|f| !f.is_empty()) {
             a.insert("friendly_name".into(), json!(f));
@@ -262,7 +264,15 @@ impl Bridge {
     }
 
     /// Make entities for resources that have none yet.
+    ///
+    /// Under the write guard, from choosing the ids to handing the
+    /// entities to their components: a rename ([`follow`]) sees each new
+    /// entity in its list and its component, or neither.
     fn add_entities(self: &Arc<Self>) {
+        let alive = self.alive.lock();
+        if !*alive {
+            return;
+        }
         let store = self.store.read();
         let mut new: Vec<Arc<dyn crate::light::Light>> = Vec::new();
         for r in store.of_type("light") {
@@ -424,6 +434,32 @@ impl Bridge {
             }
         };
         self.publish(&e.entity_id, &e.gone, || e.render(self, &self.store.read()));
+    }
+
+    /// A scene activated at `at` (`_async_record_activation`): taken and
+    /// written under the write guard by the entity as it is now, so a
+    /// rename that moves it meanwhile neither loses the activation nor
+    /// restores over it, and a scene removed meanwhile writes nothing.
+    fn activated(&self, e: &HueEntity, at: String) {
+        #[cfg(test)]
+        tests::after_render();
+        let alive = self.alive.lock();
+        if !*alive {
+            return;
+        }
+        let current = self
+            .others
+            .read()
+            .iter()
+            .find(|o| o.rid == e.rid && o.kind == e.kind)
+            .cloned();
+        let Some(e) = current else {
+            return;
+        };
+        e.set_activated(at);
+        if let Some((state, attrs)) = e.render(self, &self.store.read()) {
+            self.hass.set_state(e.entity_id.clone(), state, attrs);
+        }
     }
 
     /// The other entities of a resource, in platform order.
@@ -614,15 +650,20 @@ impl Bridge {
                         )
                     }));
                 if ty == "grouped_light" {
-                    let groups: Vec<_> = self
-                        .groups
-                        .read()
-                        .iter()
-                        .filter(|g| g.rid == id)
-                        .cloned()
-                        .collect();
-                    self.groups.write().retain(|g| g.rid != id);
+                    // Under the write guard, as [`Bridge::remove`]: the
+                    // group goes from where it is now (a rename may have
+                    // given it another id), and nothing writes it after.
+                    let _writes = self.alive.lock();
+                    let mut groups = Vec::new();
+                    self.groups.write().retain(|g| {
+                        let dropped = g.rid == id;
+                        if dropped {
+                            groups.push(g.clone());
+                        }
+                        !dropped
+                    });
                     for g in groups {
+                        g.gone.store(true, std::sync::atomic::Ordering::Relaxed);
                         self.platforms.lights.remove(&g.entity_id);
                         self.hass.remove_state(&g.entity_id);
                     }
