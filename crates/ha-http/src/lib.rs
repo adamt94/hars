@@ -14,13 +14,100 @@ pub use sse::{EventStream, Line};
 use bytes::Bytes;
 use http_body_util::{BodyExt, Full, Limited};
 use hyper::{Request, Uri, header::HeaderMap};
-use hyper_util::client::legacy::{Client as Hyper, connect::HttpConnector};
+use hyper_util::client::legacy::{
+    Client as Hyper,
+    connect::{HttpConnector, dns::Name},
+};
 use hyper_util::rt::TokioExecutor;
+use std::future::Future;
+use std::net::SocketAddr;
+use std::pin::Pin;
 use std::sync::Arc;
+use std::task::{Context, Poll};
 use std::time::Duration;
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
 pub use hyper::{Method, StatusCode, header};
+
+/// DNS resolver used by [`HttpConnector`]. When `public_only` is set, every
+/// resolved IP is validated against private/loopback/link-local/CGNAT ranges
+/// before Hyper connects, so DNS rebinding cannot bypass the policy.
+#[derive(Clone, Copy)]
+struct Resolver {
+    public_only: bool,
+}
+
+impl tower_service::Service<Name> for Resolver {
+    type Response = std::vec::IntoIter<SocketAddr>;
+    type Error = std::io::Error;
+    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
+
+    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
+    }
+
+    fn call(&mut self, name: Name) -> Self::Future {
+        let public_only = self.public_only;
+        Box::pin(async move {
+            let host = name.as_str().trim_matches(['[', ']']);
+            if public_only {
+                let lower = host.trim().trim_end_matches('.').to_ascii_lowercase();
+                if lower == "localhost"
+                    || lower.ends_with(".localhost")
+                    || lower.ends_with(".local")
+                {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::PermissionDenied,
+                        format!("blocked local host: {host}"),
+                    ));
+                }
+            }
+            let addrs: Vec<SocketAddr> = tokio::net::lookup_host((host, 0)).await?.collect();
+            if public_only {
+                if addrs.is_empty() {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::AddrNotAvailable,
+                        format!("no addresses resolved for {host}"),
+                    ));
+                }
+                for addr in &addrs {
+                    if is_private_ip(addr.ip()) {
+                        return Err(std::io::Error::new(
+                            std::io::ErrorKind::PermissionDenied,
+                            format!("blocked private address {} for host {host}", addr.ip()),
+                        ));
+                    }
+                }
+            }
+            Ok(addrs.into_iter())
+        })
+    }
+}
+
+fn is_private_ip(ip: std::net::IpAddr) -> bool {
+    let ip = match ip {
+        std::net::IpAddr::V6(v6) => v6.to_ipv4_mapped().map_or(ip, Into::into),
+        v4 => v4,
+    };
+    match ip {
+        std::net::IpAddr::V4(v4) => {
+            v4.is_loopback()
+                || v4.is_private()
+                || v4.is_link_local()
+                || v4.is_unspecified()
+                || v4.is_broadcast()
+                || v4.is_multicast()
+                || (v4.octets()[0] == 100 && (v4.octets()[1] & 0b1100_0000) == 64)
+        }
+        std::net::IpAddr::V6(v6) => {
+            v6.is_loopback()
+                || v6.is_unspecified()
+                || v6.is_multicast()
+                || (v6.segments()[0] & 0xfe00) == 0xfc00
+                || (v6.segments()[0] & 0xffc0) == 0xfe80
+        }
+    }
+}
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -44,7 +131,7 @@ pub struct Response {
 
 #[derive(Clone)]
 pub struct Client {
-    inner: Hyper<hyper_rustls::HttpsConnector<HttpConnector>, Full<Bytes>>,
+    inner: Hyper<hyper_rustls::HttpsConnector<HttpConnector<Resolver>>, Full<Bytes>>,
     user_agent: header::HeaderValue,
     headers_timeout: Duration,
     total_timeout: Duration,
@@ -54,6 +141,9 @@ pub struct Client {
     /// Headers of the caller's that are credentials too
     /// ([`Builder::credential_header`]).
     credentials: Vec<header::HeaderName>,
+    /// Require `https://` and non-private resolved IPs on every hop (initial
+    /// URL and every redirect).
+    public_https_only: bool,
 }
 
 /// aiohttp's `max_redirects`: the 10th redirect is an error.
@@ -99,6 +189,7 @@ pub struct Builder {
     max_connections: Option<usize>,
     keepalive: bool,
     credentials: Vec<header::HeaderName>,
+    public_https_only: bool,
 }
 
 impl Builder {
@@ -133,8 +224,17 @@ impl Builder {
         self
     }
 
+    /// Require `https://` and reject loopback/private/link-local hosts (after
+    /// DNS resolution) on both the initial request and every redirect hop.
+    pub fn public_https_only(mut self) -> Self {
+        self.public_https_only = true;
+        self
+    }
+
     pub fn build(self) -> Result<Client, Error> {
-        let mut http = HttpConnector::new();
+        let mut http = HttpConnector::new_with_resolver(Resolver {
+            public_only: self.public_https_only,
+        });
         http.enforce_http(false);
         if self.keepalive {
             http.set_keepalive(Some(Duration::from_secs(30)));
@@ -166,6 +266,7 @@ impl Builder {
             max_body: 4 * 1024 * 1024,
             slots: self.max_connections.map(|n| Arc::new(Semaphore::new(n))),
             credentials: self.credentials,
+            public_https_only: self.public_https_only,
         })
     }
 }
@@ -186,6 +287,7 @@ impl Client {
             max_connections: None,
             keepalive: false,
             credentials: Vec::new(),
+            public_https_only: false,
         }
     }
 
@@ -194,6 +296,12 @@ impl Client {
     pub fn with_timeouts(mut self, headers: Duration, total: Duration) -> Self {
         self.headers_timeout = headers;
         self.total_timeout = total;
+        self
+    }
+
+    /// Override the maximum response body size in bytes (default: 4 MiB).
+    pub fn with_max_body(mut self, max_body: usize) -> Self {
+        self.max_body = max_body;
         self
     }
 
@@ -270,6 +378,22 @@ impl Client {
         let mut redirects = 0;
         let mut headers = std::borrow::Cow::Borrowed(headers);
         loop {
+            if self.public_https_only {
+                if !uri
+                    .scheme_str()
+                    .is_some_and(|s| s.eq_ignore_ascii_case("https"))
+                {
+                    return Err(Error::Request("only https:// URLs are allowed".into()));
+                }
+                // Hyper's `HttpConnector` bypasses `Resolver` for IP literals,
+                // so validate literal IPs here on every hop (initial + redirects).
+                if let Some(host) = uri.host()
+                    && let Ok(ip) = host.trim_matches(['[', ']']).parse::<std::net::IpAddr>()
+                    && is_private_ip(ip)
+                {
+                    return Err(Error::Request(format!("blocked private address: {ip}")));
+                }
+            }
             let req = self.build_request(&method, &uri, &headers, body.as_ref())?;
             let res = tokio::time::timeout_at(headers_by, self.inner.request(req))
                 .await
@@ -1181,5 +1305,50 @@ mod tests {
             .expect("closed within 10 s")
             .unwrap();
         assert_eq!(n, 0);
+    }
+
+    #[tokio::test]
+    async fn public_https_only_rejects_http_and_literal_private_ips() {
+        let client = Client::builder("t").public_https_only().build().unwrap();
+        for url in [
+            "http://example.invalid/plugin.json",
+            "https://127.0.0.1/plugin.json",
+            "https://192.168.1.1/plugin.json",
+            "https://10.0.0.1/plugin.json",
+            "https://172.16.0.1/plugin.json",
+            "https://169.254.169.254/latest/meta-data/",
+            "https://100.64.0.1/plugin.json",
+            "https://[::1]/plugin.json",
+            "https://[fc00::1]/plugin.json",
+            "https://[fe80::1]/plugin.json",
+            "https://[::ffff:127.0.0.1]/plugin.json",
+        ] {
+            let err = client.get(url, &[]).await.unwrap_err();
+            assert!(
+                matches!(
+                    &err,
+                    Error::Request(msg)
+                        if msg.contains("https://") || msg.contains("blocked private address")
+                ),
+                "expected policy Error::Request for {url}, got {err:?}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn with_max_body_controls_the_response_limit() {
+        let (url1, _s1) =
+            serve_once("HTTP/1.1 200 OK\r\nContent-Length: 20\r\n\r\n01234567890123456789").await;
+        let small = Client::new("t").unwrap().with_max_body(16);
+        assert!(matches!(
+            small.get(&url1, &[]).await,
+            Err(Error::TooLarge(16))
+        ));
+
+        let (url2, _s2) =
+            serve_once("HTTP/1.1 200 OK\r\nContent-Length: 20\r\n\r\n01234567890123456789").await;
+        let larger = Client::new("t").unwrap().with_max_body(32);
+        let res = larger.get(&url2, &[]).await.unwrap();
+        assert_eq!(&res.body[..], b"01234567890123456789");
     }
 }
