@@ -837,6 +837,13 @@ impl Registry {
     /// deleted rows. `hars` keeps the entities in place and gives the device
     /// `to`'s subentry, so nothing of an imported install is lost on the way.
     pub fn move_devices_to_entry(&self, identifier: &Value, from: &str, to: &str) {
+        // Most bulbs have no device of the old entry: no write at all then.
+        let has = |d: &Device| {
+            d.config_entries.iter().any(|e| e == from) && d.identifiers.contains(identifier)
+        };
+        if !self.snapshot().devices.iter().any(|d| has(d)) {
+            return;
+        }
         let now = now_iso(&self.hass);
         let to_disabled = self.entry_disabled(Some(to));
         self.write(|tx| {
@@ -881,6 +888,11 @@ impl Registry {
                 tx.r.devices[i] = Arc::new(d);
                 tx.device_event(json!({"action": "update", "device_id": id, "changes": changes}));
                 moved.push(id);
+            }
+            // Nothing moved (the device left the old entry meanwhile): the
+            // entities aren't looked at.
+            if moved.is_empty() {
+                return;
             }
             let patch = EntityPatch {
                 config_entry_id: Some(Some(to.to_owned())),
