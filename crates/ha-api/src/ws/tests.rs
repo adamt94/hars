@@ -3199,10 +3199,17 @@ async fn a_client_that_closes_while_its_render_waits_drops_it() {
     tokio::time::sleep(Duration::from_millis(50)).await;
     drop(held);
     let until = tokio::time::Instant::now() + Duration::from_millis(500);
+    // The heavy render, had it started, would hold its permit for its whole
+    // fuel budget. A render of another test running alongside takes one
+    // for a moment, which isn't this render.
+    let mut held_for = Duration::ZERO;
     while tokio::time::Instant::now() < until {
-        assert_eq!(
-            super::template::renders_free(),
-            super::template::RENDERS_AT_ONCE,
+        match super::template::renders_free() == super::template::RENDERS_AT_ONCE {
+            true => held_for = Duration::ZERO,
+            false => held_for += Duration::from_millis(5),
+        }
+        assert!(
+            held_for < Duration::from_millis(50),
             "the render of a closed connection started"
         );
         tokio::time::sleep(Duration::from_millis(5)).await;

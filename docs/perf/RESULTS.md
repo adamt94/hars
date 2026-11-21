@@ -419,6 +419,36 @@ Against HA on the same host and devices: about 1/18th of the memory, 1/13th
 of the CPU, a fifth of the wakeups and a tenth of the start-up time. Within
 the [budgets](../PERF.md#budgets).
 
+### LIFX from the UI, 2026-11-21
+
+LIFX's config flow, its broadcast, the registry rows its set-up makes, and
+a stop hook and reload for its entries. Nothing of it runs on an install
+with no flow open and no LIFX entry: no timer, no task, no socket. The
+broadcast's socket and a flow's socket to a bulb live only within the step
+that uses them (8.5 s for a search, at most 15 s for a bulb that doesn't
+answer) and are closed when it answers. An install with a LIFX entry runs
+what it ran before (the 10 s poll, the 15-minute search), now ended with
+its entry; a state write takes one lock per bulb more. At each start the
+set-up goes over the bulb's five rows; a row that matches costs no copy of
+the registries (the change measured for Hue, 2026-11-21).
+
+Release binary (macOS arm64, stripped, `cargo build --release -p
+ha-server`): main (44c84a9) 9,684,288 bytes, branch 9,734,016 (+49,728):
+the flow, the broadcast, the product table and the row registration.
+
+Idle, a fresh install with no LIFX entry. The Linux gate
+(`scripts/perf-docker.sh`) was not run: Docker was not running on the
+machine and was left that way. Measured on macOS as for Hue (both binaries
+at once, 15 s warm-up, then 60 s):
+
+| | idle wake-ups in 60 s | CPU time in 60 s | RSS | threads |
+|---|---|---|---|---|
+| main (44c84a9) | 0 | 0.00 s | 8,448 KiB | 12 |
+| branch | 0 | 0.00 s | 8,640 KiB | 12 |
+
+RSS moves by a couple of hundred KiB between runs of the same binary
+(Hue's two runs of one main build read 8,592 and 8,448 KiB).
+
 ### Philips Hue from the UI, 2026-11-21
 
 Hue's config flow, its discovery, the registry rows its set-up makes and a
