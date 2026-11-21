@@ -505,6 +505,97 @@ async fn an_ignored_entry_makes_way_for_a_flows() {
     );
 }
 
+/// The client that replaces an ignored entry goes away while the new
+/// entry's first set-up still runs. The ignored entry has left the list
+/// by then, so what remains must not depend on the request: when the
+/// set-up is done, the device that still named the old entry goes and the
+/// removal is told.
+#[tokio::test]
+async fn a_replacement_is_finished_though_its_request_went_away() {
+    let home = home().await;
+    let old = home.entries.new_entry(
+        "switchbot_cloud",
+        "ignore",
+        "Ignored",
+        Some(TOKEN),
+        Map::new(),
+    );
+    let old_id = old["entry_id"].as_str().unwrap().to_owned();
+    home.entries.add(old);
+    home.registry.get_or_create_device(ha_registry::DeviceInfo {
+        config_entry_id: old_id.clone(),
+        identifiers: vec![json!(["switchbot_cloud", "left-behind"])],
+        ..Default::default()
+    });
+    let heard = Arc::new(Mutex::new(Vec::new()));
+    let listener: Listener = {
+        let heard = heard.clone();
+        Box::new(move |change: Change, entry: &Map<String, Value>| {
+            let id = entry["entry_id"].as_str().unwrap().to_owned();
+            heard.lock().push((change, id));
+            true
+        })
+    };
+    home.entries
+        .subscribe(Arc::new(Mutex::new(true)), listener, || {});
+    let FlowResult::Form { flow_id, .. } = home
+        .flows
+        .init("switchbot_cloud", SOURCE_USER)
+        .await
+        .unwrap()
+    else {
+        panic!("no form");
+    };
+    // The flow's own request is let through; the set-up's is held.
+    let hold = Arc::new(tokio::sync::Notify::new());
+    *home.api.hold.lock() = Some(hold.clone());
+    let answer = {
+        let flows = home.flows.clone();
+        tokio::spawn(async move { flows.configure(&flow_id, credentials(TOKEN)).await })
+    };
+    while home.api.count() < 1 {
+        home.api.arrived.notified().await;
+    }
+    hold.notify_one();
+    while home.api.count() < 2 {
+        home.api.arrived.notified().await;
+    }
+    // The old entry is out, the new one in and being set up: the request
+    // is dropped, as a disconnect drops it.
+    let listed = home.entries.list().unwrap();
+    assert_eq!(listed.len(), 1);
+    let new_id = listed[0]["entry_id"].as_str().unwrap().to_owned();
+    assert_ne!(new_id, old_id);
+    answer.abort();
+    let _ = answer.await;
+    let removed = (Change::Removed, old_id.clone());
+    assert!(!heard.lock().contains(&removed), "told before the set-up");
+    *home.api.hold.lock() = None;
+    hold.notify_one();
+    // The set-up ends, and then the rest is done.
+    let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(10);
+    while !heard.lock().contains(&removed) {
+        assert!(
+            tokio::time::Instant::now() < deadline,
+            "the ignored entry's removal was never finished: {:?}",
+            heard.lock()
+        );
+        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+    }
+    assert_eq!(
+        home.entries.runtime(&new_id).map(|r| r.state),
+        Some(EntryState::Loaded)
+    );
+    let rows = home.registry.snapshot();
+    assert!(!rows.devices.is_empty());
+    assert!(
+        rows.devices
+            .iter()
+            .all(|d| d.config_entries == [new_id.clone()]),
+        "a device of the ignored entry was left"
+    );
+}
+
 /// A flow that is left (the dialog closed) is dropped, and an empty list
 /// holds no memory.
 #[tokio::test]

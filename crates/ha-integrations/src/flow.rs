@@ -520,7 +520,11 @@ impl Manager {
     }
 
     /// `async_init`: a new flow for `handler`, at its source's step.
-    pub async fn init(&self, handler: &str, source: &'static str) -> Result<FlowResult, Error> {
+    pub async fn init(
+        self: &Arc<Self>,
+        handler: &str,
+        source: &'static str,
+    ) -> Result<FlowResult, Error> {
         let handler = HANDLERS
             .iter()
             .find(|h| h.domain == handler)
@@ -571,7 +575,7 @@ impl Manager {
     /// `async_configure`: the form's answer (in the order sent), or
     /// `None` to show the current step again.
     pub async fn configure(
-        &self,
+        self: &Arc<Self>,
         flow_id: &str,
         input: Option<Vec<(String, Value)>>,
     ) -> Result<FlowResult, Error> {
@@ -592,7 +596,7 @@ impl Manager {
 
     /// `_async_configure` and `_async_handle_step`: check the answer
     /// against the form being shown, run the step, and keep its result.
-    async fn step(&self, flow_id: &str, input: Input) -> Result<FlowResult, Error> {
+    async fn step(self: &Arc<Self>, flow_id: &str, input: Input) -> Result<FlowResult, Error> {
         let find = |flows: &[Progress]| flows.iter().position(|p| p.flow_id == flow_id);
         let flow = {
             let mut flows = self.flows.lock();
@@ -733,31 +737,47 @@ impl Manager {
         // The flow is over: a request that queued behind this one finds
         // that out now, not when the entry's setup ends.
         drop(flow);
+        // The entry is made, and an ignored one it replaces has left the
+        // list: what is still to do is done on a task of its own, as a
+        // removal is, so that a request that goes away half way (its
+        // client disconnected) leaves nothing half done. Nothing is
+        // awaited between adding the entry and here.
+        //
         // `async_add` awaits `async_setup`: the reply waits for the first
         // setup attempt, so the entry's devices are there when it comes.
-        let runtime = match (started, attempt.await) {
-            (true, Ok(runtime)) => runtime,
-            // The task ended, or was stopped, without a word.
-            (true, Err(_)) => self.entries.runtime(&entry_id),
-            (false, _) => {
-                self.entries
-                    .set_state(&entry_id, EntryState::NotLoaded, None);
-                self.entries.runtime(&entry_id)
-            }
+        let finishing = {
+            let (this, entry_id) = (self.clone(), entry_id.clone());
+            tokio::spawn(async move {
+                let runtime = match (started, attempt.await) {
+                    (true, Ok(runtime)) => runtime,
+                    // The task ended, or was stopped, without a word.
+                    (true, Err(_)) => this.entries.runtime(&entry_id),
+                    (false, _) => {
+                        this.entries
+                            .set_state(&entry_id, EntryState::NotLoaded, None);
+                        this.entries.runtime(&entry_id)
+                    }
+                };
+                // `_async_clean_up` of the entry this one replaced: the
+                // rows the new entry didn't take over, then the news.
+                if let Some(old) = replaced {
+                    if let (Some(registry), Some(id)) = (
+                        this.components.registry(),
+                        old.get("entry_id").and_then(Value::as_str),
+                    ) {
+                        let _one = switchbot_cloud::SETUP.lock();
+                        registry.clear_config_entry(id);
+                    }
+                    this.entries.tell_removed(&old);
+                }
+                this.save(true).await;
+                runtime
+            })
         };
-        // `_async_clean_up` of the entry this one replaced: the rows the
-        // new entry didn't take over, then the news.
-        if let Some(old) = replaced {
-            if let (Some(registry), Some(id)) = (
-                self.components.registry(),
-                old.get("entry_id").and_then(Value::as_str),
-            ) {
-                let _one = switchbot_cloud::SETUP.lock();
-                registry.clear_config_entry(id);
-            }
-            self.entries.tell_removed(&old);
-        }
-        self.save(true).await;
+        let runtime = match finishing.await {
+            Ok(runtime) => runtime,
+            Err(_) => self.entries.runtime(&entry_id),
+        };
         Ok(FlowResult::CreateEntry {
             flow_id: flow_id.to_owned(),
             handler: domain,
