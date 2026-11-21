@@ -105,9 +105,25 @@ pub struct HueLight {
     /// Whether HA's last turn-on set a colour temperature (uncertified
     /// lights only).
     color_temp_active: Mutex<bool>,
+    /// Removed, or moved to another id: writes nothing more.
+    pub(super) gone: std::sync::atomic::AtomicBool,
 }
 
 impl HueLight {
+    /// The same light under another id, with what it keeps between
+    /// commands: HA's entity, added again after its id changed.
+    pub(super) fn moved(&self, entity_id: EntityId) -> Self {
+        Self {
+            bridge: self.bridge.clone(),
+            rid: self.rid.clone(),
+            entity_id,
+            caps: self.caps.clone(),
+            last_brightness: Mutex::new(*self.last_brightness.lock()),
+            color_temp_active: Mutex::new(*self.color_temp_active.lock()),
+            gone: Default::default(),
+        }
+    }
+
     pub fn new(bridge: Weak<Bridge>, resource: &Value, entity_id: EntityId) -> Self {
         let mut features = 0;
         if resource["alert"]["action_values"]
@@ -172,6 +188,7 @@ impl HueLight {
             },
             last_brightness: Mutex::new(None),
             color_temp_active: Mutex::new(false),
+            gone: Default::default(),
         }
     }
 
@@ -484,11 +501,26 @@ pub struct GroupLight {
     pub(super) entity_id: EntityId,
     values: Mutex<GroupValues>,
     restore_brightness: Mutex<Option<f64>>,
+    /// Moved to another id: writes nothing more.
+    pub(super) gone: std::sync::atomic::AtomicBool,
 }
 
 const GROUP_FEATURES: u32 = FEATURE_FLASH | FEATURE_TRANSITION;
 
 impl GroupLight {
+    /// The same group under another id ([`HueLight::moved`]).
+    pub(super) fn moved(&self, entity_id: EntityId) -> Self {
+        Self {
+            bridge: self.bridge.clone(),
+            rid: self.rid.clone(),
+            group: self.group.clone(),
+            entity_id,
+            values: Mutex::new(self.values.lock().clone()),
+            restore_brightness: Mutex::new(*self.restore_brightness.lock()),
+            gone: Default::default(),
+        }
+    }
+
     pub fn new(
         bridge: Weak<Bridge>,
         rid: &str,
@@ -513,6 +545,7 @@ impl GroupLight {
                 dynamics: false,
             }),
             restore_brightness: Mutex::new(None),
+            gone: Default::default(),
         };
         g.update_values(store);
         g

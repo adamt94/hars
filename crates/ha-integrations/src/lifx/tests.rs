@@ -548,7 +548,7 @@ async fn a_command_ends_when_its_entry_is_removed() {
     let coordinator_polls = || f.got.lock().iter().filter(|g| g.0 == ty::LIGHT_GET).count();
     assert!(state(&hass, LIGHT) != Value::Null);
     f.silent.store(true, Ordering::Relaxed);
-    let light = LifxLight(b.clone());
+    let light = LifxLight(b.clone(), b.light_id().unwrap());
     let call = tokio::spawn(async move {
         use crate::light::Light;
         light.turn_off(Default::default()).await
@@ -578,7 +578,8 @@ async fn a_command_ends_when_its_entry_is_removed() {
     assert_eq!(f.got.lock().len(), sent);
     drop(components);
     // A press of a button it still holds reaches nothing either.
-    LifxButton(b.clone(), 0).press().await.unwrap();
+    let id = b.now.lock().buttons[0].entity_id.clone();
+    LifxButton(b.clone(), 0, id).press().await.unwrap();
     assert_eq!(f.got.lock().len(), sent);
     // And its socket is closed, though the bulb is still held: its port
     // is free again.

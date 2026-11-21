@@ -19,6 +19,7 @@
 mod api;
 pub mod config_flow;
 mod entities;
+mod follow;
 mod light;
 mod register;
 mod store;
@@ -56,7 +57,12 @@ pub const COMPONENTS: &[&str] = &["hue", "light", "sensor", "binary_sensor", "sw
 /// One bridge: its API, resources and entities.
 pub struct Bridge {
     hass: Hass,
-    registries: Arc<Registries>,
+    /// The registries as the entities last took them: at set-up, then
+    /// after each registry edit ([`follow`]).
+    registries: RwLock<Arc<Registries>>,
+    /// Bumped, with the write guard held, whenever `registries` is taken
+    /// again: a state made before that is made again before it's written.
+    names: std::sync::atomic::AtomicU64,
     api: Api,
     store: RwLock<Store>,
     /// Device ids whose lights are always available (`options`).
@@ -80,6 +86,37 @@ struct Gone {
     others: Vec<Arc<HueEntity>>,
 }
 
+/// The row of a resource's entity in `domain`.
+fn registry_entity<'a>(
+    r: &'a Registries,
+    domain: &str,
+    unique_id: &str,
+) -> Option<&'a Arc<ha_registry::Entity>> {
+    r.entities.iter().find(|e| {
+        e.platform == DOMAIN
+            && e.entity_id.split('.').next() == Some(domain)
+            && e.unique_id.as_ref().and_then(Value::as_str) == Some(unique_id)
+    })
+}
+
+/// The registry device for a Hue resource id (`("hue", id)`).
+fn registry_device<'a>(r: &'a Registries, hue_id: &str) -> Option<&'a Arc<ha_registry::Device>> {
+    r.devices.iter().find(|d| {
+        d.identifiers
+            .iter()
+            .any(|i| i[0] == DOMAIN && i[1] == hue_id)
+    })
+}
+
+/// A Hue device's (or room's) display name: the user's name for it, else
+/// the bridge's.
+fn device_name<'a>(r: &'a Registries, device: &'a Value) -> Option<&'a str> {
+    let id = device["id"].as_str()?;
+    registry_device(r, id)
+        .and_then(|d| d.name_by_user.as_deref())
+        .or_else(|| device["metadata"]["name"].as_str())
+}
+
 impl Bridge {
     /// `HueBaseEntity.available`: a resource without a device, or whose
     /// device has no zigbee connectivity, is always available; otherwise
@@ -101,44 +138,14 @@ impl Bridge {
         }
     }
 
-    fn registry_entity(&self, domain: &str, unique_id: &str) -> Option<&ha_registry::Entity> {
-        self.registries
-            .entities
-            .iter()
-            .find(|e| {
-                e.platform == DOMAIN
-                    && e.entity_id.split('.').next() == Some(domain)
-                    && e.unique_id.as_ref().and_then(Value::as_str) == Some(unique_id)
-            })
-            .map(|v| &**v)
+    /// The registries as the entities have them now.
+    fn rows(&self) -> Arc<Registries> {
+        self.registries.read().clone()
     }
 
     /// The registered entity id for a resource (any state or none).
     fn registered_id(&self, domain: &str, unique_id: &str) -> Option<String> {
-        self.registry_entity(domain, unique_id)
-            .map(|e| e.entity_id.clone())
-    }
-
-    /// The registry device for a Hue resource id (`("hue", id)`).
-    fn registry_device(&self, hue_id: &str) -> Option<&ha_registry::Device> {
-        self.registries
-            .devices
-            .iter()
-            .find(|d| {
-                d.identifiers
-                    .iter()
-                    .any(|i| i[0] == DOMAIN && i[1] == hue_id)
-            })
-            .map(|v| &**v)
-    }
-
-    /// A Hue device's (or room's) display name: the user's name for it,
-    /// else the bridge's.
-    fn device_name<'a>(&'a self, device: &'a Value) -> Option<&'a str> {
-        let id = device["id"].as_str()?;
-        self.registry_device(id)
-            .and_then(|d| d.name_by_user.as_deref())
-            .or_else(|| device["metadata"]["name"].as_str())
+        registry_entity(&self.rows(), domain, unique_id).map(|e| e.entity_id.clone())
     }
 
     /// `friendly_name`: the registry's name if the user set one, else the
@@ -151,14 +158,14 @@ impl Bridge {
         device: Option<&Value>,
         name: Option<&str>,
     ) {
-        let mut rows = self.registries.entities.iter();
-        let row = rows.find(|e| e.entity_id == id.as_str());
+        let r = self.rows();
+        let row = r.entities.iter().find(|e| e.entity_id == id.as_str());
         if let Some(icon) = row.and_then(|e| e.icon.as_ref()) {
             a.insert("icon".into(), json!(icon));
         }
         let user = row.and_then(|e| e.name.clone());
         let friendly = user.or_else(|| {
-            let device = device.and_then(|d| self.device_name(d));
+            let device = device.and_then(|d| device_name(&r, d));
             match (device, name) {
                 (Some(d), Some(n)) => Some(format!("{d} {n}")),
                 (Some(d), None) => Some(d.to_owned()),
@@ -180,8 +187,8 @@ impl Bridge {
         device: Option<&Value>,
         name: Option<&str>,
     ) {
-        let device_name = device.and_then(|d| self.device_name(d));
-        let unprefixed = match (name, device_name) {
+        let device_name = device.and_then(|d| device_name(&self.rows(), d).map(str::to_owned));
+        let unprefixed = match (name, device_name.as_deref()) {
             (Some(n), Some(d)) => ha_registry::strip_prefix(n, d),
             _ => None,
         };
@@ -199,7 +206,8 @@ impl Bridge {
         name: Option<&str>,
         enabled_default: bool,
     ) -> Option<EntityId> {
-        if let Some(e) = self.registry_entity(domain, unique_id) {
+        let r = self.rows();
+        if let Some(e) = registry_entity(&r, domain, unique_id) {
             if e.disabled_by.is_some() {
                 return None;
             }
@@ -211,11 +219,11 @@ impl Bridge {
         }
         let area = device
             .and_then(|d| d["id"].as_str())
-            .and_then(|id| self.registry_device(id))
+            .and_then(|id| registry_device(&r, id))
             .and_then(|d| d.area_id.as_deref())
-            .and_then(|a| self.registries.areas.iter().find(|x| x.id == a))
+            .and_then(|a| r.areas.iter().find(|x| x.id == a))
             .map(|a| a.name.as_str());
-        let parts: Vec<&str> = [area, device.and_then(|d| self.device_name(d)), name]
+        let parts: Vec<&str> = [area, device.and_then(|d| device_name(&r, d)), name]
             .into_iter()
             .flatten()
             .collect();
@@ -223,7 +231,7 @@ impl Bridge {
         // Ids in the registry, in the state machine, or given to an entity
         // not yet written: each new entity gets its own.
         let taken = |id: &str| {
-            self.registries.entities.iter().any(|e| e.entity_id == id)
+            r.entities.iter().any(|e| e.entity_id == id)
                 || EntityId::parse(id).is_ok_and(|i| self.hass.states().get(&i).is_some())
                 || self
                     .lights
@@ -363,29 +371,40 @@ impl Bridge {
         }
     }
 
-    /// Write a state, unless the entry was stopped.
-    fn write(&self, entity_id: &EntityId, state: String, attrs: Map<String, Value>) {
+    /// Write the state `render` makes under `entity_id`, unless the entry
+    /// was stopped or the entity is `gone` (removed, or moved to another
+    /// id) since the state was made: a service call renders a scene's
+    /// activation on its own task, and the event stream may take the
+    /// scene away in between (a scene that came after set-up has no
+    /// registry row, so nothing else would ever remove that state). A
+    /// state made before the registries were taken again ([`follow`]) is
+    /// made again, so it has the names they have now.
+    fn publish(
+        &self,
+        entity_id: &EntityId,
+        gone: &std::sync::atomic::AtomicBool,
+        render: impl Fn() -> Option<(String, Map<String, Value>)>,
+    ) {
+        use std::sync::atomic::Ordering;
+        let names = self.names.load(Ordering::Acquire);
+        let rendered = render();
+        #[cfg(test)]
+        tests::after_render();
         let alive = self.alive.lock();
-        if *alive {
+        if !*alive || gone.load(Ordering::Relaxed) {
+            return;
+        }
+        let rendered = match self.names.load(Ordering::Acquire) == names {
+            true => rendered,
+            false => render(),
+        };
+        if let Some((state, attrs)) = rendered {
             self.hass.set_state(entity_id.clone(), state, attrs);
         }
     }
 
-    /// Write an entity's state, unless the entry was stopped or the
-    /// entity removed since the state was made: a service call renders a
-    /// scene's activation on its own task, and the event stream may take
-    /// the scene away in between. A scene that came after set-up has no
-    /// registry row, so nothing else would ever remove that state.
     fn write_entity(&self, e: &HueEntity) {
-        let rendered = e.render(self, &self.store.read());
-        #[cfg(test)]
-        tests::after_render();
-        if let Some((state, attrs)) = rendered {
-            let alive = self.alive.lock();
-            if *alive && !e.gone.load(std::sync::atomic::Ordering::Relaxed) {
-                self.hass.set_state(e.entity_id.clone(), state, attrs);
-            }
-        }
+        self.publish(&e.entity_id, &e.gone, || e.render(self, &self.store.read()));
     }
 
     /// The other entities of a resource, in platform order.
@@ -440,6 +459,9 @@ impl Bridge {
         {
             // A write that is being made ends first; none comes after.
             let _writes = self.alive.lock();
+            for l in &gone.lights {
+                l.gone.store(true, std::sync::atomic::Ordering::Relaxed);
+            }
             for e in &gone.others {
                 e.gone.store(true, std::sync::atomic::Ordering::Relaxed);
             }
@@ -469,20 +491,15 @@ impl Bridge {
     }
 
     fn write_light(&self, l: &HueLight) {
-        let rendered = l.render(self, &self.store.read());
-        if let Some((state, attrs)) = rendered {
-            self.write(&l.entity_id, state, attrs);
-        }
+        self.publish(&l.entity_id, &l.gone, || l.render(self, &self.store.read()));
     }
 
     fn write_group(&self, g: &GroupLight) {
-        let store = self.store.read();
-        g.update_values(&store);
-        let rendered = g.render(self, &store);
-        drop(store);
-        if let Some((state, attrs)) = rendered {
-            self.write(&g.entity_id, state, attrs);
-        }
+        self.publish(&g.entity_id, &g.gone, || {
+            let store = self.store.read();
+            g.update_values(&store);
+            g.render(self, &store)
+        });
     }
 
     /// Write every entity (at start), in HA's platform order.
@@ -1088,7 +1105,8 @@ pub async fn run(
         let bridge = Arc::new(Bridge {
             hass,
             // As they are now, with this entry's rows.
-            registries: components.registries(),
+            registries: RwLock::new(components.registries()),
+            names: Default::default(),
             api,
             store: RwLock::new(store),
             ignore_availability: ignore,
@@ -1101,6 +1119,10 @@ pub async fn run(
         platforms.bridges.write().push(Arc::downgrade(&bridge));
         bridge.add_entities();
         bridge.write_all();
+        if let Some(entry_id) = entry.get("entry_id").and_then(Value::as_str) {
+            let follower = Arc::new(follow::Follow(Arc::downgrade(&bridge)));
+            components.follow(entry_id, follower);
+        }
         bridge
     };
     // When this task ends (its entry was removed), everything the bridge

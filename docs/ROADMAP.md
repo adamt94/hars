@@ -620,11 +620,17 @@ ids, addresses, names and coordinates replaced with fake ones
       (`config/area_registry/create`), and the entity ids that follow
       from a new name (`config/entity_registry/get_automatic_entity_ids`,
       then `update` with each `new_entity_id`, as the dialog sends them).
-      SwitchBot Cloud's running entities take a new name (their friendly
-      names) and a new id (the old state goes, the entity writes what it
-      had under the new one, the services find it there) before the
-      command is answered, as HA's entities do; a restart finds the same
-      ids and names. The registry's row and the running entity change one
+      SwitchBot Cloud's, Philips Hue's and LIFX's running entities take a
+      new name (their friendly names) and a new id (the old state goes,
+      the entity writes what it had under the new one, the services find
+      it there) before the command is answered, as HA's entities do; a
+      restart finds the same ids and names. A device whose entities are
+      named the old way (`has_entity_name` false, as Hue's automation
+      switches) takes a name where HA writes none into their rows. Both
+      scenarios of `scripts/vectors/device_names.py` (a Hue bridge's lamp,
+      room and bridge named in the dialog, a sensor named on its page; a
+      LIFX bulb named in the dialog and on its page) match HA's replies,
+      events, rows and states, and after a restart HA's states. The registry's row and the running entity change one
       after the other, not in one step: set-up and removal of an entry
       wait for both, but a service call does not, so one that names the
       device or its area in between can select no entity. A climate
@@ -637,8 +643,8 @@ ids, addresses, names and coordinates replaced with fake ones
       is run in Chromium with the pinned frontend. `hars` differs on
       purpose: what its running entities can't follow is refused in words
       rather than half done (a name for a device that has an entity of
-      an integration other than SwitchBot Cloud, or one whose own name
-      carries the device's, so a device with no entity rows takes a name
+      an integration other than SwitchBot Cloud, Hue or LIFX, or one
+      whose own name carries the device's and has no name of its own, so a device with no entity rows takes a name
       whatever its integration; another id for such an entity; disabling
       or enabling a
       device), and so is any of these changes when the registry file it
@@ -704,10 +710,8 @@ ids, addresses, names and coordinates replaced with fake ones
       flow (`unsupported_device`) where HA makes an entry; flows HA starts
       itself (DHCP, HomeKit, its 15-minute search, the old shared entry's
       migration) don't exist; the RSSI sensor has its row but no readings
-- [ ] Config flows: Hue's options flow, its link flow after a bridge refuses its key,
-      and its entities taking a device's new name (so a Hue device can be
-      named in the dialog's last step, where today only its area can be
-      set); registry rows for Hue resources that appear after set-up, and
+- [ ] Config flows: Hue's options flow, its link flow after a bridge refuses its key;
+      registry rows for Hue resources that appear after set-up, and
       for Hue's button and dial events; taking a device that is gone from
       the bridge out of the registry at set-up;
       options, reauth, reconfigure, discovery
@@ -717,7 +721,7 @@ ids, addresses, names and coordinates replaced with fake ones
       reload view; `logger/log_info` and `entity/source`, which the
       integration's page asks for and works without
 - [ ] Registry edits the rest of the frontend makes: the running
-      entities of Hue, LIFX, `met`, `sun` and the companion app taking a
+      entities of `met`, `sun` and the companion app taking a
       device's new name and an entity's new id (so those devices can be
       renamed); disabling and enabling a device (its entities stop, and
       start after HA's 30 s); `config/area_registry/update`, `delete` and

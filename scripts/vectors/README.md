@@ -39,6 +39,7 @@ rule have no script yet; they are listed
 | `lifx_rows.py` | `ha-integrations/src/lifx/vectors/imported/`: the four store files HA left of a used LIFX install (a light renamed, re-id'd, given an icon and an area, a device renamed and moved, buttons disabled, hidden and renamed, the disabled RSSI sensor renamed, a white light disabled, an entry that disables new entities, a bulb that no longer answers), `states.json`, and `restored.json` (rows removed and coming back, with the preference on and off) | HA 2026.6.1 with `lifx` and aiolifx 1.2.1 started several times on config directories that carry over, against `lifx_flow.py`'s fake bulbs, with `hue_rows.py`'s helpers |
 | `lifx_products.py` | `ha-integrations/src/lifx/products.rs`: aiolifx's product table (the model HA shows, and the features `lifx_features` reads) as Rust | aiolifx 1.2.1's `products_defs` |
 | `device_step.py` | `ha-api/src/config_entries/vectors/device_step.json` (4 scenarios of what the Add integration dialog's last step and the device page's dialog send after SwitchBot Cloud is added: `config/area_registry/create`, `config/device_registry/update`, `config/entity_registry/get_automatic_entity_ids` and `config/entity_registry/update` with a `new_entity_id`, valid and not, from an admin and a user; each with its reply, the `device_registry_updated`, `area_registry_updated`, `entity_registry_updated` and `state_changed` events it fired, and at the end the stored devices, entities and areas and the entities' states) | `config_flow.py`'s Home Assistant (it imports that script's `run`), so `components/config/device_registry.py`, `area_registry.py` and `entity_registry.py` on `helpers/device_registry.py`, `area_registry.py` and `entity_registry.py`, with `switchbot_cloud`'s entities following their rows (`helpers/entity.py`) |
+| `device_names.py` | `ha-api/src/config_entries/vectors/device_names.json` (2 scenarios, in `device_step.py`'s form, of naming a Philips Hue device (a lamp, a room, the bridge, a sensor) and a LIFX bulb in the Add integration dialog's last step and on the device page, with the entity ids that follow; and `restarted`: the states after Home Assistant is started again on the files those changes left) | `config_flow.py`'s Home Assistant with `hue_flow.py`'s fake bridge (aiohue 4.8.1) or `lifx_flow.py`'s fake bulbs (aiolifx 1.2.1), so `hue`'s and `lifx`'s entities following their rows and devices (`helpers/entity.py`) and `helpers/entity_registry.py`'s `async_device_modified`; for `restarted`, `hue_rows.py`'s `boot` started twice on one config directory |
 
 `render_template.py` and `template_functions.py` write two crates'
 vectors because they are two halves of one behaviour: the engine's answers
@@ -176,6 +177,14 @@ library, which imports pycryptodome):
 .venv-template/bin/python -I scripts/vectors/device_step.py
 .venv-template/bin/python -I scripts/vectors/hue_flow.py
 cargo test -p ha-api config_entries && cargo test -p ha-integrations flow
+```
+
+`device_names.py` needs both `hue_flow.py`'s aiohue 4.8.1 and
+`lifx_flow.py`'s aiolifx 1.2.1 in the same virtualenv:
+
+```sh
+.venv-template/bin/python -I scripts/vectors/device_names.py
+cargo test -p ha-api config_entries
 ```
 
 `automation_templates.py` and `automation_reload.py` run each scenario on an event loop whose clock moves only when a step

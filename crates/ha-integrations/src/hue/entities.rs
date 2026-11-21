@@ -293,6 +293,21 @@ impl HueEntity {
         }
     }
 
+    /// The same entity under another id ([`super::light::HueLight::moved`]).
+    /// A scene keeps its last activation unless one was kept under the new
+    /// id ([`HueEntity::restore`], which the caller runs).
+    pub(super) fn moved(&self, entity_id: EntityId) -> Self {
+        Self {
+            bridge: self.bridge.clone(),
+            kind: self.kind,
+            order: self.order,
+            rid: self.rid.clone(),
+            entity_id,
+            activated: Mutex::new(self.activated.lock().clone()),
+            gone: Default::default(),
+        }
+    }
+
     /// A scene restores its last activation (`BaseScene`, a RestoreEntity):
     /// any stored state but `unavailable`, and it's dumped from now on.
     pub(super) fn restore(&self, hass: &ha_core::Hass) {
@@ -368,7 +383,8 @@ impl HueEntity {
                 // In the unit the sensor component settles on (the
                 // user's, the one kept for the row, or the unit
                 // system's), converted from the bridge's °C.
-                let mut rows = bridge.registries.entities.iter();
+                let rows = bridge.rows();
+                let mut rows = rows.entities.iter();
                 let row = rows.find(|e| e.entity_id == self.entity_id.as_str());
                 let unit = crate::sensor::state_unit(&bridge.hass, row.map(|row| &**row));
                 let t = reading(r, "temperature", "temperature").and_then(number);

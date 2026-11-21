@@ -64,7 +64,8 @@ fn bridge(api: Api) -> Arc<Bridge> {
     let resources = fixture("resource")["data"].as_array().unwrap().clone();
     let bridge = Arc::new(Bridge {
         hass,
-        registries,
+        registries: RwLock::new(registries),
+        names: Default::default(),
         api,
         store: RwLock::new(Store::new(resources)),
         ignore_availability: Vec::new(),
@@ -695,12 +696,117 @@ async fn a_scene_deleted_while_it_is_activated_leaves_no_state() {
     assert!(b.others.read().iter().all(|e| e.entity_id.as_str() != id));
 }
 
+/// The registries `b` has, with `change` made to a copy of each row.
+fn changed(
+    b: &Bridge,
+    device: impl Fn(&mut ha_registry::Device),
+    entity: impl Fn(&mut ha_registry::Entity),
+) -> Arc<Registries> {
+    let mut r = (*b.rows()).clone();
+    for d in &mut r.devices {
+        let mut row = (**d).clone();
+        device(&mut row);
+        *d = Arc::new(row);
+    }
+    for e in &mut r.entities {
+        let mut row = (**e).clone();
+        entity(&mut row);
+        *e = Arc::new(row);
+    }
+    Arc::new(r)
+}
+
+/// The scene `id` and the Hue id of its room.
+fn scene_and_room(b: &Bridge, id: &str) -> (Arc<HueEntity>, String) {
+    let scene = b
+        .others
+        .read()
+        .iter()
+        .find(|e| e.entity_id.as_str() == id)
+        .cloned();
+    let scene = scene.unwrap();
+    let store = b.store.read();
+    let r = store.get(&scene.rid).unwrap();
+    let room = HueEntity::device(scene.kind, &scene.rid, r, &store).unwrap();
+    let room = room["id"].as_str().unwrap().to_owned();
+    (scene.clone(), room)
+}
+
+/// A state made before the user names the device is made again with the
+/// new name before it's written: a scene activated (its state made on the
+/// service call's task) while its room is named shows the room's new name,
+/// not the old one written over the follow's.
+#[tokio::test]
+async fn a_state_made_before_a_device_is_named_takes_the_new_name() {
+    let b = bridge(offline());
+    let id = "scene.bedroom_bedroom_dimmed";
+    let (scene, room) = scene_and_room(&b, id);
+    let named = changed(
+        &b,
+        |d| {
+            if d.identifiers.iter().any(|i| i[1] == room.as_str()) {
+                d.name_by_user = Some("Main bedroom".into());
+            }
+        },
+        |_| {},
+    );
+    let follower = b.clone();
+    AFTER_RENDER.with(|hook| {
+        *hook.borrow_mut() = Some(Box::new(move || follower.follow(named)));
+    });
+    let _ = scene.activate(None, false, None, None).await;
+    assert!(
+        AFTER_RENDER.with(|hook| hook.borrow().is_none()),
+        "not reached"
+    );
+    let (_, attributes) = state_json(&b.hass, id).unwrap();
+    assert_eq!(attributes["friendly_name"], "Main bedroom Dimmed");
+}
+
+/// An entity given another id while a state of it is being made writes
+/// that state nowhere: its old id has none, and the entity runs under the
+/// new one, where it writes.
+#[tokio::test]
+async fn an_entity_moved_while_its_state_is_made_writes_only_under_its_new_id() {
+    let b = bridge(offline());
+    let (old, new) = ("scene.bedroom_bedroom_dimmed", "scene.bedroom_dimmed");
+    let (scene, _) = scene_and_room(&b, old);
+    let moved = changed(
+        &b,
+        |_| {},
+        |e| {
+            if e.entity_id == old {
+                e.entity_id = new.into();
+            }
+        },
+    );
+    let follower = b.clone();
+    AFTER_RENDER.with(|hook| {
+        *hook.borrow_mut() = Some(Box::new(move || follower.follow(moved)));
+    });
+    let _ = scene.activate(None, false, None, None).await;
+    assert!(
+        AFTER_RENDER.with(|hook| hook.borrow().is_none()),
+        "not reached"
+    );
+    assert_eq!(state_json(&b.hass, old), None);
+    let (_, attributes) = state_json(&b.hass, new).unwrap();
+    assert_eq!(attributes["friendly_name"], "Bedroom Dimmed");
+    let running = b.others.read().iter().any(|e| e.entity_id.as_str() == new);
+    assert!(running);
+    // What still holds the entity under its old id writes nothing more.
+    assert!(scene.gone.load(std::sync::atomic::Ordering::Relaxed));
+    b.write_entity(&scene);
+    assert_eq!(state_json(&b.hass, old), None);
+}
+
 /// A second bridge, sharing the first's hass and services.
 fn second_bridge(first: &Arc<Bridge>, api: Api) -> Arc<Bridge> {
     let resources = fixture("resource")["data"].as_array().unwrap().clone();
     let b = Arc::new(Bridge {
         hass: first.hass.clone(),
-        registries: first.registries.clone(),
+        registries: RwLock::new(first.rows()),
+        names: Default::default(),
         api,
         store: RwLock::new(Store::new(resources)),
         ignore_availability: Vec::new(),
@@ -868,7 +974,8 @@ async fn scenes_restore_their_last_activation() {
     ));
     let b = Arc::new(Bridge {
         hass: hass.clone(),
-        registries,
+        registries: RwLock::new(registries),
+        names: Default::default(),
         api: offline(),
         store: RwLock::new(Store::new(
             fixture("resource")["data"].as_array().unwrap().clone(),

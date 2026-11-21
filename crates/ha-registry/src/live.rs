@@ -137,8 +137,9 @@ pub enum DeviceRefusal {
     Disable,
     /// A new name, for a device with an entity that can't take it: one
     /// of the integration named, whose running entities keep the name
-    /// they started with, or one named the old way (`None`), whose own
-    /// name HA rewrites.
+    /// they started with, or one named the old way (`None`) with no name
+    /// of its own and one that starts with the device's, which HA
+    /// rewrites.
     Rename(Option<String>),
 }
 
@@ -674,21 +675,35 @@ impl Registry {
                     changes.insert("labels".into(), json!(old));
                 }
             }
+            // The name the device had, when the user names it.
+            let mut renamed = None;
             if let Some(name) = &patch.name_by_user
                 && d.name_by_user != *name
             {
+                let old_name = d.display_name().map(str::to_owned);
                 let cant = tx.r.entities.iter().find_map(|e| {
                     (e.device_id.as_deref() == Some(device_id)).then_some(())?;
-                    match e.has_entity_name {
-                        false => Some(None),
-                        true => (!follows(&e.platform)).then(|| Some(e.platform.clone())),
+                    // `async_device_modified` gives a legacy-named entity
+                    // with no name of its own whose name starts with the
+                    // device's a name made from the new one.
+                    let named = !e.has_entity_name
+                        && e.name.is_none()
+                        && e.original_name
+                            .as_deref()
+                            .zip(old_name.as_deref())
+                            .and_then(|(own, device)| strip_prefix(own, device))
+                            .is_some();
+                    if named {
+                        return Some(None);
                     }
+                    (!follows(&e.platform)).then(|| Some(e.platform.clone()))
                 });
                 if let Some(platform) = cant {
                     return Err(DeviceRefusal::Rename(platform));
                 }
                 changes.insert("name_by_user".into(), json!(d.name_by_user));
                 d.name_by_user.clone_from(name);
+                renamed = Some(old_name);
             }
             if changes.is_empty() {
                 return Ok(tx.r.devices[i].clone());
@@ -714,6 +729,9 @@ impl Registry {
             tx.device_event(
                 json!({"action": "update", "device_id": device.id, "changes": changes}),
             );
+            if let Some(old_name) = renamed {
+                device_renamed(tx, &device, old_name.as_deref(), &now);
+            }
             let enable = EntityPatch {
                 disabled_by: Some(None),
                 ..Default::default()

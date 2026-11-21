@@ -215,8 +215,11 @@ that id). The edit and the entities' move happen under the lock that
 entries are set up and removed under, so neither a set-up nor a removal
 sees rows the entities have not caught up with, and an entity writes its
 state under the lock its id is changed under, so no write lands on an id
-it has just left. `components::follows` lists the integrations that do
-this (today `switchbot_cloud`); the registry refuses a change the others'
+it has just left. (A Hue state is made before the lock is taken, so it is
+made again under the lock if the bridge took the registries again in
+between, and an entity moved to another id writes nothing more.)
+`components::follows` lists the integrations that do this (today
+`switchbot_cloud`, `hue` and `lifx`); the registry refuses a change the others'
 entities would not follow (`ha_registry::DeviceRefusal`,
 `RenameRefusal`), and one whose store it would not write
 (`Registry::unwritable`: a version refusal, known before the change; a

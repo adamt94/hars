@@ -27,7 +27,12 @@ pub trait Follower: Send + Sync {
 /// another keep the name and id they started with until it is set up
 /// again, so a change that would reach them is refused.
 pub fn follows(platform: &str) -> bool {
-    platform == crate::switchbot_cloud::DOMAIN
+    [
+        crate::switchbot_cloud::DOMAIN,
+        crate::hue::DOMAIN,
+        crate::lifx::DOMAIN,
+    ]
+    .contains(&platform)
 }
 
 pub struct Components {

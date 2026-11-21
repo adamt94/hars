@@ -887,6 +887,17 @@ async fn replay_slowly(scenario: &Value, pause: std::time::Duration) {
             // Each subscription's events by row, a row's own in order.
             let order = |e: &Value| subs.iter().position(|(sub, _)| e["sub"] == *sub);
             events.sort_by_key(|e| (order(e), by_row(e)));
+            // A Hue group's sets, sorted as `device_names.py` sorts them.
+            for event in &mut events {
+                for key in ["old_state", "new_state"] {
+                    let state = event
+                        .pointer_mut(&format!("/event/data/{key}/attributes"))
+                        .filter(|a| a.is_object());
+                    if let Some(a) = state {
+                        sort_sets(a);
+                    }
+                }
+            }
         }
         assert_eq!(json!(events), json!(want), "{at}");
     }
@@ -945,12 +956,7 @@ async fn replay_slowly(scenario: &Value, pause: std::time::Duration) {
             let id = ha_core::EntityId::parse(e["entity_id"].as_str()?).ok()?;
             let state = home.server.hass.states().get(&id)?;
             let mut attributes = json!(state.attributes);
-            // Sets in HA, written sorted by `hue_flow.py`.
-            for key in ["hue_scenes", "lights", "entity_id"] {
-                if let Some(set) = attributes.get_mut(key).and_then(Value::as_array_mut) {
-                    set.sort_by_key(Value::to_string);
-                }
-            }
+            sort_sets(&mut attributes);
             let state = json!({"state": state.state, "attributes": attributes});
             Some((id.to_string(), state))
         })
@@ -974,6 +980,16 @@ async fn replay_slowly(scenario: &Value, pause: std::time::Duration) {
         orphans.is_empty(),
         "{name}: states with no row: {orphans:?}"
     );
+}
+
+/// A Hue group's `hue_scenes`, `lights` and `entity_id`: sets in HA,
+/// written sorted by the generators.
+fn sort_sets(attributes: &mut Value) {
+    for key in ["hue_scenes", "lights", "entity_id"] {
+        if let Some(set) = attributes.get_mut(key).and_then(Value::as_array_mut) {
+            set.sort_by_key(Value::to_string);
+        }
+    }
 }
 
 /// Two lists of registry rows are the same; if not, the first row that
@@ -1143,6 +1159,218 @@ async fn devices_and_areas_are_edited_as_home_assistant() {
     for scenario in scenarios {
         replay(scenario).await;
     }
+}
+
+/// A Hue or LIFX device named in the dialog's last step and on its page
+/// (`vectors/device_names.json`, from `scripts/vectors/device_names.py`):
+/// its entities take the new name in their friendly names at once, then
+/// the ids that follow from it, as HA's do; the rows, files and states end
+/// as HA's.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn hue_and_lifx_devices_are_named_as_in_home_assistant() {
+    let all: Value = serde_json::from_str(include_str!("vectors/device_names.json")).unwrap();
+    let scenarios = all["scenarios"].as_array().unwrap();
+    assert_eq!(scenarios.len(), 2);
+    for scenario in scenarios {
+        replay(scenario).await;
+    }
+}
+
+/// The device and entity registry changes a scenario of
+/// `vectors/device_names.json` sends, made as the WebSocket commands make
+/// them (with the entities following).
+fn name_devices(scenario: &Value, registry: &ha_registry::Registry, components: &Components) {
+    let follows = &ha_integrations::components::follows;
+    let text = |msg: &Value, key: &str| msg.get(key).map(|v| v.as_str().map(str::to_owned));
+    for step in scenario["steps"].as_array().unwrap() {
+        let Some(msg) = step.pointer("/ws/msg") else {
+            continue;
+        };
+        match msg["type"].as_str().unwrap() {
+            "config/area_registry/create" => {
+                let name = msg["name"].as_str().unwrap().to_owned();
+                let new = ha_registry::NewArea {
+                    name,
+                    ..Default::default()
+                };
+                registry.create_area(new).unwrap();
+            }
+            "config/device_registry/update" => {
+                let placeholder = msg["device_id"].as_str().unwrap();
+                let identifier = &placeholder["<device:".len()..placeholder.len() - 1];
+                let r = registry.snapshot();
+                let device = r.devices.iter().find(|d| d.identifiers[0][1] == identifier);
+                let patch = ha_registry::DevicePatch {
+                    area_id: text(msg, "area_id"),
+                    name_by_user: text(msg, "name_by_user"),
+                    ..Default::default()
+                };
+                let id = &device.unwrap().id;
+                components
+                    .registry_edit(|| registry.update_device(id, &patch, follows))
+                    .unwrap();
+            }
+            "config/entity_registry/update" => {
+                let (old, new) = (msg["entity_id"].as_str(), msg["new_entity_id"].as_str());
+                let patch = Default::default();
+                components
+                    .registry_edit(|| {
+                        registry.rename_entity(old.unwrap(), new.unwrap(), &patch, follows)
+                    })
+                    .unwrap();
+            }
+            _ => {}
+        }
+    }
+}
+
+/// The same states, or the first that differs.
+fn same_states(got: &Map<String, Value>, want: &Map<String, Value>, what: &str) {
+    for (id, state) in want {
+        assert_eq!(got.get(id), Some(state), "{what}: {id}");
+    }
+    let extra: Vec<&String> = got.keys().filter(|id| !want.contains_key(*id)).collect();
+    assert!(extra.is_empty(), "{what}: states HA hasn't: {extra:?}");
+}
+
+/// A Hue and a LIFX device named in the dialog's last step, and their
+/// entities given the ids that follow (`vectors/device_names.json`'s
+/// changes), keep their names and ids after a restart: the store files
+/// are left as they were, byte for byte, and the states are HA's after its
+/// restart (`restarted`: a room's light group lists its member's new id
+/// now), under the new ids, with none left under an old one.
+#[test]
+fn named_hue_and_lifx_devices_keep_their_names_across_a_restart() {
+    let all: Value = serde_json::from_str(include_str!("vectors/device_names.json")).unwrap();
+    for scenario in all["scenarios"].as_array().unwrap() {
+        named_across_a_restart(scenario);
+    }
+}
+
+/// [`named_hue_and_lifx_devices_keep_their_names_across_a_restart`] for
+/// one scenario, on an install of its own.
+fn named_across_a_restart(scenario: &Value) {
+    let name = scenario["name"].as_str().unwrap();
+    let dir = std::env::temp_dir().join(format!("hars-named-{name}-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(dir.join(".storage")).unwrap();
+    let outer = tokio::runtime::Runtime::new().unwrap();
+    let (base, api) = outer.block_on(FakeApi::start());
+    let endpoints = Endpoints {
+        hue_discovery: format!("{base}/discovery"),
+        hue_bridge: Some(base.clone()),
+        lifx: api.lifx.at.clone(),
+        ..Default::default()
+    };
+    // `hars` started on the directory.
+    let start = |hass: &Hass| {
+        let entries = ConfigEntries::load(hass, &dir);
+        let loaded = ha_registry::Registries::load(&dir).unwrap();
+        let registry = ha_registry::Registry::new(hass, &dir, loaded);
+        let lookup = entries.clone();
+        registry.set_entry_lookup(Arc::new(move |id: &str| lookup.info(id)));
+        let stored = entries.list();
+        let started = ha_integrations::start(
+            hass,
+            registry.clone().into(),
+            stored.as_deref(),
+            Default::default(),
+            &endpoints,
+            Some(&entries),
+        );
+        let components = started.components.clone();
+        let flows = Manager::new(
+            hass,
+            entries.clone(),
+            started.components,
+            endpoints.clone(),
+            started.tasks,
+            None,
+        )
+        .unwrap();
+        (entries, registry, flows, components)
+    };
+    fn run<T>(life: impl Future<Output = T>) -> T {
+        tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(2)
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(life)
+    }
+    let files = || {
+        [
+            "core.config_entries",
+            "core.device_registry",
+            "core.entity_registry",
+            "core.area_registry",
+        ]
+        .map(|name| std::fs::read_to_string(dir.join(".storage").join(name)).unwrap())
+    };
+    // Every state but `sun`'s (which `hars` starts on its own), as the
+    // generator writes HA's.
+    let states = |hass: &Hass| -> Map<String, Value> {
+        hass.states()
+            .all()
+            .iter()
+            .filter(|s| {
+                s.entity_id.as_str() != "sun.sun"
+                    && !s.entity_id.as_str().starts_with("sensor.sun_")
+            })
+            .map(|s| {
+                let mut attributes = json!(s.attributes);
+                sort_sets(&mut attributes);
+                let state = json!({"state": s.state, "attributes": attributes});
+                (s.entity_id.to_string(), state)
+            })
+            .collect()
+    };
+
+    // Added from the UI, then named.
+    api.set("pressed");
+    let named = run(async {
+        use ha_integrations::flow::{FlowResult, SOURCE_USER};
+        let hass = Hass::new();
+        let (entries, registry, flows, components) = start(&hass);
+        let added = match name {
+            "hue" => {
+                let answers = [Some(json!({"id": "c42996000001"})), Some(json!({}))];
+                hue_flow(&flows, &answers).await
+            }
+            _ => {
+                let FlowResult::Form { flow_id, .. } =
+                    flows.init("lifx", SOURCE_USER).await.unwrap()
+                else {
+                    panic!("no form");
+                };
+                let input = vec![("host".to_owned(), json!(lifx_fake::COLOUR))];
+                flows.configure(&flow_id, Some(input)).await.unwrap()
+            }
+        };
+        assert!(matches!(added, FlowResult::CreateEntry { .. }), "{added:?}");
+        name_devices(scenario, &registry, &components);
+        entries.flush().await;
+        registry.flush().await;
+        states(&hass)
+    });
+    // HA's states at the end of the scenario.
+    let want = scenario["states"].as_object().unwrap().clone();
+    same_states(&named, &want, &format!("{name}: the states once named"));
+    let before = files();
+
+    run(async {
+        let hass = Hass::new();
+        let (entries, registry, _flows, _components) = start(&hass);
+        hass.setups_done().await;
+        assert_eq!(entries.list().unwrap().len(), 1);
+        registry.write_unavailable_states(&hass);
+        entries.flush().await;
+        registry.flush().await;
+        let want = scenario["restarted"].as_object().unwrap();
+        same_states(&states(&hass), want, &format!("{name}: after a restart"));
+    });
+    assert!(files() == before, "{name}: a restart changed a store file");
+    let _ = std::fs::remove_dir_all(&dir);
 }
 
 /// Without a flow manager (`ApiConfig::flows`), the views aren't there.
@@ -1448,8 +1676,8 @@ fn rows_of(home: &Home) -> Value {
 /// What `hars`'s running entities can't follow is refused in words, and
 /// changes nothing: disabling a device (HA stops its entities), a name for
 /// a device with an entity of an integration that keeps the name it
-/// started with, or with one whose own name carries the device's (HA
-/// rewrites that name), and another id for such an entity. The same
+/// started with (`met`), or with one whose own name carries the device's
+/// (HA rewrites that name), and another id for such an entity. The same
 /// device can still be moved and labelled. None of this is in HA.
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn what_running_entities_cant_follow_is_refused() {
@@ -1468,7 +1696,7 @@ async fn what_running_entities_cant_follow_is_refused() {
     // Another integration's device, with an entity named after it, and a
     // companion app's, whose entity carries the device's name in its own.
     for (domain, platform, has_entity_name, name) in [
-        ("light", "hue", true, None),
+        ("weather", "met", true, None),
         ("sensor", "mobile_app", false, Some("Phone Battery")),
     ] {
         let made = home.registry.get_or_create_device(ha_registry::DeviceInfo {
@@ -1502,15 +1730,15 @@ async fn what_running_entities_cant_follow_is_refused() {
             .await,
     );
     assert_eq!(said, "hars can't disable or enable a device yet");
-    let hue = device("1");
+    let met = device("1");
     let said = refused(
         admin
-            .call(&update(hue.clone(), json!({"name_by_user": "Lamp"})))
+            .call(&update(met.clone(), json!({"name_by_user": "Lamp"})))
             .await,
     );
     assert_eq!(
         said,
-        "hars can't rename a device of the hue integration yet"
+        "hars can't rename a device of the met integration yet"
     );
     let phone = home.registry.snapshot().devices[4].id.clone();
     let said = refused(
@@ -1522,19 +1750,19 @@ async fn what_running_entities_cant_follow_is_refused() {
             .await,
     );
     assert!(said.contains("carry its name"), "{said}");
-    let msg = json!({"type": "config/entity_registry/update", "entity_id": "light.phone",
-                     "new_entity_id": "light.lamp", "area_id": "hall"});
+    let msg = json!({"type": "config/entity_registry/update", "entity_id": "weather.phone",
+                     "new_entity_id": "weather.lamp", "area_id": "hall"});
     let said = refused(admin.call(&msg).await);
     assert_eq!(
         said,
-        "hars can't change the id of an entity of the hue integration yet"
+        "hars can't change the id of an entity of the met integration yet"
     );
     assert_eq!(rows_of(&home), before, "a refused change changed something");
 
     // What needs no entity to follow is taken, for any device.
     let fields = json!({"name_by_user": null, "disabled_by": null, "area_id": "hall",
                         "labels": ["lamps"]});
-    let replies = admin.call(&update(hue, fields)).await;
+    let replies = admin.call(&update(met, fields)).await;
     assert_eq!(replies[0]["result"]["area_id"], "hall", "{replies:?}");
     assert_eq!(replies[0]["result"]["labels"], json!(["lamps"]));
 }

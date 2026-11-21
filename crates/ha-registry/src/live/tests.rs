@@ -1286,6 +1286,77 @@ fn a_device_change_enables_what_its_disable_disabled() {
     assert_eq!(ids[0].1.as_deref(), Some("sensor.switchbot_cloud_u1"));
 }
 
+/// A device with legacy-named entities (`has_entity_name` false) can be
+/// named when HA's `async_device_modified` writes no name for them: their
+/// rows stay as they are. One whose own name starts with the device's and
+/// has no name the user gave would be given one: that is refused.
+#[test]
+fn a_device_with_legacy_named_entities_is_named_where_ha_writes_no_name() {
+    let hass = Hass::new();
+    let legacy = |id: &str, original: &str, name: Option<&str>| {
+        Arc::new(Entity {
+            entity_id: id.to_owned(),
+            platform: "hue".into(),
+            unique_id: Some(json!(id)),
+            has_entity_name: false,
+            device_id: Some("dev".into()),
+            original_name: Some(original.to_owned()),
+            name: name.map(str::to_owned),
+            ..Default::default()
+        })
+    };
+    let registry = |entities| {
+        Registry::in_memory(
+            &hass,
+            Registries {
+                devices: vec![Arc::new(Device {
+                    id: "dev".into(),
+                    name: Some("Hue Bridge".into()),
+                    ..Default::default()
+                })],
+                entities,
+                ..Default::default()
+            },
+        )
+    };
+    let named = |name: &str| DevicePatch {
+        name_by_user: Some(Some(name.into())),
+        ..Default::default()
+    };
+    let follows = |platform: &str| platform == "hue";
+
+    let reg = registry(vec![
+        legacy("switch.sleep", "Automation: Go to sleep", None),
+        legacy("switch.wake", "Hue Bridge Wake up", Some("Wake")),
+    ]);
+    let mut rx = hass.bus().subscribe();
+    let device = reg.update_device("dev", &named("Hub"), &follows).unwrap();
+    assert_eq!(device.name_by_user.as_deref(), Some("Hub"));
+    // The one whose unprefixed name changes ("Wake up" before, none now)
+    // is touched, with no change to show.
+    let fired = events(&mut rx);
+    assert_eq!(fired.len(), 2, "{fired:?}");
+    assert_eq!(
+        fired[1].1,
+        json!({"action": "update", "entity_id": "switch.wake", "changes": {}})
+    );
+    let r = reg.snapshot();
+    assert_eq!(r.entities[0].modified_at, None);
+    assert_eq!(r.entities[1].name.as_deref(), Some("Wake"));
+    // An integration whose entities don't follow is still refused.
+    assert_eq!(
+        reg.update_device("dev", &named("Bridge"), &|_| false).err(),
+        Some(DeviceRefusal::Rename(Some("hue".into())))
+    );
+
+    let reg = registry(vec![legacy("switch.wake", "Hue Bridge Wake up", None)]);
+    assert_eq!(
+        reg.update_device("dev", &named("Hub"), &follows).err(),
+        Some(DeviceRefusal::Rename(None))
+    );
+    assert_eq!(reg.snapshot().devices[0].name_by_user, None);
+}
+
 /// `async_get_device`: a device is found by its identifier before any
 /// device that only shares an address with it (another integration's row
 /// for the same hardware, listed first, is not taken over); with no
