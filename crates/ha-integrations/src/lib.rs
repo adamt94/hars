@@ -14,6 +14,7 @@ pub mod mobile_app;
 pub mod naming;
 pub mod num;
 pub mod onboarding;
+pub mod plugin;
 pub mod scene;
 pub(crate) mod sensor;
 pub mod sun;
@@ -335,6 +336,72 @@ pub fn start(
         components,
         tasks,
     }
+}
+
+/// Start enabled config entries belonging to installed plugins. Returns the
+/// plugin domains that were started (for `get_config`'s `components`), and
+/// appends their tasks to `tasks`.
+pub fn start_plugin_entries(
+    plugins: &Arc<plugin::PluginManager>,
+    components: &Arc<components::Components>,
+    entries: Option<&[Map<String, Value>]>,
+    store: Option<&Arc<config_entries::ConfigEntries>>,
+    tasks: &mut Vec<Running>,
+) -> Vec<String> {
+    let mut started = Vec::new();
+    for entry in entries.unwrap_or_default() {
+        let disabled = entry.get("disabled_by").is_some_and(|d| !d.is_null());
+        if disabled || config_entries::ignored(entry) {
+            continue;
+        }
+        let Some(domain) = entry.get("domain").and_then(Value::as_str) else {
+            continue;
+        };
+        let Some(installed) = plugins.get(domain) else {
+            continue;
+        };
+        let max_ver = u64::from(installed.manifest.capabilities.config_entry_version);
+        if entry
+            .get("version")
+            .and_then(Value::as_u64)
+            .is_some_and(|v| v > max_ver)
+        {
+            let title = entry
+                .get("title")
+                .and_then(Value::as_str)
+                .unwrap_or_default();
+            tracing::error!(
+                "Migration handler not found for plugin entry {title} for {domain} (version > {max_ver})"
+            );
+            continue;
+        }
+        let entry_id = entry
+            .get("entry_id")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_owned();
+        let status = match store {
+            Some(store) => config_entries::Status::new(store.clone(), &entry_id),
+            None => config_entries::Status::none(),
+        };
+        let entry_clone = entry.clone();
+        let mut spawned = false;
+        let running = Running::start(&entry_id, status, |status| {
+            if let Some(handle) = plugins.spawn_entry(domain, components, entry_clone, status) {
+                spawned = true;
+                handle
+            } else {
+                tokio::spawn(async {})
+            }
+        });
+        if spawned {
+            tasks.push(running);
+            if !started.iter().any(|d| d == domain) {
+                started.push(domain.to_owned());
+            }
+        }
+    }
+    started
 }
 
 #[cfg(test)]

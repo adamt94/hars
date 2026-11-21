@@ -52,13 +52,15 @@
 
 use crate::components::Components;
 use crate::config_entries::{ConfigEntries, EntryState, Status};
+use crate::plugin::{PluginManager, STORE_DOMAIN};
 use crate::{Endpoints, Running, switchbot_cloud};
 use ha_core::Hass;
 use parking_lot::Mutex;
 use serde_json::{Map, Value, json};
+use std::borrow::Cow;
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 use tokio::time::Instant;
 
@@ -116,7 +118,7 @@ pub struct Cx<'a> {
     /// Where the integrations' services are.
     pub endpoints: &'a Endpoints,
     entries: &'a ConfigEntries,
-    domain: &'static str,
+    domain: &'a str,
     unique_id: &'a mut Option<String>,
     /// An entry to reload once the step has answered
     /// (`async_schedule_reload`).
@@ -212,12 +214,12 @@ impl Cx<'_> {
 /// A form's field: a key of its `vol.Schema` and what it accepts.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Field {
-    pub name: &'static str,
+    pub name: Cow<'static, str>,
     /// `vol.Required` (else `vol.Optional`).
     pub required: bool,
     pub kind: Kind,
     /// `vol.Optional(name, default=…)`: what a form sent without it gets.
-    pub default: Option<&'static str>,
+    pub default: Option<Cow<'static, str>>,
 }
 
 /// What a field accepts. A flow that needs a choice (`vol.In`) adds its
@@ -239,7 +241,7 @@ impl Field {
     /// `vol.Required(name): kind`.
     pub const fn required(name: &'static str, kind: Kind) -> Self {
         Self {
-            name,
+            name: Cow::Borrowed(name),
             required: true,
             kind,
             default: None,
@@ -249,10 +251,10 @@ impl Field {
     /// `vol.Optional(name, default=default): str`.
     pub const fn optional_str(name: &'static str, default: &'static str) -> Self {
         Self {
-            name,
+            name: Cow::Borrowed(name),
             required: false,
             kind: Kind::Str,
-            default: Some(default),
+            default: Some(Cow::Borrowed(default)),
         }
     }
 
@@ -269,7 +271,7 @@ impl Field {
         if !self.required {
             field["optional"] = json!(true);
         }
-        if let Some(default) = self.default {
+        if let Some(default) = &self.default {
             field["default"] = json!(default);
         }
         field
@@ -319,7 +321,7 @@ fn validate(
     let mut base = Vec::new();
     let mut values = Map::new();
     for (key, value) in input {
-        match schema.iter().find(|f| f.name == key) {
+        match schema.iter().find(|f| f.name.as_ref() == key) {
             Some(field) => match field.check(&value) {
                 Ok(()) => {
                     values.insert(key, value);
@@ -332,13 +334,16 @@ fn validate(
         }
     }
     for field in schema {
-        if values.contains_key(field.name) || errors.contains_key(field.name) {
+        if values.contains_key(field.name.as_ref()) || errors.contains_key(field.name.as_ref()) {
             continue;
         }
-        if let Some(default) = field.default {
-            values.insert(field.name.into(), json!(default));
+        if let Some(default) = &field.default {
+            values.insert(field.name.as_ref().into(), json!(default));
         } else if field.required {
-            errors.insert(field.name.into(), json!("required key not provided"));
+            errors.insert(
+                field.name.as_ref().into(),
+                json!("required key not provided"),
+            );
         }
     }
     if !base.is_empty() {
@@ -356,13 +361,13 @@ fn validate(
 pub enum Step {
     Form {
         /// The step the form's answer goes to.
-        step_id: &'static str,
+        step_id: Cow<'static, str>,
         /// `None`: a form with nothing to fill in (a button to press).
         schema: Option<Vec<Field>>,
         /// By field name, or `base` for the whole form: translation keys.
         /// `None` is `errors=None` (a form shown with no word on errors),
         /// which the views send as `null`; an empty list is `{}`.
-        errors: Option<Vec<(&'static str, &'static str)>>,
+        errors: Option<Vec<(Cow<'static, str>, Cow<'static, str>)>>,
         description_placeholders: Option<Map<String, Value>>,
     },
     /// The entry to make, with the flow's unique id.
@@ -371,7 +376,7 @@ pub enum Step {
         data: Map<String, Value>,
     },
     Abort {
-        reason: &'static str,
+        reason: Cow<'static, str>,
     },
 }
 
@@ -380,15 +385,22 @@ impl Step {
     /// last answer failed.
     pub fn form(step_id: &'static str, schema: Vec<Field>, error: Option<&'static str>) -> Self {
         Self::Form {
-            step_id,
+            step_id: Cow::Borrowed(step_id),
             schema: Some(schema),
-            errors: Some(error.map(|e| ("base", e)).into_iter().collect()),
+            errors: Some(
+                error
+                    .map(|e| (Cow::Borrowed("base"), Cow::Borrowed(e)))
+                    .into_iter()
+                    .collect(),
+            ),
             description_placeholders: None,
         }
     }
 
     pub fn abort(reason: &'static str) -> Self {
-        Self::Abort { reason }
+        Self::Abort {
+            reason: Cow::Borrowed(reason),
+        }
     }
 }
 
@@ -397,15 +409,15 @@ impl Step {
 pub enum FlowResult {
     Form {
         flow_id: String,
-        handler: &'static str,
-        step_id: &'static str,
+        handler: Cow<'static, str>,
+        step_id: Cow<'static, str>,
         schema: Option<Vec<Field>>,
-        errors: Option<Vec<(&'static str, &'static str)>>,
+        errors: Option<Vec<(Cow<'static, str>, Cow<'static, str>)>>,
         description_placeholders: Option<Map<String, Value>>,
     },
     CreateEntry {
         flow_id: String,
-        handler: &'static str,
+        handler: Cow<'static, str>,
         title: String,
         version: u32,
         minor_version: u32,
@@ -417,8 +429,8 @@ pub enum FlowResult {
     },
     Abort {
         flow_id: String,
-        handler: &'static str,
-        reason: &'static str,
+        handler: Cow<'static, str>,
+        reason: Cow<'static, str>,
     },
 }
 
@@ -468,19 +480,21 @@ impl std::fmt::Display for Unwritable {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InProgress {
     pub flow_id: String,
-    pub handler: &'static str,
+    pub handler: Cow<'static, str>,
     /// The context's `source`.
     pub source: &'static str,
-    pub step_id: &'static str,
+    pub step_id: Cow<'static, str>,
 }
 
 struct Progress {
     flow_id: String,
-    handler: &'static Handler,
+    domain: Cow<'static, str>,
+    version: u32,
+    minor_version: u32,
     /// The context's `unique_id`.
     unique_id: Option<String>,
     /// `cur_step`: the form being shown.
-    step_id: &'static str,
+    step_id: Cow<'static, str>,
     schema: Option<Vec<Field>>,
     /// The context's `source`.
     source: &'static str,
@@ -506,11 +520,13 @@ pub struct Manager {
     /// Empty, with nothing allocated, while no flow is open.
     flows: Mutex<Vec<Progress>>,
     /// Domains started here, for `get_config`'s `components`.
-    started: Mutex<Vec<&'static str>>,
+    started: Mutex<Vec<Cow<'static, str>>>,
     /// The entries that can be stopped, with their tasks.
     tasks: Mutex<Vec<Running>>,
     /// The companion apps' registrations, whose entries can be stopped.
     mobile_app: Option<Arc<crate::mobile_app::MobileApp>>,
+    /// Installed out-of-process plugins, if enabled.
+    plugins: OnceLock<Arc<PluginManager>>,
     /// An entry is added with its task, or removed, one at a time, so a
     /// removal never misses a task that is about to start.
     lifecycle: tokio::sync::Mutex<()>,
@@ -583,12 +599,24 @@ impl Manager {
             started: Mutex::new(Vec::new()),
             tasks: Mutex::new(tasks),
             mobile_app,
+            plugins: OnceLock::new(),
             lifecycle: tokio::sync::Mutex::new(()),
         }))
     }
 
+    /// Attach the plugin manager so installed plugins and the built-in
+    /// `hars_plugins` store flow can be added and removed from the UI.
+    pub fn set_plugins(&self, plugins: Arc<PluginManager>) {
+        let _ = self.plugins.set(plugins);
+    }
+
+    /// The attached plugin manager, if any.
+    pub fn plugins(&self) -> Option<&Arc<PluginManager>> {
+        self.plugins.get()
+    }
+
     /// The domains whose entries were started here.
-    pub fn started(&self) -> Vec<&'static str> {
+    pub fn started(&self) -> Vec<Cow<'static, str>> {
         self.started.lock().clone()
     }
 
@@ -602,9 +630,9 @@ impl Manager {
             .filter(|p| ![SOURCE_USER, SOURCE_RECONFIGURE].contains(&p.source))
             .map(|p| InProgress {
                 flow_id: p.flow_id.clone(),
-                handler: p.handler.domain,
+                handler: p.domain.clone(),
                 source: p.source,
-                step_id: p.step_id,
+                step_id: p.step_id.clone(),
             })
             .collect()
     }
@@ -620,19 +648,62 @@ impl Manager {
         handler: &str,
         source: &'static str,
     ) -> Result<FlowResult, Error> {
-        let handler = HANDLERS
-            .iter()
-            .find(|h| h.domain == handler)
-            .ok_or(Error::UnknownHandler)?;
-        // `_raise_if_step_does_not_exist`, which drops the flow again.
-        let Some(step_id) = handler.steps.iter().find(|s| **s == source) else {
-            return Err(Error::UnknownStep(format!(
-                "Handler {} doesn't support step {source}",
-                handler.class
-            )));
-        };
         // `ulid_now()`.
         let flow_id = ha_core::ContextId::at(self.hass.clock().now()).to_string();
+        let (domain, version, minor_version, step_id, flow_box): (
+            Cow<'static, str>,
+            u32,
+            u32,
+            Cow<'static, str>,
+            Box<dyn Flow>,
+        ) = if let Some(h) = HANDLERS.iter().find(|h| h.domain == handler) {
+            // `_raise_if_step_does_not_exist`, which drops the flow again.
+            let Some(step_id) = h.steps.iter().find(|s| **s == source) else {
+                return Err(Error::UnknownStep(format!(
+                    "Handler {} doesn't support step {source}",
+                    h.class
+                )));
+            };
+            (
+                Cow::Borrowed(h.domain),
+                h.version,
+                h.minor_version,
+                Cow::Borrowed(*step_id),
+                (h.new)(),
+            )
+        } else if handler == STORE_DOMAIN
+            && let Some(plugins) = self.plugins.get()
+        {
+            if source != SOURCE_USER {
+                return Err(Error::UnknownStep(format!(
+                    "Handler HarsPluginsConfigFlow doesn't support step {source}"
+                )));
+            }
+            (
+                Cow::Borrowed(STORE_DOMAIN),
+                1,
+                1,
+                Cow::Borrowed(SOURCE_USER),
+                plugins.make_store_flow(),
+            )
+        } else if let Some(plugins) = self.plugins.get()
+            && let Some((version, plugin_flow)) = plugins.make_plugin_flow(handler, flow_id.clone())
+        {
+            if source != SOURCE_USER {
+                return Err(Error::UnknownStep(format!(
+                    "Handler {handler} doesn't support step {source}"
+                )));
+            }
+            (
+                Cow::Owned(handler.to_owned()),
+                version,
+                1,
+                Cow::Borrowed(SOURCE_USER),
+                plugin_flow,
+            )
+        } else {
+            return Err(Error::UnknownHandler);
+        };
         {
             let mut flows = self.flows.lock();
             // Forms nobody came back to, and the longest untouched if
@@ -654,14 +725,16 @@ impl Manager {
             }
             flows.push(Progress {
                 flow_id: flow_id.clone(),
-                handler,
+                domain,
+                version,
+                minor_version,
                 unique_id: None,
                 step_id,
                 schema: None,
                 source,
                 touched: now,
                 busy: 0,
-                flow: Arc::new(tokio::sync::Mutex::new((handler.new)())),
+                flow: Arc::new(tokio::sync::Mutex::new(flow_box)),
                 deleted: Arc::new(tokio::sync::watch::Sender::new(false)),
             });
         }
@@ -711,12 +784,19 @@ impl Manager {
         // one before left it: a request that waited here for another that
         // ended the flow finds none, and asks its device or service nothing.
         let mut flow = flow.lock().await;
-        let (handler, step_id, schema, mut unique_id) = {
+        let (domain, version, minor_version, step_id, schema, mut unique_id) = {
             let mut flows = self.flows.lock();
             let i = find(&flows).ok_or(Error::UnknownFlow)?;
             let p = &mut flows[i];
             p.touched = Instant::now();
-            (p.handler, p.step_id, p.schema.clone(), p.unique_id.clone())
+            (
+                p.domain.clone(),
+                p.version,
+                p.minor_version,
+                p.step_id.clone(),
+                p.schema.clone(),
+                p.unique_id.clone(),
+            )
         };
         let input = match (input, schema) {
             (Input::Answer(input), Some(schema)) => {
@@ -732,7 +812,7 @@ impl Manager {
                 hass: &self.hass,
                 endpoints: &self.endpoints,
                 entries: &self.entries,
-                domain: handler.domain,
+                domain: domain.as_ref(),
                 unique_id: &mut unique_id,
                 reload: &mut reload,
             };
@@ -742,17 +822,16 @@ impl Manager {
             tokio::select! {
                 biased;
                 _ = deleted.wait_for(|d| *d) => return Err(Error::UnknownFlow),
-                step = flow.step(&mut cx, step_id, input) => step,
+                step = flow.step(&mut cx, step_id.as_ref(), input) => step,
             }
         };
         if let Some(entry_id) = reload {
             let this = self.clone();
             tokio::spawn(async move { this.reload(&entry_id).await });
         }
-        let domain = handler.domain;
-        let abort = |reason| FlowResult::Abort {
+        let abort = |reason: Cow<'static, str>| FlowResult::Abort {
             flow_id: flow_id.to_owned(),
-            handler: domain,
+            handler: domain.clone(),
             reason,
         };
         // Held from adding an entry until its task can be found and
@@ -780,7 +859,7 @@ impl Manager {
                 } => {
                     let p = &mut flows[i];
                     p.unique_id = unique_id;
-                    p.step_id = step_id;
+                    p.step_id = step_id.clone();
                     p.schema.clone_from(&schema);
                     return Ok(FlowResult::Form {
                         flow_id: flow_id.to_owned(),
@@ -803,7 +882,7 @@ impl Manager {
             let mut replaced = None;
             if let Some(unique_id) = &unique_id {
                 // An entry that is set up is found before an ignored one.
-                match self.entries.find_unique(domain, unique_id) {
+                match self.entries.find_unique(domain.as_ref(), unique_id) {
                     // An ignored entry for the same thing makes way, as
                     // in HA (`async_finish_flow`): it leaves the list
                     // now; what the registries hold for it goes, and its
@@ -813,22 +892,24 @@ impl Manager {
                             replaced = self.entries.take(id);
                         }
                     }
-                    Some(_) => return Ok(abort("already_configured")),
+                    Some(_) => return Ok(abort(Cow::Borrowed("already_configured"))),
                     None => {}
                 }
                 // The handler's other flows for the same thing end.
-                flows.retain(|p| {
-                    p.handler.domain != domain || p.unique_id.as_ref() != Some(unique_id)
-                });
+                flows.retain(|p| p.domain != domain || p.unique_id.as_ref() != Some(unique_id));
                 if flows.is_empty() {
                     *flows = Vec::new();
                 }
             }
-            let mut entry =
-                self.entries
-                    .new_entry(domain, SOURCE_USER, &title, unique_id.as_deref(), data);
-            entry.insert("version".into(), json!(handler.version));
-            entry.insert("minor_version".into(), json!(handler.minor_version));
+            let mut entry = self.entries.new_entry(
+                domain.as_ref(),
+                SOURCE_USER,
+                &title,
+                unique_id.as_deref(),
+                data,
+            );
+            entry.insert("version".into(), json!(version));
+            entry.insert("minor_version".into(), json!(minor_version));
             self.entries.add_tracked(entry.clone());
             (title, entry, replaced)
         };
@@ -893,8 +974,8 @@ impl Manager {
             flow_id: flow_id.to_owned(),
             handler: domain,
             title,
-            version: handler.version,
-            minor_version: handler.minor_version,
+            version,
+            minor_version,
             runtime,
             entry: self.entries.get(&entry_id).unwrap_or(entry),
         })
@@ -914,31 +995,71 @@ impl Manager {
             return false;
         };
         let status = Status::new(self.entries.clone(), entry_id);
-        let (running, domains) = match entry.get("domain").and_then(Value::as_str) {
+        let domain = entry.get("domain").and_then(Value::as_str);
+        let (running, domains): (Running, Vec<Cow<'static, str>>) = match domain {
             Some(switchbot_cloud::DOMAIN) => (
                 Running::start_told(entry_id, status, attempted, |status| {
                     crate::spawn_switchbot(&self.components, entry.clone(), &self.endpoints, status)
                 }),
-                switchbot_cloud::COMPONENTS,
+                switchbot_cloud::COMPONENTS
+                    .iter()
+                    .copied()
+                    .map(Cow::Borrowed)
+                    .collect(),
             ),
             Some(crate::hue::DOMAIN) => (
                 Running::start_told(entry_id, status, attempted, |status| {
                     crate::spawn_hue(&self.components, entry.clone(), &self.endpoints, status)
                 }),
-                crate::hue::COMPONENTS,
+                crate::hue::COMPONENTS
+                    .iter()
+                    .copied()
+                    .map(Cow::Borrowed)
+                    .collect(),
             ),
             Some(crate::lifx::DOMAIN) => (
                 Running::start_told(entry_id, status, attempted, |status| {
                     crate::spawn_lifx(&self.components, entry.clone(), &self.endpoints, status)
                 }),
-                crate::lifx::COMPONENTS,
+                crate::lifx::COMPONENTS
+                    .iter()
+                    .copied()
+                    .map(Cow::Borrowed)
+                    .collect(),
             ),
-            _ => return false,
+            Some(plugin_domain) => {
+                let Some(plugins) = self.plugins.get() else {
+                    return false;
+                };
+                let Some(installed) = plugins.get(plugin_domain) else {
+                    return false;
+                };
+                let mut domains = vec![Cow::Owned(plugin_domain.to_owned())];
+                for d in &installed.manifest.capabilities.entity_domains {
+                    domains.push(Cow::Owned(d.clone()));
+                }
+                let mut spawned = false;
+                let running = Running::start_told(entry_id, status, attempted, |status| {
+                    if let Some(handle) =
+                        plugins.spawn_entry(plugin_domain, &self.components, entry.clone(), status)
+                    {
+                        spawned = true;
+                        handle
+                    } else {
+                        tokio::spawn(async {})
+                    }
+                });
+                if !spawned {
+                    return false;
+                }
+                (running, domains)
+            }
+            None => return false,
         };
         self.tasks.lock().push(running);
         let mut started = self.started.lock();
         for domain in domains {
-            if !started.contains(domain) {
+            if !started.contains(&domain) {
                 started.push(domain);
             }
         }
@@ -1014,6 +1135,12 @@ impl Manager {
         }
         task.abort();
         let _ = task.await;
+        if let (Some(plugins), Some(domain)) = (
+            self.plugins.get(),
+            entry.get("domain").and_then(Value::as_str),
+        ) {
+            plugins.unload_entry(domain, entry_id).await;
+        }
         self.entries
             .set_state(entry_id, EntryState::NotLoaded, None);
         // HA's subscribers hear no `setup_in_progress` for a reload's set-up.
@@ -1059,6 +1186,12 @@ impl Manager {
         if let Some(task) = task {
             task.abort();
             let _ = task.await;
+        }
+        if let (Some(plugins), Some(domain)) = (
+            self.plugins.get(),
+            entry.get("domain").and_then(Value::as_str),
+        ) {
+            plugins.unload_entry(domain, entry_id).await;
         }
         if let Some(app) = app {
             app.stop_entry(&entry).await;

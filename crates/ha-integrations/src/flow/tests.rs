@@ -175,7 +175,10 @@ async fn a_flow_adds_switchbot_as_home_assistant_does() {
     else {
         panic!("no form");
     };
-    assert_eq!((handler, step_id), ("switchbot_cloud", "user"));
+    assert_eq!(
+        (handler.as_ref(), step_id.as_ref()),
+        ("switchbot_cloud", "user")
+    );
     assert_eq!(errors, Some(Vec::new()));
     // `voluptuous_serialize` of `STEP_USER_DATA_SCHEMA`, as HA sends it.
     assert_eq!(
@@ -327,7 +330,10 @@ async fn bad_credentials_show_the_form_again() {
         else {
             panic!("no form");
         };
-        assert_eq!((step_id, errors), ("user", Some(vec![("base", error)])));
+        assert_eq!(
+            (step_id.as_ref(), errors),
+            ("user", Some(vec![("base".into(), error.into())]))
+        );
     }
     // Shown again (a GET), the form has no error.
     let FlowResult::Form { errors, .. } = home.flows.configure(&flow_id, None).await.unwrap()
@@ -401,7 +407,10 @@ async fn one_entry_per_account() {
     else {
         panic!("no abort");
     };
-    assert_eq!((handler, reason), ("switchbot_cloud", "already_configured"));
+    assert_eq!(
+        (handler.as_ref(), reason.as_ref()),
+        ("switchbot_cloud", "already_configured")
+    );
     let second = entry_id(&add(&home, "token-two").await);
     assert_ne!(first, second);
     assert_eq!(home.entries.list().unwrap().len(), 2);
@@ -530,10 +539,7 @@ async fn an_ignored_entry_makes_way_for_a_flows() {
     assert!(
         matches!(
             again,
-            FlowResult::Abort {
-                reason: "already_configured",
-                ..
-            }
+            FlowResult::Abort { ref reason, .. } if reason == "already_configured"
         ),
         "{again:?}"
     );

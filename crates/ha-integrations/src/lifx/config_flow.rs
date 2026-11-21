@@ -193,7 +193,7 @@ impl LifxFlow {
             return Step::abort("no_devices_found");
         }
         Step::Form {
-            step_id: "pick_device",
+            step_id: "pick_device".into(),
             schema: Some(vec![Field::required("device", Kind::Select(options))]),
             errors: None,
             description_placeholders: None,
