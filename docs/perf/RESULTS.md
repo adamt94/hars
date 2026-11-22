@@ -604,3 +604,23 @@ builds; `start` now takes a plain `ha_registry::Lookup`. Two checkouts must
 not share one `CARGO_TARGET_DIR` for such a comparison: cargo names a
 workspace member's artifacts the same in both and can reuse the other
 tree's.
+
+### The `humidifier`, `fan`, `number` and `select` components, 2026-11-22
+
+Four entity components: each holds its domain's services and the
+entities platforms add, and is made by the first platform that asks for it.
+Nothing of them runs on an install with no entity in their domains: no
+timer, no task, no socket. No integration feeds them yet.
+
+Release binary (Linux aarch64, `cargo build --release --locked` in
+`rust:1`, each tree with its own target directory): main (ee4c844)
+11,034,048 bytes, branch 11,099,584 (+65,536): the four components and
+their translation, icon and manifest tables. The size moves in 64 KiB
+steps here (the linker aligns its segments), so a finer split isn't
+measurable this way.
+
+Idle is unchanged: `scripts/perf-docker.sh` (Linux) on a fresh install of
+the same code with the Tuya integration on top (which adds nothing to an
+install without a Tuya entry) read 0.00 wake-ups a second and 0.000 % CPU,
+as main.
+

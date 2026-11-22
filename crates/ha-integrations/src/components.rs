@@ -5,8 +5,12 @@
 
 use crate::button::Buttons;
 use crate::climate::Climates;
+use crate::fan::Fans;
+use crate::humidifier::Humidifiers;
 use crate::light::{Lights, Profiles};
+use crate::number::Numbers;
 use crate::scene::Scenes;
+use crate::select::Selects;
 use crate::switch::Switches;
 use ha_core::Hass;
 use ha_registry::{Lookup, Registries};
@@ -45,6 +49,10 @@ pub struct Components {
     scenes: OnceLock<Arc<Scenes>>,
     buttons: OnceLock<Arc<Buttons>>,
     climates: OnceLock<Arc<Climates>>,
+    humidifiers: OnceLock<Arc<Humidifiers>>,
+    fans: OnceLock<Arc<Fans>>,
+    numbers: OnceLock<Arc<Numbers>>,
+    selects: OnceLock<Arc<Selects>>,
     /// What every Hue bridge shares, made with the first.
     hue: OnceLock<Arc<crate::hue::Platforms>>,
     /// The entries that follow the registry, by entry id, from their
@@ -90,6 +98,10 @@ impl Components {
             scenes: OnceLock::new(),
             buttons: OnceLock::new(),
             climates: OnceLock::new(),
+            humidifiers: OnceLock::new(),
+            fans: OnceLock::new(),
+            numbers: OnceLock::new(),
+            selects: OnceLock::new(),
             hue: OnceLock::new(),
             followers: Mutex::default(),
             running: Mutex::default(),
@@ -208,6 +220,46 @@ impl Components {
         self.climates
             .get_or_init(|| {
                 let c = Arc::new(Climates::default());
+                c.register_services(&self.hass, self.registries.clone());
+                c
+            })
+            .clone()
+    }
+
+    pub fn humidifiers(&self) -> Arc<Humidifiers> {
+        self.humidifiers
+            .get_or_init(|| {
+                let c = Arc::new(Humidifiers::default());
+                c.register_services(&self.hass, self.registries.clone());
+                c
+            })
+            .clone()
+    }
+
+    pub fn fans(&self) -> Arc<Fans> {
+        self.fans
+            .get_or_init(|| {
+                let c = Arc::new(Fans::default());
+                c.register_services(&self.hass, self.registries.clone());
+                c
+            })
+            .clone()
+    }
+
+    pub fn numbers(&self) -> Arc<Numbers> {
+        self.numbers
+            .get_or_init(|| {
+                let c = Arc::new(Numbers::default());
+                c.register_services(&self.hass, self.registries.clone());
+                c
+            })
+            .clone()
+    }
+
+    pub fn selects(&self) -> Arc<Selects> {
+        self.selects
+            .get_or_init(|| {
+                let c = Arc::new(Selects::default());
                 c.register_services(&self.hass, self.registries.clone());
                 c
             })

@@ -24,10 +24,10 @@ import zipfile
 
 DOMAINS = set(
     """api auth automation binary_sensor brands button climate config
-    default_config device_tracker event frontend group history homeassistant
-    http hue input_boolean labs lifx light logbook lovelace met mobile_app
-    notify onboarding person persistent_notification recorder repairs scene
-    script sensor sun switch switchbot_cloud system_log weather websocket_api
+    default_config device_tracker event fan frontend group history homeassistant
+    http hue humidifier input_boolean labs lifx light logbook lovelace met mobile_app
+    notify number onboarding person persistent_notification recorder repairs scene
+    script select sensor sun switch switchbot_cloud system_log weather websocket_api
     zone analytics backup shopping_list google_translate radio_browser tts
     """.split()
 )

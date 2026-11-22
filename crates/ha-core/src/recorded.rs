@@ -45,6 +45,19 @@ pub fn domain_unrecorded(domain: &str) -> &'static [&'static str] {
             "target_temp_step",
             "preset_modes",
         ],
+        // `humidifier/__init__.py` HumidifierEntity.
+        "humidifier" => &[
+            "min_humidity",
+            "max_humidity",
+            "available_modes",
+            "target_humidity_step",
+        ],
+        // `fan/__init__.py` FanEntity.
+        "fan" => &["preset_modes"],
+        // `number/__init__.py` NumberEntity.
+        "number" => &["min", "max", "step", "mode"],
+        // `select/__init__.py` SelectEntity.
+        "select" => &["options"],
         // `sensor/__init__.py` SensorEntity.
         "sensor" => &["options"],
         // `automation/__init__.py` BaseAutomationEntity.
