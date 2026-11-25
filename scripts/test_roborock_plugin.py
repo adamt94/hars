@@ -1084,12 +1084,15 @@ class RoborockPluginTests(unittest.TestCase):
             reader = asyncio.StreamReader()
             replies: dict[int, dict[str, object]] = {}
             got_busy = asyncio.Event()
+            got_cancel = asyncio.Event()
 
             async def send_fn(obj: dict[str, object]) -> None:
                 if "id" in obj:
                     replies[obj["id"]] = obj
                     if obj["id"] == 999:
                         got_busy.set()
+                    elif obj["id"] == 998:
+                        got_cancel.set()
 
             serve = asyncio.create_task(
                 rp._serve_stream(reader, send_fn, backend=backend, poll_enabled=False)
@@ -1133,6 +1136,22 @@ class RoborockPluginTests(unittest.TestCase):
             )
             await asyncio.wait_for(got_busy.wait(), timeout=2.0)
             self.assertIn("error", replies[999])
+            # Cleanup RPC (`flow.cancel`) must still succeed while saturated.
+            reader.feed_data(
+                (
+                    json.dumps(
+                        {
+                            "jsonrpc": "2.0",
+                            "id": 998,
+                            "method": "flow.cancel",
+                            "params": {"flow_id": "any"},
+                        }
+                    )
+                    + "\n"
+                ).encode("utf-8")
+            )
+            await asyncio.wait_for(got_cancel.wait(), timeout=2.0)
+            self.assertEqual(replies[998]["result"], {"ok": True})
             reader.feed_data(
                 (
                     json.dumps({"jsonrpc": "2.0", "id": 1000, "method": "shutdown"})
@@ -1264,8 +1283,12 @@ class RoborockPluginTests(unittest.TestCase):
                     "params": {"flow_id": "f-cancel"},
                 }
             )
+            # Pending auth session must ALREADY be closed when `flow.cancel` returns.
+            self.assertEqual(closed_count, 1)
+            self.assertNotIn("f-cancel", p_flow._flows)
+            self.assertNotIn("f-cancel", p_flow._pending_flow_tasks)
             auth_gate.set()
-            await step_task
+            await asyncio.gather(step_task, return_exceptions=True)
             self.assertNotIn("f-cancel", p_flow._flows)
             self.assertEqual(closed_count, 1)
 
@@ -1274,11 +1297,17 @@ class RoborockPluginTests(unittest.TestCase):
             q10 = FakeQ10Device()
             write_gate = asyncio.Event()
             upserts: list[str] = []
+            last_battery: list[str] = []
 
             async def slow_send(msg: dict[str, object]) -> None:
                 if msg.get("method") == "entity.upsert":
                     upserts.append(msg["params"]["unique_id"])
                     await write_gate.wait()
+                elif (
+                    msg.get("method") == "state.set"
+                    and msg["params"]["unique_id"] == "battery_duid_q10_01"
+                ):
+                    last_battery.append(msg["params"]["state"])
 
             p_q10 = rp.RoborockPlugin(
                 slow_send, backend=FakeBackend(devices=[q10]), poll_enabled=False
@@ -1298,18 +1327,26 @@ class RoborockPluginTests(unittest.TestCase):
                 )
             )
             await asyncio.sleep(0)
-            # Fire multiple pushes while initial `entity.upsert` is suspended.
+            # Fire 20 pushes while initial `entity.upsert` is suspended; they must
+            # share a single coalesced `push_task`.
+            managed_q10 = p_q10._entries["e-q10"].devices["DUID-Q10-01"]
             q10.b01_q10_properties.status.emit_push(
                 FakeQ10Status.CLEANING, FakeYXFanLevel.TURBO, 70
             )
-            q10.b01_q10_properties.status.emit_push(
-                FakeQ10Status.CHARGING, FakeYXFanLevel.QUIET, 71
-            )
+            first_task = managed_q10.push_task
+            self.assertIsNotNone(first_task)
+            for pct in range(71, 90):
+                q10.b01_q10_properties.status.emit_push(
+                    FakeQ10Status.CHARGING, FakeYXFanLevel.QUIET, pct
+                )
+                self.assertIs(managed_q10.push_task, first_task)
             await asyncio.sleep(0)
             write_gate.set()
             await setup_task
-            await asyncio.sleep(0.05)
+            if managed_q10.push_task is not None:
+                await managed_q10.push_task
             self.assertEqual(upserts.count("duid_q10_01"), 1)
+            self.assertEqual(last_battery[-1], "89")
             await p_q10.handle_message({"jsonrpc": "2.0", "id": 2, "method": "shutdown"})
 
         asyncio.run(run())

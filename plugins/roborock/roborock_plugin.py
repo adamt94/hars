@@ -474,10 +474,11 @@ class RoborockPlugin:
         self._poll_enabled = poll_enabled
         self._data_dir = Path(".")
         self._flows: dict[str, FlowSession] = {}
-        self._cancelled_flows: set[str] = set()
+        self._pending_flow_tasks: dict[str, asyncio.Task[Any]] = {}
         self._shutting_down = False
         self._entries: dict[str, ActiveEntry] = {}
         self._entry_locks: dict[str, asyncio.Lock] = {}
+        self._notify_lock = asyncio.Lock()
 
     def _entry_lock(self, entry_id: str) -> asyncio.Lock:
         lock = self._entry_locks.get(entry_id)
@@ -614,7 +615,6 @@ class RoborockPlugin:
             region = str(user_input.get("region", "auto")).strip() or "auto"
             base_url = None if region == "auto" else f"https://{region}iot.roborock.com"
 
-            self._cancelled_flows.discard(flow_id)
             await self._close_flow(flow_id)
             try:
                 client, close_fn = await self._backend.create_auth_client(
@@ -624,6 +624,9 @@ class RoborockPlugin:
                 await self.log("error", f"Roborock auth client init failed: {exc}")
                 return self._user_form("unknown")
 
+            current = asyncio.current_task()
+            if current is not None and flow_id:
+                self._pending_flow_tasks[flow_id] = current
             try:
                 await client.request_code_v4()
             except asyncio.CancelledError:
@@ -636,9 +639,11 @@ class RoborockPlugin:
                     "warn", f"Roborock code request failed ({err_key}): {exc}"
                 )
                 return self._user_form(err_key)
+            finally:
+                if current is not None and self._pending_flow_tasks.get(flow_id) is current:
+                    self._pending_flow_tasks.pop(flow_id, None)
 
-            if self._shutting_down or flow_id in self._cancelled_flows:
-                self._cancelled_flows.discard(flow_id)
+            if self._shutting_down:
                 await close_fn()
                 return {"type": "abort", "reason": "unknown"}
 
@@ -698,8 +703,10 @@ class RoborockPlugin:
 
     async def _on_flow_cancel(self, params: dict[str, Any]) -> dict[str, Any]:
         flow_id = str(params.get("flow_id", ""))
-        if flow_id:
-            self._cancelled_flows.add(flow_id)
+        pending = self._pending_flow_tasks.pop(flow_id, None)
+        if pending is not None and not pending.done():
+            pending.cancel()
+            await asyncio.gather(pending, return_exceptions=True)
         await self._close_flow(flow_id)
         return {"ok": True}
 
@@ -847,6 +854,15 @@ class RoborockPlugin:
     def _entry_is_current(self, entry: ActiveEntry) -> bool:
         return not entry.closed and self._entries.get(entry.entry_id) is entry
 
+    async def _notify_if_current(
+        self, entry: ActiveEntry, method: str, params: dict[str, Any]
+    ) -> bool:
+        async with self._notify_lock:
+            if not self._entry_is_current(entry):
+                return False
+            await self.notify(method, params)
+            return True
+
     async def _ensure_entity(
         self,
         entry: ActiveEntry,
@@ -884,15 +900,19 @@ class RoborockPlugin:
             payload["entity_category"] = entity_category
         if fan_speed_list is not None:
             payload["fan_speed_list"] = fan_speed_list
-        # Mark registered before awaiting the socket write so concurrent
-        # publishers cannot emit duplicate `entity.upsert` notifications.
+        # Mark registered before awaiting the serialized socket write so
+        # concurrent publishers cannot emit duplicate `entity.upsert` frames
+        # and stale entries cannot write after replacement.
         managed.registered_entities.add(unique_id)
         entry.entity_to_device[unique_id] = managed.duid
         try:
-            await self.notify("entity.upsert", payload)
+            sent = await self._notify_if_current(entry, "entity.upsert", payload)
         except BaseException:
             managed.registered_entities.discard(unique_id)
             raise
+        if not sent:
+            managed.registered_entities.discard(unique_id)
+            return False
         return True
 
     async def _set_state(
@@ -902,9 +922,8 @@ class RoborockPlugin:
         state: str,
         attributes: dict[str, Any] | None = None,
     ) -> None:
-        if not self._entry_is_current(entry):
-            return
-        await self.notify(
+        await self._notify_if_current(
+            entry,
             "state.set",
             {
                 "entry_id": entry.entry_id,
@@ -1709,7 +1728,8 @@ async def _serve_stream(
     poll_enabled: bool = True,
 ) -> None:
     plugin = RoborockPlugin(send_fn, backend=backend, poll_enabled=poll_enabled)
-    in_flight: set[asyncio.Task[bool]] = set()
+    in_flight: set[asyncio.Task[Any]] = set()
+    cleanup_tasks: set[asyncio.Task[Any]] = set()
 
     async def run_one(msg: dict[str, Any]) -> bool:
         return await plugin.handle_message(msg)
@@ -1729,36 +1749,52 @@ async def _serve_stream(
                 continue
             if method == "shutdown":
                 plugin._shutting_down = True
-                for task in list(in_flight):
+                all_tasks = list(in_flight) + list(cleanup_tasks)
+                for task in all_tasks:
                     task.cancel()
-                if in_flight:
-                    await asyncio.gather(*in_flight, return_exceptions=True)
+                if all_tasks:
+                    await asyncio.gather(*all_tasks, return_exceptions=True)
                 in_flight.clear()
+                cleanup_tasks.clear()
                 await plugin.handle_message(msg)
                 break
+            # Cleanup RPCs (`flow.cancel`, `entry.unload`) bypass saturation so
+            # they can always tear down stuck flows or entries.
+            if method in ("flow.cancel", "entry.unload"):
+                task = asyncio.create_task(run_one(msg))
+                cleanup_tasks.add(task)
+                task.add_done_callback(cleanup_tasks.discard)
+                continue
             if len(in_flight) >= MAX_CONCURRENT_REQUESTS:
                 msg_id = msg.get("id")
                 if msg_id is not None:
-                    await send_fn(
-                        {
-                            "jsonrpc": "2.0",
-                            "id": msg_id,
-                            "error": {
-                                "code": -32000,
-                                "message": "plugin busy: too many in-flight requests",
-                            },
-                        }
+                    # Send busy reply asynchronously so a stalled writer never
+                    # blocks reading `shutdown` or cleanup RPCs.
+                    busy_task = asyncio.create_task(
+                        send_fn(
+                            {
+                                "jsonrpc": "2.0",
+                                "id": msg_id,
+                                "error": {
+                                    "code": -32000,
+                                    "message": "plugin busy: too many in-flight requests",
+                                },
+                            }
+                        )
                     )
+                    cleanup_tasks.add(busy_task)
+                    busy_task.add_done_callback(cleanup_tasks.discard)
                 continue
             task = asyncio.create_task(run_one(msg))
             in_flight.add(task)
             task.add_done_callback(in_flight.discard)
     finally:
         plugin._shutting_down = True
-        for task in list(in_flight):
+        all_tasks = list(in_flight) + list(cleanup_tasks)
+        for task in all_tasks:
             task.cancel()
-        if in_flight:
-            await asyncio.gather(*in_flight, return_exceptions=True)
+        if all_tasks:
+            await asyncio.gather(*all_tasks, return_exceptions=True)
         await plugin._on_shutdown()
 
 
