@@ -1,0 +1,39 @@
+{
+  "entity": {
+    "binary_sensor": {
+      "in_cleaning": { "default": "mdi:vacuum" },
+      "mop_attached": { "default": "mdi:square-rounded" },
+      "mop_drying_status": { "default": "mdi:heat-wave" },
+      "water_box_attached": { "default": "mdi:water" },
+      "water_shortage": { "default": "mdi:water" }
+    },
+    "button": {
+      "empty_dustbin": { "default": "mdi:delete-empty" },
+      "wash_mop": { "default": "mdi:water-sync" },
+      "reset_air_filter_consumable": { "default": "mdi:air-filter" },
+      "reset_main_brush_consumable": { "default": "mdi:brush" },
+      "reset_sensor_consumable": { "default": "mdi:eye-outline" },
+      "reset_side_brush_consumable": { "default": "mdi:brush" }
+    },
+    "sensor": {
+      "clean_percent": { "default": "mdi:progress-check" },
+      "cleaning_area": { "default": "mdi:texture-box" },
+      "cleaning_time": { "default": "mdi:clock-outline" },
+      "dock_error": { "default": "mdi:garage-open" },
+      "filter_time_left": { "default": "mdi:air-filter" },
+      "main_brush_time_left": { "default": "mdi:brush" },
+      "sensor_time_left": { "default": "mdi:eye-outline" },
+      "side_brush_time_left": { "default": "mdi:brush" },
+      "status": { "default": "mdi:information-outline" },
+      "total_cleaning_area": { "default": "mdi:texture-box" },
+      "total_cleaning_count": { "default": "mdi:counter" },
+      "total_cleaning_time": { "default": "mdi:history" },
+      "vacuum_error": { "default": "mdi:alert-circle" }
+    },
+    "switch": {
+      "child_lock": { "default": "mdi:account-lock" },
+      "dnd_switch": { "default": "mdi:bell-cancel" },
+      "status_indicator": { "default": "mdi:alarm-light-outline" }
+    }
+  }
+}
