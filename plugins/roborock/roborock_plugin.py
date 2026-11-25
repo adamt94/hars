@@ -475,10 +475,33 @@ class RoborockPlugin:
         self._data_dir = Path(".")
         self._flows: dict[str, FlowSession] = {}
         self._pending_flow_tasks: dict[str, asyncio.Task[Any]] = {}
+        self._closing_tasks: set[asyncio.Task[Any]] = set()
         self._shutting_down = False
         self._entries: dict[str, ActiveEntry] = {}
         self._entry_locks: dict[str, asyncio.Lock] = {}
-        self._notify_lock = asyncio.Lock()
+        self._send_lock = asyncio.Lock()
+
+    async def send_frame(
+        self,
+        obj: dict[str, Any],
+        guard: Callable[[], bool] | None = None,
+    ) -> bool:
+        async with self._send_lock:
+            if guard is not None and not guard():
+                return False
+            await self._send(obj)
+            return True
+
+    async def _close_session_safe(
+        self, close_fn: Callable[[], Awaitable[None]]
+    ) -> None:
+        task = asyncio.create_task(close_fn())
+        self._closing_tasks.add(task)
+        task.add_done_callback(self._closing_tasks.discard)
+        try:
+            await asyncio.shield(task)
+        except Exception:
+            pass
 
     def _entry_lock(self, entry_id: str) -> asyncio.Lock:
         lock = self._entry_locks.get(entry_id)
@@ -488,7 +511,7 @@ class RoborockPlugin:
         return lock
 
     async def notify(self, method: str, params: dict[str, Any]) -> None:
-        await self._send({"jsonrpc": "2.0", "method": method, "params": params})
+        await self.send_frame({"jsonrpc": "2.0", "method": method, "params": params})
 
     async def log(self, level: str, message: str) -> None:
         await self.notify("log", {"level": level, "message": message})
@@ -521,13 +544,13 @@ class RoborockPlugin:
             elif method == "shutdown":
                 await self._on_shutdown()
                 if msg_id is not None:
-                    await self._send(
+                    await self.send_frame(
                         {"jsonrpc": "2.0", "id": msg_id, "result": {"ok": True}}
                     )
                 return False
             else:
                 if msg_id is not None:
-                    await self._send(
+                    await self.send_frame(
                         {
                             "jsonrpc": "2.0",
                             "id": msg_id,
@@ -540,11 +563,11 @@ class RoborockPlugin:
                 return True
 
             if msg_id is not None:
-                await self._send({"jsonrpc": "2.0", "id": msg_id, "result": result})
+                await self.send_frame({"jsonrpc": "2.0", "id": msg_id, "result": result})
         except Exception as exc:
             await self.log("error", f"{method} failed: {exc}")
             if msg_id is not None:
-                await self._send(
+                await self.send_frame(
                     {
                         "jsonrpc": "2.0",
                         "id": msg_id,
@@ -598,10 +621,7 @@ class RoborockPlugin:
     async def _close_flow(self, flow_id: str) -> None:
         flow = self._flows.pop(flow_id, None)
         if flow is not None:
-            try:
-                await flow.close_session()
-            except Exception:
-                pass
+            await self._close_session_safe(flow.close_session)
 
     async def _on_flow_step(self, params: dict[str, Any]) -> dict[str, Any]:
         flow_id = str(params.get("flow_id", ""))
@@ -630,10 +650,10 @@ class RoborockPlugin:
             try:
                 await client.request_code_v4()
             except asyncio.CancelledError:
-                await close_fn()
+                await self._close_session_safe(close_fn)
                 raise
             except Exception as exc:
-                await close_fn()
+                await self._close_session_safe(close_fn)
                 err_key = classify_auth_error(exc)
                 await self.log(
                     "warn", f"Roborock code request failed ({err_key}): {exc}"
@@ -644,7 +664,7 @@ class RoborockPlugin:
                     self._pending_flow_tasks.pop(flow_id, None)
 
             if self._shutting_down:
-                await close_fn()
+                await self._close_session_safe(close_fn)
                 return {"type": "abort", "reason": "unknown"}
 
             self._flows[flow_id] = FlowSession(
@@ -703,7 +723,9 @@ class RoborockPlugin:
 
     async def _on_flow_cancel(self, params: dict[str, Any]) -> dict[str, Any]:
         flow_id = str(params.get("flow_id", ""))
-        pending = self._pending_flow_tasks.pop(flow_id, None)
+        # Keep the task in `_pending_flow_tasks` until its `finally` clears it
+        # so overlapping `flow.cancel` calls also await session close.
+        pending = self._pending_flow_tasks.get(flow_id)
         if pending is not None and not pending.done():
             pending.cancel()
             await asyncio.gather(pending, return_exceptions=True)
@@ -857,11 +879,10 @@ class RoborockPlugin:
     async def _notify_if_current(
         self, entry: ActiveEntry, method: str, params: dict[str, Any]
     ) -> bool:
-        async with self._notify_lock:
-            if not self._entry_is_current(entry):
-                return False
-            await self.notify(method, params)
-            return True
+        return await self.send_frame(
+            {"jsonrpc": "2.0", "method": method, "params": params},
+            guard=lambda: self._entry_is_current(entry),
+        )
 
     async def _ensure_entity(
         self,
@@ -1714,6 +1735,8 @@ class RoborockPlugin:
             await self._close_flow(flow_id)
         for entry_id in list(self._entries.keys()):
             await self._unload_entry_impl(entry_id)
+        if self._closing_tasks:
+            await asyncio.gather(*list(self._closing_tasks), return_exceptions=True)
 
 
 # ----------------------------------------------------------------------
@@ -1730,6 +1753,7 @@ async def _serve_stream(
     plugin = RoborockPlugin(send_fn, backend=backend, poll_enabled=poll_enabled)
     in_flight: set[asyncio.Task[Any]] = set()
     cleanup_tasks: set[asyncio.Task[Any]] = set()
+    busy_tasks: set[asyncio.Task[Any]] = set()
 
     async def run_one(msg: dict[str, Any]) -> bool:
         return await plugin.handle_message(msg)
@@ -1749,29 +1773,31 @@ async def _serve_stream(
                 continue
             if method == "shutdown":
                 plugin._shutting_down = True
-                all_tasks = list(in_flight) + list(cleanup_tasks)
+                all_tasks = list(in_flight) + list(cleanup_tasks) + list(busy_tasks)
                 for task in all_tasks:
                     task.cancel()
                 if all_tasks:
                     await asyncio.gather(*all_tasks, return_exceptions=True)
                 in_flight.clear()
                 cleanup_tasks.clear()
+                busy_tasks.clear()
                 await plugin.handle_message(msg)
                 break
-            # Cleanup RPCs (`flow.cancel`, `entry.unload`) bypass saturation so
-            # they can always tear down stuck flows or entries.
+            # Cleanup RPCs (`flow.cancel`, `entry.unload`) bypass ordinary
+            # saturation (bounded separately to prevent unbounded growth).
             if method in ("flow.cancel", "entry.unload"):
-                task = asyncio.create_task(run_one(msg))
-                cleanup_tasks.add(task)
-                task.add_done_callback(cleanup_tasks.discard)
+                if len(cleanup_tasks) < MAX_CONCURRENT_REQUESTS:
+                    task = asyncio.create_task(run_one(msg))
+                    cleanup_tasks.add(task)
+                    task.add_done_callback(cleanup_tasks.discard)
                 continue
             if len(in_flight) >= MAX_CONCURRENT_REQUESTS:
                 msg_id = msg.get("id")
-                if msg_id is not None:
-                    # Send busy reply asynchronously so a stalled writer never
-                    # blocks reading `shutdown` or cleanup RPCs.
+                if msg_id is not None and len(busy_tasks) < MAX_CONCURRENT_REQUESTS:
+                    # Send busy reply asynchronously under bounded task cap so
+                    # a stalled writer neither blocks shutdown nor grows memory.
                     busy_task = asyncio.create_task(
-                        send_fn(
+                        plugin.send_frame(
                             {
                                 "jsonrpc": "2.0",
                                 "id": msg_id,
@@ -1782,15 +1808,15 @@ async def _serve_stream(
                             }
                         )
                     )
-                    cleanup_tasks.add(busy_task)
-                    busy_task.add_done_callback(cleanup_tasks.discard)
+                    busy_tasks.add(busy_task)
+                    busy_task.add_done_callback(busy_tasks.discard)
                 continue
             task = asyncio.create_task(run_one(msg))
             in_flight.add(task)
             task.add_done_callback(in_flight.discard)
     finally:
         plugin._shutting_down = True
-        all_tasks = list(in_flight) + list(cleanup_tasks)
+        all_tasks = list(in_flight) + list(cleanup_tasks) + list(busy_tasks)
         for task in all_tasks:
             task.cancel()
         if all_tasks:
@@ -1804,13 +1830,10 @@ async def run_stdio(backend: Any | None = None) -> None:
     protocol = asyncio.StreamReaderProtocol(reader)
     await loop.connect_read_pipe(lambda: protocol, sys.stdin)
 
-    write_lock = asyncio.Lock()
-
+    # Serialized by `RoborockPlugin._send_lock` (single lock across check+write).
     async def send_fn(obj: dict[str, Any]) -> None:
-        line = json.dumps(obj, separators=(",", ":")) + "\n"
-        async with write_lock:
-            sys.stdout.write(line)
-            sys.stdout.flush()
+        sys.stdout.write(json.dumps(obj, separators=(",", ":")) + "\n")
+        sys.stdout.flush()
 
     await _serve_stream(reader, send_fn, backend=backend)
 
@@ -1822,13 +1845,10 @@ async def run_unix_socket(socket_path: Path, backend: Any | None = None) -> None
     async def handle_client(
         reader: asyncio.StreamReader, writer: asyncio.StreamWriter
     ) -> None:
-        write_lock = asyncio.Lock()
-
+        # Serialized by `RoborockPlugin._send_lock` (single lock across check+write).
         async def send_fn(obj: dict[str, Any]) -> None:
-            data = (json.dumps(obj, separators=(",", ":")) + "\n").encode("utf-8")
-            async with write_lock:
-                writer.write(data)
-                await writer.drain()
+            writer.write((json.dumps(obj, separators=(",", ":")) + "\n").encode("utf-8"))
+            await writer.drain()
 
         try:
             await _serve_stream(reader, send_fn, backend=backend)

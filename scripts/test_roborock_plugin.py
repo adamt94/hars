@@ -1239,9 +1239,10 @@ class RoborockPluginTests(unittest.TestCase):
             ]
             self.assertEqual(stale_writes, [])
 
-            # 3. `flow.cancel` while `request_code_v4` is pending closes the session
-            # and does not register the cancelled flow.
+            # 3. Overlapping `flow.cancel` while `request_code_v4` + `close_fn` are
+            # gated both wait until the HTTP session actually closes.
             auth_gate = asyncio.Event()
+            close_gate = asyncio.Event()
             closed_count = 0
 
             class SlowAuthBackend(FakeBackend):
@@ -1255,6 +1256,7 @@ class RoborockPluginTests(unittest.TestCase):
 
                     async def close_fn() -> None:
                         nonlocal closed_count
+                        await close_gate.wait()
                         closed_count += 1
 
                     return client, close_fn
@@ -1275,15 +1277,32 @@ class RoborockPluginTests(unittest.TestCase):
                 )
             )
             await asyncio.sleep(0)
-            await p_flow.handle_message(
-                {
-                    "jsonrpc": "2.0",
-                    "id": 2,
-                    "method": "flow.cancel",
-                    "params": {"flow_id": "f-cancel"},
-                }
+            c1 = asyncio.create_task(
+                p_flow.handle_message(
+                    {
+                        "jsonrpc": "2.0",
+                        "id": 2,
+                        "method": "flow.cancel",
+                        "params": {"flow_id": "f-cancel"},
+                    }
+                )
             )
-            # Pending auth session must ALREADY be closed when `flow.cancel` returns.
+            c2 = asyncio.create_task(
+                p_flow.handle_message(
+                    {
+                        "jsonrpc": "2.0",
+                        "id": 3,
+                        "method": "flow.cancel",
+                        "params": {"flow_id": "f-cancel"},
+                    }
+                )
+            )
+            await asyncio.sleep(0.02)
+            # Neither cancel may return while `close_fn` is still gated.
+            self.assertFalse(c1.done())
+            self.assertFalse(c2.done())
+            close_gate.set()
+            await asyncio.gather(c1, c2)
             self.assertEqual(closed_count, 1)
             self.assertNotIn("f-cancel", p_flow._flows)
             self.assertNotIn("f-cancel", p_flow._pending_flow_tasks)
