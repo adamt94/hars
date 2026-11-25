@@ -321,6 +321,7 @@ impl PluginEntityStore {
                         hass: self.components.hass().clone(),
                         friendly_name: friendly_name.clone(),
                         available: RwLock::new(true),
+                        last_pressed: RwLock::new(None),
                         call_plugin: self.call_plugin.clone(),
                     });
                     self.components.buttons().add(btn.clone());
@@ -396,16 +397,17 @@ impl PluginEntityStore {
         if let Some(name) = &reg.friendly_name {
             merged.entry("friendly_name").or_insert_with(|| json!(name));
         }
+        let mut state_str = params.state;
         match &reg.handle {
             EntityHandle::Switch(sw) => {
                 let mut inner = sw.state.write();
                 inner.available = available;
-                inner.is_on = params.state == "on";
+                inner.is_on = state_str == "on";
             }
             EntityHandle::Light(light) => {
                 let mut inner = light.state.write();
                 inner.available = available;
-                inner.light.on = params.state == "on";
+                inner.light.on = state_str == "on";
                 update_light_state(&mut inner.light, &light.caps, &params.attributes);
                 let mut light_attrs =
                     crate::light::attributes(&light.caps, &inner.light, available);
@@ -416,6 +418,15 @@ impl PluginEntityStore {
             }
             EntityHandle::Button(btn) => {
                 *btn.available.write() = available;
+                // Preserve the last-press timestamp when a plugin marks a
+                // button available again with `"unknown"` (matching HA's
+                // `ButtonEntity`).
+                if available
+                    && state_str == "unknown"
+                    && let Some(ts) = btn.last_pressed.read().clone()
+                {
+                    state_str = ts;
+                }
             }
             EntityHandle::Scene(scene) => {
                 *scene.available.write() = available;
@@ -429,7 +440,7 @@ impl PluginEntityStore {
         }
         self.components
             .hass()
-            .set_state(reg.entity_id.clone(), params.state, merged);
+            .set_state(reg.entity_id.clone(), state_str, merged);
         Ok(())
     }
 
@@ -737,6 +748,7 @@ struct PluginButton {
     hass: Hass,
     friendly_name: Option<String>,
     available: RwLock<bool>,
+    last_pressed: RwLock<Option<String>>,
     call_plugin: CallPluginFn,
 }
 
@@ -750,6 +762,7 @@ impl Button for PluginButton {
     }
 
     fn pressed(&self, at: String, context: &Context) {
+        *self.last_pressed.write() = Some(at.clone());
         let mut attrs = Attributes::new();
         if let Some(name) = &self.friendly_name {
             attrs.insert("friendly_name".into(), json!(name));

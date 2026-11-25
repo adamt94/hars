@@ -443,7 +443,9 @@ class ManagedDevice:
     buttons: dict[str, Callable[[], Awaitable[None]]] = field(default_factory=dict)
     q7_data: Any = None
     unsub_listeners: list[Callable[[], None]] = field(default_factory=list)
-    push_tasks: set[asyncio.Task[None]] = field(default_factory=set)
+    publish_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
+    push_dirty: bool = False
+    push_task: asyncio.Task[None] | None = None
 
 
 @dataclass
@@ -472,6 +474,8 @@ class RoborockPlugin:
         self._poll_enabled = poll_enabled
         self._data_dir = Path(".")
         self._flows: dict[str, FlowSession] = {}
+        self._cancelled_flows: set[str] = set()
+        self._shutting_down = False
         self._entries: dict[str, ActiveEntry] = {}
         self._entry_locks: dict[str, asyncio.Lock] = {}
 
@@ -610,6 +614,7 @@ class RoborockPlugin:
             region = str(user_input.get("region", "auto")).strip() or "auto"
             base_url = None if region == "auto" else f"https://{region}iot.roborock.com"
 
+            self._cancelled_flows.discard(flow_id)
             await self._close_flow(flow_id)
             try:
                 client, close_fn = await self._backend.create_auth_client(
@@ -621,6 +626,9 @@ class RoborockPlugin:
 
             try:
                 await client.request_code_v4()
+            except asyncio.CancelledError:
+                await close_fn()
+                raise
             except Exception as exc:
                 await close_fn()
                 err_key = classify_auth_error(exc)
@@ -628,6 +636,11 @@ class RoborockPlugin:
                     "warn", f"Roborock code request failed ({err_key}): {exc}"
                 )
                 return self._user_form(err_key)
+
+            if self._shutting_down or flow_id in self._cancelled_flows:
+                self._cancelled_flows.discard(flow_id)
+                await close_fn()
+                return {"type": "abort", "reason": "unknown"}
 
             self._flows[flow_id] = FlowSession(
                 username=username,
@@ -685,6 +698,8 @@ class RoborockPlugin:
 
     async def _on_flow_cancel(self, params: dict[str, Any]) -> dict[str, Any]:
         flow_id = str(params.get("flow_id", ""))
+        if flow_id:
+            self._cancelled_flows.add(flow_id)
         await self._close_flow(flow_id)
         return {"ok": True}
 
@@ -829,6 +844,9 @@ class RoborockPlugin:
             },
         )
 
+    def _entry_is_current(self, entry: ActiveEntry) -> bool:
+        return not entry.closed and self._entries.get(entry.entry_id) is entry
+
     async def _ensure_entity(
         self,
         entry: ActiveEntry,
@@ -845,7 +863,7 @@ class RoborockPlugin:
         fan_speed_list: list[str] | None = None,
     ) -> bool:
         """Register entity if new; returns True if newly registered."""
-        if unique_id in managed.registered_entities:
+        if not self._entry_is_current(entry) or unique_id in managed.registered_entities:
             return False
         payload: dict[str, Any] = {
             "entry_id": entry.entry_id,
@@ -866,22 +884,30 @@ class RoborockPlugin:
             payload["entity_category"] = entity_category
         if fan_speed_list is not None:
             payload["fan_speed_list"] = fan_speed_list
-        await self.notify("entity.upsert", payload)
+        # Mark registered before awaiting the socket write so concurrent
+        # publishers cannot emit duplicate `entity.upsert` notifications.
         managed.registered_entities.add(unique_id)
         entry.entity_to_device[unique_id] = managed.duid
+        try:
+            await self.notify("entity.upsert", payload)
+        except BaseException:
+            managed.registered_entities.discard(unique_id)
+            raise
         return True
 
     async def _set_state(
         self,
-        entry_id: str,
+        entry: ActiveEntry,
         unique_id: str,
         state: str,
         attributes: dict[str, Any] | None = None,
     ) -> None:
+        if not self._entry_is_current(entry):
+            return
         await self.notify(
             "state.set",
             {
-                "entry_id": entry_id,
+                "entry_id": entry.entry_id,
                 "unique_id": unique_id,
                 "state": state,
                 "attributes": attributes or {},
@@ -912,19 +938,22 @@ class RoborockPlugin:
         # Publish initial state (`unknown`) and restore availability after an
         # outage without clobbering press timestamps during healthy polls.
         if is_new or managed.unavailable:
-            await self._set_state(entry.entry_id, uid, "unknown")
+            await self._set_state(entry, uid, "unknown")
 
     async def _refresh_device(
         self, entry: ActiveEntry, managed: ManagedDevice, *, initial: bool = False
     ) -> None:
+        if not self._entry_is_current(entry):
+            return
         if managed.kind == "v1":
             await self._refresh_v1(entry, managed, initial=initial)
         elif managed.kind == "b01_q7":
             await self._refresh_q7(entry, managed)
         elif managed.kind == "b01_q10":
             await self._refresh_q10(entry, managed)
-        managed.last_success = time.monotonic()
-        managed.unavailable = False
+        if self._entry_is_current(entry):
+            managed.last_success = time.monotonic()
+            managed.unavailable = False
 
     async def _refresh_v1(
         self, entry: ActiveEntry, managed: ManagedDevice, *, initial: bool
@@ -982,7 +1011,7 @@ class RoborockPlugin:
         if getattr(status, "battery", None) is not None:
             vac_attrs["battery_level"] = status.battery
         await self._set_state(
-            entry.entry_id,
+            entry,
             slug,
             map_v1_activity(
                 getattr(status, "state", None), getattr(status, "state_name", None)
@@ -1136,7 +1165,7 @@ class RoborockPlugin:
                 original_icon=icon,
                 entity_category="diagnostic",
             )
-            await self._set_state(entry.entry_id, uid, str(val))
+            await self._set_state(entry, uid, str(val))
 
         # 3. Binary sensors (matching HA `components/roborock/binary_sensor.py`)
         state_name_lower = (getattr(status, "state_name", None) or "").lower()
@@ -1197,7 +1226,7 @@ class RoborockPlugin:
                 original_icon=icon,
                 entity_category="diagnostic",
             )
-            await self._set_state(entry.entry_id, uid, "on" if bool(val) else "off")
+            await self._set_state(entry, uid, "on" if bool(val) else "off")
 
         # 4. Switches (matching HA `components/roborock/switch.py`)
         switch_specs = [
@@ -1236,7 +1265,7 @@ class RoborockPlugin:
                 original_icon=icon,
                 entity_category="config",
             )
-            await self._set_state(entry.entry_id, uid, "on" if bool(is_on) else "off")
+            await self._set_state(entry, uid, "on" if bool(is_on) else "off")
 
         # 5. Buttons (dock actions + consumable resets)
         command_api = getattr(props, "command", None)
@@ -1316,7 +1345,7 @@ class RoborockPlugin:
             fan_speed_list=fan_list,
         )
         await self._set_state(
-            entry.entry_id,
+            entry,
             slug,
             map_q7_activity(getattr(data, "status", None)),
             {
@@ -1337,7 +1366,7 @@ class RoborockPlugin:
                 unit_of_measurement="%",
                 entity_category="diagnostic",
             )
-            await self._set_state(entry.entry_id, uid, str(data.quantity))
+            await self._set_state(entry, uid, str(data.quantity))
 
     def _attach_q10_listener(
         self, entry: ActiveEntry, managed: ManagedDevice
@@ -1348,16 +1377,28 @@ class RoborockPlugin:
         if not callable(add_listener):
             return
 
+        async def drain_pushes() -> None:
+            try:
+                while managed.push_dirty and self._entry_is_current(entry):
+                    managed.push_dirty = False
+                    await self._publish_q10_state(entry, managed)
+            finally:
+                managed.push_task = None
+                if managed.push_dirty and self._entry_is_current(entry):
+                    # Schedule one more drain if a push arrived right as we exited.
+                    on_push()
+
         def on_push() -> None:
-            if entry.closed:
+            if not self._entry_is_current(entry):
+                return
+            managed.push_dirty = True
+            if managed.push_task is not None and not managed.push_task.done():
                 return
             try:
                 loop = asyncio.get_running_loop()
             except RuntimeError:
                 return
-            task = loop.create_task(self._publish_q10_state(entry, managed))
-            managed.push_tasks.add(task)
-            task.add_done_callback(managed.push_tasks.discard)
+            managed.push_task = loop.create_task(drain_pushes())
 
         unsub = add_listener(on_push)
         if callable(unsub):
@@ -1366,45 +1407,46 @@ class RoborockPlugin:
     async def _publish_q10_state(
         self, entry: ActiveEntry, managed: ManagedDevice
     ) -> None:
-        if entry.closed:
-            return
-        api = managed.device.b01_q10_properties
-        slug = managed.duid_slug
-        status = api.status
-        fan_list = self._backend.q10_fan_speed_list()
-        await self._ensure_entity(
-            entry,
-            managed,
-            slug,
-            "vacuum",
-            name=None,
-            supported_features=B01_VACUUM_FEATURES,
-            fan_speed_list=fan_list,
-        )
-        fan_level = getattr(status, "fan_level", None)
-        await self._set_state(
-            entry.entry_id,
-            slug,
-            map_q10_activity(getattr(status, "status", None)),
-            {
-                "supported_features": B01_VACUUM_FEATURES,
-                "fan_speed_list": fan_list,
-                "fan_speed": _enum_value_str(fan_level),
-            },
-        )
-        if getattr(status, "battery", None) is not None:
-            uid = f"battery_{slug}"
+        async with managed.publish_lock:
+            if not self._entry_is_current(entry):
+                return
+            api = managed.device.b01_q10_properties
+            slug = managed.duid_slug
+            status = api.status
+            fan_list = self._backend.q10_fan_speed_list()
             await self._ensure_entity(
                 entry,
                 managed,
-                uid,
-                "sensor",
-                name="Battery",
-                device_class="battery",
-                unit_of_measurement="%",
-                entity_category="diagnostic",
+                slug,
+                "vacuum",
+                name=None,
+                supported_features=B01_VACUUM_FEATURES,
+                fan_speed_list=fan_list,
             )
-            await self._set_state(entry.entry_id, uid, str(status.battery))
+            fan_level = getattr(status, "fan_level", None)
+            await self._set_state(
+                entry,
+                slug,
+                map_q10_activity(getattr(status, "status", None)),
+                {
+                    "supported_features": B01_VACUUM_FEATURES,
+                    "fan_speed_list": fan_list,
+                    "fan_speed": _enum_value_str(fan_level),
+                },
+            )
+            if getattr(status, "battery", None) is not None:
+                uid = f"battery_{slug}"
+                await self._ensure_entity(
+                    entry,
+                    managed,
+                    uid,
+                    "sensor",
+                    name="Battery",
+                    device_class="battery",
+                    unit_of_measurement="%",
+                    entity_category="diagnostic",
+                )
+                await self._set_state(entry, uid, str(status.battery))
 
     async def _refresh_q10(self, entry: ActiveEntry, managed: ManagedDevice) -> None:
         api = managed.device.b01_q10_properties
@@ -1435,9 +1477,11 @@ class RoborockPlugin:
     async def _mark_device_unavailable(
         self, entry: ActiveEntry, managed: ManagedDevice
     ) -> None:
+        if not self._entry_is_current(entry):
+            return
         managed.unavailable = True
         for uid in list(managed.registered_entities):
-            await self._set_state(entry.entry_id, uid, "unavailable")
+            await self._set_state(entry, uid, "unavailable")
 
     async def _poll_loop(self, entry: ActiveEntry) -> None:
         try:
@@ -1511,11 +1555,15 @@ class RoborockPlugin:
         else:
             raise RuntimeError(f"unsupported domain {domain!r}")
 
-        # Refresh immediately so HA reflects the new device state.
-        try:
-            await self._refresh_device(entry, managed, initial=False)
-        except Exception as exc:
-            await self.log("debug", f"Post-command refresh failed for {duid}: {exc}")
+        # Refresh immediately so HA reflects the new device state, unless the
+        # entry was unloaded or replaced while the command ran.
+        if self._entry_is_current(entry):
+            try:
+                await self._refresh_device(entry, managed, initial=False)
+            except Exception as exc:
+                await self.log(
+                    "debug", f"Post-command refresh failed for {duid}: {exc}"
+                )
         return {"ok": True}
 
     async def _call_vacuum(
@@ -1610,11 +1658,14 @@ class RoborockPlugin:
                 except Exception:
                     pass
             managed.unsub_listeners.clear()
-            for task in list(managed.push_tasks):
-                task.cancel()
-            if managed.push_tasks:
-                await asyncio.gather(*managed.push_tasks, return_exceptions=True)
-            managed.push_tasks.clear()
+            managed.push_dirty = False
+            if managed.push_task is not None:
+                managed.push_task.cancel()
+                try:
+                    await managed.push_task
+                except asyncio.CancelledError:
+                    pass
+                managed.push_task = None
         if entry.poll_task is not None:
             entry.poll_task.cancel()
             try:
@@ -1639,6 +1690,7 @@ class RoborockPlugin:
         return {"ok": True}
 
     async def _on_shutdown(self) -> None:
+        self._shutting_down = True
         for flow_id in list(self._flows.keys()):
             await self._close_flow(flow_id)
         for entry_id in list(self._entries.keys()):
@@ -1657,14 +1709,10 @@ async def _serve_stream(
     poll_enabled: bool = True,
 ) -> None:
     plugin = RoborockPlugin(send_fn, backend=backend, poll_enabled=poll_enabled)
-    sem = asyncio.Semaphore(MAX_CONCURRENT_REQUESTS)
     in_flight: set[asyncio.Task[bool]] = set()
 
     async def run_one(msg: dict[str, Any]) -> bool:
-        try:
-            return await plugin.handle_message(msg)
-        finally:
-            sem.release()
+        return await plugin.handle_message(msg)
 
     try:
         while True:
@@ -1680,6 +1728,7 @@ async def _serve_stream(
                 await plugin.handle_message(msg)
                 continue
             if method == "shutdown":
+                plugin._shutting_down = True
                 for task in list(in_flight):
                     task.cancel()
                 if in_flight:
@@ -1687,11 +1736,25 @@ async def _serve_stream(
                 in_flight.clear()
                 await plugin.handle_message(msg)
                 break
-            await sem.acquire()
+            if len(in_flight) >= MAX_CONCURRENT_REQUESTS:
+                msg_id = msg.get("id")
+                if msg_id is not None:
+                    await send_fn(
+                        {
+                            "jsonrpc": "2.0",
+                            "id": msg_id,
+                            "error": {
+                                "code": -32000,
+                                "message": "plugin busy: too many in-flight requests",
+                            },
+                        }
+                    )
+                continue
             task = asyncio.create_task(run_one(msg))
             in_flight.add(task)
             task.add_done_callback(in_flight.discard)
     finally:
+        plugin._shutting_down = True
         for task in list(in_flight):
             task.cancel()
         if in_flight:

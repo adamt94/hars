@@ -1404,7 +1404,7 @@ async fn user_disabled_plugin_vacuum_cannot_be_commanded() {
             args: vec![],
         },
         capabilities: Capabilities {
-            entity_domains: vec!["vacuum".into()],
+            entity_domains: vec!["vacuum".into(), "button".into()],
             config_entry_version: 1,
         },
     };
@@ -1495,6 +1495,74 @@ async fn user_disabled_plugin_vacuum_cannot_be_commanded() {
     .await
     .unwrap();
     assert_eq!(calls.load(Ordering::SeqCst), 0);
+
+    // Pressed button retains its last-press timestamp across an outage.
+    let btn_id = store
+        .upsert_entity(protocol::EntityUpsertParams {
+            entry_id: "e1".into(),
+            unique_id: "empty_dustbin".into(),
+            domain: "button".into(),
+            device_identifier: None,
+            name: Some("Empty dustbin".into()),
+            object_id_base: None,
+            original_icon: None,
+            device_class: None,
+            unit_of_measurement: None,
+            entity_category: None,
+            supported_features: 0,
+            supported_color_modes: vec![],
+            effect_list: None,
+            min_color_temp_kelvin: None,
+            max_color_temp_kelvin: None,
+            fan_speed_list: None,
+        })
+        .unwrap();
+    let btn_eid = ha_core::EntityId::parse(&btn_id).unwrap();
+    store
+        .set_state(protocol::StateSetParams {
+            entry_id: "e1".into(),
+            unique_id: "empty_dustbin".into(),
+            state: "unknown".into(),
+            attributes: Map::new(),
+        })
+        .unwrap();
+    hass.call_service(
+        "button",
+        "press",
+        json!({"entity_id": btn_id}).as_object().cloned().unwrap(),
+        None,
+        false,
+        None,
+    )
+    .await
+    .unwrap();
+    let pressed_ts = hass.states().get(&btn_eid).unwrap().state.to_string();
+    assert_ne!(pressed_ts, "unknown");
+    // Outage -> unavailable -> recovery ("unknown") restores pressed timestamp.
+    store
+        .set_state(protocol::StateSetParams {
+            entry_id: "e1".into(),
+            unique_id: "empty_dustbin".into(),
+            state: "unavailable".into(),
+            attributes: Map::new(),
+        })
+        .unwrap();
+    assert_eq!(
+        hass.states().get(&btn_eid).unwrap().state.as_str(),
+        "unavailable"
+    );
+    store
+        .set_state(protocol::StateSetParams {
+            entry_id: "e1".into(),
+            unique_id: "empty_dustbin".into(),
+            state: "unknown".into(),
+            attributes: Map::new(),
+        })
+        .unwrap();
+    assert_eq!(
+        hass.states().get(&btn_eid).unwrap().state.as_str(),
+        pressed_ts
+    );
 
     let _ = std::fs::remove_dir_all(&dir);
 }

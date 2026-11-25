@@ -141,7 +141,7 @@ class FakeYXFanLevel(Enum):
 
 class FakeQ10DP(Enum):
     SEEK = (11, "dpSeek")
-    EMPTY = (12, "dpEmpty")
+    REMOTE = (12, "dpRemote")
 
     @property
     def code(self) -> int:
@@ -946,7 +946,7 @@ class RoborockPluginTests(unittest.TestCase):
                         "unique_id": "duid_q10_01",
                         "domain": "vacuum",
                         "service": "send_command",
-                        "data": {"command": "dpEmpty", "params": [1]},
+                        "data": {"command": "dpRemote", "params": [1]},
                     },
                 }
             )
@@ -1069,6 +1069,250 @@ class RoborockPluginTests(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 rp._remove_stale_socket(regular)
             self.assertEqual(regular.read_text(encoding="utf-8"), "keep me")
+
+    def test_round2_concurrency_saturation_reload_flow_cancel_and_q10_coalescing(
+        self,
+    ) -> None:
+        async def run() -> None:
+            # 1. Saturated dispatcher rejects excess requests immediately and
+            # still handles `shutdown` without blocking.
+            gate = asyncio.Event()
+            backend = FakeBackend(
+                devices=[FakeV1Device()],
+                setup_gate={f"e-{i}": gate for i in range(rp.MAX_CONCURRENT_REQUESTS)},
+            )
+            reader = asyncio.StreamReader()
+            replies: dict[int, dict[str, object]] = {}
+            got_busy = asyncio.Event()
+
+            async def send_fn(obj: dict[str, object]) -> None:
+                if "id" in obj:
+                    replies[obj["id"]] = obj
+                    if obj["id"] == 999:
+                        got_busy.set()
+
+            serve = asyncio.create_task(
+                rp._serve_stream(reader, send_fn, backend=backend, poll_enabled=False)
+            )
+            for i in range(rp.MAX_CONCURRENT_REQUESTS):
+                reader.feed_data(
+                    (
+                        json.dumps(
+                            {
+                                "jsonrpc": "2.0",
+                                "id": i + 1,
+                                "method": "entry.setup",
+                                "params": {
+                                    "entry_id": f"e-{i}",
+                                    "title": "Slow",
+                                    "data": {"username": "a@b", "user_data": {"rruid": "1"}},
+                                },
+                            }
+                        )
+                        + "\n"
+                    ).encode("utf-8")
+                )
+            # 65th request must fail fast with busy error instead of stalling reader.
+            reader.feed_data(
+                (
+                    json.dumps(
+                        {
+                            "jsonrpc": "2.0",
+                            "id": 999,
+                            "method": "entity.call",
+                            "params": {
+                                "entry_id": "e-0",
+                                "unique_id": "x",
+                                "domain": "vacuum",
+                                "service": "start",
+                            },
+                        }
+                    )
+                    + "\n"
+                ).encode("utf-8")
+            )
+            await asyncio.wait_for(got_busy.wait(), timeout=2.0)
+            self.assertIn("error", replies[999])
+            reader.feed_data(
+                (
+                    json.dumps({"jsonrpc": "2.0", "id": 1000, "method": "shutdown"})
+                    + "\n"
+                ).encode("utf-8")
+            )
+            reader.feed_eof()
+            await asyncio.wait_for(serve, timeout=2.0)
+            self.assertEqual(replies[1000]["result"], {"ok": True})
+
+            # 2. Unloaded entry's in-flight command cannot overwrite replacement entry's state.
+            cmd_gate = asyncio.Event()
+            old_q7 = FakeQ7Device()
+            orig_start = old_q7.b01_q7_properties.start_clean
+
+            async def slow_start() -> None:
+                await cmd_gate.wait()
+                await orig_start()
+
+            old_q7.b01_q7_properties.start_clean = slow_start  # type: ignore[method-assign]
+            new_q7 = FakeQ7Device()
+
+            async def new_query(_props: list[FakeB01Props]) -> object:
+                @dataclass
+                class Data:
+                    status: Enum = FakeQ7Status.CHARGING
+                    wind_name: str = "turbo"
+                    quantity: int = 99
+
+                return Data()
+
+            new_q7.b01_q7_properties.query_values = new_query  # type: ignore[method-assign]
+            b_reload = FakeBackend(devices=[old_q7])
+            p_reload, sent_reload = self._make_plugin(b_reload)
+            await p_reload.handle_message(
+                {
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "method": "entry.setup",
+                    "params": {
+                        "entry_id": "e1",
+                        "title": "Q7",
+                        "data": {"username": "a@b", "user_data": {"rruid": "1"}},
+                    },
+                }
+            )
+            cmd_task = asyncio.create_task(
+                p_reload.handle_message(
+                    {
+                        "jsonrpc": "2.0",
+                        "id": 2,
+                        "method": "entity.call",
+                        "params": {
+                            "entry_id": "e1",
+                            "unique_id": "duid_q7_01",
+                            "domain": "vacuum",
+                            "service": "start",
+                        },
+                    }
+                )
+            )
+            await asyncio.sleep(0)
+            # Reload entry `e1` with `new_q7` reporting battery 99.
+            b_reload.devices = [new_q7]
+            await p_reload.handle_message(
+                {
+                    "jsonrpc": "2.0",
+                    "id": 3,
+                    "method": "entry.setup",
+                    "params": {
+                        "entry_id": "e1",
+                        "title": "Q7",
+                        "data": {"username": "a@b", "user_data": {"rruid": "1"}},
+                    },
+                }
+            )
+            sent_reload.clear()
+            cmd_gate.set()
+            await cmd_task
+            stale_writes = [
+                m
+                for m in sent_reload
+                if m.get("method") == "state.set"
+                and m["params"]["unique_id"] == "battery_duid_q7_01"
+            ]
+            self.assertEqual(stale_writes, [])
+
+            # 3. `flow.cancel` while `request_code_v4` is pending closes the session
+            # and does not register the cancelled flow.
+            auth_gate = asyncio.Event()
+            closed_count = 0
+
+            class SlowAuthBackend(FakeBackend):
+                async def create_auth_client(self, username: str, base_url: str | None):
+                    client = FakeAuthClient(username, base_url)
+
+                    async def slow_req() -> None:
+                        await auth_gate.wait()
+
+                    client.request_code_v4 = slow_req  # type: ignore[method-assign]
+
+                    async def close_fn() -> None:
+                        nonlocal closed_count
+                        closed_count += 1
+
+                    return client, close_fn
+
+            p_flow, _ = self._make_plugin(SlowAuthBackend())
+            step_task = asyncio.create_task(
+                p_flow.handle_message(
+                    {
+                        "jsonrpc": "2.0",
+                        "id": 1,
+                        "method": "flow.step",
+                        "params": {
+                            "flow_id": "f-cancel",
+                            "step_id": "user",
+                            "input": {"username": "a@b", "region": "auto"},
+                        },
+                    }
+                )
+            )
+            await asyncio.sleep(0)
+            await p_flow.handle_message(
+                {
+                    "jsonrpc": "2.0",
+                    "id": 2,
+                    "method": "flow.cancel",
+                    "params": {"flow_id": "f-cancel"},
+                }
+            )
+            auth_gate.set()
+            await step_task
+            self.assertNotIn("f-cancel", p_flow._flows)
+            self.assertEqual(closed_count, 1)
+
+            # 4. Q10 concurrent pushes under a stalled writer coalesce to one task
+            # and never emit duplicate `entity.upsert`.
+            q10 = FakeQ10Device()
+            write_gate = asyncio.Event()
+            upserts: list[str] = []
+
+            async def slow_send(msg: dict[str, object]) -> None:
+                if msg.get("method") == "entity.upsert":
+                    upserts.append(msg["params"]["unique_id"])
+                    await write_gate.wait()
+
+            p_q10 = rp.RoborockPlugin(
+                slow_send, backend=FakeBackend(devices=[q10]), poll_enabled=False
+            )
+            setup_task = asyncio.create_task(
+                p_q10.handle_message(
+                    {
+                        "jsonrpc": "2.0",
+                        "id": 1,
+                        "method": "entry.setup",
+                        "params": {
+                            "entry_id": "e-q10",
+                            "title": "Q10",
+                            "data": {"username": "a@b", "user_data": {"rruid": "1"}},
+                        },
+                    }
+                )
+            )
+            await asyncio.sleep(0)
+            # Fire multiple pushes while initial `entity.upsert` is suspended.
+            q10.b01_q10_properties.status.emit_push(
+                FakeQ10Status.CLEANING, FakeYXFanLevel.TURBO, 70
+            )
+            q10.b01_q10_properties.status.emit_push(
+                FakeQ10Status.CHARGING, FakeYXFanLevel.QUIET, 71
+            )
+            await asyncio.sleep(0)
+            write_gate.set()
+            await setup_task
+            await asyncio.sleep(0.05)
+            self.assertEqual(upserts.count("duid_q10_01"), 1)
+            await p_q10.handle_message({"jsonrpc": "2.0", "id": 2, "method": "shutdown"})
+
+        asyncio.run(run())
 
     def test_atomic_json_cache_roundtrip_and_mode(self) -> None:
         @dataclass
