@@ -26,6 +26,7 @@ pub const SUPPORTED_ENTITY_DOMAINS: &[&str] = &[
     "switch",
     "button",
     "scene",
+    "vacuum",
     "sensor",
     "binary_sensor",
 ];
@@ -67,6 +68,7 @@ const BUILTIN_DOMAINS: &[&str] = &[
     "switch",
     "switchbot_cloud",
     "system_log",
+    "vacuum",
     "weather",
     "websocket_api",
     "zone",

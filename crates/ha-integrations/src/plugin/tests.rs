@@ -520,7 +520,7 @@ async fn unix_socket_sidecar_plugin_works_identically() {
         Some(&entries),
         &mut tasks,
     );
-    assert_eq!(started, vec!["sidecar_demo"]);
+    assert_eq!(started, vec!["sidecar_demo", "sensor"]);
 
     for _ in 0..40 {
         if hass
@@ -894,6 +894,7 @@ async fn entity_store_guards_foreign_devices_duplicates_and_attribute_growth() {
             effect_list: None,
             min_color_temp_kelvin: None,
             max_color_temp_kelvin: None,
+            fan_speed_list: None,
         })
         .unwrap();
     let dup = store.upsert_entity(protocol::EntityUpsertParams {
@@ -912,6 +913,7 @@ async fn entity_store_guards_foreign_devices_duplicates_and_attribute_growth() {
         effect_list: None,
         min_color_temp_kelvin: None,
         max_color_temp_kelvin: None,
+        fan_speed_list: None,
     });
     assert!(dup.is_err());
 
@@ -1122,7 +1124,7 @@ for line in sys.stdin:
         Some(&entries),
         &mut tasks,
     );
-    assert_eq!(started, vec!["v2_plug"]);
+    assert_eq!(started, vec!["v2_plug", "sensor"]);
 
     for _ in 0..40 {
         if entries
@@ -1142,4 +1144,240 @@ for line in sys.stdin:
         t.task.abort();
     }
     let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn stdio_plugin_vacuum_entities_and_services() {
+    use crate::vacuum::feature;
+
+    let dir = temp_dir("vacuum-plugin");
+    let plugin_dir = dir.join("plugins/mock_vac");
+    std::fs::create_dir_all(plugin_dir.join("bin")).unwrap();
+    let features = feature::START
+        | feature::PAUSE
+        | feature::STOP
+        | feature::RETURN_HOME
+        | feature::CLEAN_SPOT
+        | feature::LOCATE
+        | feature::FAN_SPEED
+        | feature::SEND_COMMAND
+        | feature::STATE;
+    let manifest = PluginManifest {
+        schema_version: 1,
+        domain: "mock_vac".into(),
+        name: "Mock Vacuum".into(),
+        version: "0.1.0".into(),
+        iot_class: "local_polling".into(),
+        config_flow: true,
+        documentation: None,
+        description: None,
+        transport: Transport::Stdio {
+            command: "bin/vac.py".into(),
+            args: vec![],
+        },
+        capabilities: Capabilities {
+            entity_domains: vec!["vacuum".into(), "sensor".into()],
+            config_entry_version: 1,
+        },
+    };
+    std::fs::write(
+        plugin_dir.join("plugin.json"),
+        serde_json::to_string_pretty(&manifest).unwrap(),
+    )
+    .unwrap();
+    let bin = plugin_dir.join("bin/vac.py");
+    std::fs::write(
+        &bin,
+        format!(
+            r#"#!/usr/bin/env python3
+import json, sys
+def send(o):
+    sys.stdout.write(json.dumps(o) + "\n"); sys.stdout.flush()
+for line in sys.stdin:
+    m = json.loads(line)
+    mid, meth, p = m.get("id"), m.get("method"), m.get("params") or {{}}
+    if meth == "initialize":
+        send({{"jsonrpc": "2.0", "id": mid, "result": {{"protocol_version": 1}}}})
+    elif meth == "entry.setup":
+        eid = p["entry_id"]
+        send({{"jsonrpc": "2.0", "method": "device.upsert", "params": {{
+            "entry_id": eid, "identifier": "rr-1", "name": "Roborock S8",
+            "manufacturer": "Roborock", "model": "roborock.vacuum.a70"
+        }}}})
+        send({{"jsonrpc": "2.0", "method": "entity.upsert", "params": {{
+            "entry_id": eid, "unique_id": "rr_1", "domain": "vacuum",
+            "device_identifier": "rr-1",
+            "supported_features": {features},
+            "fan_speed_list": ["quiet", "balanced", "turbo", "max"]
+        }}}})
+        send({{"jsonrpc": "2.0", "method": "state.set", "params": {{
+            "entry_id": eid, "unique_id": "rr_1", "state": "docked",
+            "attributes": {{"fan_speed": "balanced"}}
+        }}}})
+        send({{"jsonrpc": "2.0", "method": "entry.status", "params": {{
+            "entry_id": eid, "state": "loaded"
+        }}}})
+        send({{"jsonrpc": "2.0", "id": mid, "result": {{"ok": True}}}})
+    elif meth == "entity.call":
+        eid, uid, svc, data = p["entry_id"], p["unique_id"], p["service"], p.get("data") or {{}}
+        state_map = {{
+            "start": "cleaning",
+            "pause": "paused",
+            "stop": "idle",
+            "return_to_base": "returning",
+            "clean_spot": "cleaning",
+            "locate": "docked",
+        }}
+        new_state = state_map.get(svc, "cleaning")
+        attrs = {{"last_service": svc, "last_data": data}}
+        if svc == "set_fan_speed":
+            attrs["fan_speed"] = data["fan_speed"]
+        send({{"jsonrpc": "2.0", "method": "state.set", "params": {{
+            "entry_id": eid, "unique_id": uid, "state": new_state, "attributes": attrs
+        }}}})
+        send({{"jsonrpc": "2.0", "id": mid, "result": {{"ok": True}}}})
+    elif meth == "entry.unload":
+        send({{"jsonrpc": "2.0", "id": mid, "result": {{"ok": True}}}})
+    elif meth == "shutdown":
+        send({{"jsonrpc": "2.0", "id": mid, "result": {{"ok": True}}}})
+        break
+"#
+        ),
+    )
+    .unwrap();
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::set_permissions(&bin, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+    let hass = Hass::new();
+    let registry = Registry::new(&hass, &dir, Registries::default());
+    let entries = ConfigEntries::load(&hass, &dir);
+    let entry = entries.new_entry("mock_vac", SOURCE_USER, "Roborock", None, Map::new());
+    entries.add(entry);
+
+    let components = Components::new(&hass, registry, Profiles::default());
+    let plugins = PluginManager::load(&dir);
+    let mut tasks = Vec::new();
+    let started = crate::start_plugin_entries(
+        &plugins,
+        &components,
+        entries.list().as_deref(),
+        Some(&entries),
+        &mut tasks,
+    );
+    assert_eq!(started, vec!["mock_vac", "vacuum", "sensor"]);
+
+    let vac_id = ha_core::EntityId::parse("vacuum.roborock_s8").unwrap();
+    for _ in 0..50 {
+        if hass.states().get(&vac_id).is_some() {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    let st = hass.states().get(&vac_id).expect("vacuum state present");
+    assert_eq!(st.state.as_str(), "docked");
+    assert_eq!(st.attributes["friendly_name"], json!("Roborock S8"));
+    assert_eq!(st.attributes["supported_features"], json!(features));
+    assert_eq!(
+        st.attributes["fan_speed_list"],
+        json!(["quiet", "balanced", "turbo", "max"])
+    );
+    assert_eq!(st.attributes["fan_speed"], json!("balanced"));
+
+    // Start, set_fan_speed, send_command, return_to_base.
+    hass.call_service(
+        "vacuum",
+        "start",
+        json!({"entity_id": "vacuum.roborock_s8"})
+            .as_object()
+            .cloned()
+            .unwrap(),
+        None,
+        false,
+        None,
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        hass.states().get(&vac_id).unwrap().state.as_str(),
+        "cleaning"
+    );
+
+    hass.call_service(
+        "vacuum",
+        "set_fan_speed",
+        json!({"entity_id": "vacuum.roborock_s8", "fan_speed": "turbo"})
+            .as_object()
+            .cloned()
+            .unwrap(),
+        None,
+        false,
+        None,
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        hass.states().get(&vac_id).unwrap().attributes["fan_speed"],
+        json!("turbo")
+    );
+
+    hass.call_service(
+        "vacuum",
+        "send_command",
+        json!({
+            "entity_id": "vacuum.roborock_s8",
+            "command": "app_segment_clean",
+            "params": [{"segments": [16]}],
+        })
+        .as_object()
+        .cloned()
+        .unwrap(),
+        None,
+        false,
+        None,
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        hass.states().get(&vac_id).unwrap().attributes["last_data"]["command"],
+        json!("app_segment_clean")
+    );
+
+    hass.call_service(
+        "vacuum",
+        "return_to_base",
+        json!({"entity_id": "vacuum.roborock_s8"})
+            .as_object()
+            .cloned()
+            .unwrap(),
+        None,
+        false,
+        None,
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        hass.states().get(&vac_id).unwrap().state.as_str(),
+        "returning"
+    );
+
+    plugins.shutdown_all().await;
+    for t in tasks {
+        t.task.abort();
+    }
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn bundled_roborock_plugin_manifest_loads_and_validates() {
+    let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../plugins/roborock");
+    let loaded = InstalledPlugin::load(&manifest_dir).expect("roborock plugin loads");
+    assert_eq!(loaded.domain(), "roborock");
+    assert!(loaded.allows_entity_domain("vacuum"));
+    assert!(loaded.allows_entity_domain("sensor"));
+    assert!(loaded.allows_entity_domain("binary_sensor"));
+    assert!(loaded.allows_entity_domain("switch"));
+    assert!(loaded.allows_entity_domain("button"));
+    assert!(loaded.translations_for("config").is_some());
+    assert!(loaded.icons_for("entity").is_some());
 }

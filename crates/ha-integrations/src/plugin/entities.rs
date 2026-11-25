@@ -15,6 +15,7 @@ use crate::light::{
 };
 use crate::scene::Scene;
 use crate::switch::Switch;
+use crate::vacuum::Vacuum;
 use ha_core::{Attributes, Context, EntityId, Hass, ServiceError};
 use ha_registry::{DeviceInfo, EntityPatch};
 use parking_lot::{Mutex, RwLock};
@@ -69,6 +70,7 @@ enum EntityHandle {
     Light(Arc<PluginLight>),
     Button(Arc<PluginButton>),
     Scene(Arc<PluginScene>),
+    Vacuum(Arc<PluginVacuum>),
     Passive,
 }
 
@@ -168,7 +170,7 @@ impl PluginEntityStore {
         let entity_id = if let Some(registry) = self.components.registry() {
             let mut patch = EntityPatch {
                 config_entry_id: Some(Some(params.entry_id.clone())),
-                device_id: Some(device_id),
+                device_id: Some(device_id.clone()),
                 has_entity_name: Some(true),
                 original_name: Some(params.name.clone()),
                 object_id_base: Some(
@@ -192,6 +194,12 @@ impl PluginEntityStore {
                         .iter()
                         .map(|m| m.as_str())
                         .collect::<Vec<_>>(),
+                })));
+            } else if params.domain == "vacuum"
+                && let Some(fan_speeds) = &params.fan_speed_list
+            {
+                patch.capabilities = Some(Some(json!({
+                    "fan_speed_list": fan_speeds,
                 })));
             }
             let row = registry.get_or_create_entity(
@@ -220,8 +228,18 @@ impl PluginEntityStore {
                 .map_err(|e| format!("invalid entity_id: {e}"))?
         };
 
+        let friendly_name = params.name.clone().or_else(|| {
+            device_id.as_deref().and_then(|did| {
+                self.components
+                    .registries()
+                    .devices
+                    .iter()
+                    .find(|d| d.id == did)
+                    .and_then(|d| d.name_by_user.clone().or_else(|| d.name.clone()))
+            })
+        });
         let mut base_attrs = Attributes::new();
-        if let Some(name) = &params.name {
+        if let Some(name) = &friendly_name {
             base_attrs.insert("friendly_name".into(), json!(name));
         }
         if let Some(icon) = &params.original_icon {
@@ -232,6 +250,15 @@ impl PluginEntityStore {
         }
         if let Some(unit) = &params.unit_of_measurement {
             base_attrs.insert("unit_of_measurement".into(), json!(unit));
+        }
+        if params.domain == "vacuum" {
+            base_attrs.insert(
+                "supported_features".into(),
+                json!(params.supported_features),
+            );
+            if let Some(fan_speeds) = &params.fan_speed_list {
+                base_attrs.insert("fan_speed_list".into(), json!(fan_speeds));
+            }
         }
 
         let entry = entries
@@ -305,6 +332,18 @@ impl PluginEntityStore {
                 self.components.scenes().add(scene.clone());
                 EntityHandle::Scene(scene)
             }
+            "vacuum" => {
+                let vac = Arc::new(PluginVacuum {
+                    entity_id: entity_id.clone(),
+                    entry_id: params.entry_id.clone(),
+                    unique_id: params.unique_id.clone(),
+                    supported_features: params.supported_features,
+                    available: RwLock::new(true),
+                    call_plugin: self.call_plugin.clone(),
+                });
+                self.components.vacuums().add(vac.clone());
+                EntityHandle::Vacuum(vac)
+            }
             _ => EntityHandle::Passive,
         };
 
@@ -314,7 +353,7 @@ impl PluginEntityStore {
             RegisteredEntity {
                 entity_id,
                 domain: params.domain,
-                friendly_name: params.name,
+                friendly_name,
                 handle,
                 base_attrs,
             },
@@ -373,6 +412,10 @@ impl PluginEntityStore {
             EntityHandle::Scene(scene) => {
                 *scene.available.write() = available;
             }
+            EntityHandle::Vacuum(vac) => {
+                *vac.available.write() = available;
+                merged.insert("supported_features".into(), json!(vac.supported_features));
+            }
             EntityHandle::Passive => {}
         }
         self.components
@@ -414,6 +457,7 @@ impl PluginEntityStore {
                     EntityHandle::Light(light) => light.state.write().available = false,
                     EntityHandle::Button(btn) => *btn.available.write() = false,
                     EntityHandle::Scene(scene) => *scene.available.write() = false,
+                    EntityHandle::Vacuum(vac) => *vac.available.write() = false,
                     EntityHandle::Passive => {}
                 }
                 let mut attrs = Attributes::new();
@@ -446,6 +490,7 @@ impl PluginEntityStore {
             "light" => self.components.lights().remove(&reg.entity_id),
             "button" => self.components.buttons().remove(&reg.entity_id),
             "scene" => self.components.scenes().remove(&reg.entity_id),
+            "vacuum" => self.components.vacuums().remove(&reg.entity_id),
             _ => {}
         }
     }
@@ -748,5 +793,80 @@ impl Scene for PluginScene {
             data,
         });
         Box::pin(call)
+    }
+}
+
+struct PluginVacuum {
+    entity_id: EntityId,
+    entry_id: String,
+    unique_id: String,
+    supported_features: u32,
+    available: RwLock<bool>,
+    call_plugin: CallPluginFn,
+}
+
+impl PluginVacuum {
+    fn invoke(&self, service: &str, data: Map<String, Value>) -> BoxFuture<'_> {
+        let call = (self.call_plugin)(EntityCallParams {
+            entry_id: self.entry_id.clone(),
+            unique_id: self.unique_id.clone(),
+            domain: "vacuum".into(),
+            service: service.into(),
+            data,
+        });
+        Box::pin(call)
+    }
+}
+
+impl Vacuum for PluginVacuum {
+    fn entity_id(&self) -> &EntityId {
+        &self.entity_id
+    }
+
+    fn available(&self) -> bool {
+        *self.available.read()
+    }
+
+    fn supported_features(&self) -> u32 {
+        self.supported_features
+    }
+
+    fn start(&self) -> BoxFuture<'_> {
+        self.invoke("start", Map::new())
+    }
+
+    fn pause(&self) -> BoxFuture<'_> {
+        self.invoke("pause", Map::new())
+    }
+
+    fn stop(&self) -> BoxFuture<'_> {
+        self.invoke("stop", Map::new())
+    }
+
+    fn return_to_base(&self) -> BoxFuture<'_> {
+        self.invoke("return_to_base", Map::new())
+    }
+
+    fn clean_spot(&self) -> BoxFuture<'_> {
+        self.invoke("clean_spot", Map::new())
+    }
+
+    fn locate(&self) -> BoxFuture<'_> {
+        self.invoke("locate", Map::new())
+    }
+
+    fn set_fan_speed(&self, fan_speed: &str) -> BoxFuture<'_> {
+        let mut data = Map::new();
+        data.insert("fan_speed".into(), json!(fan_speed));
+        self.invoke("set_fan_speed", data)
+    }
+
+    fn send_command(&self, command: &str, params: Option<Value>) -> BoxFuture<'_> {
+        let mut data = Map::new();
+        data.insert("command".into(), json!(command));
+        if let Some(params) = params {
+            data.insert("params".into(), params);
+        }
+        self.invoke("send_command", data)
     }
 }
