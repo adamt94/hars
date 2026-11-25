@@ -475,6 +475,8 @@ class RoborockPlugin:
         self._data_dir = Path(".")
         self._flows: dict[str, FlowSession] = {}
         self._pending_flow_tasks: dict[str, asyncio.Task[Any]] = {}
+        self._cancelling_flows: set[str] = set()
+        self._flow_closing: dict[str, asyncio.Task[Any]] = {}
         self._closing_tasks: set[asyncio.Task[Any]] = set()
         self._shutting_down = False
         self._entries: dict[str, ActiveEntry] = {}
@@ -493,11 +495,22 @@ class RoborockPlugin:
             return True
 
     async def _close_session_safe(
-        self, close_fn: Callable[[], Awaitable[None]]
+        self,
+        close_fn: Callable[[], Awaitable[None]],
+        *,
+        flow_id: str | None = None,
     ) -> None:
         task = asyncio.create_task(close_fn())
         self._closing_tasks.add(task)
-        task.add_done_callback(self._closing_tasks.discard)
+        if flow_id:
+            self._flow_closing[flow_id] = task
+
+        def _done(t: asyncio.Task[Any]) -> None:
+            self._closing_tasks.discard(t)
+            if flow_id and self._flow_closing.get(flow_id) is t:
+                self._flow_closing.pop(flow_id, None)
+
+        task.add_done_callback(_done)
         try:
             await asyncio.shield(task)
         except Exception:
@@ -621,7 +634,11 @@ class RoborockPlugin:
     async def _close_flow(self, flow_id: str) -> None:
         flow = self._flows.pop(flow_id, None)
         if flow is not None:
-            await self._close_session_safe(flow.close_session)
+            await self._close_session_safe(flow.close_session, flow_id=flow_id)
+            return
+        closing = self._flow_closing.get(flow_id)
+        if closing is not None and not closing.done():
+            await asyncio.gather(asyncio.shield(closing), return_exceptions=True)
 
     async def _on_flow_step(self, params: dict[str, Any]) -> dict[str, Any]:
         flow_id = str(params.get("flow_id", ""))
@@ -650,10 +667,10 @@ class RoborockPlugin:
             try:
                 await client.request_code_v4()
             except asyncio.CancelledError:
-                await self._close_session_safe(close_fn)
+                await self._close_session_safe(close_fn, flow_id=flow_id)
                 raise
             except Exception as exc:
-                await self._close_session_safe(close_fn)
+                await self._close_session_safe(close_fn, flow_id=flow_id)
                 err_key = classify_auth_error(exc)
                 await self.log(
                     "warn", f"Roborock code request failed ({err_key}): {exc}"
@@ -662,9 +679,10 @@ class RoborockPlugin:
             finally:
                 if current is not None and self._pending_flow_tasks.get(flow_id) is current:
                     self._pending_flow_tasks.pop(flow_id, None)
+                self._cancelling_flows.discard(flow_id)
 
             if self._shutting_down:
-                await self._close_session_safe(close_fn)
+                await self._close_session_safe(close_fn, flow_id=flow_id)
                 return {"type": "abort", "reason": "unknown"}
 
             self._flows[flow_id] = FlowSession(
@@ -723,11 +741,14 @@ class RoborockPlugin:
 
     async def _on_flow_cancel(self, params: dict[str, Any]) -> dict[str, Any]:
         flow_id = str(params.get("flow_id", ""))
-        # Keep the task in `_pending_flow_tasks` until its `finally` clears it
-        # so overlapping `flow.cancel` calls also await session close.
+        # Cancel at most once so a second overlapping `flow.cancel` does not
+        # interrupt the shielded close in progress; wait for both the pending
+        # step and any active session close before acknowledging.
         pending = self._pending_flow_tasks.get(flow_id)
         if pending is not None and not pending.done():
-            pending.cancel()
+            if flow_id not in self._cancelling_flows:
+                self._cancelling_flows.add(flow_id)
+                pending.cancel()
             await asyncio.gather(pending, return_exceptions=True)
         await self._close_flow(flow_id)
         return {"ok": True}
