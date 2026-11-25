@@ -20,6 +20,7 @@ pub(crate) mod sensor;
 pub mod sun;
 pub mod switch;
 pub mod switchbot_cloud;
+pub mod vacuum;
 pub mod weather;
 
 use ha_core::Hass;
@@ -398,6 +399,11 @@ pub fn start_plugin_entries(
             tasks.push(running);
             if !started.iter().any(|d| d == domain) {
                 started.push(domain.to_owned());
+            }
+            for ed in &installed.manifest.capabilities.entity_domains {
+                if !started.iter().any(|d| d == ed) {
+                    started.push(ed.clone());
+                }
             }
         }
     }

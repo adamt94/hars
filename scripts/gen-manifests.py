@@ -27,8 +27,9 @@ DOMAINS = set(
     default_config device_tracker event frontend group history homeassistant
     http hue input_boolean labs lifx light logbook lovelace met mobile_app
     notify onboarding person persistent_notification recorder repairs scene
-    script sensor sun switch switchbot_cloud system_log weather websocket_api
-    zone analytics backup shopping_list google_translate radio_browser tts
+    script sensor sun switch switchbot_cloud system_log vacuum weather
+    websocket_api zone analytics backup shopping_list google_translate
+    radio_browser tts
     """.split()
 )
 
