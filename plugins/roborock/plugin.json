@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "domain": "roborock",
+  "name": "Roborock",
+  "version": "0.1.0",
+  "iot_class": "local_polling",
+  "config_flow": true,
+  "documentation": "https://www.home-assistant.io/integrations/roborock",
+  "description": "Control Roborock vacuums and docks locally (LAN) with cloud MQTT fallback via python-roborock",
+  "transport": {
+    "type": "stdio",
+    "command": "bin/hars-roborock",
+    "args": []
+  },
+  "capabilities": {
+    "entity_domains": [
+      "vacuum",
+      "sensor",
+      "binary_sensor",
+      "switch",
+      "button"
+    ],
+    "config_entry_version": 1
+  }
+}

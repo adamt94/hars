@@ -31,7 +31,7 @@ Place a plugin under `<config>/plugins/<domain>/`:
     "args": []
   },
   "capabilities": {
-    "entity_domains": ["switch", "light", "button", "scene", "sensor", "binary_sensor"],
+    "entity_domains": ["switch", "light", "button", "scene", "vacuum", "sensor", "binary_sensor"],
     "config_entry_version": 1
   }
 }
@@ -81,3 +81,6 @@ Send without `"id"` for fire-and-forget, or include `"id"` to receive `{"result"
 - **From a local folder:** `HARS_CONFIG=./config hars plugin install ./my_plug`
 - **From a bundle URL:** `HARS_CONFIG=./config hars plugin install https://example.com/my_plug.json`
 - **In the UI:** **Settings → Devices & services → Add integration → Hars Plugins** (zero restart required).
+
+See [`plugins/roborock/`](../../plugins/roborock/README.md) for a complete
+working plugin supporting both `stdio` and Docker `unix_socket` transports.

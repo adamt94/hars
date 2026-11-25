@@ -1,0 +1,33 @@
+#!/usr/bin/env sh
+# Launcher for the hars Roborock plugin (`stdio` transport).
+# Resolution order:
+#   1. $HARS_ROBOROCK_PYTHON (explicit Python interpreter with python-roborock)
+#   2. <config>/plugins/.data/roborock/.venv/bin/python3 (persists across upgrades)
+#   3. <plugin_dir>/.venv/bin/python3 (local virtualenv inside installed plugin dir)
+#   4. `uv run` (auto-provisions python-roborock without manual venv setup)
+#   5. `python3` from PATH
+set -eu
+
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+PLUGIN_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
+DATA_VENV="$PLUGIN_DIR/../.data/roborock/.venv/bin/python3"
+ENTRYPOINT="$PLUGIN_DIR/roborock_plugin.py"
+
+if [ -n "${HARS_ROBOROCK_PYTHON:-}" ]; then
+  exec "$HARS_ROBOROCK_PYTHON" -u "$ENTRYPOINT" --stdio "$@"
+fi
+
+if [ -x "$DATA_VENV" ]; then
+  exec "$DATA_VENV" -u "$ENTRYPOINT" --stdio "$@"
+fi
+
+if [ -x "$PLUGIN_DIR/.venv/bin/python3" ]; then
+  exec "$PLUGIN_DIR/.venv/bin/python3" -u "$ENTRYPOINT" --stdio "$@"
+fi
+
+if command -v uv >/dev/null 2>&1; then
+  exec uv run --quiet --no-project --with "python-roborock==5.12.0" --with "aiohttp>=3.9" \
+    python3 -u "$ENTRYPOINT" --stdio "$@"
+fi
+
+exec python3 -u "$ENTRYPOINT" --stdio "$@"

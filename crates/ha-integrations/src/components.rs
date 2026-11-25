@@ -8,6 +8,7 @@ use crate::climate::Climates;
 use crate::light::{Lights, Profiles};
 use crate::scene::Scenes;
 use crate::switch::Switches;
+use crate::vacuum::Vacuums;
 use ha_core::Hass;
 use ha_registry::{Lookup, Registries};
 use parking_lot::Mutex;
@@ -45,6 +46,7 @@ pub struct Components {
     scenes: OnceLock<Arc<Scenes>>,
     buttons: OnceLock<Arc<Buttons>>,
     climates: OnceLock<Arc<Climates>>,
+    vacuums: OnceLock<Arc<Vacuums>>,
     /// What every Hue bridge shares, made with the first.
     hue: OnceLock<Arc<crate::hue::Platforms>>,
     /// The entries that follow the registry, by entry id, from their
@@ -90,6 +92,7 @@ impl Components {
             scenes: OnceLock::new(),
             buttons: OnceLock::new(),
             climates: OnceLock::new(),
+            vacuums: OnceLock::new(),
             hue: OnceLock::new(),
             followers: Mutex::default(),
             running: Mutex::default(),
@@ -208,6 +211,16 @@ impl Components {
         self.climates
             .get_or_init(|| {
                 let c = Arc::new(Climates::default());
+                c.register_services(&self.hass, self.registries.clone());
+                c
+            })
+            .clone()
+    }
+
+    pub fn vacuums(&self) -> Arc<Vacuums> {
+        self.vacuums
+            .get_or_init(|| {
+                let c = Arc::new(Vacuums::default());
                 c.register_services(&self.hass, self.registries.clone());
                 c
             })

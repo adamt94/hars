@@ -47,6 +47,8 @@ pub fn domain_unrecorded(domain: &str) -> &'static [&'static str] {
         ],
         // `sensor/__init__.py` SensorEntity.
         "sensor" => &["options"],
+        // `vacuum/__init__.py` StateVacuumEntity.
+        "vacuum" => &["fan_speed_list"],
         // `automation/__init__.py` BaseAutomationEntity.
         "automation" => &["last_triggered", "mode", "current", "max", "id"],
         // `person/__init__.py` Person.
@@ -140,6 +142,9 @@ mod tests {
         let sensor = hass.unrecorded(&EntityId::parse("sensor.x").unwrap());
         assert!(sensor.excludes("options") && sensor.excludes("restored"));
         assert!(!sensor.excludes("unit_of_measurement"));
+        let vacuum = hass.unrecorded(&EntityId::parse("vacuum.roborock").unwrap());
+        assert!(vacuum.excludes("fan_speed_list"));
+        assert!(!vacuum.excludes("fan_speed"));
     }
 
     #[test]

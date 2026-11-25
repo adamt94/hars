@@ -258,6 +258,9 @@ pub struct EntityUpsertParams {
     pub min_color_temp_kelvin: Option<i64>,
     #[serde(default)]
     pub max_color_temp_kelvin: Option<i64>,
+    /// For `vacuum` entities: available fan speeds (`fan_speed_list`).
+    #[serde(default)]
+    pub fan_speed_list: Option<Vec<String>>,
 }
 
 /// Parameters sent by a plugin in `state.set`.
