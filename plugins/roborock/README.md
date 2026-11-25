@@ -27,19 +27,21 @@ Adds Roborock vacuum and dock support to `hars` as an out-of-process plugin
 
 ## Option 1: Install locally (macOS / Linux, `stdio` transport)
 
-1. Make sure either [`uv`](https://docs.astral.sh/uv/) is installed (zero
-   manual venv setup) **or** install `python-roborock==5.12.0` into a Python
-   environment:
-
-   ```sh
-   python3 -m venv plugins/roborock/.venv
-   plugins/roborock/.venv/bin/pip install -r plugins/roborock/requirements.txt
-   ```
-
-2. Install the plugin into your `hars` config directory:
+1. Install the plugin into your `hars` config directory:
 
    ```sh
    HARS_CONFIG=./config cargo run --release -- plugin install ./plugins/roborock
+   ```
+
+2. If [`uv`](https://docs.astral.sh/uv/) is installed, no extra Python setup is
+   needed—`bin/hars-roborock` provisions `python-roborock==5.12.0`
+   automatically. Otherwise, create a virtualenv in the persistent plugin data
+   directory (after step 1 so it is not copied over symlinks and survives
+   plugin upgrades):
+
+   ```sh
+   python3 -m venv ./config/plugins/.data/roborock/.venv
+   ./config/plugins/.data/roborock/.venv/bin/pip install -r ./config/plugins/roborock/requirements.txt
    ```
 
 3. Start `hars` and add your account in **Settings → Devices & services → Add
@@ -50,9 +52,16 @@ Adds Roborock vacuum and dock support to `hars` as an out-of-process plugin
 For `hars`'s `FROM scratch` Docker image, run the Roborock plugin as a sidecar
 container sharing `<config>/plugins/run/roborock.sock`:
 
-1. Copy `plugins/roborock/plugin.sidecar.json` as
-   `<config>/plugins/roborock/plugin.json` along with `translations/` and
-   `icons.json`.
+1. Create `<config>/plugins/roborock/` and copy the sidecar manifest and assets
+   into it:
+
+   ```sh
+   mkdir -p ./config/plugins/roborock/translations
+   cp plugins/roborock/plugin.sidecar.json ./config/plugins/roborock/plugin.json
+   cp plugins/roborock/translations/en.json ./config/plugins/roborock/translations/en.json
+   cp plugins/roborock/icons.json ./config/plugins/roborock/icons.json
+   ```
+
 2. Build and run the sidecar beside `hars`:
 
    ```yaml

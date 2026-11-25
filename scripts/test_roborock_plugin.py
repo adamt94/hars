@@ -15,6 +15,7 @@ from pathlib import Path
 import stat
 import sys
 import tempfile
+from typing import Callable
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -66,6 +67,47 @@ class FakeDockError(Enum):
     ok = 0
 
 
+class FakeConsumableAttribute(Enum):
+    MAIN_BRUSH_WORK_TIME = "main_brush_work_time"
+    SIDE_BRUSH_WORK_TIME = "side_brush_work_time"
+    FILTER_WORK_TIME = "filter_work_time"
+    SENSOR_DIRTY_TIME = "sensor_dirty_time"
+
+
+class FakeB01Props(Enum):
+    STATUS = "status"
+    WIND = "wind"
+    QUANTITY = "quantity"
+    CLEANING_TIME = "cleaning_time"
+
+
+class FakeSCWindMapping(Enum):
+    QUIET = (1, "quiet")
+    BALANCED = (2, "balanced")
+    TURBO = (3, "turbo")
+    MAX = (4, "max")
+    MAX_PLUS = (5, "max_plus")
+
+    @property
+    def code(self) -> int:
+        return self.value[0]
+
+    @property
+    def label(self) -> str:
+        return self.value[1]
+
+    @classmethod
+    def keys(cls) -> list[str]:
+        return [m.label for m in cls]
+
+    @classmethod
+    def from_value(cls, val: str) -> "FakeSCWindMapping":
+        for m in cls:
+            if m.label == val:
+                return m
+        raise ValueError(f"invalid Q7 fan speed {val!r}")
+
+
 class FakeQ7Status(Enum):
     CHARGING = 8
     SWEEP_MOPING = 5
@@ -76,8 +118,41 @@ class FakeQ10Status(Enum):
     CHARGING = 6
 
 
-class FakeQ10Fan(Enum):
+class FakeYXFanLevel(Enum):
+    OFF = "off"
+    QUIET = "quiet"
+    BALANCED = "balanced"
     TURBO = "turbo"
+    MAX = "max"
+    MAX_PLUS = "max_plus"
+    UNKNOWN = "unknown"
+
+    @property
+    def code(self) -> int:
+        return list(FakeYXFanLevel).index(self)
+
+    @classmethod
+    def from_value(cls, val: str) -> "FakeYXFanLevel":
+        for m in cls:
+            if m.value == val:
+                return m
+        raise ValueError(f"invalid Q10 fan level {val!r}")
+
+
+class FakeQ10DP(Enum):
+    SEEK = (11, "dpSeek")
+    EMPTY = (12, "dpEmpty")
+
+    @property
+    def code(self) -> int:
+        return self.value[0]
+
+    @classmethod
+    def from_any_optional(cls, raw: str) -> "FakeQ10DP | None":
+        for m in cls:
+            if raw in (m.name, m.value[1], str(m.value[0])):
+                return m
+        return None
 
 
 @dataclass
@@ -145,7 +220,12 @@ class FakeV1Status:
         self.in_returning = 0
         self.fan_speed_options = list(FakeFanMode)
         self.fan_speed_name = "balanced"
-        self.fan_speed_mapping = {101: "quiet", 102: "balanced", 103: "turbo", 104: "max"}
+        self.fan_speed_mapping = {
+            101: "quiet",
+            102: "balanced",
+            103: "turbo",
+            104: "max",
+        }
         self.square_meter_clean_area = 42.5
         self.clean_time = 1800
         self.clean_percent = 100
@@ -171,8 +251,11 @@ class FakeConsumables:
     async def refresh(self) -> None:
         pass
 
-    async def reset_consumable(self, attr: str) -> None:
-        self.reset_calls.append(attr)
+    async def reset_consumable(self, attr: FakeConsumableAttribute) -> None:
+        # Mirror real python-roborock: evaluates `attr.value`, rejecting raw strings.
+        if not isinstance(attr, FakeConsumableAttribute):
+            raise AttributeError("ConsumableAttribute enum required")
+        self.reset_calls.append(attr.value)
 
 
 class FakeCleanSummary:
@@ -222,7 +305,11 @@ class FakeQ7Props:
     def __init__(self) -> None:
         self.calls: list[tuple[str, object]] = []
 
-    async def query_values(self, _props: list[str]) -> object:
+    async def query_values(self, props: list[FakeB01Props]) -> object:
+        # Enforce real python-roborock enum list requirement.
+        if not all(isinstance(p, FakeB01Props) for p in props):
+            raise TypeError("RoborockB01Props enum list required")
+
         @dataclass
         class Data:
             status: Enum = FakeQ7Status.CHARGING
@@ -246,8 +333,9 @@ class FakeQ7Props:
     async def find_me(self) -> None:
         self.calls.append(("find_me", None))
 
-    async def set_fan_speed(self, speed: str) -> None:
-        self.calls.append(("set_fan_speed", speed))
+    async def set_fan_speed(self, speed: FakeSCWindMapping) -> None:
+        # Mirror real python-roborock: accesses `.code`.
+        self.calls.append(("set_fan_speed", speed.code))
 
     async def send(self, cmd: str, params: object = None) -> None:
         self.calls.append(("send", (cmd, params)))
@@ -262,6 +350,75 @@ class FakeQ7Device:
         self.v1_properties = None
         self.b01_q7_properties = FakeQ7Props()
         self.b01_q10_properties = None
+
+
+class FakeQ10StatusTrait:
+    def __init__(self) -> None:
+        self.status: FakeQ10Status | None = None
+        self.fan_level: FakeYXFanLevel | None = None
+        self.battery: int | None = None
+        self._listeners: list[Callable[[], None]] = []
+
+    def add_update_listener(self, cb: Callable[[], None]) -> Callable[[], None]:
+        self._listeners.append(cb)
+
+        def unsub() -> None:
+            if cb in self._listeners:
+                self._listeners.remove(cb)
+
+        return unsub
+
+    def emit_push(
+        self, status: FakeQ10Status, fan_level: FakeYXFanLevel, battery: int
+    ) -> None:
+        self.status = status
+        self.fan_level = fan_level
+        self.battery = battery
+        for cb in list(self._listeners):
+            cb()
+
+
+class FakeQ10VacuumApi:
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, object]] = []
+
+    async def start_clean(self) -> None:
+        self.calls.append(("start_clean", None))
+
+    async def set_fan_level(self, level: FakeYXFanLevel) -> None:
+        # Mirror real python-roborock: reads `.code`.
+        self.calls.append(("set_fan_level", level.code))
+
+
+class FakeQ10CommandApi:
+    def __init__(self) -> None:
+        self.calls: list[tuple[int, object]] = []
+
+    async def send(self, dp: FakeQ10DP, params: object = None) -> None:
+        # Mirror real python-roborock MQTT encoder: reads `.code`.
+        self.calls.append((dp.code, params))
+
+
+class FakeQ10Props:
+    def __init__(self) -> None:
+        self.status = FakeQ10StatusTrait()
+        self.vacuum = FakeQ10VacuumApi()
+        self.command = FakeQ10CommandApi()
+
+    async def refresh(self) -> None:
+        # Real Q10 refresh is fire-and-forget; push arrives asynchronously later.
+        pass
+
+
+class FakeQ10Device:
+    def __init__(self) -> None:
+        self.duid = "DUID-Q10-01"
+        self.name = "Hall Q10"
+        self.product = FakeProduct("roborock.vacuum.q10")
+        self.device_info = FakeDeviceInfo("01.00.01")
+        self.v1_properties = None
+        self.b01_q7_properties = None
+        self.b01_q10_properties = FakeQ10Props()
 
 
 class FakeManager:
@@ -289,12 +446,43 @@ class FakeBackend:
         self,
         devices: list[object] | None = None,
         setup_error: Exception | None = None,
+        setup_gate: dict[str, asyncio.Event] | None = None,
     ) -> None:
         self.devices = devices if devices is not None else [FakeV1Device()]
         self.setup_error = setup_error
+        self.setup_gate = setup_gate or {}
         self.managers: list[FakeManager] = []
         self.caches: list[FakeCache] = []
         self.sessions_closed = 0
+
+    def resolve_consumable_attribute(self, attr_name: str) -> FakeConsumableAttribute:
+        return FakeConsumableAttribute[attr_name.upper()]
+
+    def q7_request_props(self) -> list[FakeB01Props]:
+        return [
+            FakeB01Props.STATUS,
+            FakeB01Props.WIND,
+            FakeB01Props.QUANTITY,
+            FakeB01Props.CLEANING_TIME,
+        ]
+
+    def q7_fan_speed_list(self) -> list[str]:
+        return FakeSCWindMapping.keys()
+
+    def resolve_q7_fan_speed(self, fan_speed: str) -> FakeSCWindMapping:
+        return FakeSCWindMapping.from_value(fan_speed)
+
+    def q10_fan_speed_list(self) -> list[str]:
+        return [m.value for m in FakeYXFanLevel if m != FakeYXFanLevel.UNKNOWN]
+
+    def resolve_q10_fan_level(self, fan_speed: str) -> FakeYXFanLevel:
+        return FakeYXFanLevel.from_value(fan_speed)
+
+    def resolve_q10_dp(self, command: str) -> FakeQ10DP:
+        dp = FakeQ10DP.from_any_optional(command)
+        if dp is None:
+            raise ValueError(f"invalid Q10 command {command!r}")
+        return dp
 
     async def create_auth_client(self, username: str, base_url: str | None):
         client = FakeAuthClient(username, base_url)
@@ -313,6 +501,8 @@ class FakeBackend:
         base_url: str | None,
         data_dir: Path,
     ):
+        if entry_id in self.setup_gate:
+            await self.setup_gate[entry_id].wait()
         if self.setup_error is not None:
             raise self.setup_error
         mgr = FakeManager(self.devices)
@@ -367,7 +557,6 @@ class RoborockPluginTests(unittest.TestCase):
             )
             self.assertEqual(sent[-1]["result"]["protocol_version"], 1)
 
-            # Show initial user form.
             await plugin.handle_message(
                 {
                     "jsonrpc": "2.0",
@@ -381,7 +570,6 @@ class RoborockPluginTests(unittest.TestCase):
             self.assertEqual(res["step_id"], "user")
             self.assertEqual([f["name"] for f in res["schema"]], ["username", "region"])
 
-            # Non-existent email surfaces HA's `invalid_email` error key.
             await plugin.handle_message(
                 {
                     "jsonrpc": "2.0",
@@ -396,7 +584,6 @@ class RoborockPluginTests(unittest.TestCase):
             )
             self.assertEqual(sent[-1]["result"]["errors"], {"base": "invalid_email"})
 
-            # Valid email advances to `code` step.
             await plugin.handle_message(
                 {
                     "jsonrpc": "2.0",
@@ -411,7 +598,6 @@ class RoborockPluginTests(unittest.TestCase):
             )
             self.assertEqual(sent[-1]["result"]["step_id"], "code")
 
-            # Bad verification code keeps user on `code` step with `invalid_code`.
             await plugin.handle_message(
                 {
                     "jsonrpc": "2.0",
@@ -426,7 +612,6 @@ class RoborockPluginTests(unittest.TestCase):
             )
             self.assertEqual(sent[-1]["result"]["errors"], {"base": "invalid_code"})
 
-            # Valid code creates HA-compatible entry data.
             await plugin.handle_message(
                 {
                     "jsonrpc": "2.0",
@@ -450,7 +635,7 @@ class RoborockPluginTests(unittest.TestCase):
 
         asyncio.run(run())
 
-    def test_v1_setup_entities_service_calls_and_unload(self) -> None:
+    def test_v1_setup_buttons_recovery_service_calls_and_unload(self) -> None:
         async def run() -> None:
             dev = FakeV1Device()
             backend = FakeBackend(devices=[dev])
@@ -473,12 +658,6 @@ class RoborockPluginTests(unittest.TestCase):
                 }
             )
 
-            methods = [m.get("method") for m in sent if "method" in m]
-            self.assertIn("device.upsert", methods)
-            self.assertIn("entity.upsert", methods)
-            self.assertIn("state.set", methods)
-            self.assertIn("entry.status", methods)
-
             status_msgs = [m for m in sent if m.get("method") == "entry.status"]
             self.assertEqual(status_msgs[-1]["params"]["state"], "loaded")
 
@@ -493,10 +672,16 @@ class RoborockPluginTests(unittest.TestCase):
                 ["quiet", "balanced", "turbo", "max"],
             )
             self.assertEqual(upserted["battery_duid_s8_01"]["domain"], "sensor")
-            self.assertEqual(upserted["in_cleaning_duid_s8_01"]["domain"], "binary_sensor")
+            self.assertEqual(
+                upserted["in_cleaning_duid_s8_01"]["domain"], "binary_sensor"
+            )
+            self.assertEqual(
+                upserted["water_shortage_duid_s8_01"]["domain"], "binary_sensor"
+            )
             self.assertEqual(upserted["child_lock_duid_s8_01"]["domain"], "switch")
             self.assertEqual(upserted["empty_dustbin_duid_s8_01"]["domain"], "button")
 
+            # Buttons get initial `unknown` state (so they aren't left unavailable).
             states = {
                 m["params"]["unique_id"]: m["params"]
                 for m in sent
@@ -506,6 +691,43 @@ class RoborockPluginTests(unittest.TestCase):
             self.assertEqual(states["battery_duid_s8_01"]["state"], "98")
             self.assertEqual(states["battery_charging_duid_s8_01"]["state"], "on")
             self.assertEqual(states["child_lock_duid_s8_01"]["state"], "off")
+            self.assertEqual(states["empty_dustbin_duid_s8_01"]["state"], "unknown")
+            self.assertEqual(
+                states["reset_main_brush_consumable_duid_s8_01"]["state"], "unknown"
+            )
+
+            # Outage marks buttons unavailable; subsequent refresh restores them.
+            entry = plugin._entries["e1"]
+            managed = entry.devices["DUID-S8-01"]
+            sent.clear()
+            await plugin._mark_device_unavailable(entry, managed)
+            unavail_states = {
+                m["params"]["unique_id"]: m["params"]["state"]
+                for m in sent
+                if m.get("method") == "state.set"
+            }
+            self.assertEqual(unavail_states["empty_dustbin_duid_s8_01"], "unavailable")
+
+            sent.clear()
+            await plugin._refresh_device(entry, managed, initial=False)
+            recovered_states = {
+                m["params"]["unique_id"]: m["params"]["state"]
+                for m in sent
+                if m.get("method") == "state.set"
+            }
+            self.assertEqual(recovered_states["empty_dustbin_duid_s8_01"], "unknown")
+            self.assertEqual(
+                recovered_states["reset_main_brush_consumable_duid_s8_01"], "unknown"
+            )
+            # Healthy subsequent poll does NOT overwrite button state again.
+            sent.clear()
+            await plugin._refresh_device(entry, managed, initial=False)
+            healthy_states = {
+                m["params"]["unique_id"]: m["params"]["state"]
+                for m in sent
+                if m.get("method") == "state.set"
+            }
+            self.assertNotIn("empty_dustbin_duid_s8_01", healthy_states)
 
             # Vacuum service calls (including smart segment resume on start).
             dev.v1_properties.status.in_cleaning = 3
@@ -555,7 +777,7 @@ class RoborockPluginTests(unittest.TestCase):
                 ],
             )
 
-            # Switch toggle and dock button press.
+            # Switch toggle, dock button, and enum-backed consumable reset.
             await plugin.handle_message(
                 {
                     "jsonrpc": "2.0",
@@ -623,10 +845,11 @@ class RoborockPluginTests(unittest.TestCase):
 
         asyncio.run(run())
 
-    def test_q7_device_and_setup_error_classification(self) -> None:
+    def test_q7_and_q10_enums_and_q10_push_listener(self) -> None:
         async def run() -> None:
             q7 = FakeQ7Device()
-            backend = FakeBackend(devices=[q7])
+            q10 = FakeQ10Device()
+            backend = FakeBackend(devices=[q7, q10])
             plugin, sent = self._make_plugin(backend)
             await plugin.handle_message(
                 {
@@ -634,28 +857,111 @@ class RoborockPluginTests(unittest.TestCase):
                     "id": 1,
                     "method": "entry.setup",
                     "params": {
-                        "entry_id": "e-q7",
-                        "title": "Q7",
+                        "entry_id": "e-b01",
+                        "title": "B01",
                         "data": {"username": "a@b", "user_data": {"rruid": "1"}},
                     },
                 }
             )
+
+            # Q7 fan speed list matches SCWindMapping (no `off`, includes `max_plus`).
+            upserted = {
+                m["params"]["unique_id"]: m["params"]
+                for m in sent
+                if m.get("method") == "entity.upsert"
+            }
+            self.assertEqual(
+                upserted["duid_q7_01"]["fan_speed_list"],
+                ["quiet", "balanced", "turbo", "max", "max_plus"],
+            )
+
+            # Q7 set_fan_speed passes enum with `.code` (3 for turbo).
             await plugin.handle_message(
                 {
                     "jsonrpc": "2.0",
                     "id": 2,
                     "method": "entity.call",
                     "params": {
-                        "entry_id": "e-q7",
+                        "entry_id": "e-b01",
                         "unique_id": "duid_q7_01",
                         "domain": "vacuum",
-                        "service": "start",
+                        "service": "set_fan_speed",
+                        "data": {"fan_speed": "turbo"},
+                    },
+                }
+            )
+            self.assertEqual(q7.b01_q7_properties.calls, [("set_fan_speed", 3)])
+
+            # Q10 push listener publishes state immediately when MQTT push arrives.
+            sent.clear()
+            q10.b01_q10_properties.status.emit_push(
+                FakeQ10Status.CLEANING, FakeYXFanLevel.TURBO, 77
+            )
+            await asyncio.sleep(0)
+            pushed = {
+                m["params"]["unique_id"]: m["params"]
+                for m in sent
+                if m.get("method") == "state.set"
+            }
+            self.assertEqual(pushed["duid_q10_01"]["state"], "cleaning")
+            self.assertEqual(pushed["duid_q10_01"]["attributes"]["fan_speed"], "turbo")
+            self.assertEqual(pushed["battery_duid_q10_01"]["state"], "77")
+
+            # Q10 locate, set_fan_speed, and send_command resolve real enums.
+            await plugin.handle_message(
+                {
+                    "jsonrpc": "2.0",
+                    "id": 3,
+                    "method": "entity.call",
+                    "params": {
+                        "entry_id": "e-b01",
+                        "unique_id": "duid_q10_01",
+                        "domain": "vacuum",
+                        "service": "locate",
                         "data": {},
                     },
                 }
             )
-            self.assertEqual(q7.b01_q7_properties.calls, [("start_clean", None)])
-            await plugin.handle_message({"jsonrpc": "2.0", "id": 3, "method": "shutdown"})
+            await plugin.handle_message(
+                {
+                    "jsonrpc": "2.0",
+                    "id": 4,
+                    "method": "entity.call",
+                    "params": {
+                        "entry_id": "e-b01",
+                        "unique_id": "duid_q10_01",
+                        "domain": "vacuum",
+                        "service": "set_fan_speed",
+                        "data": {"fan_speed": "turbo"},
+                    },
+                }
+            )
+            await plugin.handle_message(
+                {
+                    "jsonrpc": "2.0",
+                    "id": 5,
+                    "method": "entity.call",
+                    "params": {
+                        "entry_id": "e-b01",
+                        "unique_id": "duid_q10_01",
+                        "domain": "vacuum",
+                        "service": "send_command",
+                        "data": {"command": "dpEmpty", "params": [1]},
+                    },
+                }
+            )
+            self.assertEqual(
+                q10.b01_q10_properties.command.calls,
+                [(11, None), (12, [1])],
+            )
+            self.assertEqual(
+                q10.b01_q10_properties.vacuum.calls,
+                [("set_fan_level", 3)],
+            )
+
+            await plugin.handle_message({"jsonrpc": "2.0", "id": 6, "method": "shutdown"})
+            # Listener unsubscribed on shutdown.
+            self.assertEqual(q10.b01_q10_properties.status._listeners, [])
 
             # Auth error -> setup_error; transient error -> setup_retry.
             for exc, expected in (
@@ -679,6 +985,90 @@ class RoborockPluginTests(unittest.TestCase):
                 self.assertEqual(status["params"]["state"], expected)
 
         asyncio.run(run())
+
+    def test_concurrent_stream_dispatch_avoids_head_of_line_blocking(self) -> None:
+        async def run() -> None:
+            gate = asyncio.Event()
+            dev = FakeV1Device()
+            backend = FakeBackend(devices=[dev], setup_gate={"e-slow": gate})
+
+            reader = asyncio.StreamReader()
+            sent: list[dict[str, object]] = []
+            call_done = asyncio.Event()
+
+            async def send_fn(obj: dict[str, object]) -> None:
+                sent.append(obj)
+                if obj.get("id") == 3:
+                    call_done.set()
+
+            serve_task = asyncio.create_task(
+                rp._serve_stream(reader, send_fn, backend=backend, poll_enabled=False)
+            )
+
+            def push(msg: dict[str, object]) -> None:
+                reader.feed_data((json.dumps(msg) + "\n").encode("utf-8"))
+
+            # Load fast entry `e-fast`.
+            push(
+                {
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "method": "entry.setup",
+                    "params": {
+                        "entry_id": "e-fast",
+                        "title": "Fast",
+                        "data": {"username": "a@b", "user_data": {"rruid": "1"}},
+                    },
+                }
+            )
+            await asyncio.sleep(0.05)
+
+            # Start stalled setup for `e-slow`, then immediately call `locate` on `e-fast`.
+            push(
+                {
+                    "jsonrpc": "2.0",
+                    "id": 2,
+                    "method": "entry.setup",
+                    "params": {
+                        "entry_id": "e-slow",
+                        "title": "Slow",
+                        "data": {"username": "b@c", "user_data": {"rruid": "2"}},
+                    },
+                }
+            )
+            push(
+                {
+                    "jsonrpc": "2.0",
+                    "id": 3,
+                    "method": "entity.call",
+                    "params": {
+                        "entry_id": "e-fast",
+                        "unique_id": "duid_s8_01",
+                        "domain": "vacuum",
+                        "service": "locate",
+                        "data": {},
+                    },
+                }
+            )
+
+            # `entity.call` must complete even though `e-slow` is still blocked.
+            await asyncio.wait_for(call_done.wait(), timeout=2.0)
+            self.assertIn(("find_me", None), dev.v1_properties.command.sent)
+
+            # Shutdown must cancel the stalled setup cleanly without hanging.
+            push({"jsonrpc": "2.0", "id": 4, "method": "shutdown", "params": {}})
+            reader.feed_eof()
+            await asyncio.wait_for(serve_task, timeout=2.0)
+
+        asyncio.run(run())
+
+    def test_unix_socket_refuses_to_unlink_regular_file(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            regular = Path(tmp) / "important.txt"
+            regular.write_text("keep me", encoding="utf-8")
+            with self.assertRaises(RuntimeError):
+                rp._remove_stale_socket(regular)
+            self.assertEqual(regular.read_text(encoding="utf-8"), "keep me")
 
     def test_atomic_json_cache_roundtrip_and_mode(self) -> None:
         @dataclass

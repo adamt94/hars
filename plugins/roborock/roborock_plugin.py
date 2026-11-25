@@ -18,6 +18,7 @@ import json
 import os
 from pathlib import Path
 import re
+import stat
 import sys
 import tempfile
 import time
@@ -26,6 +27,7 @@ from typing import Any, Awaitable, Callable
 PROTOCOL_VERSION = 1
 PLUGIN_VERSION = "0.1.0"
 DOMAIN = "roborock"
+MAX_CONCURRENT_REQUESTS = 64
 
 # Home Assistant VacuumEntityFeature bitmask (`components/vacuum/const.py`).
 FEAT_PAUSE = 4
@@ -236,6 +238,19 @@ def is_auth_failure(exc: Exception) -> bool:
     )
 
 
+def _remove_stale_socket(socket_path: Path) -> None:
+    """Remove an existing Unix domain socket; refuse to touch non-socket files."""
+    try:
+        st = os.lstat(socket_path)
+    except FileNotFoundError:
+        return
+    if not stat.S_ISSOCK(st.st_mode):
+        raise RuntimeError(
+            f"refusing to remove non-socket path at {socket_path}"
+        )
+    socket_path.unlink()
+
+
 class AtomicJsonFileCache:
     """Persistent file-backed cache matching `roborock.devices.cache.Cache`."""
 
@@ -290,12 +305,18 @@ class LiveRoborockBackend:
     def _import_roborock(self) -> dict[str, Any]:
         try:
             import aiohttp
-            from roborock.data import UserData
+            from roborock.data import SCWindMapping, UserData
+            from roborock.data.b01_q10.b01_q10_code_mappings import (
+                B01_Q10_DP,
+                YXFanLevel,
+            )
             from roborock.devices.cache import CacheData
             from roborock.devices.device_manager import (
                 UserParams,
                 create_device_manager,
             )
+            from roborock.devices.traits.v1.consumeable import ConsumableAttribute
+            from roborock.roborock_message import RoborockB01Props
             from roborock.web_api import RoborockApiClient
         except ImportError as exc:
             raise RuntimeError(
@@ -306,11 +327,55 @@ class LiveRoborockBackend:
         return {
             "aiohttp": aiohttp,
             "UserData": UserData,
+            "SCWindMapping": SCWindMapping,
+            "B01_Q10_DP": B01_Q10_DP,
+            "YXFanLevel": YXFanLevel,
             "CacheData": CacheData,
             "UserParams": UserParams,
             "create_device_manager": create_device_manager,
+            "ConsumableAttribute": ConsumableAttribute,
+            "RoborockB01Props": RoborockB01Props,
             "RoborockApiClient": RoborockApiClient,
         }
+
+    def resolve_consumable_attribute(self, attr_name: str) -> Any:
+        enum_cls = self._import_roborock()["ConsumableAttribute"]
+        try:
+            return enum_cls[attr_name.upper()]
+        except KeyError as exc:
+            raise ValueError(f"unknown consumable attribute {attr_name!r}") from exc
+
+    def q7_request_props(self) -> list[Any]:
+        props_cls = self._import_roborock()["RoborockB01Props"]
+        return [
+            props_cls.STATUS,
+            props_cls.WIND,
+            props_cls.QUANTITY,
+            props_cls.CLEANING_TIME,
+        ]
+
+    def q7_fan_speed_list(self) -> list[str]:
+        wind_cls = self._import_roborock()["SCWindMapping"]
+        return list(wind_cls.keys())
+
+    def resolve_q7_fan_speed(self, fan_speed: str) -> Any:
+        wind_cls = self._import_roborock()["SCWindMapping"]
+        return wind_cls.from_value(fan_speed)
+
+    def q10_fan_speed_list(self) -> list[str]:
+        fan_cls = self._import_roborock()["YXFanLevel"]
+        return [level.value for level in fan_cls if level != fan_cls.UNKNOWN]
+
+    def resolve_q10_fan_level(self, fan_speed: str) -> Any:
+        fan_cls = self._import_roborock()["YXFanLevel"]
+        return fan_cls.from_value(fan_speed)
+
+    def resolve_q10_dp(self, command: str) -> Any:
+        dp_cls = self._import_roborock()["B01_Q10_DP"]
+        dp = dp_cls.from_any_optional(command)
+        if dp is None:
+            raise ValueError(f"invalid Q10 command {command!r}")
+        return dp
 
     async def create_auth_client(
         self, username: str, base_url: str | None
@@ -373,9 +438,12 @@ class ManagedDevice:
     duid_slug: str
     registered_entities: set[str] = field(default_factory=set)
     last_success: float | None = None
+    unavailable: bool = False
     switches: dict[str, Any] = field(default_factory=dict)
     buttons: dict[str, Callable[[], Awaitable[None]]] = field(default_factory=dict)
     q7_data: Any = None
+    unsub_listeners: list[Callable[[], None]] = field(default_factory=list)
+    push_tasks: set[asyncio.Task[None]] = field(default_factory=set)
 
 
 @dataclass
@@ -405,6 +473,14 @@ class RoborockPlugin:
         self._data_dir = Path(".")
         self._flows: dict[str, FlowSession] = {}
         self._entries: dict[str, ActiveEntry] = {}
+        self._entry_locks: dict[str, asyncio.Lock] = {}
+
+    def _entry_lock(self, entry_id: str) -> asyncio.Lock:
+        lock = self._entry_locks.get(entry_id)
+        if lock is None:
+            lock = asyncio.Lock()
+            self._entry_locks[entry_id] = lock
+        return lock
 
     async def notify(self, method: str, params: dict[str, Any]) -> None:
         await self._send({"jsonrpc": "2.0", "method": method, "params": params})
@@ -548,7 +624,9 @@ class RoborockPlugin:
             except Exception as exc:
                 await close_fn()
                 err_key = classify_auth_error(exc)
-                await self.log("warn", f"Roborock code request failed ({err_key}): {exc}")
+                await self.log(
+                    "warn", f"Roborock code request failed ({err_key}): {exc}"
+                )
                 return self._user_form(err_key)
 
             self._flows[flow_id] = FlowSession(
@@ -571,17 +649,23 @@ class RoborockPlugin:
                 err_key = classify_auth_error(exc)
                 if err_key == "invalid_email":
                     err_key = "invalid_email_or_region"
-                await self.log("warn", f"Roborock code login failed ({err_key}): {exc}")
+                await self.log(
+                    "warn", f"Roborock code login failed ({err_key}): {exc}"
+                )
                 return self._code_form(err_key)
 
             base_url_attr = getattr(flow.client, "base_url", None)
-            if asyncio.iscoroutine(base_url_attr) or hasattr(base_url_attr, "__await__"):
+            if asyncio.iscoroutine(base_url_attr) or hasattr(
+                base_url_attr, "__await__"
+            ):
                 resolved_base_url = await base_url_attr
             else:
                 resolved_base_url = base_url_attr
 
             user_data_dict = (
-                user_data.as_dict() if hasattr(user_data, "as_dict") else dict(user_data)
+                user_data.as_dict()
+                if hasattr(user_data, "as_dict")
+                else dict(user_data)
             )
             rruid = getattr(user_data, "rruid", None) or user_data_dict.get("rruid")
             username = flow.username
@@ -610,6 +694,12 @@ class RoborockPlugin:
 
     async def _on_entry_setup(self, params: dict[str, Any]) -> dict[str, Any]:
         entry_id = str(params.get("entry_id", ""))
+        async with self._entry_lock(entry_id):
+            return await self._setup_entry_locked(entry_id, params)
+
+    async def _setup_entry_locked(
+        self, entry_id: str, params: dict[str, Any]
+    ) -> dict[str, Any]:
         data = params.get("data") or {}
         if entry_id in self._entries:
             await self._unload_entry_impl(entry_id)
@@ -682,6 +772,8 @@ class RoborockPlugin:
             )
             entry.devices[managed.duid] = managed
             await self._upsert_device(entry_id, managed)
+            if kind == "b01_q10":
+                self._attach_q10_listener(entry, managed)
             try:
                 await self._refresh_device(entry, managed, initial=True)
                 setup_count += 1
@@ -751,9 +843,10 @@ class RoborockPlugin:
         entity_category: str | None = None,
         supported_features: int = 0,
         fan_speed_list: list[str] | None = None,
-    ) -> None:
+    ) -> bool:
+        """Register entity if new; returns True if newly registered."""
         if unique_id in managed.registered_entities:
-            return
+            return False
         payload: dict[str, Any] = {
             "entry_id": entry.entry_id,
             "unique_id": unique_id,
@@ -776,6 +869,7 @@ class RoborockPlugin:
         await self.notify("entity.upsert", payload)
         managed.registered_entities.add(unique_id)
         entry.entity_to_device[unique_id] = managed.duid
+        return True
 
     async def _set_state(
         self,
@@ -794,6 +888,32 @@ class RoborockPlugin:
             },
         )
 
+    async def _ensure_button(
+        self,
+        entry: ActiveEntry,
+        managed: ManagedDevice,
+        uid: str,
+        *,
+        name: str,
+        icon: str,
+        action: Callable[[], Awaitable[None]],
+        entity_category: str | None = None,
+    ) -> None:
+        managed.buttons[uid] = action
+        is_new = await self._ensure_entity(
+            entry,
+            managed,
+            uid,
+            "button",
+            name=name,
+            original_icon=icon,
+            entity_category=entity_category,
+        )
+        # Publish initial state (`unknown`) and restore availability after an
+        # outage without clobbering press timestamps during healthy polls.
+        if is_new or managed.unavailable:
+            await self._set_state(entry.entry_id, uid, "unknown")
+
     async def _refresh_device(
         self, entry: ActiveEntry, managed: ManagedDevice, *, initial: bool = False
     ) -> None:
@@ -804,6 +924,7 @@ class RoborockPlugin:
         elif managed.kind == "b01_q10":
             await self._refresh_q10(entry, managed)
         managed.last_success = time.monotonic()
+        managed.unavailable = False
 
     async def _refresh_v1(
         self, entry: ActiveEntry, managed: ManagedDevice, *, initial: bool
@@ -1120,29 +1241,21 @@ class RoborockPlugin:
         # 5. Buttons (dock actions + consumable resets)
         command_api = getattr(props, "command", None)
         if has_dock and command_api is not None:
-            empty_uid = f"empty_dustbin_{slug}"
-            managed.buttons[empty_uid] = lambda api=command_api: api.send(
-                "app_start_collect_dust"
-            )
-            await self._ensure_entity(
+            await self._ensure_button(
                 entry,
                 managed,
-                empty_uid,
-                "button",
+                f"empty_dustbin_{slug}",
                 name="Empty dustbin",
-                original_icon="mdi:delete-empty",
+                icon="mdi:delete-empty",
+                action=lambda api=command_api: api.send("app_start_collect_dust"),
             )
-            wash_uid = f"wash_mop_{slug}"
-            managed.buttons[wash_uid] = lambda api=command_api: api.send(
-                "app_start_wash"
-            )
-            await self._ensure_entity(
+            await self._ensure_button(
                 entry,
                 managed,
-                wash_uid,
-                "button",
+                f"wash_mop_{slug}",
                 name="Wash mop",
-                original_icon="mdi:water-sync",
+                icon="mdi:water-sync",
+                action=lambda api=command_api: api.send("app_start_wash"),
             )
 
         if consumables is not None and hasattr(consumables, "reset_consumable"):
@@ -1150,57 +1263,49 @@ class RoborockPlugin:
                 (
                     f"reset_main_brush_consumable_{slug}",
                     "Reset main brush consumable",
-                    "main_brush_work_time",
+                    "MAIN_BRUSH_WORK_TIME",
                     "mdi:brush",
                 ),
                 (
                     f"reset_side_brush_consumable_{slug}",
                     "Reset side brush consumable",
-                    "side_brush_work_time",
+                    "SIDE_BRUSH_WORK_TIME",
                     "mdi:brush",
                 ),
                 (
                     f"reset_air_filter_consumable_{slug}",
                     "Reset air filter consumable",
-                    "filter_work_time",
+                    "FILTER_WORK_TIME",
                     "mdi:air-filter",
                 ),
                 (
                     f"reset_sensor_consumable_{slug}",
                     "Reset sensor consumable",
-                    "sensor_dirty_time",
+                    "SENSOR_DIRTY_TIME",
                     "mdi:eye-outline",
                 ),
             ]
-            for uid, name, attr_name, icon in reset_specs:
-                managed.buttons[uid] = (
-                    lambda c=consumables, a=attr_name: c.reset_consumable(a)
-                )
-                await self._ensure_entity(
+            for uid, name, enum_key, icon in reset_specs:
+                await self._ensure_button(
                     entry,
                     managed,
                     uid,
-                    "button",
                     name=name,
-                    original_icon=icon,
+                    icon=icon,
                     entity_category="config",
+                    action=lambda c=consumables, k=enum_key: c.reset_consumable(
+                        self._backend.resolve_consumable_attribute(k)
+                    ),
                 )
 
     async def _refresh_q7(self, entry: ActiveEntry, managed: ManagedDevice) -> None:
         api = managed.device.b01_q7_properties
         slug = managed.duid_slug
-        data = await api.query_values(
-            [
-                "status",
-                "wind",
-                "quantity",
-                "cleaning_time",
-            ]
-        )
+        data = await api.query_values(self._backend.q7_request_props())
         if data is None:
             raise RuntimeError("Q7 device returned empty properties")
         managed.q7_data = data
-        fan_list = ["off", "quiet", "balanced", "turbo", "max"]
+        fan_list = self._backend.q7_fan_speed_list()
         await self._ensure_entity(
             entry,
             managed,
@@ -1234,12 +1339,39 @@ class RoborockPlugin:
             )
             await self._set_state(entry.entry_id, uid, str(data.quantity))
 
-    async def _refresh_q10(self, entry: ActiveEntry, managed: ManagedDevice) -> None:
+    def _attach_q10_listener(
+        self, entry: ActiveEntry, managed: ManagedDevice
+    ) -> None:
+        api = managed.device.b01_q10_properties
+        status_trait = getattr(api, "status", None)
+        add_listener = getattr(status_trait, "add_update_listener", None)
+        if not callable(add_listener):
+            return
+
+        def on_push() -> None:
+            if entry.closed:
+                return
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                return
+            task = loop.create_task(self._publish_q10_state(entry, managed))
+            managed.push_tasks.add(task)
+            task.add_done_callback(managed.push_tasks.discard)
+
+        unsub = add_listener(on_push)
+        if callable(unsub):
+            managed.unsub_listeners.append(unsub)
+
+    async def _publish_q10_state(
+        self, entry: ActiveEntry, managed: ManagedDevice
+    ) -> None:
+        if entry.closed:
+            return
         api = managed.device.b01_q10_properties
         slug = managed.duid_slug
-        await api.refresh()
         status = api.status
-        fan_list = ["off", "quiet", "balanced", "turbo", "max", "max_plus"]
+        fan_list = self._backend.q10_fan_speed_list()
         await self._ensure_entity(
             entry,
             managed,
@@ -1274,6 +1406,11 @@ class RoborockPlugin:
             )
             await self._set_state(entry.entry_id, uid, str(status.battery))
 
+    async def _refresh_q10(self, entry: ActiveEntry, managed: ManagedDevice) -> None:
+        api = managed.device.b01_q10_properties
+        await api.refresh()
+        await self._publish_q10_state(entry, managed)
+
     def _next_poll_interval(self, entry: ActiveEntry) -> float:
         intervals: list[float] = []
         for managed in entry.devices.values():
@@ -1294,6 +1431,13 @@ class RoborockPlugin:
             else:
                 intervals.append(B01_POLL_INTERVAL)
         return min(intervals) if intervals else V1_CLOUD_IDLE_INTERVAL
+
+    async def _mark_device_unavailable(
+        self, entry: ActiveEntry, managed: ManagedDevice
+    ) -> None:
+        managed.unavailable = True
+        for uid in list(managed.registered_entities):
+            await self._set_state(entry.entry_id, uid, "unavailable")
 
     async def _poll_loop(self, entry: ActiveEntry) -> None:
         try:
@@ -1324,8 +1468,7 @@ class RoborockPlugin:
                             "warn",
                             f"Roborock {managed.duid} refresh failed: {exc}",
                         )
-                        for uid in list(managed.registered_entities):
-                            await self._set_state(entry.entry_id, uid, "unavailable")
+                        await self._mark_device_unavailable(entry, managed)
         except asyncio.CancelledError:
             return
 
@@ -1421,7 +1564,10 @@ class RoborockPlugin:
             elif service == "locate":
                 await api.find_me()
             elif service == "set_fan_speed":
-                await api.set_fan_speed(str(data.get("fan_speed", "")))
+                wind = self._backend.resolve_q7_fan_speed(
+                    str(data.get("fan_speed", ""))
+                )
+                await api.set_fan_speed(wind)
             elif service == "send_command":
                 await api.send(str(data.get("command", "")), data.get("params"))
             else:
@@ -1439,13 +1585,16 @@ class RoborockPlugin:
             elif service == "return_to_base":
                 await api.vacuum.return_to_dock()
             elif service == "locate":
-                await api.command.send("seek")
+                dp_seek = self._backend.resolve_q10_dp("SEEK")
+                await api.command.send(dp_seek)
             elif service == "set_fan_speed":
-                await api.vacuum.set_fan_level(str(data.get("fan_speed", "")))
-            elif service == "send_command":
-                await api.command.send(
-                    str(data.get("command", "")), params=data.get("params")
+                fan_level = self._backend.resolve_q10_fan_level(
+                    str(data.get("fan_speed", ""))
                 )
+                await api.vacuum.set_fan_level(fan_level)
+            elif service == "send_command":
+                dp_cmd = self._backend.resolve_q10_dp(str(data.get("command", "")))
+                await api.command.send(dp_cmd, params=data.get("params"))
             else:
                 raise ValueError(f"unsupported Q10 vacuum service {service!r}")
 
@@ -1454,6 +1603,18 @@ class RoborockPlugin:
         if entry is None:
             return
         entry.closed = True
+        for managed in entry.devices.values():
+            for unsub in managed.unsub_listeners:
+                try:
+                    unsub()
+                except Exception:
+                    pass
+            managed.unsub_listeners.clear()
+            for task in list(managed.push_tasks):
+                task.cancel()
+            if managed.push_tasks:
+                await asyncio.gather(*managed.push_tasks, return_exceptions=True)
+            managed.push_tasks.clear()
         if entry.poll_task is not None:
             entry.poll_task.cancel()
             try:
@@ -1473,7 +1634,8 @@ class RoborockPlugin:
 
     async def _on_entry_unload(self, params: dict[str, Any]) -> dict[str, Any]:
         entry_id = str(params.get("entry_id", ""))
-        await self._unload_entry_impl(entry_id)
+        async with self._entry_lock(entry_id):
+            await self._unload_entry_impl(entry_id)
         return {"ok": True}
 
     async def _on_shutdown(self) -> None:
@@ -1484,8 +1646,57 @@ class RoborockPlugin:
 
 
 # ----------------------------------------------------------------------
-# Transports: stdio and Unix domain socket
+# Transports: stdio and Unix domain socket (concurrent RPC dispatch)
 # ----------------------------------------------------------------------
+
+
+async def _serve_stream(
+    reader: asyncio.StreamReader,
+    send_fn: Callable[[dict[str, Any]], Awaitable[None]],
+    backend: Any | None = None,
+    poll_enabled: bool = True,
+) -> None:
+    plugin = RoborockPlugin(send_fn, backend=backend, poll_enabled=poll_enabled)
+    sem = asyncio.Semaphore(MAX_CONCURRENT_REQUESTS)
+    in_flight: set[asyncio.Task[bool]] = set()
+
+    async def run_one(msg: dict[str, Any]) -> bool:
+        try:
+            return await plugin.handle_message(msg)
+        finally:
+            sem.release()
+
+    try:
+        while True:
+            raw = await reader.readline()
+            if not raw:
+                break
+            text = raw.decode("utf-8").strip()
+            if not text:
+                continue
+            msg = json.loads(text)
+            method = msg.get("method")
+            if method == "initialize":
+                await plugin.handle_message(msg)
+                continue
+            if method == "shutdown":
+                for task in list(in_flight):
+                    task.cancel()
+                if in_flight:
+                    await asyncio.gather(*in_flight, return_exceptions=True)
+                in_flight.clear()
+                await plugin.handle_message(msg)
+                break
+            await sem.acquire()
+            task = asyncio.create_task(run_one(msg))
+            in_flight.add(task)
+            task.add_done_callback(in_flight.discard)
+    finally:
+        for task in list(in_flight):
+            task.cancel()
+        if in_flight:
+            await asyncio.gather(*in_flight, return_exceptions=True)
+        await plugin._on_shutdown()
 
 
 async def run_stdio(backend: Any | None = None) -> None:
@@ -1502,27 +1713,12 @@ async def run_stdio(backend: Any | None = None) -> None:
             sys.stdout.write(line)
             sys.stdout.flush()
 
-    plugin = RoborockPlugin(send_fn, backend=backend)
-    try:
-        while True:
-            raw = await reader.readline()
-            if not raw:
-                break
-            text = raw.decode("utf-8").strip()
-            if not text:
-                continue
-            msg = json.loads(text)
-            keep_going = await plugin.handle_message(msg)
-            if not keep_going:
-                break
-    finally:
-        await plugin._on_shutdown()
+    await _serve_stream(reader, send_fn, backend=backend)
 
 
 async def run_unix_socket(socket_path: Path, backend: Any | None = None) -> None:
     socket_path.parent.mkdir(parents=True, exist_ok=True)
-    if socket_path.exists():
-        socket_path.unlink()
+    _remove_stale_socket(socket_path)
 
     async def handle_client(
         reader: asyncio.StreamReader, writer: asyncio.StreamWriter
@@ -1535,21 +1731,9 @@ async def run_unix_socket(socket_path: Path, backend: Any | None = None) -> None
                 writer.write(data)
                 await writer.drain()
 
-        plugin = RoborockPlugin(send_fn, backend=backend)
         try:
-            while True:
-                raw = await reader.readline()
-                if not raw:
-                    break
-                text = raw.decode("utf-8").strip()
-                if not text:
-                    continue
-                msg = json.loads(text)
-                keep_going = await plugin.handle_message(msg)
-                if not keep_going:
-                    break
+            await _serve_stream(reader, send_fn, backend=backend)
         finally:
-            await plugin._on_shutdown()
             writer.close()
             try:
                 await writer.wait_closed()

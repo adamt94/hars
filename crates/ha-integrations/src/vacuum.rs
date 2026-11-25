@@ -2,6 +2,11 @@
 //! `components/vacuum/const.py`): `vacuum.start`, `vacuum.pause`,
 //! `vacuum.stop`, `vacuum.return_to_base`, `vacuum.clean_spot`,
 //! `vacuum.locate`, `vacuum.set_fan_speed`, and `vacuum.send_command`.
+//!
+//! Deliberately omitted for now: `vacuum.clean_area` and the
+//! `vacuum/get_segments` WebSocket command (which depend on entity-registry
+//! `options` editing and repair flows that `hars` does not implement yet;
+//! segment/room cleaning is available via `vacuum.send_command`).
 
 use crate::light::BoxFuture;
 use crate::switch::select;

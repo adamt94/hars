@@ -1381,3 +1381,120 @@ fn bundled_roborock_plugin_manifest_loads_and_validates() {
     assert!(loaded.translations_for("config").is_some());
     assert!(loaded.icons_for("entity").is_some());
 }
+
+#[tokio::test]
+async fn user_disabled_plugin_vacuum_cannot_be_commanded() {
+    use crate::vacuum::feature;
+    use std::sync::atomic::AtomicUsize;
+
+    let dir = temp_dir("disabled-vacuum");
+    let plugin_dir = dir.join("plugins/roborock");
+    std::fs::create_dir_all(plugin_dir.join("bin")).unwrap();
+    let manifest = PluginManifest {
+        schema_version: 1,
+        domain: "roborock".into(),
+        name: "Roborock".into(),
+        version: "0.1.0".into(),
+        iot_class: "local_polling".into(),
+        config_flow: true,
+        documentation: None,
+        description: None,
+        transport: Transport::Stdio {
+            command: "bin/rr".into(),
+            args: vec![],
+        },
+        capabilities: Capabilities {
+            entity_domains: vec!["vacuum".into()],
+            config_entry_version: 1,
+        },
+    };
+    std::fs::write(
+        plugin_dir.join("plugin.json"),
+        serde_json::to_string_pretty(&manifest).unwrap(),
+    )
+    .unwrap();
+    std::fs::write(plugin_dir.join("bin/rr"), b"").unwrap();
+    let installed = Arc::new(InstalledPlugin::load(&plugin_dir).unwrap());
+
+    let hass = Hass::new();
+    let registry = Registry::new(&hass, &dir, Registries::default());
+    let components = Components::new(&hass, registry.clone(), Profiles::default());
+    // Ensure `vacuum.*` services are registered.
+    let _ = components.vacuums();
+
+    // Pre-create a user-disabled entity row as `hars import` leaves it.
+    let pre = registry.get_or_create_entity(
+        "vacuum",
+        "roborock",
+        "duid_disabled",
+        Some("user".into()),
+        ha_registry::EntityPatch {
+            config_entry_id: Some(Some("e1".into())),
+            has_entity_name: Some(true),
+            original_name: Some(Some("Disabled Vac".into())),
+            object_id_base: Some(Some("Disabled Vac".into())),
+            ..Default::default()
+        },
+    );
+    assert_eq!(pre.disabled_by.as_deref(), Some("user"));
+
+    let calls = Arc::new(AtomicUsize::new(0));
+    let calls_ref = calls.clone();
+    let store = entities::PluginEntityStore::new(
+        installed,
+        components,
+        Arc::new(move |_| {
+            calls_ref.fetch_add(1, Ordering::SeqCst);
+            Box::pin(async { Ok(()) })
+        }),
+    );
+    store.activate_entry("e1");
+    let id = store
+        .upsert_entity(protocol::EntityUpsertParams {
+            entry_id: "e1".into(),
+            unique_id: "duid_disabled".into(),
+            domain: "vacuum".into(),
+            device_identifier: None,
+            name: Some("Disabled Vac".into()),
+            object_id_base: None,
+            original_icon: None,
+            device_class: None,
+            unit_of_measurement: None,
+            entity_category: None,
+            supported_features: feature::START | feature::STATE,
+            supported_color_modes: vec![],
+            effect_list: None,
+            min_color_temp_kelvin: None,
+            max_color_temp_kelvin: None,
+            fan_speed_list: None,
+        })
+        .unwrap();
+    store
+        .set_state(protocol::StateSetParams {
+            entry_id: "e1".into(),
+            unique_id: "duid_disabled".into(),
+            state: "docked".into(),
+            attributes: Map::new(),
+        })
+        .unwrap();
+
+    // Disabled entity has no state and receives no service calls.
+    assert!(
+        hass.states()
+            .get(&ha_core::EntityId::parse(&id).unwrap())
+            .is_none()
+    );
+    hass.call_service(
+        "vacuum",
+        "start",
+        json!({"entity_id": id}).as_object().cloned().unwrap(),
+        None,
+        false,
+        None,
+    )
+    .await
+    .unwrap();
+    assert_eq!(calls.load(Ordering::SeqCst), 0);
+
+    let _ = std::fs::remove_dir_all(&dir);
+}

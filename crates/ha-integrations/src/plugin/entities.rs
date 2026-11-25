@@ -72,6 +72,8 @@ enum EntityHandle {
     Scene(Arc<PluginScene>),
     Vacuum(Arc<PluginVacuum>),
     Passive,
+    /// Registry row has `disabled_by` set: no service adapter or state writes.
+    Disabled,
 }
 
 impl PluginEntityStore {
@@ -167,7 +169,7 @@ impl PluginEntityStore {
                 .and_then(|e| e.devices.get(ident).cloned())
         });
 
-        let entity_id = if let Some(registry) = self.components.registry() {
+        let (entity_id, disabled) = if let Some(registry) = self.components.registry() {
             let mut patch = EntityPatch {
                 config_entry_id: Some(Some(params.entry_id.clone())),
                 device_id: Some(device_id.clone()),
@@ -209,8 +211,9 @@ impl PluginEntityStore {
                 None,
                 patch,
             );
-            EntityId::parse(&row.entity_id)
-                .map_err(|e| format!("invalid entity_id {:?}: {e}", row.entity_id))?
+            let id = EntityId::parse(&row.entity_id)
+                .map_err(|e| format!("invalid entity_id {:?}: {e}", row.entity_id))?;
+            (id, row.disabled_by.is_some())
         } else {
             let slug = ha_core::slugify(
                 params
@@ -224,8 +227,9 @@ impl PluginEntityStore {
             } else {
                 slug
             };
-            EntityId::parse(&format!("{}.{slug}", params.domain))
-                .map_err(|e| format!("invalid entity_id: {e}"))?
+            let id = EntityId::parse(&format!("{}.{slug}", params.domain))
+                .map_err(|e| format!("invalid entity_id: {e}"))?;
+            (id, false)
         };
 
         let friendly_name = params.name.clone().or_else(|| {
@@ -269,82 +273,86 @@ impl PluginEntityStore {
             self.unregister_adapter(&old);
         }
 
-        let handle = match params.domain.as_str() {
-            "switch" => {
-                let sw = Arc::new(PluginSwitch {
-                    entity_id: entity_id.clone(),
-                    entry_id: params.entry_id.clone(),
-                    unique_id: params.unique_id.clone(),
-                    state: RwLock::new(SwitchInner {
-                        available: true,
-                        is_on: false,
-                    }),
-                    call_plugin: self.call_plugin.clone(),
-                });
-                self.components.switches().add(sw.clone());
-                EntityHandle::Switch(sw)
+        let handle = if disabled {
+            EntityHandle::Disabled
+        } else {
+            match params.domain.as_str() {
+                "switch" => {
+                    let sw = Arc::new(PluginSwitch {
+                        entity_id: entity_id.clone(),
+                        entry_id: params.entry_id.clone(),
+                        unique_id: params.unique_id.clone(),
+                        state: RwLock::new(SwitchInner {
+                            available: true,
+                            is_on: false,
+                        }),
+                        call_plugin: self.call_plugin.clone(),
+                    });
+                    self.components.switches().add(sw.clone());
+                    EntityHandle::Switch(sw)
+                }
+                "light" => {
+                    let caps = parse_light_caps(&params);
+                    let min_k = params.min_color_temp_kelvin.unwrap_or(2000);
+                    let max_k = params.max_color_temp_kelvin.unwrap_or(6535);
+                    let light = Arc::new(PluginLight {
+                        entity_id: entity_id.clone(),
+                        entry_id: params.entry_id.clone(),
+                        unique_id: params.unique_id.clone(),
+                        caps,
+                        state: RwLock::new(LightInner {
+                            available: true,
+                            light: LightState {
+                                min_color_temp_kelvin: min_k,
+                                max_color_temp_kelvin: max_k,
+                                ..Default::default()
+                            },
+                        }),
+                        call_plugin: self.call_plugin.clone(),
+                    });
+                    self.components.lights().add(light.clone());
+                    EntityHandle::Light(light)
+                }
+                "button" => {
+                    let btn = Arc::new(PluginButton {
+                        entity_id: entity_id.clone(),
+                        entry_id: params.entry_id.clone(),
+                        unique_id: params.unique_id.clone(),
+                        hass: self.components.hass().clone(),
+                        friendly_name: friendly_name.clone(),
+                        available: RwLock::new(true),
+                        call_plugin: self.call_plugin.clone(),
+                    });
+                    self.components.buttons().add(btn.clone());
+                    EntityHandle::Button(btn)
+                }
+                "scene" => {
+                    let scene = Arc::new(PluginScene {
+                        entity_id: entity_id.clone(),
+                        entry_id: params.entry_id.clone(),
+                        unique_id: params.unique_id.clone(),
+                        hass: self.components.hass().clone(),
+                        friendly_name: friendly_name.clone(),
+                        available: RwLock::new(true),
+                        call_plugin: self.call_plugin.clone(),
+                    });
+                    self.components.scenes().add(scene.clone());
+                    EntityHandle::Scene(scene)
+                }
+                "vacuum" => {
+                    let vac = Arc::new(PluginVacuum {
+                        entity_id: entity_id.clone(),
+                        entry_id: params.entry_id.clone(),
+                        unique_id: params.unique_id.clone(),
+                        supported_features: params.supported_features,
+                        available: RwLock::new(true),
+                        call_plugin: self.call_plugin.clone(),
+                    });
+                    self.components.vacuums().add(vac.clone());
+                    EntityHandle::Vacuum(vac)
+                }
+                _ => EntityHandle::Passive,
             }
-            "light" => {
-                let caps = parse_light_caps(&params);
-                let min_k = params.min_color_temp_kelvin.unwrap_or(2000);
-                let max_k = params.max_color_temp_kelvin.unwrap_or(6535);
-                let light = Arc::new(PluginLight {
-                    entity_id: entity_id.clone(),
-                    entry_id: params.entry_id.clone(),
-                    unique_id: params.unique_id.clone(),
-                    caps,
-                    state: RwLock::new(LightInner {
-                        available: true,
-                        light: LightState {
-                            min_color_temp_kelvin: min_k,
-                            max_color_temp_kelvin: max_k,
-                            ..Default::default()
-                        },
-                    }),
-                    call_plugin: self.call_plugin.clone(),
-                });
-                self.components.lights().add(light.clone());
-                EntityHandle::Light(light)
-            }
-            "button" => {
-                let btn = Arc::new(PluginButton {
-                    entity_id: entity_id.clone(),
-                    entry_id: params.entry_id.clone(),
-                    unique_id: params.unique_id.clone(),
-                    hass: self.components.hass().clone(),
-                    friendly_name: params.name.clone(),
-                    available: RwLock::new(true),
-                    call_plugin: self.call_plugin.clone(),
-                });
-                self.components.buttons().add(btn.clone());
-                EntityHandle::Button(btn)
-            }
-            "scene" => {
-                let scene = Arc::new(PluginScene {
-                    entity_id: entity_id.clone(),
-                    entry_id: params.entry_id.clone(),
-                    unique_id: params.unique_id.clone(),
-                    hass: self.components.hass().clone(),
-                    friendly_name: params.name.clone(),
-                    available: RwLock::new(true),
-                    call_plugin: self.call_plugin.clone(),
-                });
-                self.components.scenes().add(scene.clone());
-                EntityHandle::Scene(scene)
-            }
-            "vacuum" => {
-                let vac = Arc::new(PluginVacuum {
-                    entity_id: entity_id.clone(),
-                    entry_id: params.entry_id.clone(),
-                    unique_id: params.unique_id.clone(),
-                    supported_features: params.supported_features,
-                    available: RwLock::new(true),
-                    call_plugin: self.call_plugin.clone(),
-                });
-                self.components.vacuums().add(vac.clone());
-                EntityHandle::Vacuum(vac)
-            }
-            _ => EntityHandle::Passive,
         };
 
         let id_str = entity_id.as_str().to_owned();
@@ -417,6 +425,7 @@ impl PluginEntityStore {
                 merged.insert("supported_features".into(), json!(vac.supported_features));
             }
             EntityHandle::Passive => {}
+            EntityHandle::Disabled => return Ok(()),
         }
         self.components
             .hass()
@@ -452,13 +461,16 @@ impl PluginEntityStore {
         let hass = self.components.hass();
         for entry in entries.values() {
             for reg in entry.entities.values() {
+                if matches!(reg.handle, EntityHandle::Disabled) {
+                    continue;
+                }
                 match &reg.handle {
                     EntityHandle::Switch(sw) => sw.state.write().available = false,
                     EntityHandle::Light(light) => light.state.write().available = false,
                     EntityHandle::Button(btn) => *btn.available.write() = false,
                     EntityHandle::Scene(scene) => *scene.available.write() = false,
                     EntityHandle::Vacuum(vac) => *vac.available.write() = false,
-                    EntityHandle::Passive => {}
+                    EntityHandle::Passive | EntityHandle::Disabled => {}
                 }
                 let mut attrs = Attributes::new();
                 if let Some(name) = &reg.friendly_name {
@@ -485,6 +497,9 @@ impl PluginEntityStore {
     }
 
     fn unregister_adapter(&self, reg: &RegisteredEntity) {
+        if matches!(reg.handle, EntityHandle::Disabled) {
+            return;
+        }
         match reg.domain.as_str() {
             "switch" => self.components.switches().remove(&reg.entity_id),
             "light" => self.components.lights().remove(&reg.entity_id),
