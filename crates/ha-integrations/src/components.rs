@@ -9,7 +9,9 @@ use crate::cover::Covers;
 use crate::fan::Fans;
 use crate::light::{Lights, Profiles};
 use crate::lock::Locks;
+use crate::media_player::MediaPlayers;
 use crate::number::Numbers;
+use crate::remote::Remotes;
 use crate::scene::Scenes;
 use crate::select::Selects;
 use crate::switch::Switches;
@@ -57,6 +59,8 @@ pub struct Components {
     covers: OnceLock<Arc<Covers>>,
     locks: OnceLock<Arc<Locks>>,
     fans: OnceLock<Arc<Fans>>,
+    media_players: OnceLock<Arc<MediaPlayers>>,
+    remotes: OnceLock<Arc<Remotes>>,
     /// What every Hue bridge shares, made with the first.
     hue: OnceLock<Arc<crate::hue::Platforms>>,
     /// The entries that follow the registry, by entry id, from their
@@ -108,6 +112,8 @@ impl Components {
             covers: OnceLock::new(),
             locks: OnceLock::new(),
             fans: OnceLock::new(),
+            media_players: OnceLock::new(),
+            remotes: OnceLock::new(),
             hue: OnceLock::new(),
             followers: Mutex::default(),
             running: Mutex::default(),
@@ -291,6 +297,26 @@ impl Components {
             })
             .clone()
     }
+
+    pub fn media_players(&self) -> Arc<MediaPlayers> {
+        self.media_players
+            .get_or_init(|| {
+                let c = Arc::new(MediaPlayers::default());
+                c.register_services(&self.hass, self.registries.clone());
+                c
+            })
+            .clone()
+    }
+
+    pub fn remotes(&self) -> Arc<Remotes> {
+        self.remotes
+            .get_or_init(|| {
+                let c = Arc::new(Remotes::default());
+                c.register_services(&self.hass, self.registries.clone());
+                c
+            })
+            .clone()
+    }
 }
 
 /// Points in the code where a test runs something of its own, once, on
@@ -357,5 +383,9 @@ mod tests {
         assert!(hass.services().has_service("lock", "unlock"));
         assert!(Arc::ptr_eq(&c.fans(), &c.fans()));
         assert!(hass.services().has_service("fan", "set_percentage"));
+        assert!(Arc::ptr_eq(&c.media_players(), &c.media_players()));
+        assert!(hass.services().has_service("media_player", "play_media"));
+        assert!(Arc::ptr_eq(&c.remotes(), &c.remotes()));
+        assert!(hass.services().has_service("remote", "send_command"));
     }
 }

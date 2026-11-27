@@ -16,7 +16,9 @@ use crate::light::{
     TurnOff, White,
 };
 use crate::lock::Lock;
+use crate::media_player::{self, MediaPlayer, MediaPlayerState, PlayMedia};
 use crate::number::{self, Number};
+use crate::remote::{DeleteCommand, LearnCommand, Remote, SendCommand};
 use crate::scene::Scene;
 use crate::select::Select;
 use crate::switch::Switch;
@@ -81,6 +83,8 @@ enum EntityHandle {
     Cover(Arc<PluginCover>),
     Lock(Arc<PluginLock>),
     Fan(Arc<PluginFan>),
+    MediaPlayer(Arc<PluginMediaPlayer>),
+    Remote(Arc<PluginRemote>),
     Passive,
     /// Registry row has `disabled_by` set: no service adapter or state writes.
     Disabled,
@@ -162,6 +166,16 @@ impl PluginEntityStore {
                 params.entry_id, self.domain
             ));
         }
+        if let Some(existing) = entries
+            .get(&params.entry_id)
+            .and_then(|e| e.entities.get(&params.unique_id))
+            && existing.domain != params.domain
+        {
+            return Err(format!(
+                "unique_id {:?} is already registered in domain {:?} for entry {:?}",
+                params.unique_id, existing.domain, params.entry_id
+            ));
+        }
         for (other_eid, other) in entries.iter() {
             if other_eid != &params.entry_id
                 && let Some(existing) = other.entities.get(&params.unique_id)
@@ -173,6 +187,32 @@ impl PluginEntityStore {
                 ));
             }
         }
+        let prev_media_caps = entries
+            .get(&params.entry_id)
+            .and_then(|e| e.entities.get(&params.unique_id))
+            .and_then(|reg| match &reg.handle {
+                EntityHandle::MediaPlayer(old) => {
+                    let s = old.state.read();
+                    Some((s.source_list.clone(), s.sound_mode_list.clone()))
+                }
+                _ => None,
+            });
+        let resolved_media_source_list = if params.domain == "media_player" {
+            match &params.source_list {
+                Some(list) => normalize_string_list_vec(list),
+                None => prev_media_caps.as_ref().and_then(|(s, _)| s.clone()),
+            }
+        } else {
+            None
+        };
+        let resolved_media_sound_mode_list = if params.domain == "media_player" {
+            match &params.sound_mode_list {
+                Some(list) => normalize_string_list_vec(list),
+                None => prev_media_caps.as_ref().and_then(|(_, m)| m.clone()),
+            }
+        } else {
+            None
+        };
         let device_id = params.device_identifier.as_ref().and_then(|ident| {
             entries
                 .get(&params.entry_id)
@@ -238,6 +278,12 @@ impl PluginEntityStore {
                     patch.capabilities = Some(Some(json!({
                         "preset_modes": params.preset_modes,
                     })));
+                } else if params.domain == "media_player" {
+                    patch.capabilities = Some(Some(media_player_capabilities(
+                        params.supported_features,
+                        &resolved_media_source_list,
+                        &resolved_media_sound_mode_list,
+                    )));
                 }
                 let row = registry.get_or_create_entity(
                     &params.domain,
@@ -349,6 +395,26 @@ impl PluginEntityStore {
                 let sc = params.speed_count.unwrap_or(100).max(1);
                 base_attrs.insert("percentage_step".into(), json!(100.0 / f64::from(sc)));
             }
+        } else if params.domain == "media_player" {
+            base_attrs.insert(
+                "supported_features".into(),
+                json!(params.supported_features),
+            );
+            if params.supported_features & media_player::feature::SELECT_SOURCE != 0
+                && let Some(sources) = &resolved_media_source_list
+            {
+                base_attrs.insert("source_list".into(), sources.clone());
+            }
+            if params.supported_features & media_player::feature::SELECT_SOUND_MODE != 0
+                && let Some(modes) = &resolved_media_sound_mode_list
+            {
+                base_attrs.insert("sound_mode_list".into(), modes.clone());
+            }
+        } else if params.domain == "remote" {
+            base_attrs.insert(
+                "supported_features".into(),
+                json!(params.supported_features),
+            );
         }
 
         let entry = entries
@@ -616,6 +682,55 @@ impl PluginEntityStore {
                     self.components.fans().add(f.clone());
                     EntityHandle::Fan(f)
                 }
+                "media_player" => {
+                    let (available, state, volume_level) = match &prev_handle {
+                        Some(EntityHandle::MediaPlayer(old)) => {
+                            let s = old.state.read();
+                            (s.available, s.state, s.volume_level)
+                        }
+                        _ => (true, None, None),
+                    };
+                    let volume_step = params
+                        .volume_step
+                        .filter(|v| v.is_finite() && *v > 0.0)
+                        .unwrap_or(0.1);
+                    let mp = Arc::new(PluginMediaPlayer {
+                        entity_id: entity_id.clone(),
+                        entry_id: params.entry_id.clone(),
+                        unique_id: params.unique_id.clone(),
+                        supported_features: params.supported_features,
+                        state: RwLock::new(MediaPlayerInner {
+                            available,
+                            state,
+                            volume_level,
+                            volume_step,
+                            source_list: resolved_media_source_list,
+                            sound_mode_list: resolved_media_sound_mode_list,
+                        }),
+                        call_plugin: self.call_plugin.clone(),
+                    });
+                    self.components.media_players().add(mp.clone());
+                    EntityHandle::MediaPlayer(mp)
+                }
+                "remote" => {
+                    let (available, is_on) = match &prev_handle {
+                        Some(EntityHandle::Remote(old)) => {
+                            let s = old.state.read();
+                            (s.available, s.is_on)
+                        }
+                        _ => (true, false),
+                    };
+                    let rem = Arc::new(PluginRemote {
+                        entity_id: entity_id.clone(),
+                        entry_id: params.entry_id.clone(),
+                        unique_id: params.unique_id.clone(),
+                        supported_features: params.supported_features,
+                        state: RwLock::new(RemoteInner { available, is_on }),
+                        call_plugin: self.call_plugin.clone(),
+                    });
+                    self.components.remotes().add(rem.clone());
+                    EntityHandle::Remote(rem)
+                }
                 _ => EntityHandle::Passive,
             }
         };
@@ -837,6 +952,99 @@ impl PluginEntityStore {
                 }
                 merged.insert("supported_features".into(), json!(f.supported_features));
             }
+            EntityHandle::MediaPlayer(mp) => {
+                let updated_caps = {
+                    let mut inner = mp.state.write();
+                    inner.available = available;
+                    inner.state = available.then(|| MediaPlayerState::parse(&state_str));
+                    inner.volume_level = available
+                        .then(|| {
+                            params
+                                .attributes
+                                .get("volume_level")
+                                .and_then(Value::as_f64)
+                        })
+                        .flatten();
+                    let mut caps_changed = false;
+                    if let Some(v) = params.attributes.get("source_list")
+                        && !same_string_list_val(&inner.source_list, v)
+                    {
+                        inner.source_list = normalize_string_list_val(v);
+                        if mp.supported_features & media_player::feature::SELECT_SOURCE != 0 {
+                            caps_changed = true;
+                        }
+                    }
+                    if let Some(v) = params.attributes.get("sound_mode_list")
+                        && !same_string_list_val(&inner.sound_mode_list, v)
+                    {
+                        inner.sound_mode_list = normalize_string_list_val(v);
+                        if mp.supported_features & media_player::feature::SELECT_SOUND_MODE != 0 {
+                            caps_changed = true;
+                        }
+                    }
+                    if !available {
+                        // HA omits state_attributes when unavailable, retaining
+                        // base entity attributes + capability_attributes + supported_features.
+                        merged = unavailable_base_attrs(reg, &params.attributes);
+                    }
+                    if mp.supported_features & media_player::feature::SELECT_SOURCE != 0 {
+                        match &inner.source_list {
+                            Some(sources) => {
+                                if merged.get("source_list") != Some(sources) {
+                                    merged.insert("source_list".into(), sources.clone());
+                                }
+                            }
+                            None => {
+                                merged.remove("source_list");
+                            }
+                        }
+                    } else {
+                        merged.remove("source_list");
+                    }
+                    if mp.supported_features & media_player::feature::SELECT_SOUND_MODE != 0 {
+                        match &inner.sound_mode_list {
+                            Some(modes) => {
+                                if merged.get("sound_mode_list") != Some(modes) {
+                                    merged.insert("sound_mode_list".into(), modes.clone());
+                                }
+                            }
+                            None => {
+                                merged.remove("sound_mode_list");
+                            }
+                        }
+                    } else {
+                        merged.remove("sound_mode_list");
+                    }
+                    merged.insert("supported_features".into(), json!(mp.supported_features));
+                    caps_changed.then(|| {
+                        media_player_capabilities(
+                            mp.supported_features,
+                            &inner.source_list,
+                            &inner.sound_mode_list,
+                        )
+                    })
+                };
+                if let Some(new_caps) = updated_caps
+                    && let Some(registry) = self.components.registry()
+                {
+                    registry.update_entity(
+                        reg.entity_id.as_str(),
+                        EntityPatch {
+                            capabilities: Some(Some(new_caps)),
+                            ..Default::default()
+                        },
+                    );
+                }
+            }
+            EntityHandle::Remote(rem) => {
+                let mut inner = rem.state.write();
+                inner.available = available;
+                inner.is_on = available && state_str == "on";
+                if !available {
+                    merged = unavailable_base_attrs(reg, &params.attributes);
+                }
+                merged.insert("supported_features".into(), json!(rem.supported_features));
+            }
             EntityHandle::Passive => {}
             EntityHandle::Disabled => return Ok(()),
         }
@@ -937,6 +1145,27 @@ impl PluginEntityStore {
                             attrs.remove("preset_modes");
                         }
                     }
+                    EntityHandle::MediaPlayer(mp) => {
+                        let mut inner = mp.state.write();
+                        inner.available = false;
+                        if mp.supported_features & media_player::feature::SELECT_SOURCE != 0
+                            && let Some(sources) = &inner.source_list
+                        {
+                            attrs.insert("source_list".into(), sources.clone());
+                        } else {
+                            attrs.remove("source_list");
+                        }
+                        if mp.supported_features & media_player::feature::SELECT_SOUND_MODE != 0
+                            && let Some(modes) = &inner.sound_mode_list
+                        {
+                            attrs.insert("sound_mode_list".into(), modes.clone());
+                        } else {
+                            attrs.remove("sound_mode_list");
+                        }
+                    }
+                    EntityHandle::Remote(rem) => {
+                        rem.state.write().available = false;
+                    }
                     EntityHandle::Passive | EntityHandle::Disabled => {}
                 }
                 hass.set_state(reg.entity_id.clone(), "unavailable", attrs);
@@ -974,6 +1203,8 @@ impl PluginEntityStore {
             "cover" => self.components.covers().remove(&reg.entity_id),
             "lock" => self.components.locks().remove(&reg.entity_id),
             "fan" => self.components.fans().remove(&reg.entity_id),
+            "media_player" => self.components.media_players().remove(&reg.entity_id),
+            "remote" => self.components.remotes().remove(&reg.entity_id),
             _ => {}
         }
     }
@@ -1752,5 +1983,380 @@ impl Fan for PluginFan {
         let mut data = Map::new();
         data.insert("direction".into(), json!(direction));
         self.invoke("set_direction", data)
+    }
+}
+
+fn normalize_string_list_vec(list: &[String]) -> Option<Value> {
+    if list.is_empty() {
+        None
+    } else {
+        Some(json!(list))
+    }
+}
+
+fn normalize_string_list_val(v: &Value) -> Option<Value> {
+    let arr = v.as_array()?;
+    if arr.is_empty() {
+        return None;
+    }
+    if arr.iter().all(Value::is_string) {
+        return Some(v.clone());
+    }
+    let filtered: Vec<Value> = arr.iter().filter(|x| x.is_string()).cloned().collect();
+    (!filtered.is_empty()).then_some(Value::Array(filtered))
+}
+
+fn same_string_list_val(cached: &Option<Value>, incoming: &Value) -> bool {
+    match incoming {
+        Value::Array(arr) if arr.iter().all(Value::is_string) => {
+            if arr.is_empty() {
+                cached.is_none()
+            } else {
+                cached.as_ref() == Some(incoming)
+            }
+        }
+        Value::Null => cached.is_none(),
+        _ => cached == &normalize_string_list_val(incoming),
+    }
+}
+
+fn is_py_truthy(v: &Value) -> bool {
+    match v {
+        Value::Null => false,
+        Value::Bool(b) => *b,
+        Value::Number(n) => n.as_f64().is_some_and(|f| f != 0.0),
+        Value::String(s) => !s.is_empty(),
+        Value::Array(a) => !a.is_empty(),
+        Value::Object(m) => !m.is_empty(),
+    }
+}
+
+/// Build the attribute map for an explicit `state.set("unavailable", ...)`
+/// frame, mirroring HA's `Entity._async_calculate_state` when `not available`:
+/// keep registration `base_attrs`, `friendly_name`, and any incoming base entity
+/// attributes (`unit_of_measurement`, `assumed_state` when Python-truthy,
+/// `attribution`, `device_class`, `entity_picture`, `icon`, `friendly_name`),
+/// while dropping live `state_attributes` and `extra_state_attributes`.
+fn unavailable_base_attrs(reg: &RegisteredEntity, incoming: &Map<String, Value>) -> Attributes {
+    const BASE_ENTITY_KEYS: &[&str] = &[
+        "unit_of_measurement",
+        "assumed_state",
+        "attribution",
+        "device_class",
+        "entity_picture",
+        "icon",
+        "friendly_name",
+    ];
+    let mut out = reg.base_attrs.clone();
+    for &key in BASE_ENTITY_KEYS {
+        if let Some(v) = incoming.get(key)
+            && !v.is_null()
+            && !(key == "assumed_state" && !is_py_truthy(v))
+        {
+            out.insert(key.into(), v.clone());
+        }
+    }
+    if let Some(name) = &reg.friendly_name {
+        out.entry("friendly_name").or_insert_with(|| json!(name));
+    }
+    out
+}
+
+fn media_player_capabilities(
+    supported_features: u32,
+    source_list: &Option<Value>,
+    sound_mode_list: &Option<Value>,
+) -> Value {
+    let mut caps = Map::new();
+    if supported_features & media_player::feature::SELECT_SOURCE != 0
+        && let Some(sources) = source_list
+    {
+        caps.insert("source_list".into(), sources.clone());
+    }
+    if supported_features & media_player::feature::SELECT_SOUND_MODE != 0
+        && let Some(modes) = sound_mode_list
+    {
+        caps.insert("sound_mode_list".into(), modes.clone());
+    }
+    Value::Object(caps)
+}
+
+struct MediaPlayerInner {
+    available: bool,
+    state: Option<MediaPlayerState>,
+    volume_level: Option<f64>,
+    volume_step: f64,
+    source_list: Option<Value>,
+    sound_mode_list: Option<Value>,
+}
+
+struct PluginMediaPlayer {
+    entity_id: EntityId,
+    entry_id: String,
+    unique_id: String,
+    supported_features: u32,
+    state: RwLock<MediaPlayerInner>,
+    call_plugin: CallPluginFn,
+}
+
+impl PluginMediaPlayer {
+    fn invoke(&self, service: &str, data: Map<String, Value>) -> BoxFuture<'_> {
+        let call = (self.call_plugin)(EntityCallParams {
+            entry_id: self.entry_id.clone(),
+            unique_id: self.unique_id.clone(),
+            domain: "media_player".into(),
+            service: service.into(),
+            data,
+        });
+        Box::pin(call)
+    }
+}
+
+impl MediaPlayer for PluginMediaPlayer {
+    fn entity_id(&self) -> &EntityId {
+        &self.entity_id
+    }
+
+    fn available(&self) -> bool {
+        self.state.read().available
+    }
+
+    fn supported_features(&self) -> u32 {
+        self.supported_features
+    }
+
+    fn state(&self) -> Option<MediaPlayerState> {
+        self.state.read().state
+    }
+
+    fn volume_info(&self) -> (Option<f64>, f64) {
+        let s = self.state.read();
+        (s.volume_level, s.volume_step)
+    }
+
+    fn turn_on(&self) -> BoxFuture<'_> {
+        self.invoke("turn_on", Map::new())
+    }
+
+    fn turn_off(&self) -> BoxFuture<'_> {
+        self.invoke("turn_off", Map::new())
+    }
+
+    fn volume_up(&self) -> BoxFuture<'_> {
+        if self.supported_features & media_player::feature::VOLUME_STEP != 0 {
+            return self.invoke("volume_up", Map::new());
+        }
+        let (level, step) = self.volume_info();
+        if let Some(v) = level
+            && v < 1.0
+            && (self.supported_features & media_player::feature::VOLUME_SET) != 0
+        {
+            return self.set_volume_level((v + step).min(1.0));
+        }
+        Box::pin(async { Ok(()) })
+    }
+
+    fn volume_down(&self) -> BoxFuture<'_> {
+        if self.supported_features & media_player::feature::VOLUME_STEP != 0 {
+            return self.invoke("volume_down", Map::new());
+        }
+        let (level, step) = self.volume_info();
+        if let Some(v) = level
+            && v > 0.0
+            && (self.supported_features & media_player::feature::VOLUME_SET) != 0
+        {
+            return self.set_volume_level((v - step).max(0.0));
+        }
+        Box::pin(async { Ok(()) })
+    }
+
+    fn set_volume_level(&self, volume: f64) -> BoxFuture<'_> {
+        let mut data = Map::new();
+        data.insert("volume_level".into(), json!(volume));
+        self.invoke("volume_set", data)
+    }
+
+    fn mute_volume(&self, mute: bool) -> BoxFuture<'_> {
+        let mut data = Map::new();
+        data.insert("is_volume_muted".into(), json!(mute));
+        self.invoke("volume_mute", data)
+    }
+
+    fn media_play(&self) -> BoxFuture<'_> {
+        self.invoke("media_play", Map::new())
+    }
+
+    fn media_pause(&self) -> BoxFuture<'_> {
+        self.invoke("media_pause", Map::new())
+    }
+
+    fn media_stop(&self) -> BoxFuture<'_> {
+        self.invoke("media_stop", Map::new())
+    }
+
+    fn media_next_track(&self) -> BoxFuture<'_> {
+        self.invoke("media_next_track", Map::new())
+    }
+
+    fn media_previous_track(&self) -> BoxFuture<'_> {
+        self.invoke("media_previous_track", Map::new())
+    }
+
+    fn media_seek(&self, position: f64) -> BoxFuture<'_> {
+        let mut data = Map::new();
+        data.insert("seek_position".into(), json!(position));
+        self.invoke("media_seek", data)
+    }
+
+    fn play_media(&self, params: PlayMedia) -> BoxFuture<'_> {
+        let mut data = Map::new();
+        data.insert("media_content_type".into(), json!(params.media_type));
+        data.insert("media_content_id".into(), json!(params.media_id));
+        if let Some(enqueue) = params.enqueue {
+            data.insert("enqueue".into(), json!(enqueue));
+        }
+        if let Some(announce) = params.announce {
+            data.insert("announce".into(), json!(announce));
+        }
+        data.insert("extra".into(), Value::Object(params.extra));
+        self.invoke("play_media", data)
+    }
+
+    fn select_source(&self, source: &str) -> BoxFuture<'_> {
+        let mut data = Map::new();
+        data.insert("source".into(), json!(source));
+        self.invoke("select_source", data)
+    }
+
+    fn select_sound_mode(&self, sound_mode: &str) -> BoxFuture<'_> {
+        let mut data = Map::new();
+        data.insert("sound_mode".into(), json!(sound_mode));
+        self.invoke("select_sound_mode", data)
+    }
+
+    fn set_shuffle(&self, shuffle: bool) -> BoxFuture<'_> {
+        let mut data = Map::new();
+        data.insert("shuffle".into(), json!(shuffle));
+        self.invoke("shuffle_set", data)
+    }
+
+    fn set_repeat(&self, repeat: &str) -> BoxFuture<'_> {
+        let mut data = Map::new();
+        data.insert("repeat".into(), json!(repeat));
+        self.invoke("repeat_set", data)
+    }
+
+    fn join_players(&self, group_members: &[String]) -> BoxFuture<'_> {
+        let mut data = Map::new();
+        data.insert("group_members".into(), json!(group_members));
+        self.invoke("join", data)
+    }
+
+    fn unjoin_player(&self) -> BoxFuture<'_> {
+        self.invoke("unjoin", Map::new())
+    }
+
+    fn clear_playlist(&self) -> BoxFuture<'_> {
+        self.invoke("clear_playlist", Map::new())
+    }
+}
+
+struct RemoteInner {
+    available: bool,
+    is_on: bool,
+}
+
+struct PluginRemote {
+    entity_id: EntityId,
+    entry_id: String,
+    unique_id: String,
+    supported_features: u32,
+    state: RwLock<RemoteInner>,
+    call_plugin: CallPluginFn,
+}
+
+impl PluginRemote {
+    fn invoke(&self, service: &str, data: Map<String, Value>) -> BoxFuture<'_> {
+        let call = (self.call_plugin)(EntityCallParams {
+            entry_id: self.entry_id.clone(),
+            unique_id: self.unique_id.clone(),
+            domain: "remote".into(),
+            service: service.into(),
+            data,
+        });
+        Box::pin(call)
+    }
+}
+
+impl Remote for PluginRemote {
+    fn entity_id(&self) -> &EntityId {
+        &self.entity_id
+    }
+
+    fn available(&self) -> bool {
+        self.state.read().available
+    }
+
+    fn is_on(&self) -> bool {
+        self.state.read().is_on
+    }
+
+    fn turn_on(&self, activity: Option<&str>) -> BoxFuture<'_> {
+        let mut data = Map::new();
+        if let Some(a) = activity {
+            data.insert("activity".into(), json!(a));
+        }
+        self.invoke("turn_on", data)
+    }
+
+    fn turn_off(&self, activity: Option<&str>) -> BoxFuture<'_> {
+        let mut data = Map::new();
+        if let Some(a) = activity {
+            data.insert("activity".into(), json!(a));
+        }
+        self.invoke("turn_off", data)
+    }
+
+    fn send_command(&self, cmd: SendCommand) -> BoxFuture<'_> {
+        let mut data = Map::new();
+        data.insert("command".into(), json!(cmd.command));
+        if let Some(device) = cmd.device {
+            data.insert("device".into(), json!(device));
+        }
+        data.insert("num_repeats".into(), json!(cmd.num_repeats));
+        if let Some(delay) = cmd.delay_secs {
+            data.insert("delay_secs".into(), json!(delay));
+        }
+        data.insert("hold_secs".into(), json!(cmd.hold_secs));
+        self.invoke("send_command", data)
+    }
+
+    fn learn_command(&self, cmd: LearnCommand) -> BoxFuture<'_> {
+        let mut data = Map::new();
+        if let Some(device) = cmd.device {
+            data.insert("device".into(), json!(device));
+        }
+        if let Some(command) = cmd.command {
+            data.insert("command".into(), json!(command));
+        }
+        if let Some(ct) = cmd.command_type {
+            data.insert("command_type".into(), json!(ct));
+        }
+        if let Some(alt) = cmd.alternative {
+            data.insert("alternative".into(), json!(alt));
+        }
+        if let Some(timeout) = cmd.timeout {
+            data.insert("timeout".into(), json!(timeout));
+        }
+        self.invoke("learn_command", data)
+    }
+
+    fn delete_command(&self, cmd: DeleteCommand) -> BoxFuture<'_> {
+        let mut data = Map::new();
+        data.insert("command".into(), json!(cmd.command));
+        if let Some(device) = cmd.device {
+            data.insert("device".into(), json!(device));
+        }
+        self.invoke("delete_command", data)
     }
 }

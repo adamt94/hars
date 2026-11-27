@@ -25,10 +25,10 @@ import zipfile
 DOMAINS = sorted(
     """api auth automation binary_sensor button climate config cover
     device_tracker event fan frontend group history homeassistant http hue
-    input_boolean lifx light lock logbook lovelace met mobile_app notify
-    number onboarding person persistent_notification recorder repairs scene
-    script select sensor sun switch switchbot_cloud system_log vacuum weather
-    websocket_api zone""".split()
+    input_boolean lifx light lock logbook lovelace media_player met mobile_app
+    notify number onboarding person persistent_notification recorder remote
+    repairs scene script select sensor sun switch switchbot_cloud system_log
+    vacuum weather websocket_api zone""".split()
 )
 
 
