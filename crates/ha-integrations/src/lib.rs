@@ -16,6 +16,7 @@ pub mod media_player;
 pub mod met;
 pub mod mobile_app;
 pub mod naming;
+pub mod notify;
 pub mod num;
 pub mod number;
 pub mod onboarding;

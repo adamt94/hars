@@ -407,6 +407,9 @@ async fn fallback(cloud: &Cloud, p: Pending) -> Result<(), ServiceError> {
 }
 
 /// The push services and channels of every registration.
+/// Registered `MobileAppNotifyEntity` adapter keyed by `webhook_id`.
+type NotifyAdapter = (Arc<str>, Arc<dyn crate::notify::Notify>);
+
 pub struct Notifier {
     hass: Hass,
     registry: Arc<Registry>,
@@ -415,7 +418,52 @@ pub struct Notifier {
     cloud: Cloud,
     /// `registered_targets`: legacy service name to webhook id.
     targets: Mutex<BTreeMap<String, Arc<str>>>,
+    /// Shared `Components` when running inside `hars` (lazily acquires
+    /// `Components::notifiers()` on first `register_services`).
+    entities: Option<Arc<crate::components::Components>>,
+    /// The `Notifiers` registry `MobileAppNotifyEntity` adapters are attached to.
+    notifiers: std::sync::OnceLock<Arc<crate::notify::Notifiers>>,
+    /// Registered `MobileAppNotifyEntity` adapters keyed by `webhook_id`.
+    adapters: Mutex<Vec<NotifyAdapter>>,
     me: Weak<Notifier>,
+}
+
+struct MobileAppNotifyEntity {
+    notifier: Weak<Notifier>,
+    reg: Arc<Registration>,
+}
+
+impl crate::notify::Notify for MobileAppNotifyEntity {
+    fn entity_id(&self) -> Option<EntityId> {
+        let notifier = self.notifier.upgrade()?;
+        notify_entity(&notifier.registry, &self.reg)
+    }
+
+    fn available(&self) -> bool {
+        self.notifier.upgrade().is_some()
+    }
+
+    fn supported_features(&self) -> u32 {
+        crate::notify::feature::TITLE
+    }
+
+    fn send_message<'a>(
+        &'a self,
+        message: &'a str,
+        title: Option<&'a str>,
+        context: Context,
+    ) -> crate::light::BoxFuture<'a> {
+        let Some(notifier) = self.notifier.upgrade() else {
+            return Box::pin(async { Ok(()) });
+        };
+        let reg = self.reg.clone();
+        let n = Notification {
+            message: message.to_owned(),
+            title: title.map(str::to_owned),
+            ..Default::default()
+        };
+        Box::pin(async move { notifier.entity_send(reg, n, context).await })
+    }
 }
 
 impl std::fmt::Debug for Notifier {
@@ -431,11 +479,22 @@ impl std::fmt::Debug for Notifier {
 pub type Opening = std::pin::Pin<Box<dyn Future<Output = Result<(), ServiceError>> + Send>>;
 
 impl Notifier {
+    #[cfg_attr(not(test), allow(dead_code))]
     pub(super) fn new(
         hass: &Hass,
         registry: Arc<Registry>,
         registrations: Registrations,
         relay: Arc<dyn Relay>,
+    ) -> Arc<Self> {
+        Self::with_components(hass, registry, registrations, relay, None)
+    }
+
+    pub(super) fn with_components(
+        hass: &Hass,
+        registry: Arc<Registry>,
+        registrations: Registrations,
+        relay: Arc<dyn Relay>,
+        entities: Option<Arc<crate::components::Components>>,
     ) -> Arc<Self> {
         Arc::new_cyclic(|me| Self {
             hass: hass.clone(),
@@ -447,6 +506,9 @@ impl Notifier {
                 clock: hass.clock().clone(),
             },
             targets: Mutex::new(BTreeMap::new()),
+            entities,
+            notifiers: std::sync::OnceLock::new(),
+            adapters: Mutex::new(Vec::new()),
             me: me.clone(),
         })
     }
@@ -594,27 +656,40 @@ impl Notifier {
         if !services.has_service(NOTIFY, NOTIFY) {
             self.register_legacy(NOTIFY.into());
         }
-        if !services.has_service(NOTIFY, "send_message") {
-            let me = self.me.clone();
-            services.register_with_schema(
-                NOTIFY,
-                "send_message",
-                Some(
-                    Schema::entity_service()
-                        .required("message", Kind::String)
-                        .optional("title", Kind::String),
-                ),
-                SupportsResponse::None,
-                move |call| {
-                    let me = me.upgrade();
-                    async move {
-                        match me {
-                            Some(me) => me.send_message(call).await,
-                            None => Ok(None),
-                        }
-                    }
-                },
-            );
+        // Attach `MobileAppNotifyEntity` adapters onto the shared `notify`
+        // entity component (which registers `notify.send_message` once).
+        let notifiers = self
+            .notifiers
+            .get_or_init(|| match &self.entities {
+                Some(components) => components.notifiers(),
+                None => {
+                    let n = Arc::new(crate::notify::Notifiers::default());
+                    n.register_services(&self.hass, self.registry.clone());
+                    n
+                }
+            })
+            .clone();
+        let mut regs: Vec<Arc<Registration>> = self
+            .registrations
+            .read()
+            .values()
+            .filter(|r| supports_push(r))
+            .cloned()
+            .collect();
+        regs.sort_unstable_by_key(|r| r.seq);
+        let mut adapters = self.adapters.lock();
+        // Rebuild in `seq` order so dispatch order matches HA's registration order
+        // and stale/unloaded adapters are cleanly detached even across renames.
+        for (_, old) in adapters.drain(..) {
+            notifiers.remove_arc(&old);
+        }
+        for reg in regs {
+            let adapter: Arc<dyn crate::notify::Notify> = Arc::new(MobileAppNotifyEntity {
+                notifier: self.me.clone(),
+                reg: reg.clone(),
+            });
+            notifiers.add(adapter.clone());
+            adapters.push((reg.webhook_id.clone(), adapter));
         }
     }
 
@@ -705,47 +780,6 @@ impl Notifier {
             "Device(s) with webhook id(s) {} not connected to local push notifications",
             failed.join(", ")
         )))
-    }
-
-    /// `notify.send_message` on the targeted `MobileAppNotifyEntity`s, at
-    /// once; the first error is raised.
-    async fn send_message(
-        &self,
-        call: ServiceCall,
-    ) -> Result<Option<ServiceResponse>, ServiceError> {
-        let target = call.entity_ids()?;
-        let indirect = self.registry.snapshot().target_entities(&call.data);
-        let d = &call.data;
-        let message = d
-            .get("message")
-            .and_then(Value::as_str)
-            .unwrap_or_default()
-            .to_owned();
-        let title = d.get("title").and_then(Value::as_str).map(str::to_owned);
-        let mut regs: Vec<Arc<Registration>> =
-            self.registrations.read().values().cloned().collect();
-        regs.sort_unstable_by_key(|r| r.seq);
-        let chosen = regs.into_iter().filter(|reg| {
-            notify_entity(&self.registry, reg).is_some_and(|id| match &target {
-                ha_core::EntityTarget::All => true,
-                ha_core::EntityTarget::Ids(ids) => {
-                    ids.contains(&id) || indirect.iter().any(|x| x == id.as_str())
-                }
-            })
-        });
-        let sends = chosen.map(|reg| {
-            let n = Notification {
-                message: message.clone(),
-                title: title.clone(),
-                ..Default::default()
-            };
-            self.entity_send(reg, n, call.context.clone())
-        });
-        crate::light::join_all(sends)
-            .await
-            .into_iter()
-            .collect::<Result<Vec<()>, _>>()?;
-        Ok(None)
     }
 
     /// `MobileAppNotifyEntity.async_send_message`, then

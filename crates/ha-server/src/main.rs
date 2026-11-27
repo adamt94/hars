@@ -204,6 +204,7 @@ async fn run(thp_disabled: std::io::Result<bool>) -> anyhow::Result<()> {
         api_config.integrations.push("mobile_app");
     }
     // The apps' sensors, restored, before start.
+    mobile_app.set_entities(started.components.clone());
     mobile_app.setup(
         &hass,
         registry.clone(),

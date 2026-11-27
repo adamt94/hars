@@ -8,6 +8,7 @@
 use super::manifest::InstalledPlugin;
 use super::protocol::{DeviceUpsertParams, EntityCallParams, EntityUpsertParams, StateSetParams};
 use crate::button::Button;
+use crate::climate::{self, Climate, SetTemperature, Temp};
 use crate::components::Components;
 use crate::cover::Cover;
 use crate::fan::{self, Fan};
@@ -17,6 +18,7 @@ use crate::light::{
 };
 use crate::lock::Lock;
 use crate::media_player::{self, MediaPlayer, MediaPlayerState, PlayMedia};
+use crate::notify::Notify;
 use crate::number::{self, Number};
 use crate::remote::{DeleteCommand, LearnCommand, Remote, SendCommand};
 use crate::scene::Scene;
@@ -77,6 +79,7 @@ enum EntityHandle {
     Light(Arc<PluginLight>),
     Button(Arc<PluginButton>),
     Scene(Arc<PluginScene>),
+    Climate(Arc<PluginClimate>),
     Vacuum(Arc<PluginVacuum>),
     Select(Arc<PluginSelect>),
     Number(Arc<PluginNumber>),
@@ -85,6 +88,7 @@ enum EntityHandle {
     Fan(Arc<PluginFan>),
     MediaPlayer(Arc<PluginMediaPlayer>),
     Remote(Arc<PluginRemote>),
+    Notify(Arc<PluginNotify>),
     Passive,
     /// Registry row has `disabled_by` set: no service adapter or state writes.
     Disabled,
@@ -213,6 +217,94 @@ impl PluginEntityStore {
         } else {
             None
         };
+        let prev_climate_caps = entries
+            .get(&params.entry_id)
+            .and_then(|e| e.entities.get(&params.unique_id))
+            .and_then(|reg| match &reg.handle {
+                EntityHandle::Climate(old) => Some(old.state.read().clone()),
+                _ => None,
+            });
+        let resolved_climate = if params.domain == "climate" {
+            let min_temp = params
+                .min_temp
+                .filter(|v| v.is_finite())
+                .map(temp_from_f64)
+                .or_else(|| prev_climate_caps.as_ref().map(|c| c.min_temp))
+                .unwrap_or(Temp::Int(climate::DEFAULT_MIN_TEMP));
+            let max_temp = params
+                .max_temp
+                .filter(|v| v.is_finite())
+                .map(temp_from_f64)
+                .or_else(|| prev_climate_caps.as_ref().map(|c| c.max_temp))
+                .unwrap_or(Temp::Int(climate::DEFAULT_MAX_TEMP));
+            let target_temp_step = params
+                .target_temp_step
+                .filter(|v| v.is_finite() && *v > 0.0)
+                .map(temp_from_f64)
+                .or_else(|| prev_climate_caps.as_ref().and_then(|c| c.target_temp_step));
+            let min_humidity = params
+                .min_humidity
+                .filter(|v| v.is_finite())
+                .map(temp_from_f64)
+                .or_else(|| prev_climate_caps.as_ref().map(|c| c.min_humidity))
+                .unwrap_or(Temp::Int(climate::DEFAULT_MIN_HUMIDITY));
+            let max_humidity = params
+                .max_humidity
+                .filter(|v| v.is_finite())
+                .map(temp_from_f64)
+                .or_else(|| prev_climate_caps.as_ref().map(|c| c.max_humidity))
+                .unwrap_or(Temp::Int(climate::DEFAULT_MAX_HUMIDITY));
+            let target_humidity_step = params
+                .target_humidity_step
+                .filter(|v| v.is_finite() && *v > 0.0)
+                .map(temp_from_f64)
+                .or_else(|| {
+                    prev_climate_caps
+                        .as_ref()
+                        .and_then(|c| c.target_humidity_step)
+                });
+            let hvac_modes = params
+                .hvac_modes
+                .clone()
+                .or_else(|| prev_climate_caps.as_ref().map(|c| c.hvac_modes.clone()))
+                .unwrap_or_default();
+            let fan_modes = params
+                .fan_modes
+                .clone()
+                .or_else(|| prev_climate_caps.as_ref().and_then(|c| c.fan_modes.clone()));
+            let preset_modes = params.preset_modes.clone().or_else(|| {
+                prev_climate_caps
+                    .as_ref()
+                    .and_then(|c| c.preset_modes.clone())
+            });
+            let swing_modes = params.swing_modes.clone().or_else(|| {
+                prev_climate_caps
+                    .as_ref()
+                    .and_then(|c| c.swing_modes.clone())
+            });
+            let swing_horizontal_modes = params.swing_horizontal_modes.clone().or_else(|| {
+                prev_climate_caps
+                    .as_ref()
+                    .and_then(|c| c.swing_horizontal_modes.clone())
+            });
+            Some(ClimateInner {
+                available: prev_climate_caps.as_ref().is_none_or(|c| c.available),
+                hvac_mode: prev_climate_caps.as_ref().and_then(|c| c.hvac_mode.clone()),
+                min_temp,
+                max_temp,
+                target_temp_step,
+                min_humidity,
+                max_humidity,
+                target_humidity_step,
+                hvac_modes,
+                fan_modes,
+                preset_modes,
+                swing_modes,
+                swing_horizontal_modes,
+            })
+        } else {
+            None
+        };
         let device_id = params.device_identifier.as_ref().and_then(|ident| {
             entries
                 .get(&params.entry_id)
@@ -284,6 +376,9 @@ impl PluginEntityStore {
                         &resolved_media_source_list,
                         &resolved_media_sound_mode_list,
                     )));
+                } else if let Some(clim) = &resolved_climate {
+                    patch.capabilities =
+                        Some(Some(climate_capabilities(params.supported_features, clim)));
                 }
                 let row = registry.get_or_create_entity(
                     &params.domain,
@@ -410,11 +505,21 @@ impl PluginEntityStore {
             {
                 base_attrs.insert("sound_mode_list".into(), modes.clone());
             }
-        } else if params.domain == "remote" {
+        } else if params.domain == "remote" || params.domain == "notify" {
             base_attrs.insert(
                 "supported_features".into(),
                 json!(params.supported_features),
             );
+        } else if let Some(clim) = &resolved_climate {
+            base_attrs.insert(
+                "supported_features".into(),
+                json!(params.supported_features),
+            );
+            if let Value::Object(caps) = climate_capabilities(params.supported_features, clim) {
+                for (k, v) in caps {
+                    base_attrs.insert(k, v);
+                }
+            }
         }
 
         let entry = entries
@@ -731,6 +836,49 @@ impl PluginEntityStore {
                     self.components.remotes().add(rem.clone());
                     EntityHandle::Remote(rem)
                 }
+                "climate" => {
+                    let inner = resolved_climate.expect("climate state built above");
+                    let clim = Arc::new(PluginClimate {
+                        entity_id: entity_id.clone(),
+                        entry_id: params.entry_id.clone(),
+                        unique_id: params.unique_id.clone(),
+                        supported_features: params.supported_features,
+                        state: RwLock::new(inner),
+                        call_plugin: self.call_plugin.clone(),
+                    });
+                    self.components.climates().add(clim.clone());
+                    EntityHandle::Climate(clim)
+                }
+                "notify" => {
+                    let prev = match &prev_handle {
+                        Some(EntityHandle::Notify(old)) => {
+                            let mut s = old.state.lock();
+                            s.active = false;
+                            NotifyInner {
+                                active: true,
+                                available: s.available,
+                                last_notified: s.last_notified.clone(),
+                            }
+                        }
+                        _ => NotifyInner {
+                            active: true,
+                            available: true,
+                            last_notified: None,
+                        },
+                    };
+                    let n = Arc::new(PluginNotify {
+                        entity_id: entity_id.clone(),
+                        entry_id: params.entry_id.clone(),
+                        unique_id: params.unique_id.clone(),
+                        supported_features: params.supported_features,
+                        hass: self.components.hass().clone(),
+                        base_attrs: base_attrs.clone(),
+                        state: Mutex::new(prev),
+                        call_plugin: self.call_plugin.clone(),
+                    });
+                    self.components.notifiers().add(n.clone());
+                    EntityHandle::Notify(n)
+                }
                 _ => EntityHandle::Passive,
             }
         };
@@ -1045,6 +1193,210 @@ impl PluginEntityStore {
                 }
                 merged.insert("supported_features".into(), json!(rem.supported_features));
             }
+            EntityHandle::Climate(clim) => {
+                let updated_caps = {
+                    let mut inner = clim.state.write();
+                    inner.available = available;
+                    match state_str.as_str() {
+                        "unknown" | "unavailable" => inner.hvac_mode = None,
+                        other => {
+                            if inner.hvac_mode.as_deref() != Some(other) {
+                                inner.hvac_mode = Some(other.to_owned());
+                            }
+                        }
+                    }
+                    let mut caps_changed = false;
+                    if let Some(v) = params.attributes.get("min_temp").and_then(Value::as_f64)
+                        && v.is_finite()
+                    {
+                        let t = temp_from_f64(v);
+                        if inner.min_temp != t {
+                            inner.min_temp = t;
+                            caps_changed = true;
+                        }
+                    }
+                    if let Some(v) = params.attributes.get("max_temp").and_then(Value::as_f64)
+                        && v.is_finite()
+                    {
+                        let t = temp_from_f64(v);
+                        if inner.max_temp != t {
+                            inner.max_temp = t;
+                            caps_changed = true;
+                        }
+                    }
+                    if let Some(raw) = params.attributes.get("target_temp_step") {
+                        let next = match raw {
+                            Value::Null => Some(None),
+                            v => v
+                                .as_f64()
+                                .filter(|f| f.is_finite() && *f >= 0.0)
+                                .map(|f| (f > 0.0).then(|| temp_from_f64(f))),
+                        };
+                        if let Some(t) = next
+                            && inner.target_temp_step != t
+                        {
+                            inner.target_temp_step = t;
+                            caps_changed = true;
+                        }
+                    }
+                    let has_hum = clim.supported_features & climate::feature::TARGET_HUMIDITY != 0;
+                    if let Some(v) = params
+                        .attributes
+                        .get("min_humidity")
+                        .and_then(Value::as_f64)
+                        && v.is_finite()
+                    {
+                        let t = temp_from_f64(v);
+                        if inner.min_humidity != t {
+                            inner.min_humidity = t;
+                            if has_hum {
+                                caps_changed = true;
+                            }
+                        }
+                    }
+                    if let Some(v) = params
+                        .attributes
+                        .get("max_humidity")
+                        .and_then(Value::as_f64)
+                        && v.is_finite()
+                    {
+                        let t = temp_from_f64(v);
+                        if inner.max_humidity != t {
+                            inner.max_humidity = t;
+                            if has_hum {
+                                caps_changed = true;
+                            }
+                        }
+                    }
+                    if let Some(raw) = params.attributes.get("target_humidity_step") {
+                        let next = match raw {
+                            Value::Null => Some(None),
+                            v => v
+                                .as_f64()
+                                .filter(|f| f.is_finite() && *f > 0.0)
+                                .map(|f| Some(temp_from_f64(f))),
+                        };
+                        if let Some(t) = next
+                            && inner.target_humidity_step != t
+                        {
+                            inner.target_humidity_step = t;
+                            if has_hum {
+                                caps_changed = true;
+                            }
+                        }
+                    }
+                    if let Some(arr) = params
+                        .attributes
+                        .get("hvac_modes")
+                        .and_then(Value::as_array)
+                        && !same_str_slice(&inner.hvac_modes, arr)
+                    {
+                        inner.hvac_modes = arr
+                            .iter()
+                            .filter_map(Value::as_str)
+                            .map(str::to_owned)
+                            .collect();
+                        caps_changed = true;
+                    }
+                    {
+                        let ClimateInner {
+                            fan_modes,
+                            preset_modes,
+                            swing_modes,
+                            swing_horizontal_modes,
+                            ..
+                        } = &mut *inner;
+                        for (key, slot, feat) in [
+                            ("fan_modes", fan_modes, climate::feature::FAN_MODE),
+                            ("preset_modes", preset_modes, climate::feature::PRESET_MODE),
+                            ("swing_modes", swing_modes, climate::feature::SWING_MODE),
+                            (
+                                "swing_horizontal_modes",
+                                swing_horizontal_modes,
+                                climate::feature::SWING_HORIZONTAL_MODE,
+                            ),
+                        ] {
+                            if let Some(v) = params.attributes.get(key)
+                                && !same_opt_str_slice(slot, v)
+                            {
+                                *slot = v.as_array().map(|arr| {
+                                    arr.iter()
+                                        .filter_map(Value::as_str)
+                                        .map(str::to_owned)
+                                        .collect::<Vec<_>>()
+                                });
+                                if clim.supported_features & feat != 0 {
+                                    caps_changed = true;
+                                }
+                            }
+                        }
+                    }
+                    if !available {
+                        merged = unavailable_base_attrs(reg, &params.attributes);
+                    } else {
+                        if inner.target_temp_step.is_none() {
+                            merged.remove("target_temp_step");
+                        }
+                        if !has_hum {
+                            merged.remove("min_humidity");
+                            merged.remove("max_humidity");
+                            merged.remove("target_humidity_step");
+                        } else if inner.target_humidity_step.is_none() {
+                            merged.remove("target_humidity_step");
+                        }
+                        for (key, feat) in [
+                            ("fan_modes", climate::feature::FAN_MODE),
+                            ("preset_modes", climate::feature::PRESET_MODE),
+                            ("swing_modes", climate::feature::SWING_MODE),
+                            (
+                                "swing_horizontal_modes",
+                                climate::feature::SWING_HORIZONTAL_MODE,
+                            ),
+                        ] {
+                            if clim.supported_features & feat == 0 {
+                                merged.remove(key);
+                            }
+                        }
+                    }
+                    let caps = climate_capabilities(clim.supported_features, &inner);
+                    if let Value::Object(map) = &caps {
+                        for (k, v) in map {
+                            merged.insert(k.clone(), v.clone());
+                        }
+                    }
+                    merged.insert("supported_features".into(), json!(clim.supported_features));
+                    caps_changed.then_some(caps)
+                };
+                if let Some(new_caps) = updated_caps
+                    && let Some(registry) = self.components.registry()
+                {
+                    registry.update_entity(
+                        reg.entity_id.as_str(),
+                        EntityPatch {
+                            capabilities: Some(Some(new_caps)),
+                            ..Default::default()
+                        },
+                    );
+                }
+            }
+            EntityHandle::Notify(n) => {
+                let mut inner = n.state.lock();
+                inner.available = available;
+                if !available {
+                    merged = unavailable_base_attrs(reg, &params.attributes);
+                } else if state_str == "unknown"
+                    && let Some(ts) = inner.last_notified.clone()
+                {
+                    state_str = ts;
+                } else if state_str != "unknown" {
+                    inner.last_notified = Some(state_str.clone());
+                }
+                merged.insert("supported_features".into(), json!(n.supported_features));
+                self.components
+                    .hass()
+                    .set_state(reg.entity_id.clone(), state_str, merged);
+                return Ok(());
+            }
             EntityHandle::Passive => {}
             EntityHandle::Disabled => return Ok(()),
         }
@@ -1166,6 +1518,23 @@ impl PluginEntityStore {
                     EntityHandle::Remote(rem) => {
                         rem.state.write().available = false;
                     }
+                    EntityHandle::Climate(clim) => {
+                        let mut inner = clim.state.write();
+                        inner.available = false;
+                        if let Value::Object(caps) =
+                            climate_capabilities(clim.supported_features, &inner)
+                        {
+                            for (k, v) in caps {
+                                attrs.insert(k, v);
+                            }
+                        }
+                    }
+                    EntityHandle::Notify(n) => {
+                        let mut inner = n.state.lock();
+                        inner.available = false;
+                        hass.set_state(reg.entity_id.clone(), "unavailable", attrs);
+                        continue;
+                    }
                     EntityHandle::Passive | EntityHandle::Disabled => {}
                 }
                 hass.set_state(reg.entity_id.clone(), "unavailable", attrs);
@@ -1205,6 +1574,13 @@ impl PluginEntityStore {
             "fan" => self.components.fans().remove(&reg.entity_id),
             "media_player" => self.components.media_players().remove(&reg.entity_id),
             "remote" => self.components.remotes().remove(&reg.entity_id),
+            "climate" => self.components.climates().remove(&reg.entity_id),
+            "notify" => {
+                if let EntityHandle::Notify(n) = &reg.handle {
+                    n.state.lock().active = false;
+                }
+                self.components.notifiers().remove(&reg.entity_id);
+            }
             _ => {}
         }
     }
@@ -2358,5 +2734,294 @@ impl Remote for PluginRemote {
             data.insert("device".into(), json!(device));
         }
         self.invoke("delete_command", data)
+    }
+}
+
+fn same_str_slice(existing: &[String], arr: &[Value]) -> bool {
+    let mut iter = arr.iter().filter_map(Value::as_str);
+    existing
+        .iter()
+        .all(|s| iter.next().is_some_and(|v| v == s.as_str()))
+        && iter.next().is_none()
+}
+
+fn same_opt_str_slice(existing: &Option<Vec<String>>, incoming: &Value) -> bool {
+    match (existing, incoming.as_array()) {
+        (Some(list), Some(arr)) => same_str_slice(list, arr),
+        (None, None) => true,
+        _ => false,
+    }
+}
+
+fn temp_from_f64(v: f64) -> Temp {
+    if v.fract() == 0.0 && v >= i64::MIN as f64 && v < i64::MAX as f64 {
+        Temp::Int(v as i64)
+    } else {
+        Temp::Float(v)
+    }
+}
+
+fn temp_json(t: Temp) -> Value {
+    match t {
+        Temp::Int(i) => json!(i),
+        Temp::Float(f) => json!(f),
+    }
+}
+
+fn climate_capabilities(supported_features: u32, c: &ClimateInner) -> Value {
+    let mut caps = Map::new();
+    caps.insert("hvac_modes".into(), json!(c.hvac_modes));
+    caps.insert("min_temp".into(), temp_json(c.min_temp));
+    caps.insert("max_temp".into(), temp_json(c.max_temp));
+    if let Some(step) = c.target_temp_step.filter(|s| s.get() != 0.0) {
+        caps.insert("target_temp_step".into(), temp_json(step));
+    }
+    if supported_features & climate::feature::TARGET_HUMIDITY != 0 {
+        caps.insert("min_humidity".into(), temp_json(c.min_humidity));
+        caps.insert("max_humidity".into(), temp_json(c.max_humidity));
+        if let Some(step) = c.target_humidity_step {
+            caps.insert("target_humidity_step".into(), temp_json(step));
+        }
+    }
+    if supported_features & climate::feature::FAN_MODE != 0 {
+        caps.insert("fan_modes".into(), json!(c.fan_modes));
+    }
+    if supported_features & climate::feature::PRESET_MODE != 0 {
+        caps.insert("preset_modes".into(), json!(c.preset_modes));
+    }
+    if supported_features & climate::feature::SWING_MODE != 0 {
+        caps.insert("swing_modes".into(), json!(c.swing_modes));
+    }
+    if supported_features & climate::feature::SWING_HORIZONTAL_MODE != 0 {
+        caps.insert(
+            "swing_horizontal_modes".into(),
+            json!(c.swing_horizontal_modes),
+        );
+    }
+    Value::Object(caps)
+}
+
+#[derive(Clone)]
+struct ClimateInner {
+    available: bool,
+    hvac_mode: Option<String>,
+    min_temp: Temp,
+    max_temp: Temp,
+    target_temp_step: Option<Temp>,
+    min_humidity: Temp,
+    max_humidity: Temp,
+    target_humidity_step: Option<Temp>,
+    hvac_modes: Vec<String>,
+    fan_modes: Option<Vec<String>>,
+    preset_modes: Option<Vec<String>>,
+    swing_modes: Option<Vec<String>>,
+    swing_horizontal_modes: Option<Vec<String>>,
+}
+
+struct PluginClimate {
+    entity_id: EntityId,
+    entry_id: String,
+    unique_id: String,
+    supported_features: u32,
+    state: RwLock<ClimateInner>,
+    call_plugin: CallPluginFn,
+}
+
+impl PluginClimate {
+    fn invoke(&self, service: &str, data: Map<String, Value>) -> BoxFuture<'_> {
+        let call = (self.call_plugin)(EntityCallParams {
+            entry_id: self.entry_id.clone(),
+            unique_id: self.unique_id.clone(),
+            domain: "climate".into(),
+            service: service.into(),
+            data,
+        });
+        Box::pin(call)
+    }
+}
+
+impl Climate for PluginClimate {
+    fn entity_id(&self) -> &EntityId {
+        &self.entity_id
+    }
+
+    fn available(&self) -> bool {
+        self.state.read().available
+    }
+
+    fn supported_features(&self) -> u32 {
+        self.supported_features
+    }
+
+    fn hvac_mode(&self) -> Option<String> {
+        self.state.read().hvac_mode.clone()
+    }
+
+    fn hvac_modes(&self) -> &[&'static str] {
+        &[]
+    }
+
+    fn hvac_modes_vec(&self) -> Vec<String> {
+        self.state.read().hvac_modes.clone()
+    }
+
+    fn fan_modes_vec(&self) -> Vec<String> {
+        self.state.read().fan_modes.clone().unwrap_or_default()
+    }
+
+    fn preset_modes_vec(&self) -> Vec<String> {
+        self.state.read().preset_modes.clone().unwrap_or_default()
+    }
+
+    fn swing_modes_vec(&self) -> Vec<String> {
+        self.state.read().swing_modes.clone().unwrap_or_default()
+    }
+
+    fn swing_horizontal_modes_vec(&self) -> Vec<String> {
+        self.state
+            .read()
+            .swing_horizontal_modes
+            .clone()
+            .unwrap_or_default()
+    }
+
+    fn temp_bounds(&self) -> (Temp, Temp) {
+        let s = self.state.read();
+        (s.min_temp, s.max_temp)
+    }
+
+    fn humidity_bounds(&self) -> (Temp, Temp) {
+        let s = self.state.read();
+        (s.min_humidity, s.max_humidity)
+    }
+
+    fn turn_on(&self) -> BoxFuture<'_> {
+        self.invoke("turn_on", Map::new())
+    }
+
+    fn turn_off(&self) -> BoxFuture<'_> {
+        self.invoke("turn_off", Map::new())
+    }
+
+    fn set_hvac_mode(&self, mode: &str) -> BoxFuture<'_> {
+        let mut data = Map::new();
+        data.insert("hvac_mode".into(), json!(mode));
+        self.invoke("set_hvac_mode", data)
+    }
+
+    fn set_fan_mode(&self, mode: &str) -> BoxFuture<'_> {
+        let mut data = Map::new();
+        data.insert("fan_mode".into(), json!(mode));
+        self.invoke("set_fan_mode", data)
+    }
+
+    fn set_preset_mode(&self, mode: &str) -> BoxFuture<'_> {
+        let mut data = Map::new();
+        data.insert("preset_mode".into(), json!(mode));
+        self.invoke("set_preset_mode", data)
+    }
+
+    fn set_humidity(&self, humidity: i64) -> BoxFuture<'_> {
+        let mut data = Map::new();
+        data.insert("humidity".into(), json!(humidity));
+        self.invoke("set_humidity", data)
+    }
+
+    fn set_swing_mode(&self, mode: &str) -> BoxFuture<'_> {
+        let mut data = Map::new();
+        data.insert("swing_mode".into(), json!(mode));
+        self.invoke("set_swing_mode", data)
+    }
+
+    fn set_swing_horizontal_mode(&self, mode: &str) -> BoxFuture<'_> {
+        let mut data = Map::new();
+        data.insert("swing_horizontal_mode".into(), json!(mode));
+        self.invoke("set_swing_horizontal_mode", data)
+    }
+
+    fn set_temperature(&self, args: SetTemperature) -> BoxFuture<'_> {
+        let mut data = Map::new();
+        if let Some(t) = args.temperature {
+            data.insert("temperature".into(), json!(t));
+        }
+        if let Some(low) = args.target_temp_low {
+            data.insert("target_temp_low".into(), json!(low));
+        }
+        if let Some(high) = args.target_temp_high {
+            data.insert("target_temp_high".into(), json!(high));
+        }
+        if let Some(mode) = args.hvac_mode {
+            data.insert("hvac_mode".into(), json!(mode));
+        }
+        self.invoke("set_temperature", data)
+    }
+}
+
+struct NotifyInner {
+    active: bool,
+    available: bool,
+    last_notified: Option<String>,
+}
+
+struct PluginNotify {
+    entity_id: EntityId,
+    entry_id: String,
+    unique_id: String,
+    supported_features: u32,
+    hass: Hass,
+    base_attrs: Attributes,
+    state: Mutex<NotifyInner>,
+    call_plugin: CallPluginFn,
+}
+
+impl Notify for PluginNotify {
+    fn entity_id(&self) -> Option<EntityId> {
+        Some(self.entity_id.clone())
+    }
+
+    fn available(&self) -> bool {
+        self.state.lock().available
+    }
+
+    fn supported_features(&self) -> u32 {
+        self.supported_features
+    }
+
+    fn send_message<'a>(
+        &'a self,
+        message: &'a str,
+        title: Option<&'a str>,
+        context: Context,
+    ) -> BoxFuture<'a> {
+        let mut data = Map::new();
+        data.insert("message".into(), json!(message));
+        if let Some(t) = title {
+            data.insert("title".into(), json!(t));
+        }
+        let call = (self.call_plugin)(EntityCallParams {
+            entry_id: self.entry_id.clone(),
+            unique_id: self.unique_id.clone(),
+            domain: "notify".into(),
+            service: "send_message".into(),
+            data,
+        });
+        Box::pin(async move {
+            call.await?;
+            // Record last notification timestamp (`NotifyEntity._async_record_notification`),
+            // serialized with availability and deactivation under `self.state`.
+            let ts = ha_core::isoformat(self.hass.clock().now());
+            let mut inner = self.state.lock();
+            if !inner.active {
+                return Ok(());
+            }
+            inner.last_notified = Some(ts.clone());
+            if inner.available {
+                let mut attrs = self.base_attrs.clone();
+                attrs.insert("supported_features".into(), json!(self.supported_features));
+                self.hass
+                    .set_state_with_context(self.entity_id.clone(), ts, attrs, Some(context));
+            }
+            Ok(())
+        })
     }
 }

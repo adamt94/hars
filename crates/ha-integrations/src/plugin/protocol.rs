@@ -228,9 +228,10 @@ pub struct DeviceUpsertParams {
 pub struct EntityUpsertParams {
     pub entry_id: String,
     pub unique_id: String,
-    /// Entity domain (`light`, `switch`, `button`, `scene`, `vacuum`,
-    /// `select`, `number`, `cover`, `lock`, `fan`, `media_player`, `remote`,
-    /// `sensor`, `binary_sensor`). Must be listed in `plugin.json` capabilities.
+    /// Entity domain (`light`, `switch`, `button`, `scene`, `climate`,
+    /// `vacuum`, `select`, `number`, `cover`, `lock`, `fan`, `media_player`,
+    /// `remote`, `notify`, `sensor`, `binary_sensor`). Must be listed in
+    /// `plugin.json` capabilities.
     pub domain: String,
     /// Optional device identifier previously registered via `device.upsert`.
     #[serde(default)]
@@ -291,6 +292,28 @@ pub struct EntityUpsertParams {
     pub sound_mode_list: Option<Vec<String>>,
     #[serde(default)]
     pub volume_step: Option<f64>,
+    /// For `climate` entities: HVAC/fan/swing modes and temperature/humidity
+    /// bounds and steps (`preset_modes` is shared with `fan`).
+    #[serde(default)]
+    pub hvac_modes: Option<Vec<String>>,
+    #[serde(default)]
+    pub fan_modes: Option<Vec<String>>,
+    #[serde(default)]
+    pub swing_modes: Option<Vec<String>>,
+    #[serde(default)]
+    pub swing_horizontal_modes: Option<Vec<String>>,
+    #[serde(default)]
+    pub min_temp: Option<f64>,
+    #[serde(default)]
+    pub max_temp: Option<f64>,
+    #[serde(default)]
+    pub target_temp_step: Option<f64>,
+    #[serde(default)]
+    pub min_humidity: Option<f64>,
+    #[serde(default)]
+    pub max_humidity: Option<f64>,
+    #[serde(default)]
+    pub target_humidity_step: Option<f64>,
 }
 
 /// Parameters sent by a plugin in `state.set`.

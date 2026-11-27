@@ -2875,3 +2875,593 @@ async fn plugin_media_player_and_remote_round1_edge_cases() {
     assert!(hass.states().get(&rem_eid).is_none());
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[tokio::test]
+async fn plugin_climate_all_services_capabilities_and_unavailable() {
+    use crate::climate::feature as cf;
+
+    let dir = temp_dir("plugin-climate");
+    let plug_dir = dir.join("plugins").join("hvac_plug");
+    std::fs::create_dir_all(&plug_dir).unwrap();
+    std::fs::write(
+        plug_dir.join("plugin.json"),
+        serde_json::to_vec(&json!({
+            "schema_version": 1,
+            "domain": "hvac_plug",
+            "name": "HVAC Plug",
+            "version": "1.0.0",
+            "transport": { "type": "unix_socket" },
+            "capabilities": { "entity_domains": ["climate"] }
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+    let installed = Arc::new(manifest::InstalledPlugin::load(&plug_dir).unwrap());
+    let hass = Hass::new();
+    let registry = Registry::in_memory(&hass, Registries::default());
+    let components =
+        crate::components::Components::new(&hass, registry.clone(), Default::default());
+    let recorded: Arc<parking_lot::Mutex<Vec<protocol::EntityCallParams>>> =
+        Arc::new(parking_lot::Mutex::new(Vec::new()));
+    let recorded_cb = recorded.clone();
+    let store = entities::PluginEntityStore::new(
+        installed,
+        components.clone(),
+        Arc::new(move |call| {
+            recorded_cb.lock().push(call);
+            Box::pin(async { Ok(()) })
+        }),
+    );
+    store.activate_entry("e1");
+
+    let all_features = cf::TARGET_TEMPERATURE
+        | cf::TARGET_TEMPERATURE_RANGE
+        | cf::TARGET_HUMIDITY
+        | cf::FAN_MODE
+        | cf::PRESET_MODE
+        | cf::SWING_MODE
+        | cf::TURN_OFF
+        | cf::TURN_ON
+        | cf::SWING_HORIZONTAL_MODE;
+
+    let eid_str = store
+        .upsert_entity(protocol::EntityUpsertParams {
+            entry_id: "e1".into(),
+            unique_id: "thermo-1".into(),
+            domain: "climate".into(),
+            name: Some("Hall Thermostat".into()),
+            supported_features: all_features,
+            hvac_modes: Some(vec![
+                "off".into(),
+                "heat".into(),
+                "cool".into(),
+                "heat_cool".into(),
+            ]),
+            fan_modes: Some(vec!["auto".into(), "low".into(), "high".into()]),
+            preset_modes: Some(vec!["none".into(), "eco".into(), "away".into()]),
+            swing_modes: Some(vec!["off".into(), "vertical".into()]),
+            swing_horizontal_modes: Some(vec!["off".into(), "left".into(), "right".into()]),
+            min_temp: Some(10.0),
+            max_temp: Some(30.0),
+            target_temp_step: Some(0.5),
+            min_humidity: Some(25.0),
+            max_humidity: Some(80.0),
+            target_humidity_step: Some(5.0),
+            ..Default::default()
+        })
+        .unwrap();
+    let eid = ha_core::EntityId::parse(&eid_str).unwrap();
+
+    // Registry capabilities snapshot matches HA's ClimateEntity.capability_attributes.
+    let snap = registry.snapshot();
+    let row = snap
+        .entities
+        .iter()
+        .find(|e| e.entity_id == eid_str)
+        .unwrap();
+    assert_eq!(
+        serde_json::to_value(&row.capabilities).unwrap(),
+        json!({
+            "hvac_modes": ["off", "heat", "cool", "heat_cool"],
+            "min_temp": 10,
+            "max_temp": 30,
+            "target_temp_step": 0.5,
+            "min_humidity": 25,
+            "max_humidity": 80,
+            "target_humidity_step": 5,
+            "fan_modes": ["auto", "low", "high"],
+            "preset_modes": ["none", "eco", "away"],
+            "swing_modes": ["off", "vertical"],
+            "swing_horizontal_modes": ["off", "left", "right"],
+        })
+    );
+
+    // Publish initial state "heat".
+    store
+        .set_state(protocol::StateSetParams {
+            entry_id: "e1".into(),
+            unique_id: "thermo-1".into(),
+            state: "heat".into(),
+            attributes: json!({"current_temperature": 21.0, "temperature": 22.0})
+                .as_object()
+                .cloned()
+                .unwrap(),
+        })
+        .unwrap();
+
+    let call = |service: &'static str, mut extra: Map<String, Value>| {
+        let hass = hass.clone();
+        let eid_str = eid_str.clone();
+        async move {
+            extra.insert("entity_id".into(), json!(eid_str));
+            hass.call_service("climate", service, extra, None, false, None)
+                .await
+        }
+    };
+
+    // Call all 10 climate services.
+    call("turn_on", Map::new()).await.unwrap();
+    call("turn_off", Map::new()).await.unwrap();
+    call("toggle", Map::new()).await.unwrap(); // state is "heat" -> turn_off
+    call(
+        "set_hvac_mode",
+        json!({"hvac_mode": "cool"}).as_object().cloned().unwrap(),
+    )
+    .await
+    .unwrap();
+    call(
+        "set_fan_mode",
+        json!({"fan_mode": "high"}).as_object().cloned().unwrap(),
+    )
+    .await
+    .unwrap();
+    call(
+        "set_preset_mode",
+        json!({"preset_mode": "eco"}).as_object().cloned().unwrap(),
+    )
+    .await
+    .unwrap();
+    call(
+        "set_humidity",
+        json!({"humidity": 55}).as_object().cloned().unwrap(),
+    )
+    .await
+    .unwrap();
+    call(
+        "set_swing_mode",
+        json!({"swing_mode": "vertical"})
+            .as_object()
+            .cloned()
+            .unwrap(),
+    )
+    .await
+    .unwrap();
+    call(
+        "set_swing_horizontal_mode",
+        json!({"swing_horizontal_mode": "left"})
+            .as_object()
+            .cloned()
+            .unwrap(),
+    )
+    .await
+    .unwrap();
+    call(
+        "set_temperature",
+        json!({"temperature": 23.5, "hvac_mode": "heat"})
+            .as_object()
+            .cloned()
+            .unwrap(),
+    )
+    .await
+    .unwrap();
+
+    // Validation rejections must not reach the plugin.
+    assert!(
+        call(
+            "set_preset_mode",
+            json!({"preset_mode": "bogus"})
+                .as_object()
+                .cloned()
+                .unwrap()
+        )
+        .await
+        .is_err()
+    );
+    assert!(
+        call(
+            "set_humidity",
+            json!({"humidity": 90}).as_object().cloned().unwrap()
+        )
+        .await
+        .is_err()
+    );
+    assert!(
+        call(
+            "set_swing_mode",
+            json!({"swing_mode": "bogus"}).as_object().cloned().unwrap()
+        )
+        .await
+        .is_err()
+    );
+    assert!(
+        call(
+            "set_swing_horizontal_mode",
+            json!({"swing_horizontal_mode": "bogus"})
+                .as_object()
+                .cloned()
+                .unwrap()
+        )
+        .await
+        .is_err()
+    );
+
+    let calls: Vec<(&str, Value)> = recorded
+        .lock()
+        .iter()
+        .map(|c| {
+            assert_eq!(c.domain, "climate");
+            assert_eq!(c.unique_id, "thermo-1");
+            (
+                Box::leak(c.service.clone().into_boxed_str()) as &str,
+                Value::Object(c.data.clone()),
+            )
+        })
+        .collect();
+    assert_eq!(calls.len(), 10);
+    assert_eq!(calls[0], ("turn_on", json!({})));
+    assert_eq!(calls[1], ("turn_off", json!({})));
+    assert_eq!(calls[2], ("turn_off", json!({})));
+    assert_eq!(calls[3], ("set_hvac_mode", json!({"hvac_mode": "cool"})));
+    assert_eq!(calls[4], ("set_fan_mode", json!({"fan_mode": "high"})));
+    assert_eq!(calls[5], ("set_preset_mode", json!({"preset_mode": "eco"})));
+    assert_eq!(calls[6], ("set_humidity", json!({"humidity": 55})));
+    assert_eq!(
+        calls[7],
+        ("set_swing_mode", json!({"swing_mode": "vertical"}))
+    );
+    assert_eq!(
+        calls[8],
+        (
+            "set_swing_horizontal_mode",
+            json!({"swing_horizontal_mode": "left"})
+        )
+    );
+    assert_eq!(
+        calls[9],
+        (
+            "set_temperature",
+            json!({"temperature": 23.5, "hvac_mode": "heat"})
+        )
+    );
+
+    // Live capability update via state.set propagates to registry and survives omitted re-upsert.
+    store
+        .set_state(protocol::StateSetParams {
+            entry_id: "e1".into(),
+            unique_id: "thermo-1".into(),
+            state: "cool".into(),
+            attributes: json!({
+                "preset_modes": ["none", "boost"],
+                "max_humidity": 90,
+                "target_humidity_step": 1,
+                "current_temperature": 22.0,
+            })
+            .as_object()
+            .cloned()
+            .unwrap(),
+        })
+        .unwrap();
+    store
+        .upsert_entity(protocol::EntityUpsertParams {
+            entry_id: "e1".into(),
+            unique_id: "thermo-1".into(),
+            domain: "climate".into(),
+            name: Some("Hall Thermostat".into()),
+            supported_features: all_features,
+            ..Default::default()
+        })
+        .unwrap();
+    let snap2 = registry.snapshot();
+    let row2 = snap2
+        .entities
+        .iter()
+        .find(|e| e.entity_id == eid_str)
+        .unwrap();
+    let caps2 = serde_json::to_value(&row2.capabilities).unwrap();
+    assert_eq!(caps2["preset_modes"], json!(["none", "boost"]));
+    assert_eq!(caps2["max_humidity"], json!(90));
+    assert_eq!(caps2["target_humidity_step"], json!(1));
+    assert_eq!(
+        caps2["hvac_modes"],
+        json!(["off", "heat", "cool", "heat_cool"])
+    );
+
+    // Newly allowed preset & humidity now succeed.
+    call(
+        "set_preset_mode",
+        json!({"preset_mode": "boost"})
+            .as_object()
+            .cloned()
+            .unwrap(),
+    )
+    .await
+    .unwrap();
+    call(
+        "set_humidity",
+        json!({"humidity": 88}).as_object().cloned().unwrap(),
+    )
+    .await
+    .unwrap();
+
+    // Explicit unavailable strips state_attributes while keeping capabilities + base entity attrs.
+    store
+        .set_state(protocol::StateSetParams {
+            entry_id: "e1".into(),
+            unique_id: "thermo-1".into(),
+            state: "unavailable".into(),
+            attributes: json!({
+                "current_temperature": 22.0,
+                "temperature": 23.5,
+                "attribution": "HVAC Cloud",
+            })
+            .as_object()
+            .cloned()
+            .unwrap(),
+        })
+        .unwrap();
+    let st = hass.states().get(&eid).unwrap();
+    assert_eq!(st.state.as_str(), "unavailable");
+    assert_eq!(st.attributes["attribution"], json!("HVAC Cloud"));
+    assert_eq!(
+        st.attributes["hvac_modes"],
+        json!(["off", "heat", "cool", "heat_cool"])
+    );
+    assert_eq!(st.attributes["preset_modes"], json!(["none", "boost"]));
+    assert!(!st.attributes.contains_key("current_temperature"));
+    assert!(!st.attributes.contains_key("temperature"));
+
+    // Disconnect mark_all_unavailable keeps capability attributes; deactivate removes entity.
+    store.mark_all_unavailable();
+    let st2 = hass.states().get(&eid).unwrap();
+    assert_eq!(st2.state.as_str(), "unavailable");
+    assert_eq!(st2.attributes["min_temp"], json!(10));
+    assert_eq!(st2.attributes["max_humidity"], json!(90));
+
+    store.deactivate_entry("e1");
+    assert!(hass.states().get(&eid).is_none());
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[tokio::test]
+async fn shared_notify_component_fans_out_mobile_app_and_plugin_entities() {
+    #[derive(Debug)]
+    struct MockRelay {
+        sent: parking_lot::Mutex<Vec<(String, Value)>>,
+    }
+
+    impl crate::mobile_app::notify::Relay for MockRelay {
+        fn post(&self, url: &str, body: String) -> crate::mobile_app::notify::RelayFuture {
+            let parsed: Value = serde_json::from_str(&body).unwrap();
+            self.sent.lock().push((url.to_owned(), parsed));
+            Box::pin(async {
+                Ok(crate::mobile_app::notify::RelayAnswer {
+                    status: 201,
+                    content_type: "application/json".into(),
+                    body: br#"{"rateLimits":{"attempts":1,"successful":1,"errors":0,"total":1,"maximum":500,"remaining":499,"resetsAt":"2026-01-01T00:00:00.000Z"}}"#.to_vec(),
+                })
+            })
+        }
+    }
+
+    let dir = temp_dir("shared-notify");
+    let plug_dir = dir.join("plugins").join("ntfy_plug");
+    std::fs::create_dir_all(&plug_dir).unwrap();
+    std::fs::write(
+        plug_dir.join("plugin.json"),
+        serde_json::to_vec(&json!({
+            "schema_version": 1,
+            "domain": "ntfy_plug",
+            "name": "Ntfy Plug",
+            "version": "1.0.0",
+            "transport": { "type": "unix_socket" },
+            "capabilities": { "entity_domains": ["notify"] }
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+    let installed = Arc::new(manifest::InstalledPlugin::load(&plug_dir).unwrap());
+    let hass = Hass::new();
+    let registry = Registry::in_memory(
+        &hass,
+        Registries {
+            entities: vec![Arc::new(ha_registry::Entity {
+                entity_id: "notify.test_phone".into(),
+                platform: "mobile_app".into(),
+                unique_id: Some(json!("phone-1")),
+                config_entry_id: Some("ma-entry-1".into()),
+                ..Default::default()
+            })],
+            ..Default::default()
+        },
+    );
+    let components =
+        crate::components::Components::new(&hass, registry.clone(), Default::default());
+    let config_entries = ConfigEntries::load(&hass, &dir);
+
+    // 1. Set up a mobile_app registration wired onto the shared Components.
+    let entry_map = json!({
+        "entry_id": "ma-entry-1",
+        "domain": "mobile_app",
+        "title": "Test Phone",
+        "data": {
+            "webhook_id": "wh-1",
+            "device_id": "phone-1",
+            "device_name": "Test Phone",
+            "app_id": "io.home-assistant.test",
+            "app_version": "1.0",
+            "os_version": "18.0",
+            "app_data": {
+                "push_url": "https://relay.example.test/send",
+                "push_token": "tok-123"
+            }
+        }
+    })
+    .as_object()
+    .cloned()
+    .unwrap();
+    let relay = Arc::new(MockRelay {
+        sent: parking_lot::Mutex::new(Vec::new()),
+    });
+    let mobile_app = crate::mobile_app::MobileApp::new(&[entry_map], vec![]);
+    mobile_app.set_entities(components.clone());
+    mobile_app.set_relay(relay.clone());
+    mobile_app.setup(&hass, registry.clone(), config_entries, None);
+
+    // 2. Register two plugin notify entities (one supporting TITLE, one not).
+    let plugin_calls: Arc<parking_lot::Mutex<Vec<protocol::EntityCallParams>>> =
+        Arc::new(parking_lot::Mutex::new(Vec::new()));
+    let plugin_calls_cb = plugin_calls.clone();
+    let store = entities::PluginEntityStore::new(
+        installed,
+        components.clone(),
+        Arc::new(move |call| {
+            plugin_calls_cb.lock().push(call);
+            Box::pin(async { Ok(()) })
+        }),
+    );
+    store.activate_entry("p1");
+    let titled_id = store
+        .upsert_entity(protocol::EntityUpsertParams {
+            entry_id: "p1".into(),
+            unique_id: "topic-titled".into(),
+            domain: "notify".into(),
+            name: Some("Alerts".into()),
+            supported_features: crate::notify::feature::TITLE,
+            ..Default::default()
+        })
+        .unwrap();
+    let plain_id = store
+        .upsert_entity(protocol::EntityUpsertParams {
+            entry_id: "p1".into(),
+            unique_id: "topic-plain".into(),
+            domain: "notify".into(),
+            name: Some("Plain".into()),
+            supported_features: 0,
+            ..Default::default()
+        })
+        .unwrap();
+
+    // 3. Single `notify.send_message` with `entity_id: "all"` hits mobile_app + both plugins.
+    hass.call_service(
+        "notify",
+        "send_message",
+        json!({"entity_id": "all", "message": "hello all", "title": "Heads up"})
+            .as_object()
+            .cloned()
+            .unwrap(),
+        None,
+        false,
+        None,
+    )
+    .await
+    .unwrap();
+
+    // Verify mobile_app relay received it.
+    {
+        let sent = relay.sent.lock();
+        assert_eq!(sent.len(), 1);
+        assert_eq!(sent[0].1["message"], json!("hello all"));
+        assert_eq!(sent[0].1["title"], json!("Heads up"));
+    }
+
+    // Verify both plugin notify entities received it, and TITLE was stripped for the plain one.
+    {
+        let calls = plugin_calls.lock();
+        assert_eq!(calls.len(), 2);
+        let titled = calls
+            .iter()
+            .find(|c| c.unique_id == "topic-titled")
+            .unwrap();
+        assert_eq!(titled.domain, "notify");
+        assert_eq!(titled.service, "send_message");
+        assert_eq!(
+            Value::Object(titled.data.clone()),
+            json!({"message": "hello all", "title": "Heads up"})
+        );
+        let plain = calls.iter().find(|c| c.unique_id == "topic-plain").unwrap();
+        assert_eq!(
+            Value::Object(plain.data.clone()),
+            json!({"message": "hello all"})
+        );
+    }
+
+    // Plugin notify entities recorded ISO timestamp state + friendly_name + supported_features.
+    let titled_eid = ha_core::EntityId::parse(&titled_id).unwrap();
+    let st = hass.states().get(&titled_eid).unwrap();
+    let recorded_ts = st.state.as_str().to_owned();
+    assert!(
+        recorded_ts.contains('T'),
+        "expected ISO timestamp, got {recorded_ts}"
+    );
+    assert_eq!(st.attributes["friendly_name"], json!("Alerts"));
+    assert_eq!(st.attributes["supported_features"], json!(1));
+
+    // Preserves last_notified across unavailable -> unknown recovery and re-upsert.
+    store
+        .set_state(protocol::StateSetParams {
+            entry_id: "p1".into(),
+            unique_id: "topic-titled".into(),
+            state: "unavailable".into(),
+            attributes: Map::new(),
+        })
+        .unwrap();
+    assert_eq!(
+        hass.states().get(&titled_eid).unwrap().state.as_str(),
+        "unavailable"
+    );
+    store
+        .upsert_entity(protocol::EntityUpsertParams {
+            entry_id: "p1".into(),
+            unique_id: "topic-titled".into(),
+            domain: "notify".into(),
+            name: Some("Alerts".into()),
+            supported_features: crate::notify::feature::TITLE,
+            ..Default::default()
+        })
+        .unwrap();
+    store
+        .set_state(protocol::StateSetParams {
+            entry_id: "p1".into(),
+            unique_id: "topic-titled".into(),
+            state: "unknown".into(),
+            attributes: Map::new(),
+        })
+        .unwrap();
+    assert_eq!(
+        hass.states().get(&titled_eid).unwrap().state.as_str(),
+        recorded_ts
+    );
+
+    // Deactivating the plugin entry detaches both plugin notify entities while mobile_app stays live.
+    store.deactivate_entry("p1");
+    let plain_eid = ha_core::EntityId::parse(&plain_id).unwrap();
+    assert!(hass.states().get(&titled_eid).is_none());
+    assert!(hass.states().get(&plain_eid).is_none());
+
+    hass.call_service(
+        "notify",
+        "send_message",
+        json!({"entity_id": "all", "message": "only phone"})
+            .as_object()
+            .cloned()
+            .unwrap(),
+        None,
+        false,
+        None,
+    )
+    .await
+    .unwrap();
+    assert_eq!(relay.sent.lock().len(), 2);
+    assert_eq!(plugin_calls.lock().len(), 2);
+    let _ = std::fs::remove_dir_all(&dir);
+}
