@@ -2941,12 +2941,12 @@ async fn plugin_climate_all_services_capabilities_and_unavailable() {
             preset_modes: Some(vec!["none".into(), "eco".into(), "away".into()]),
             swing_modes: Some(vec!["off".into(), "vertical".into()]),
             swing_horizontal_modes: Some(vec!["off".into(), "left".into(), "right".into()]),
-            min_temp: Some(10.0),
-            max_temp: Some(30.0),
-            target_temp_step: Some(0.5),
-            min_humidity: Some(25.0),
-            max_humidity: Some(80.0),
-            target_humidity_step: Some(5.0),
+            min_temp: json!(10).as_number().cloned(),
+            max_temp: json!(30).as_number().cloned(),
+            target_temp_step: json!(0.5).as_number().cloned(),
+            min_humidity: json!(25).as_number().cloned(),
+            max_humidity: json!(80).as_number().cloned(),
+            target_humidity_step: json!(5).as_number().cloned(),
             ..Default::default()
         })
         .unwrap();
@@ -2999,10 +2999,10 @@ async fn plugin_climate_all_services_capabilities_and_unavailable() {
         }
     };
 
-    // Call all 10 climate services.
+    // Call all 10 climate services (all 10 reach the plugin with distinct RPC names).
     call("turn_on", Map::new()).await.unwrap();
     call("turn_off", Map::new()).await.unwrap();
-    call("toggle", Map::new()).await.unwrap(); // state is "heat" -> turn_off
+    call("toggle", Map::new()).await.unwrap();
     call(
         "set_hvac_mode",
         json!({"hvac_mode": "cool"}).as_object().cloned().unwrap(),
@@ -3095,44 +3095,43 @@ async fn plugin_climate_all_services_capabilities_and_unavailable() {
         .is_err()
     );
 
-    let calls: Vec<(&str, Value)> = recorded
-        .lock()
-        .iter()
-        .map(|c| {
-            assert_eq!(c.domain, "climate");
-            assert_eq!(c.unique_id, "thermo-1");
+    {
+        let guard = recorded.lock();
+        let calls: Vec<(&str, Value)> = guard
+            .iter()
+            .map(|c| {
+                assert_eq!(c.domain, "climate");
+                assert_eq!(c.unique_id, "thermo-1");
+                (c.service.as_str(), Value::Object(c.data.clone()))
+            })
+            .collect();
+        assert_eq!(calls.len(), 10);
+        assert_eq!(calls[0], ("turn_on", json!({})));
+        assert_eq!(calls[1], ("turn_off", json!({})));
+        assert_eq!(calls[2], ("toggle", json!({})));
+        assert_eq!(calls[3], ("set_hvac_mode", json!({"hvac_mode": "cool"})));
+        assert_eq!(calls[4], ("set_fan_mode", json!({"fan_mode": "high"})));
+        assert_eq!(calls[5], ("set_preset_mode", json!({"preset_mode": "eco"})));
+        assert_eq!(calls[6], ("set_humidity", json!({"humidity": 55})));
+        assert_eq!(
+            calls[7],
+            ("set_swing_mode", json!({"swing_mode": "vertical"}))
+        );
+        assert_eq!(
+            calls[8],
             (
-                Box::leak(c.service.clone().into_boxed_str()) as &str,
-                Value::Object(c.data.clone()),
+                "set_swing_horizontal_mode",
+                json!({"swing_horizontal_mode": "left"})
             )
-        })
-        .collect();
-    assert_eq!(calls.len(), 10);
-    assert_eq!(calls[0], ("turn_on", json!({})));
-    assert_eq!(calls[1], ("turn_off", json!({})));
-    assert_eq!(calls[2], ("turn_off", json!({})));
-    assert_eq!(calls[3], ("set_hvac_mode", json!({"hvac_mode": "cool"})));
-    assert_eq!(calls[4], ("set_fan_mode", json!({"fan_mode": "high"})));
-    assert_eq!(calls[5], ("set_preset_mode", json!({"preset_mode": "eco"})));
-    assert_eq!(calls[6], ("set_humidity", json!({"humidity": 55})));
-    assert_eq!(
-        calls[7],
-        ("set_swing_mode", json!({"swing_mode": "vertical"}))
-    );
-    assert_eq!(
-        calls[8],
-        (
-            "set_swing_horizontal_mode",
-            json!({"swing_horizontal_mode": "left"})
-        )
-    );
-    assert_eq!(
-        calls[9],
-        (
-            "set_temperature",
-            json!({"temperature": 23.5, "hvac_mode": "heat"})
-        )
-    );
+        );
+        assert_eq!(
+            calls[9],
+            (
+                "set_temperature",
+                json!({"temperature": 23.5, "hvac_mode": "heat"})
+            )
+        );
+    }
 
     // Live capability update via state.set propagates to registry and survives omitted re-upsert.
     store
@@ -3463,5 +3462,313 @@ async fn shared_notify_component_fans_out_mobile_app_and_plugin_entities() {
     .unwrap();
     assert_eq!(relay.sent.lock().len(), 2);
     assert_eq!(plugin_calls.lock().len(), 2);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[tokio::test(start_paused = true)]
+async fn climate_and_notify_round1_regressions() {
+    use crate::climate::feature as cf;
+    use ha_core::ServiceError;
+
+    let dir = temp_dir("climate-notify-r1");
+    let plug_dir = dir.join("plugins").join("r1_plug");
+    std::fs::create_dir_all(&plug_dir).unwrap();
+    std::fs::write(
+        plug_dir.join("plugin.json"),
+        serde_json::to_vec(&json!({
+            "schema_version": 1,
+            "domain": "r1_plug",
+            "name": "R1 Plug",
+            "version": "1.0.0",
+            "transport": { "type": "unix_socket" },
+            "capabilities": { "entity_domains": ["climate", "notify"] }
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+    let installed = Arc::new(manifest::InstalledPlugin::load(&plug_dir).unwrap());
+    let hass = Hass::new();
+    let registry = Registry::in_memory(&hass, Registries::default());
+    let components =
+        crate::components::Components::new(&hass, registry.clone(), Default::default());
+
+    let gate = Arc::new(tokio::sync::Notify::new());
+    let hold_first = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let seen_calls: Arc<parking_lot::Mutex<Vec<protocol::EntityCallParams>>> =
+        Arc::new(parking_lot::Mutex::new(Vec::new()));
+    let gate_cb = gate.clone();
+    let hold_cb = hold_first.clone();
+    let seen_cb = seen_calls.clone();
+    let store = entities::PluginEntityStore::new(
+        installed,
+        components.clone(),
+        Arc::new(move |call| {
+            let should_hold = hold_cb.swap(false, Ordering::SeqCst);
+            seen_cb.lock().push(call);
+            let gate = gate_cb.clone();
+            Box::pin(async move {
+                if should_hold {
+                    gate.notified().await;
+                }
+                Ok(())
+            })
+        }),
+    );
+    store.activate_entry("e1");
+
+    // 1. Climate display rounding (7.25 -> 7.2), float min_humidity (30.0 -> "30.0"),
+    //    Unicode digit & big-int humidity coercion, and cleared steps staying absent when unavailable.
+    let clim_id = store
+        .upsert_entity(protocol::EntityUpsertParams {
+            entry_id: "e1".into(),
+            unique_id: "c1".into(),
+            domain: "climate".into(),
+            name: Some("Rounding Stat".into()),
+            supported_features: cf::TARGET_TEMPERATURE | cf::TARGET_HUMIDITY,
+            hvac_modes: Some(vec!["off".into(), "heat".into()]),
+            min_temp: json!(7.25).as_number().cloned(),
+            max_temp: json!(30).as_number().cloned(),
+            target_temp_step: json!(0.5).as_number().cloned(),
+            min_humidity: json!(30.0).as_number().cloned(),
+            max_humidity: json!(80).as_number().cloned(),
+            target_humidity_step: json!(1).as_number().cloned(),
+            ..Default::default()
+        })
+        .unwrap();
+    let clim_eid = ha_core::EntityId::parse(&clim_id).unwrap();
+    let snap = registry.snapshot();
+    let row = snap
+        .entities
+        .iter()
+        .find(|e| e.entity_id == clim_id)
+        .unwrap();
+    let caps = serde_json::to_value(&row.capabilities).unwrap();
+    assert_eq!(caps["min_temp"], json!(7.2));
+    assert_eq!(caps["max_temp"], json!(30));
+
+    // `humidity: true` coerces to 1 and fails with `"min_humidity": "30.0"`.
+    let err = hass
+        .call_service(
+            "climate",
+            "set_humidity",
+            json!({"entity_id": clim_id, "humidity": true})
+                .as_object()
+                .cloned()
+                .unwrap(),
+            None,
+            false,
+            None,
+        )
+        .await
+        .unwrap_err();
+    match err {
+        ServiceError::Validation(r) => {
+            assert_eq!(r.key, "humidity_out_of_range");
+            let p = r.placeholders.as_ref().unwrap();
+            assert_eq!(p["humidity"], "1");
+            assert_eq!(p["min_humidity"], "30.0");
+            assert_eq!(p["max_humidity"], "80");
+        }
+        other => panic!("expected validation error, got {other:?}"),
+    }
+
+    // Unicode fullwidth digits `"５５"` coerce to 55 and reach the plugin.
+    hass.call_service(
+        "climate",
+        "set_humidity",
+        json!({"entity_id": clim_id, "humidity": "５５"})
+            .as_object()
+            .cloned()
+            .unwrap(),
+        None,
+        false,
+        None,
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        seen_calls.lock().last().unwrap().data["humidity"],
+        json!(55)
+    );
+
+    // Arbitrary-precision integer string `"18446744073709551616"` reaches range check.
+    let err_big = hass
+        .call_service(
+            "climate",
+            "set_humidity",
+            json!({"entity_id": clim_id, "humidity": "18446744073709551616"})
+                .as_object()
+                .cloned()
+                .unwrap(),
+            None,
+            false,
+            None,
+        )
+        .await
+        .unwrap_err();
+    match err_big {
+        ServiceError::Validation(r) => {
+            assert_eq!(r.key, "humidity_out_of_range");
+            assert_eq!(
+                r.placeholders.as_ref().unwrap()["humidity"],
+                "18446744073709551616"
+            );
+        }
+        other => panic!("expected validation error, got {other:?}"),
+    }
+
+    // Clear target_temp_step & target_humidity_step with null; verify they do NOT resurrect on unavailable.
+    store
+        .set_state(protocol::StateSetParams {
+            entry_id: "e1".into(),
+            unique_id: "c1".into(),
+            state: "heat".into(),
+            attributes: json!({"target_temp_step": null, "target_humidity_step": null})
+                .as_object()
+                .cloned()
+                .unwrap(),
+        })
+        .unwrap();
+    store
+        .set_state(protocol::StateSetParams {
+            entry_id: "e1".into(),
+            unique_id: "c1".into(),
+            state: "unavailable".into(),
+            attributes: Map::new(),
+        })
+        .unwrap();
+    let st_unavail = hass.states().get(&clim_eid).unwrap();
+    assert!(!st_unavail.attributes.contains_key("target_temp_step"));
+    assert!(!st_unavail.attributes.contains_key("target_humidity_step"));
+    store.mark_all_unavailable();
+    let st_disc = hass.states().get(&clim_eid).unwrap();
+    assert!(!st_disc.attributes.contains_key("target_temp_step"));
+    assert!(!st_disc.attributes.contains_key("target_humidity_step"));
+
+    // 2. Plugin notify: initial "unknown", in-flight re-upsert timestamp preservation,
+    //    5s context expiry, restore across reload, and 33-target concurrent fan-out.
+    let n_id = store
+        .upsert_entity(protocol::EntityUpsertParams {
+            entry_id: "e1".into(),
+            unique_id: "n1".into(),
+            domain: "notify".into(),
+            name: Some("Slow Notify".into()),
+            supported_features: crate::notify::feature::TITLE,
+            ..Default::default()
+        })
+        .unwrap();
+    let n_eid = ha_core::EntityId::parse(&n_id).unwrap();
+    assert_eq!(hass.states().get(&n_eid).unwrap().state.as_str(), "unknown");
+
+    // Hold send_message in flight, re-upsert same entity, advance clock 6s (past 5s context window), then release.
+    hold_first.store(true, Ordering::SeqCst);
+    let orig_ctx = Context::new();
+    let orig_ctx_id = orig_ctx.id;
+    let hass_send = hass.clone();
+    let n_id_send = n_id.clone();
+    let send_task = tokio::spawn(async move {
+        hass_send
+            .call_service(
+                "notify",
+                "send_message",
+                json!({"entity_id": n_id_send, "message": "delayed"})
+                    .as_object()
+                    .cloned()
+                    .unwrap(),
+                None,
+                false,
+                Some(orig_ctx),
+            )
+            .await
+    });
+    tokio::task::yield_now().await;
+    // Re-upsert while send is in flight with a new name.
+    store
+        .upsert_entity(protocol::EntityUpsertParams {
+            entry_id: "e1".into(),
+            unique_id: "n1".into(),
+            domain: "notify".into(),
+            name: Some("Renamed Notify".into()),
+            supported_features: crate::notify::feature::TITLE,
+            ..Default::default()
+        })
+        .unwrap();
+    tokio::time::advance(Duration::from_secs(6)).await;
+    gate.notify_one();
+    send_task.await.unwrap().unwrap();
+
+    let after_send = hass.states().get(&n_eid).unwrap();
+    let saved_ts = after_send.state.as_str().to_owned();
+    assert!(saved_ts.contains('T'), "expected timestamp, got {saved_ts}");
+    assert_eq!(
+        after_send.attributes["friendly_name"],
+        json!("Renamed Notify")
+    );
+    assert_ne!(
+        after_send.context.id, orig_ctx_id,
+        "context must expire after >5s"
+    );
+
+    // Unload & reload restores the saved timestamp via `hass.restore()`.
+    store.deactivate_entry("e1");
+    assert!(hass.states().get(&n_eid).is_none());
+    store.activate_entry("e1");
+    store
+        .upsert_entity(protocol::EntityUpsertParams {
+            entry_id: "e1".into(),
+            unique_id: "n1".into(),
+            domain: "notify".into(),
+            name: Some("Renamed Notify".into()),
+            supported_features: crate::notify::feature::TITLE,
+            ..Default::default()
+        })
+        .unwrap();
+    assert_eq!(hass.states().get(&n_eid).unwrap().state.as_str(), saved_ts);
+
+    // 33-target concurrent fan-out: target 33 starts even while target 1 is held open!
+    for i in 2..=33 {
+        store
+            .upsert_entity(protocol::EntityUpsertParams {
+                entry_id: "e1".into(),
+                unique_id: format!("n{i}"),
+                domain: "notify".into(),
+                name: Some(format!("Notify {i}")),
+                ..Default::default()
+            })
+            .unwrap();
+    }
+    seen_calls.lock().clear();
+    hold_first.store(true, Ordering::SeqCst);
+    let hass_fan = hass.clone();
+    let fan_task = tokio::spawn(async move {
+        hass_fan
+            .call_service(
+                "notify",
+                "send_message",
+                json!({"entity_id": "all", "message": "fanout"})
+                    .as_object()
+                    .cloned()
+                    .unwrap(),
+                None,
+                false,
+                None,
+            )
+            .await
+    });
+    for _ in 0..20 {
+        tokio::task::yield_now().await;
+        if seen_calls.lock().len() == 33 {
+            break;
+        }
+    }
+    assert_eq!(
+        seen_calls.lock().len(),
+        33,
+        "all 33 targets should start concurrently while target 1 is held"
+    );
+    gate.notify_one();
+    fan_task.await.unwrap().unwrap();
+
+    store.deactivate_entry("e1");
     let _ = std::fs::remove_dir_all(&dir);
 }

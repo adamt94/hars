@@ -218,6 +218,15 @@ pub trait Climate: Send + Sync {
             false => unsupported(),
         }
     }
+    /// The base `async_toggle`: `off` -> `turn_on`, anything else -> `turn_off`.
+    /// Platforms and plugins may override this to handle `climate.toggle` directly.
+    fn toggle(&self) -> BoxFuture<'_> {
+        if self.hvac_mode().as_deref() == Some("off") {
+            self.turn_on()
+        } else {
+            self.turn_off()
+        }
+    }
 }
 
 /// A method the entity doesn't implement (Python's `NotImplementedError`).
@@ -295,19 +304,32 @@ fn valid_mode(kind: &str, label: &str, mode: &str, modes: &[String]) -> Result<(
 
 /// `async_service_humidity_set`'s range check, then the entity's call.
 async fn set_humidity(c: &dyn Climate, data: &Map<String, Value>) -> Result<(), ServiceError> {
-    let raw = data
-        .get("humidity")
-        .and_then(|v| {
-            v.as_i64()
-                .map(i128::from)
-                .or_else(|| v.as_u64().map(i128::from))
-        })
-        .unwrap_or(0);
     let (min, max) = c.humidity_bounds();
-    let h_f = raw as f64;
+    let val = data.get("humidity");
+    let (h_f, shown, parsed_i64): (f64, String, Option<i64>) = match val {
+        Some(Value::Number(n)) => {
+            if let Some(i) = n.as_i64() {
+                (i as f64, i.to_string(), Some(i))
+            } else if let Some(u) = n.as_u64() {
+                (u as f64, u.to_string(), i64::try_from(u).ok())
+            } else {
+                (0.0, "0".into(), Some(0))
+            }
+        }
+        Some(Value::String(s)) => {
+            // Canonical base-10 integer string outside 64-bit JSON range (from `Kind::BigInt`).
+            let f = s.parse::<f64>().unwrap_or(if s.starts_with('-') {
+                f64::NEG_INFINITY
+            } else {
+                f64::INFINITY
+            });
+            (f, s.clone(), None)
+        }
+        _ => (0.0, "0".into(), Some(0)),
+    };
     if h_f < min.get() || h_f > max.get() {
         let mut p = Map::new();
-        p.insert("humidity".into(), json!(raw.to_string()));
+        p.insert("humidity".into(), json!(shown));
         p.insert("min_humidity".into(), json!(min.py_str()));
         p.insert("max_humidity".into(), json!(max.py_str()));
         return Err(ServiceError::validation(
@@ -315,13 +337,13 @@ async fn set_humidity(c: &dyn Climate, data: &Map<String, Value>) -> Result<(), 
             "humidity_out_of_range",
             Some(p),
             format!(
-                "Provided humidity {raw} is not valid. Accepted range is {} to {}",
+                "Provided humidity {shown} is not valid. Accepted range is {} to {}",
                 min.py_str(),
                 max.py_str()
             ),
         ));
     }
-    let humidity = i64::try_from(raw).unwrap_or(i64::MAX);
+    let humidity = parsed_i64.unwrap_or(i64::MAX);
     c.set_humidity(humidity).await
 }
 
@@ -439,8 +461,7 @@ fn dispatch_one<'a>(
     match name {
         "turn_on" => c.turn_on(),
         "turn_off" => c.turn_off(),
-        "toggle" if c.hvac_mode().as_deref() == Some("off") => c.turn_on(),
-        "toggle" => c.turn_off(),
+        "toggle" => c.toggle(),
         "set_hvac_mode" => {
             let mode = str_of("hvac_mode");
             if let Err(e) = valid_mode("hvac", "HVAC", mode, &c.hvac_modes_vec()) {
@@ -534,7 +555,7 @@ impl Climates {
             ),
             (
                 "set_humidity",
-                entity().required("humidity", Kind::Int(Range::ANY)),
+                entity().required("humidity", Kind::BigInt),
                 &[TARGET_HUMIDITY],
             ),
             (
@@ -572,19 +593,17 @@ impl Climates {
                         let data = &call.data;
                         if let [only] = chosen.as_slice() {
                             dispatch_one(&**only, name, data).await?;
-                        } else {
+                        } else if !chosen.is_empty() {
                             let mut first_err: Option<ServiceError> = None;
-                            for chunk in chosen.chunks(32) {
-                                for res in crate::light::join_all(
-                                    chunk.iter().map(|c| dispatch_one(&**c, name, data)),
-                                )
-                                .await
+                            for res in crate::light::join_all(
+                                chosen.iter().map(|c| dispatch_one(&**c, name, data)),
+                            )
+                            .await
+                            {
+                                if let Err(e) = res
+                                    && first_err.is_none()
                                 {
-                                    if let Err(e) = res
-                                        && first_err.is_none()
-                                    {
-                                        first_err = Some(e);
-                                    }
+                                    first_err = Some(e);
                                 }
                             }
                             if let Some(e) = first_err {

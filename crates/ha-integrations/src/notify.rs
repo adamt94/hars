@@ -70,7 +70,7 @@ impl Notifiers {
         hass: &Hass,
         registries: impl Into<ha_registry::Lookup>,
     ) {
-        let registries = registries.into();
+        let registries = registries.into().downgrade();
         let weak = Arc::downgrade(self);
         hass.services().register_with_schema(
             DOMAIN,
@@ -89,7 +89,10 @@ impl Notifiers {
                         return Ok(None);
                     };
                     let target = call.entity_ids()?;
-                    let indirect = registries.get().target_entities(&call.data);
+                    let indirect = registries
+                        .get()
+                        .map(|r| r.target_entities(&call.data))
+                        .unwrap_or_default();
                     let list: Vec<Arc<dyn Notify>> = {
                         let items = notifiers.items.read();
                         items
@@ -117,21 +120,18 @@ impl Notifiers {
 
                     if let [only] = list.as_slice() {
                         dispatch_one(&**only, message, raw_title, ctx).await?;
-                    } else {
+                    } else if !list.is_empty() {
                         let mut first_err: Option<ServiceError> = None;
-                        for chunk in list.chunks(32) {
-                            for res in crate::light::join_all(
-                                chunk
-                                    .iter()
-                                    .map(|n| dispatch_one(&**n, message, raw_title, ctx.clone())),
-                            )
-                            .await
+                        for res in crate::light::join_all(
+                            list.iter()
+                                .map(|n| dispatch_one(&**n, message, raw_title, ctx.clone())),
+                        )
+                        .await
+                        {
+                            if let Err(e) = res
+                                && first_err.is_none()
                             {
-                                if let Err(e) = res
-                                    && first_err.is_none()
-                                {
-                                    first_err = Some(e);
-                                }
+                                first_err = Some(e);
                             }
                         }
                         if let Some(e) = first_err {
@@ -261,5 +261,16 @@ mod tests {
         let weak = Arc::downgrade(&notifiers);
         drop((hass, notifiers));
         assert!(weak.upgrade().is_none());
+
+        // Live `Registry` path must not create a `Hass -> Services -> Registry -> Hass` cycle.
+        let hass2 = Hass::new();
+        let live_reg = ha_registry::Registry::in_memory(&hass2, ha_registry::Registries::default());
+        let weak_reg = Arc::downgrade(&live_reg);
+        let notifiers2 = Arc::new(Notifiers::default());
+        notifiers2.register_services(&hass2, live_reg.clone());
+        let weak_n2 = Arc::downgrade(&notifiers2);
+        drop((hass2, live_reg, notifiers2));
+        assert!(weak_n2.upgrade().is_none());
+        assert!(weak_reg.upgrade().is_none());
     }
 }

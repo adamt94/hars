@@ -15,7 +15,7 @@ use serde::Serialize;
 use serde_json::{Map, Value, json};
 use std::collections::HashMap;
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 use std::time::Duration;
 
 /// `helpers/registry.py`: a save 10 s after the last change while
@@ -62,6 +62,32 @@ impl Lookup {
         match self {
             Self::Fixed(_) => None,
             Self::Live(r) => Some(r),
+        }
+    }
+
+    /// A non-owning handle for long-lived service closures owned by `Hass`,
+    /// breaking the `Hass -> Services -> Lookup::Live(Registry) -> Hass` cycle.
+    pub fn downgrade(&self) -> WeakLookup {
+        match self {
+            Self::Fixed(r) => WeakLookup::Fixed(r.clone()),
+            Self::Live(r) => WeakLookup::Live(Arc::downgrade(r)),
+        }
+    }
+}
+
+/// Non-owning counterpart to [`Lookup`] for closures stored inside `Hass`.
+#[derive(Clone)]
+pub enum WeakLookup {
+    Fixed(Arc<Registries>),
+    Live(Weak<Registry>),
+}
+
+impl WeakLookup {
+    /// The registries as they are now, or `None` if the live registry dropped.
+    pub fn get(&self) -> Option<Arc<Registries>> {
+        match self {
+            Self::Fixed(r) => Some(r.clone()),
+            Self::Live(r) => r.upgrade().map(|live| live.snapshot()),
         }
     }
 }

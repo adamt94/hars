@@ -21,6 +21,10 @@ pub enum Kind {
     Boolean,
     /// `vol.All(vol.Coerce(int), vol.Range(...))`.
     Int(Range),
+    /// `vol.Coerce(int)` with arbitrary-precision fallback: coerces to JSON
+    /// integer when in `i64`/`u64` range, or canonical base-10 string when
+    /// beyond 64 bits (so entity range checks still format `str(value)` as HA).
+    BigInt,
     /// `vol.All(vol.Coerce(float), vol.Range(...))`.
     Float(Range),
     /// `cv.string`: a string, or a number turned into one.
@@ -338,6 +342,39 @@ fn check(kind: &Kind, value: &Value) -> Checked {
                 _ => Err(expected()),
             }
         }
+        Kind::BigInt => {
+            let expected = || ("expected int".to_owned(), None);
+            match value {
+                Value::Number(n) => {
+                    if n.is_i64() || n.is_u64() {
+                        return Ok(None);
+                    }
+                    let Some(f) = n.as_f64().filter(|f| f.is_finite()) else {
+                        return Err(expected());
+                    };
+                    let t = f.trunc();
+                    if t >= i64::MIN as f64 && t < i64::MAX as f64 {
+                        return Ok(Some(Value::from(t as i64)));
+                    }
+                    if t >= 0.0 && t < u64::MAX as f64 {
+                        return Ok(Some(Value::from(t as u64)));
+                    }
+                    Ok(Some(Value::String(format!("{t:.0}"))))
+                }
+                Value::Bool(b) => Ok(Some(Value::from(i64::from(*b)))),
+                Value::String(s) => {
+                    let canonical = parse_python_big_int(s).ok_or_else(expected)?;
+                    if let Ok(i) = canonical.parse::<i64>() {
+                        Ok(Some(Value::from(i)))
+                    } else if let Ok(u) = canonical.parse::<u64>() {
+                        Ok(Some(Value::from(u)))
+                    } else {
+                        Ok(Some(Value::String(canonical)))
+                    }
+                }
+                _ => Err(expected()),
+            }
+        }
         Kind::Float(range) => {
             let (n, changed) = match value {
                 Value::Number(n) => (n.as_f64().unwrap_or(0.0), false),
@@ -550,15 +587,76 @@ fn check_target(key: &str, value: &Value) -> Checked {
     }
 }
 
+/// Python 3.14 Unicode decimal digit (`Nd`) block starts; each block spans 10
+/// consecutive code points representing `0..=9`.
+const UNICODE_DECIMAL_STARTS: [u32; 76] = [
+    0x0030, 0x0660, 0x06F0, 0x07C0, 0x0966, 0x09E6, 0x0A66, 0x0AE6, 0x0B66, 0x0BE6, 0x0C66, 0x0CE6,
+    0x0D66, 0x0DE6, 0x0E50, 0x0ED0, 0x0F20, 0x1040, 0x1090, 0x17E0, 0x1810, 0x1946, 0x19D0, 0x1A80,
+    0x1A90, 0x1B50, 0x1BB0, 0x1C40, 0x1C50, 0xA620, 0xA8D0, 0xA900, 0xA9D0, 0xA9F0, 0xAA50, 0xABF0,
+    0xFF10, 0x104A0, 0x10D30, 0x10D40, 0x11066, 0x110F0, 0x11136, 0x111D0, 0x112F0, 0x11450,
+    0x114D0, 0x11650, 0x116C0, 0x116D0, 0x116DA, 0x11730, 0x118E0, 0x11950, 0x11BF0, 0x11C50,
+    0x11D50, 0x11DA0, 0x11F50, 0x16130, 0x16A60, 0x16AC0, 0x16B50, 0x16D70, 0x1CCF0, 0x1D7CE,
+    0x1D7D8, 0x1D7E2, 0x1D7EC, 0x1D7F6, 0x1E140, 0x1E2F0, 0x1E4F0, 0x1E5F1, 0x1E950, 0x1FBF0,
+];
+
+fn unicode_decimal_digit(c: char) -> Option<u8> {
+    if c.is_ascii_digit() {
+        return Some(c as u8 - b'0');
+    }
+    let cp = c as u32;
+    let idx = UNICODE_DECIMAL_STARTS.partition_point(|&start| start <= cp);
+    if idx == 0 {
+        return None;
+    }
+    let delta = cp - UNICODE_DECIMAL_STARTS[idx - 1];
+    (delta < 10).then_some(delta as u8)
+}
+
+/// Normalize Python's `int(str)` (surrounding whitespace, optional sign,
+/// Unicode decimal digits with single `_` separators) into canonical base-10
+/// ASCII (`"0"`, `"-42"`, `"18446744073709551616"`).
+fn parse_python_big_int(s: &str) -> Option<String> {
+    let t = s.trim();
+    let (neg, digits) = if let Some(rest) = t.strip_prefix('-') {
+        (true, rest)
+    } else if let Some(rest) = t.strip_prefix('+') {
+        (false, rest)
+    } else {
+        (false, t)
+    };
+    if digits.is_empty() {
+        return None;
+    }
+    let mut out = String::with_capacity(digits.len() + usize::from(neg));
+    let mut prev_underscore = true; // disallows leading `_`
+    for c in digits.chars() {
+        if c == '_' {
+            if prev_underscore {
+                return None;
+            }
+            prev_underscore = true;
+        } else {
+            let d = unicode_decimal_digit(c)?;
+            out.push((b'0' + d) as char);
+            prev_underscore = false;
+        }
+    }
+    if prev_underscore {
+        return None;
+    }
+    let trimmed = out.trim_start_matches('0');
+    if trimmed.is_empty() {
+        Some("0".into())
+    } else if neg {
+        Some(format!("-{trimmed}"))
+    } else {
+        Some(trimmed.to_owned())
+    }
+}
+
 /// Whether `int(str)` accepts `s`, whatever its size.
 fn is_python_int(s: &str) -> bool {
-    let t = s.trim();
-    let digits = t.strip_prefix(['+', '-']).unwrap_or(t);
-    !digits.is_empty()
-        && !digits.starts_with('_')
-        && !digits.ends_with('_')
-        && !digits.contains("__")
-        && digits.bytes().all(|b| b.is_ascii_digit() || b == b'_')
+    parse_python_big_int(s).is_some()
 }
 
 /// Python's `float(str)`: surrounding whitespace, optional sign, and single
@@ -585,19 +683,9 @@ fn parse_python_float(s: &str) -> Option<f64> {
 }
 
 /// Python's `int(str)`: surrounding whitespace, an optional sign, and
-/// digits with single `_` separators.
+/// Unicode decimal digits with single `_` separators.
 fn parse_python_int(s: &str) -> Option<i128> {
-    let t = s.trim();
-    let digits = t.strip_prefix(['+', '-']).unwrap_or(t);
-    let ok = !digits.is_empty()
-        && !digits.starts_with('_')
-        && !digits.ends_with('_')
-        && !digits.contains("__")
-        && digits.bytes().all(|b| b.is_ascii_digit() || b == b'_');
-    if !ok {
-        return None;
-    }
-    t.replace('_', "").parse().ok()
+    parse_python_big_int(s)?.parse().ok()
 }
 
 fn int_in_range(n: i128, range: &Range) -> Result<(), String> {

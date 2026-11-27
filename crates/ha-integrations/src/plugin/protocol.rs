@@ -303,17 +303,17 @@ pub struct EntityUpsertParams {
     #[serde(default)]
     pub swing_horizontal_modes: Option<Vec<String>>,
     #[serde(default)]
-    pub min_temp: Option<f64>,
+    pub min_temp: Option<serde_json::Number>,
     #[serde(default)]
-    pub max_temp: Option<f64>,
+    pub max_temp: Option<serde_json::Number>,
     #[serde(default)]
-    pub target_temp_step: Option<f64>,
+    pub target_temp_step: Option<serde_json::Number>,
     #[serde(default)]
-    pub min_humidity: Option<f64>,
+    pub min_humidity: Option<serde_json::Number>,
     #[serde(default)]
-    pub max_humidity: Option<f64>,
+    pub max_humidity: Option<serde_json::Number>,
     #[serde(default)]
-    pub target_humidity_step: Option<f64>,
+    pub target_humidity_step: Option<serde_json::Number>,
 }
 
 /// Parameters sent by a plugin in `state.set`.
