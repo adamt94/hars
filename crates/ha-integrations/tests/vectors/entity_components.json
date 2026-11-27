@@ -1,0 +1,632 @@
+{
+  "ha_version": "2026.6.1",
+  "unrecorded": {
+    "select": [
+      "options"
+    ],
+    "number": [
+      "max",
+      "min",
+      "mode",
+      "step"
+    ],
+    "cover": [],
+    "lock": [],
+    "fan": [
+      "preset_modes"
+    ]
+  },
+  "number_steps": {
+    "0_10": 1.0,
+    "0_1": 0.1
+  },
+  "select": [
+    {
+      "domain": "select",
+      "service": "select_next",
+      "data": {
+        "entity_id": "select.mode"
+      },
+      "calls": [
+        "off"
+      ]
+    },
+    {
+      "domain": "select",
+      "service": "select_next",
+      "data": {
+        "entity_id": "select.mode"
+      },
+      "calls": [
+        "mild"
+      ]
+    },
+    {
+      "domain": "select",
+      "service": "select_last",
+      "data": {
+        "entity_id": "select.mode"
+      },
+      "calls": [
+        "intense"
+      ]
+    },
+    {
+      "domain": "select",
+      "service": "select_next",
+      "data": {
+        "entity_id": "select.mode",
+        "cycle": true
+      },
+      "calls": [
+        "off"
+      ]
+    },
+    {
+      "domain": "select",
+      "service": "select_previous",
+      "data": {
+        "entity_id": "select.mode",
+        "cycle": false
+      },
+      "calls": [
+        "off"
+      ]
+    },
+    {
+      "domain": "select",
+      "service": "select_previous",
+      "data": {
+        "entity_id": "select.mode",
+        "cycle": true
+      },
+      "calls": [
+        "intense"
+      ]
+    },
+    {
+      "domain": "select",
+      "service": "select_first",
+      "data": {
+        "entity_id": "select.mode"
+      },
+      "calls": [
+        "off"
+      ]
+    },
+    {
+      "domain": "select",
+      "service": "select_option",
+      "data": {
+        "entity_id": "select.mode",
+        "option": "moderate"
+      },
+      "calls": [
+        "moderate"
+      ]
+    },
+    {
+      "domain": "select",
+      "service": "select_option",
+      "data": {
+        "entity_id": "select.mode",
+        "option": "invalid"
+      },
+      "error": {
+        "kind": "validation",
+        "translation_domain": "select",
+        "translation_key": "not_valid_option",
+        "translation_placeholders": {
+          "entity_id": "select.mode",
+          "option": "invalid",
+          "options": "off, mild, moderate, intense"
+        },
+        "message": "not_valid_option"
+      }
+    },
+    {
+      "domain": "select",
+      "service": "select_next",
+      "data": {
+        "entity_id": "select.mode",
+        "cycle": "true"
+      },
+      "error": {
+        "kind": "invalid",
+        "message": "expected bool for dictionary value @ data['cycle']"
+      }
+    }
+  ],
+  "number": [
+    {
+      "domain": "number",
+      "service": "set_value",
+      "data": {
+        "entity_id": "number.level",
+        "value": 0
+      },
+      "calls": [
+        0.0
+      ]
+    },
+    {
+      "domain": "number",
+      "service": "set_value",
+      "data": {
+        "entity_id": "number.level",
+        "value": "7.5"
+      },
+      "calls": [
+        7.5
+      ]
+    },
+    {
+      "domain": "number",
+      "service": "set_value",
+      "data": {
+        "entity_id": "number.level",
+        "value": 10
+      },
+      "calls": [
+        10.0
+      ]
+    },
+    {
+      "domain": "number",
+      "service": "set_value",
+      "data": {
+        "entity_id": "number.level",
+        "value": 11
+      },
+      "error": {
+        "kind": "validation",
+        "translation_domain": "number",
+        "translation_key": "out_of_range",
+        "translation_placeholders": {
+          "value": 11.0,
+          "entity_id": "number.level",
+          "min_value": "0.0",
+          "max_value": "10.0"
+        },
+        "message": "out_of_range"
+      }
+    },
+    {
+      "domain": "number",
+      "service": "set_value",
+      "data": {
+        "entity_id": "number.level",
+        "value": -1.5
+      },
+      "error": {
+        "kind": "validation",
+        "translation_domain": "number",
+        "translation_key": "out_of_range",
+        "translation_placeholders": {
+          "value": -1.5,
+          "entity_id": "number.level",
+          "min_value": "0.0",
+          "max_value": "10.0"
+        },
+        "message": "out_of_range"
+      }
+    },
+    {
+      "domain": "number",
+      "service": "set_value",
+      "data": {
+        "entity_id": "number.level",
+        "value": "bad"
+      },
+      "error": {
+        "kind": "invalid",
+        "message": "expected float for dictionary value @ data['value']"
+      }
+    }
+  ],
+  "cover": [
+    {
+      "domain": "cover",
+      "service": "open_cover",
+      "data": {
+        "entity_id": "cover.blinds"
+      },
+      "calls": [
+        "open_cover"
+      ]
+    },
+    {
+      "domain": "cover",
+      "service": "close_cover",
+      "data": {
+        "entity_id": "cover.blinds"
+      },
+      "calls": [
+        "close_cover"
+      ]
+    },
+    {
+      "domain": "cover",
+      "service": "stop_cover",
+      "data": {
+        "entity_id": "cover.blinds"
+      },
+      "calls": [
+        "stop_cover"
+      ]
+    },
+    {
+      "domain": "cover",
+      "service": "set_cover_position",
+      "data": {
+        "entity_id": "cover.blinds",
+        "position": 55
+      },
+      "calls": [
+        "set_cover_position:55"
+      ]
+    },
+    {
+      "domain": "cover",
+      "service": "set_cover_position",
+      "data": {
+        "entity_id": "cover.blinds",
+        "position": 101
+      },
+      "error": {
+        "kind": "invalid",
+        "message": "value must be at most 100 for dictionary value @ data['position']"
+      }
+    },
+    {
+      "domain": "cover",
+      "service": "open_cover_tilt",
+      "data": {
+        "entity_id": "cover.blinds"
+      },
+      "calls": [
+        "open_cover_tilt"
+      ]
+    },
+    {
+      "domain": "cover",
+      "service": "close_cover_tilt",
+      "data": {
+        "entity_id": "cover.blinds"
+      },
+      "calls": [
+        "close_cover_tilt"
+      ]
+    },
+    {
+      "domain": "cover",
+      "service": "stop_cover_tilt",
+      "data": {
+        "entity_id": "cover.blinds"
+      },
+      "calls": [
+        "stop_cover_tilt"
+      ]
+    },
+    {
+      "domain": "cover",
+      "service": "set_cover_tilt_position",
+      "data": {
+        "entity_id": "cover.blinds",
+        "tilt_position": 25
+      },
+      "calls": [
+        "set_cover_tilt_position:25"
+      ]
+    },
+    {
+      "domain": "cover",
+      "service": "toggle",
+      "data": {
+        "entity_id": "cover.blinds"
+      },
+      "calls": [
+        "open_cover"
+      ]
+    },
+    {
+      "domain": "cover",
+      "service": "toggle_cover_tilt",
+      "data": {
+        "entity_id": "cover.blinds"
+      },
+      "calls": [
+        "open_cover_tilt"
+      ]
+    },
+    {
+      "domain": "cover",
+      "service": "toggle",
+      "data": {
+        "entity_id": "cover.open_only"
+      },
+      "error": {
+        "kind": "validation",
+        "translation_domain": "homeassistant",
+        "translation_key": "service_not_supported",
+        "translation_placeholders": {
+          "domain": "cover",
+          "service": "toggle",
+          "entity_id": "cover.open_only"
+        },
+        "message": "service_not_supported"
+      }
+    }
+  ],
+  "lock": [
+    {
+      "domain": "lock",
+      "service": "unlock",
+      "data": {
+        "entity_id": "lock.front"
+      },
+      "error": {
+        "kind": "validation",
+        "translation_domain": "lock",
+        "translation_key": "add_default_code",
+        "translation_placeholders": {
+          "entity_id": "lock.front",
+          "code_format": "^\\d{4}$"
+        },
+        "message": "add_default_code"
+      }
+    },
+    {
+      "domain": "lock",
+      "service": "unlock",
+      "data": {
+        "entity_id": "lock.front",
+        "code": "12"
+      },
+      "error": {
+        "kind": "validation",
+        "translation_domain": "lock",
+        "translation_key": "add_default_code",
+        "translation_placeholders": {
+          "entity_id": "lock.front",
+          "code_format": "^\\d{4}$"
+        },
+        "message": "add_default_code"
+      }
+    },
+    {
+      "domain": "lock",
+      "service": "lock",
+      "data": {
+        "entity_id": "lock.front",
+        "code": "1234"
+      },
+      "calls": [
+        "lock:1234"
+      ]
+    },
+    {
+      "domain": "lock",
+      "service": "unlock",
+      "data": {
+        "entity_id": "lock.front",
+        "code": "1234"
+      },
+      "calls": [
+        "unlock:1234"
+      ]
+    },
+    {
+      "domain": "lock",
+      "service": "open",
+      "data": {
+        "entity_id": "lock.front",
+        "code": "1234"
+      },
+      "calls": [
+        "open:1234"
+      ]
+    },
+    {
+      "domain": "lock",
+      "service": "unlock",
+      "data": {
+        "entity_id": "lock.side"
+      },
+      "calls": [
+        "unlock:4321"
+      ]
+    },
+    {
+      "domain": "lock",
+      "service": "open",
+      "data": {
+        "entity_id": "lock.side"
+      },
+      "error": {
+        "kind": "validation",
+        "translation_domain": "homeassistant",
+        "translation_key": "service_not_supported",
+        "translation_placeholders": {
+          "domain": "lock",
+          "service": "open",
+          "entity_id": "lock.side"
+        },
+        "message": "service_not_supported"
+      }
+    }
+  ],
+  "fan": [
+    {
+      "domain": "fan",
+      "service": "turn_on",
+      "data": {
+        "entity_id": "fan.bedroom",
+        "percentage": 33,
+        "preset_mode": "auto"
+      },
+      "calls": [
+        "turn_on:33:auto"
+      ]
+    },
+    {
+      "domain": "fan",
+      "service": "increase_speed",
+      "data": {
+        "entity_id": "fan.bedroom"
+      },
+      "calls": [
+        "set_percentage:66"
+      ]
+    },
+    {
+      "domain": "fan",
+      "service": "increase_speed",
+      "data": {
+        "entity_id": "fan.bedroom"
+      },
+      "calls": [
+        "set_percentage:100"
+      ]
+    },
+    {
+      "domain": "fan",
+      "service": "increase_speed",
+      "data": {
+        "entity_id": "fan.bedroom"
+      },
+      "calls": [
+        "set_percentage:100"
+      ]
+    },
+    {
+      "domain": "fan",
+      "service": "decrease_speed",
+      "data": {
+        "entity_id": "fan.bedroom"
+      },
+      "calls": [
+        "set_percentage:66"
+      ]
+    },
+    {
+      "domain": "fan",
+      "service": "decrease_speed",
+      "data": {
+        "entity_id": "fan.bedroom",
+        "percentage_step": 16
+      },
+      "calls": [
+        "set_percentage:50"
+      ]
+    },
+    {
+      "domain": "fan",
+      "service": "oscillate",
+      "data": {
+        "entity_id": "fan.bedroom",
+        "oscillating": "on"
+      },
+      "calls": [
+        "oscillate:True"
+      ]
+    },
+    {
+      "domain": "fan",
+      "service": "set_direction",
+      "data": {
+        "entity_id": "fan.bedroom",
+        "direction": "reverse"
+      },
+      "calls": [
+        "set_direction:reverse"
+      ]
+    },
+    {
+      "domain": "fan",
+      "service": "set_preset_mode",
+      "data": {
+        "entity_id": "fan.bedroom",
+        "preset_mode": "sleep"
+      },
+      "calls": [
+        "set_preset_mode:sleep"
+      ]
+    },
+    {
+      "domain": "fan",
+      "service": "set_preset_mode",
+      "data": {
+        "entity_id": "fan.bedroom",
+        "preset_mode": "nope"
+      },
+      "error": {
+        "kind": "validation",
+        "translation_domain": "fan",
+        "translation_key": "not_valid_preset_mode",
+        "translation_placeholders": {
+          "preset_mode": "nope",
+          "preset_modes": "auto, sleep, breeze"
+        },
+        "message": "not_valid_preset_mode"
+      }
+    },
+    {
+      "domain": "fan",
+      "service": "turn_on",
+      "data": {
+        "entity_id": "fan.bedroom",
+        "preset_mode": "nope"
+      },
+      "error": {
+        "kind": "validation",
+        "translation_domain": "fan",
+        "translation_key": "not_valid_preset_mode",
+        "translation_placeholders": {
+          "preset_mode": "nope",
+          "preset_modes": "auto, sleep, breeze"
+        },
+        "message": "not_valid_preset_mode"
+      }
+    },
+    {
+      "domain": "fan",
+      "service": "toggle",
+      "data": {
+        "entity_id": "fan.bedroom"
+      },
+      "calls": [
+        "turn_off"
+      ]
+    },
+    {
+      "domain": "fan",
+      "service": "toggle",
+      "data": {
+        "entity_id": "fan.bedroom"
+      },
+      "calls": [
+        "turn_on:None:None"
+      ]
+    },
+    {
+      "domain": "fan",
+      "service": "oscillate",
+      "data": {
+        "entity_id": "fan.basic",
+        "oscillating": true
+      },
+      "error": {
+        "kind": "validation",
+        "translation_domain": "homeassistant",
+        "translation_key": "service_not_supported",
+        "translation_placeholders": {
+          "domain": "fan",
+          "service": "oscillate",
+          "entity_id": "fan.basic"
+        },
+        "message": "service_not_supported"
+      }
+    }
+  ]
+}

@@ -23,11 +23,12 @@ import zipfile
 # What hars runs or will run (docs/ROADMAP.md), plus the core domains the
 # frontend asks about. Others are answered with nothing.
 DOMAINS = sorted(
-    """api auth automation binary_sensor button climate config device_tracker
-    event frontend group history homeassistant http hue input_boolean lifx
-    light logbook lovelace met mobile_app notify onboarding person
-    persistent_notification recorder repairs scene script sensor sun switch
-    switchbot_cloud system_log vacuum weather websocket_api zone""".split()
+    """api auth automation binary_sensor button climate config cover
+    device_tracker event fan frontend group history homeassistant http hue
+    input_boolean lifx light lock logbook lovelace met mobile_app notify
+    number onboarding person persistent_notification recorder repairs scene
+    script select sensor sun switch switchbot_cloud system_log vacuum weather
+    websocket_api zone""".split()
 )
 
 

@@ -47,6 +47,12 @@ pub fn domain_unrecorded(domain: &str) -> &'static [&'static str] {
         ],
         // `sensor/__init__.py` SensorEntity.
         "sensor" => &["options"],
+        // `select/__init__.py` SelectEntity.
+        "select" => &["options"],
+        // `number/__init__.py` NumberEntity.
+        "number" => &["min", "max", "step", "mode"],
+        // `fan/__init__.py` FanEntity.
+        "fan" => &["preset_modes"],
         // `vacuum/__init__.py` StateVacuumEntity.
         "vacuum" => &["fan_speed_list"],
         // `automation/__init__.py` BaseAutomationEntity.
@@ -145,6 +151,19 @@ mod tests {
         let vacuum = hass.unrecorded(&EntityId::parse("vacuum.roborock").unwrap());
         assert!(vacuum.excludes("fan_speed_list"));
         assert!(!vacuum.excludes("fan_speed"));
+        let select = hass.unrecorded(&EntityId::parse("select.mode").unwrap());
+        assert!(select.excludes("options"));
+        let number = hass.unrecorded(&EntityId::parse("number.volume").unwrap());
+        for attr in ["min", "max", "step", "mode"] {
+            assert!(number.excludes(attr));
+        }
+        let fan = hass.unrecorded(&EntityId::parse("fan.bedroom").unwrap());
+        assert!(fan.excludes("preset_modes"));
+        assert!(!fan.excludes("percentage"));
+        let cover = hass.unrecorded(&EntityId::parse("cover.blinds").unwrap());
+        assert!(cover.domain.is_empty());
+        let lock = hass.unrecorded(&EntityId::parse("lock.front").unwrap());
+        assert!(lock.domain.is_empty());
     }
 
     #[test]
