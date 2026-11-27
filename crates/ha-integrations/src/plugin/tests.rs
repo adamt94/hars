@@ -1826,7 +1826,8 @@ async fn plugin_supports_select_number_cover_lock_and_fan() {
         ]
     );
 
-    // Crash marks all five unavailable, and deactivate_entry unregisters them.
+    // Crash marks all five unavailable while preserving capabilities & units,
+    // and deactivate_entry unregisters them.
     store.mark_all_unavailable();
     for id in [&sel_id, &num_id, &cov_id, &lck_id, &fan_id] {
         assert_eq!(
@@ -1838,6 +1839,33 @@ async fn plugin_supports_select_number_cover_lock_and_fan() {
             "unavailable"
         );
     }
+    let sel_st = hass
+        .states()
+        .get(&ha_core::EntityId::parse(&sel_id).unwrap())
+        .unwrap();
+    assert_eq!(
+        sel_st.attributes["options"],
+        json!(["eco", "normal", "turbo"])
+    );
+    let num_st = hass
+        .states()
+        .get(&ha_core::EntityId::parse(&num_id).unwrap())
+        .unwrap();
+    assert_eq!(num_st.attributes["min"], json!(0.0));
+    assert_eq!(num_st.attributes["max"], json!(50.0));
+    assert_eq!(num_st.attributes["step"], json!(5.0));
+    assert_eq!(num_st.attributes["mode"], json!("slider"));
+    let lck_st = hass
+        .states()
+        .get(&ha_core::EntityId::parse(&lck_id).unwrap())
+        .unwrap();
+    assert_eq!(lck_st.attributes["code_format"], json!(r"^\d{4}$"));
+    let fan_st = hass
+        .states()
+        .get(&ha_core::EntityId::parse(&fan_id).unwrap())
+        .unwrap();
+    assert_eq!(fan_st.attributes["preset_modes"], json!(["auto", "sleep"]));
+
     store.deactivate_entry("e1");
     for id in [&sel_id, &num_id, &cov_id, &lck_id, &fan_id] {
         assert!(
@@ -1846,6 +1874,287 @@ async fn plugin_supports_select_number_cover_lock_and_fan() {
                 .is_none()
         );
     }
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[tokio::test]
+async fn plugin_round1_edge_cases_default_code_reupsert_dynamic_attrs_and_dropped_pct() {
+    use crate::{cover, fan, lock};
+
+    let dir = temp_dir("foundation-edge-cases");
+    let plugin_dir = dir.join("plugins/edge_dev");
+    std::fs::create_dir_all(plugin_dir.join("bin")).unwrap();
+    let manifest = PluginManifest {
+        schema_version: 1,
+        domain: "edge_dev".into(),
+        name: "Edge Device".into(),
+        version: "0.1.0".into(),
+        iot_class: "local_push".into(),
+        config_flow: true,
+        documentation: None,
+        description: None,
+        transport: Transport::Stdio {
+            command: "bin/edge".into(),
+            args: vec![],
+        },
+        capabilities: Capabilities {
+            entity_domains: vec!["cover".into(), "lock".into(), "fan".into()],
+            config_entry_version: 1,
+        },
+    };
+    std::fs::write(
+        plugin_dir.join("plugin.json"),
+        serde_json::to_string_pretty(&manifest).unwrap(),
+    )
+    .unwrap();
+    std::fs::write(plugin_dir.join("bin/edge"), b"").unwrap();
+    let installed = Arc::new(InstalledPlugin::load(&plugin_dir).unwrap());
+
+    let hass = Hass::new();
+    // Seed an imported lock row carrying `options.lock.default_code`.
+    let seeded_row: ha_registry::Entity = serde_json::from_value(json!({
+        "entity_id": "lock.imported_door",
+        "platform": "edge_dev",
+        "unique_id": "lck_imported",
+        "config_entry_id": "e1",
+        "options": { "lock": { "default_code": "4321" } }
+    }))
+    .unwrap();
+    let initial = Registries {
+        entities: vec![Arc::new(seeded_row)],
+        ..Default::default()
+    };
+    let registry = Registry::new(&hass, &dir, initial);
+    let components = Components::new(&hass, registry, Profiles::default());
+
+    let recorded: Arc<parking_lot::Mutex<Vec<protocol::EntityCallParams>>> = Default::default();
+    let rec = recorded.clone();
+    let store = entities::PluginEntityStore::new(
+        installed,
+        components.clone(),
+        Arc::new(move |params| {
+            rec.lock().push(params);
+            Box::pin(async { Ok(()) })
+        }),
+    );
+    store.activate_entry("e1");
+
+    // 1. Imported lock uses `options.lock.default_code` when `code` is omitted.
+    let lck_id = store
+        .upsert_entity(protocol::EntityUpsertParams {
+            entry_id: "e1".into(),
+            unique_id: "lck_imported".into(),
+            domain: "lock".into(),
+            name: Some("Imported Door".into()),
+            supported_features: lock::feature::OPEN,
+            code_format: Some(r"^\d{4}$".into()),
+            ..Default::default()
+        })
+        .unwrap();
+    assert_eq!(lck_id, "lock.imported_door");
+    hass.call_service(
+        "lock",
+        "unlock",
+        json!({"entity_id": lck_id}).as_object().cloned().unwrap(),
+        None,
+        false,
+        None,
+    )
+    .await
+    .unwrap();
+    // Dynamic code_format override persists across later frames without it.
+    store
+        .set_state(protocol::StateSetParams {
+            entry_id: "e1".into(),
+            unique_id: "lck_imported".into(),
+            state: "unlocked".into(),
+            attributes: json!({"code_format": r"^\d{6}$"})
+                .as_object()
+                .cloned()
+                .unwrap(),
+        })
+        .unwrap();
+    store
+        .set_state(protocol::StateSetParams {
+            entry_id: "e1".into(),
+            unique_id: "lck_imported".into(),
+            state: "locked".into(),
+            attributes: Map::new(),
+        })
+        .unwrap();
+    let lck_eid = ha_core::EntityId::parse(&lck_id).unwrap();
+    assert_eq!(
+        hass.states().get(&lck_eid).unwrap().attributes["code_format"],
+        json!(r"^\d{6}$")
+    );
+    // Old 4-digit default_code no longer matches `^\d{6}$`, so unlock without code fails.
+    assert!(
+        hass.call_service(
+            "lock",
+            "unlock",
+            json!({"entity_id": lck_id}).as_object().cloned().unwrap(),
+            None,
+            false,
+            None,
+        )
+        .await
+        .is_err()
+    );
+
+    // 2. Re-upsert preserves live fan `is_on` and cover `is_opening` state;
+    //    dropped fan `percentage` resets `increase_speed` to 33%; dynamic
+    //    `preset_modes` stay synced with published attributes.
+    let fan_id = store
+        .upsert_entity(protocol::EntityUpsertParams {
+            entry_id: "e1".into(),
+            unique_id: "fan_edge".into(),
+            domain: "fan".into(),
+            name: Some("Edge Fan".into()),
+            supported_features: fan::feature::TURN_ON
+                | fan::feature::TURN_OFF
+                | fan::feature::SET_SPEED
+                | fan::feature::PRESET_MODE,
+            preset_modes: Some(vec!["auto".into()]),
+            speed_count: Some(3),
+            ..Default::default()
+        })
+        .unwrap();
+    store
+        .set_state(protocol::StateSetParams {
+            entry_id: "e1".into(),
+            unique_id: "fan_edge".into(),
+            state: "on".into(),
+            attributes: json!({"percentage": 66, "preset_modes": ["sleep"]})
+                .as_object()
+                .cloned()
+                .unwrap(),
+        })
+        .unwrap();
+    // Subsequent state frame omitting preset_modes still advertises ["sleep"].
+    store
+        .set_state(protocol::StateSetParams {
+            entry_id: "e1".into(),
+            unique_id: "fan_edge".into(),
+            state: "on".into(),
+            attributes: json!({"percentage": 66}).as_object().cloned().unwrap(),
+        })
+        .unwrap();
+    let fan_eid = ha_core::EntityId::parse(&fan_id).unwrap();
+    assert_eq!(
+        hass.states().get(&fan_eid).unwrap().attributes["preset_modes"],
+        json!(["sleep"])
+    );
+    // Re-upserting metadata preserves `is_on = true`, so toggle sends `turn_off`.
+    store
+        .upsert_entity(protocol::EntityUpsertParams {
+            entry_id: "e1".into(),
+            unique_id: "fan_edge".into(),
+            domain: "fan".into(),
+            name: Some("Edge Fan".into()),
+            supported_features: fan::feature::TURN_ON
+                | fan::feature::TURN_OFF
+                | fan::feature::SET_SPEED
+                | fan::feature::PRESET_MODE,
+            preset_modes: Some(vec!["sleep".into()]),
+            speed_count: Some(3),
+            ..Default::default()
+        })
+        .unwrap();
+    hass.call_service(
+        "fan",
+        "toggle",
+        json!({"entity_id": fan_id}).as_object().cloned().unwrap(),
+        None,
+        false,
+        None,
+    )
+    .await
+    .unwrap();
+    // Turning off without `percentage` drops cached percentage -> increase_speed sends 33%.
+    store
+        .set_state(protocol::StateSetParams {
+            entry_id: "e1".into(),
+            unique_id: "fan_edge".into(),
+            state: "off".into(),
+            attributes: Map::new(),
+        })
+        .unwrap();
+    hass.call_service(
+        "fan",
+        "increase_speed",
+        json!({"entity_id": fan_id}).as_object().cloned().unwrap(),
+        None,
+        false,
+        None,
+    )
+    .await
+    .unwrap();
+
+    // 3. Re-upserting a moving cover preserves `is_opening` -> toggle sends `stop_cover`.
+    let cov_id = store
+        .upsert_entity(protocol::EntityUpsertParams {
+            entry_id: "e1".into(),
+            unique_id: "cov_edge".into(),
+            domain: "cover".into(),
+            name: Some("Edge Blinds".into()),
+            supported_features: cover::feature::OPEN | cover::feature::CLOSE | cover::feature::STOP,
+            ..Default::default()
+        })
+        .unwrap();
+    store
+        .set_state(protocol::StateSetParams {
+            entry_id: "e1".into(),
+            unique_id: "cov_edge".into(),
+            state: "opening".into(),
+            attributes: Map::new(),
+        })
+        .unwrap();
+    store
+        .upsert_entity(protocol::EntityUpsertParams {
+            entry_id: "e1".into(),
+            unique_id: "cov_edge".into(),
+            domain: "cover".into(),
+            name: Some("Edge Blinds".into()),
+            supported_features: cover::feature::OPEN | cover::feature::CLOSE | cover::feature::STOP,
+            ..Default::default()
+        })
+        .unwrap();
+    hass.call_service(
+        "cover",
+        "toggle",
+        json!({"entity_id": cov_id}).as_object().cloned().unwrap(),
+        None,
+        false,
+        None,
+    )
+    .await
+    .unwrap();
+
+    let calls: Vec<(String, String, Value)> = recorded
+        .lock()
+        .iter()
+        .map(|c| {
+            (
+                c.domain.clone(),
+                c.service.clone(),
+                Value::Object(c.data.clone()),
+            )
+        })
+        .collect();
+    assert_eq!(
+        calls,
+        vec![
+            ("lock".into(), "unlock".into(), json!({"code": "4321"})),
+            ("fan".into(), "turn_off".into(), json!({})),
+            (
+                "fan".into(),
+                "set_percentage".into(),
+                json!({"percentage": 33})
+            ),
+            ("cover".into(), "stop_cover".into(), json!({})),
+        ]
+    );
 
     let _ = std::fs::remove_dir_all(&dir);
 }

@@ -177,22 +177,96 @@ impl Locks {
 /// at index 0; unanchored at the end unless `$` or `\Z` is present).
 ///
 /// Uses a bounded Thompson NFA so matching runs in O(|states| * |input|) time
-/// with no backtracking blowup and no external regex crate dependency.
+/// with bounded parse depth, bounded compile work, iterative epsilon-closure
+/// (no call-stack blowup), and no external regex crate dependency.
 pub fn code_format_matches(pattern: &str, input: &str) -> bool {
+    if pattern.len() > MAX_PATTERN_BYTES {
+        return false;
+    }
     let Ok(prog) = compile(pattern) else {
         return false;
     };
     run_nfa(&prog, input)
 }
 
+const MAX_PATTERN_BYTES: usize = 512;
+const MAX_PARSE_DEPTH: usize = 32;
 const MAX_INSTS: usize = 2048;
+const MAX_COMPILE_STEPS: usize = 4096;
+
+/// Base codepoints of every 10-character Unicode Decimal_Number (`Nd`) block
+/// (Python 3 `re` `\d` without `(?a)`). Sorted for binary search.
+const UNICODE_ND_BASES: [u32; 76] = [
+    0x0030, 0x0660, 0x06F0, 0x07C0, 0x0966, 0x09E6, 0x0A66, 0x0AE6, 0x0B66, 0x0BE6, 0x0C66, 0x0CE6,
+    0x0D66, 0x0DE6, 0x0E50, 0x0ED0, 0x0F20, 0x1040, 0x1090, 0x17E0, 0x1810, 0x1946, 0x19D0, 0x1A80,
+    0x1A90, 0x1B50, 0x1BB0, 0x1C40, 0x1C50, 0xA620, 0xA8D0, 0xA900, 0xA9D0, 0xA9F0, 0xAA50, 0xABF0,
+    0xFF10, 0x104A0, 0x10D30, 0x10D40, 0x11066, 0x110F0, 0x11136, 0x111D0, 0x112F0, 0x11450,
+    0x114D0, 0x11650, 0x116C0, 0x116D0, 0x116DA, 0x11730, 0x118E0, 0x11950, 0x11BF0, 0x11C50,
+    0x11D50, 0x11DA0, 0x11F50, 0x16130, 0x16A60, 0x16AC0, 0x16B50, 0x16D70, 0x1CCF0, 0x1D7CE,
+    0x1D7D8, 0x1D7E2, 0x1D7EC, 0x1D7F6, 0x1E140, 0x1E2F0, 0x1E4F0, 0x1E5F1, 0x1E950, 0x1FBF0,
+];
+
+fn is_unicode_decimal_digit(c: char) -> bool {
+    if c.is_ascii_digit() {
+        return true;
+    }
+    let cp = u32::from(c);
+    let idx = UNICODE_ND_BASES.partition_point(|&b| b <= cp);
+    idx > 0 && cp < UNICODE_ND_BASES[idx - 1] + 10
+}
+
+#[derive(Clone, Copy, Default)]
+struct Flags {
+    ignore_case: bool,
+    ascii: bool,
+}
+
+fn char_eq(a: char, b: char, ignore_case: bool) -> bool {
+    if !ignore_case {
+        return a == b;
+    }
+    a == b || a.to_lowercase().eq(b.to_lowercase())
+}
+
+fn char_in_range(c: char, lo: char, hi: char, ignore_case: bool) -> bool {
+    if lo <= c && c <= hi {
+        return true;
+    }
+    if !ignore_case {
+        return false;
+    }
+    if c.is_ascii_alphabetic() {
+        let low = c.to_ascii_lowercase();
+        let up = c.to_ascii_uppercase();
+        return (lo <= low && low <= hi) || (lo <= up && up <= hi);
+    }
+    let mut lc = c.to_lowercase();
+    if let (Some(only), None) = (lc.next(), lc.next())
+        && lo <= only
+        && only <= hi
+    {
+        return true;
+    }
+    let mut uc = c.to_uppercase();
+    if let (Some(only), None) = (uc.next(), uc.next())
+        && lo <= only
+        && only <= hi
+    {
+        return true;
+    }
+    false
+}
 
 #[derive(Clone)]
 enum CharMatcher {
-    Literal(char),
+    Literal {
+        ch: char,
+        ignore_case: bool,
+    },
     AnyNonNewline,
     Class {
         negated: bool,
+        flags: Flags,
         items: Vec<ClassItem>,
     },
 }
@@ -209,15 +283,40 @@ enum ClassItem {
 impl CharMatcher {
     fn matches(&self, c: char) -> bool {
         match self {
-            CharMatcher::Literal(lit) => c == *lit,
+            CharMatcher::Literal { ch, ignore_case } => char_eq(c, *ch, *ignore_case),
             CharMatcher::AnyNonNewline => c != '\n',
-            CharMatcher::Class { negated, items } => {
+            CharMatcher::Class {
+                negated,
+                flags,
+                items,
+            } => {
                 let hit = items.iter().any(|item| match *item {
-                    ClassItem::Single(x) => c == x,
-                    ClassItem::Range(a, b) => a <= c && c <= b,
-                    ClassItem::Digit(inv) => c.is_ascii_digit() ^ inv,
-                    ClassItem::Word(inv) => (c.is_alphanumeric() || c == '_') ^ inv,
-                    ClassItem::Space(inv) => c.is_whitespace() ^ inv,
+                    ClassItem::Single(x) => char_eq(c, x, flags.ignore_case),
+                    ClassItem::Range(a, b) => char_in_range(c, a, b, flags.ignore_case),
+                    ClassItem::Digit(inv) => {
+                        let d = if flags.ascii {
+                            c.is_ascii_digit()
+                        } else {
+                            is_unicode_decimal_digit(c)
+                        };
+                        d ^ inv
+                    }
+                    ClassItem::Word(inv) => {
+                        let w = if flags.ascii {
+                            c.is_ascii_alphanumeric() || c == '_'
+                        } else {
+                            c.is_alphanumeric() || c == '_'
+                        };
+                        w ^ inv
+                    }
+                    ClassItem::Space(inv) => {
+                        let s = if flags.ascii {
+                            c.is_ascii_whitespace()
+                        } else {
+                            c.is_whitespace()
+                        };
+                        s ^ inv
+                    }
                 });
                 hit ^ *negated
             }
@@ -252,18 +351,20 @@ enum Ast {
     },
 }
 
-struct Parser<'a> {
+struct Parser {
     chars: Vec<char>,
     pos: usize,
-    _raw: &'a str,
+    depth: usize,
+    flags: Flags,
 }
 
-impl<'a> Parser<'a> {
-    fn new(raw: &'a str) -> Self {
+impl Parser {
+    fn new(raw: &str) -> Self {
         Self {
             chars: raw.chars().collect(),
             pos: 0,
-            _raw: raw,
+            depth: 0,
+            flags: Flags::default(),
         }
     }
 
@@ -278,16 +379,24 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_alt(&mut self) -> Result<Ast, ()> {
-        let mut branches = vec![self.parse_seq()?];
-        while self.peek() == Some('|') {
-            self.next();
-            branches.push(self.parse_seq()?);
+        if self.depth >= MAX_PARSE_DEPTH {
+            return Err(());
         }
-        Ok(if branches.len() == 1 {
-            branches.pop().unwrap()
-        } else {
-            Ast::Alt(branches)
-        })
+        self.depth += 1;
+        let res = (|| {
+            let mut branches = vec![self.parse_seq()?];
+            while self.peek() == Some('|') {
+                self.next();
+                branches.push(self.parse_seq()?);
+            }
+            Ok(if branches.len() == 1 {
+                branches.pop().unwrap()
+            } else {
+                Ast::Alt(branches)
+            })
+        })();
+        self.depth -= 1;
+        res
     }
 
     fn parse_seq(&mut self) -> Result<Ast, ()> {
@@ -315,62 +424,124 @@ impl<'a> Parser<'a> {
             '^' => Ok(Ast::StartAnchor),
             '$' => Ok(Ast::EndAnchor),
             '.' => Ok(Ast::Atom(CharMatcher::AnyNonNewline)),
-            '(' => {
-                // Support `(?:...)` non-capturing groups alongside `(...)`.
-                if self.peek() == Some('?') {
-                    self.next();
-                    if self.next() != Some(':') {
-                        return Err(());
-                    }
-                }
-                let inner = self.parse_alt()?;
-                if self.next() != Some(')') {
-                    return Err(());
-                }
-                Ok(inner)
-            }
+            '(' => self.parse_group(),
             '[' => self.parse_class(),
             '\\' => self.parse_escape(),
             '*' | '+' | '?' | '{' => Err(()),
-            lit => Ok(Ast::Atom(CharMatcher::Literal(lit))),
+            lit => Ok(Ast::Atom(CharMatcher::Literal {
+                ch: lit,
+                ignore_case: self.flags.ignore_case,
+            })),
         }
+    }
+
+    /// Parse `(...)`, `(?:...)`, global inline flags `(?i)` / `(?a)` / `(?u)`,
+    /// and scoped inline flags `(?i:...)` / `(?-i:...)`.
+    fn parse_group(&mut self) -> Result<Ast, ()> {
+        if self.peek() == Some('?') {
+            self.next();
+            let mut new_flags = self.flags;
+            let mut clearing = false;
+            loop {
+                match self.peek() {
+                    Some(':') => {
+                        self.next();
+                        let saved = self.flags;
+                        self.flags = new_flags;
+                        let inner = self.parse_alt();
+                        self.flags = saved;
+                        let inner = inner?;
+                        if self.next() != Some(')') {
+                            return Err(());
+                        }
+                        return Ok(inner);
+                    }
+                    Some(')') if !clearing => {
+                        self.next();
+                        self.flags = new_flags;
+                        return Ok(Ast::Empty);
+                    }
+                    Some('-') if !clearing => {
+                        self.next();
+                        clearing = true;
+                    }
+                    Some('i') => {
+                        self.next();
+                        new_flags.ignore_case = !clearing;
+                    }
+                    Some('a') if !clearing => {
+                        self.next();
+                        new_flags.ascii = true;
+                    }
+                    Some('u') if !clearing => {
+                        self.next();
+                        new_flags.ascii = false;
+                    }
+                    _ => return Err(()),
+                }
+            }
+        }
+        let inner = self.parse_alt()?;
+        if self.next() != Some(')') {
+            return Err(());
+        }
+        Ok(inner)
     }
 
     fn parse_escape(&mut self) -> Result<Ast, ()> {
         let Some(c) = self.next() else {
             return Err(());
         };
+        let flags = self.flags;
         match c {
             'd' => Ok(Ast::Atom(CharMatcher::Class {
                 negated: false,
+                flags,
                 items: vec![ClassItem::Digit(false)],
             })),
             'D' => Ok(Ast::Atom(CharMatcher::Class {
                 negated: false,
+                flags,
                 items: vec![ClassItem::Digit(true)],
             })),
             'w' => Ok(Ast::Atom(CharMatcher::Class {
                 negated: false,
+                flags,
                 items: vec![ClassItem::Word(false)],
             })),
             'W' => Ok(Ast::Atom(CharMatcher::Class {
                 negated: false,
+                flags,
                 items: vec![ClassItem::Word(true)],
             })),
             's' => Ok(Ast::Atom(CharMatcher::Class {
                 negated: false,
+                flags,
                 items: vec![ClassItem::Space(false)],
             })),
             'S' => Ok(Ast::Atom(CharMatcher::Class {
                 negated: false,
+                flags,
                 items: vec![ClassItem::Space(true)],
             })),
             'A' => Ok(Ast::StartAnchor),
             'Z' => Ok(Ast::EndStrictAnchor),
-            'n' => Ok(Ast::Atom(CharMatcher::Literal('\n'))),
-            'r' => Ok(Ast::Atom(CharMatcher::Literal('\r'))),
-            't' => Ok(Ast::Atom(CharMatcher::Literal('\t'))),
-            other => Ok(Ast::Atom(CharMatcher::Literal(other))),
+            'n' => Ok(Ast::Atom(CharMatcher::Literal {
+                ch: '\n',
+                ignore_case: false,
+            })),
+            'r' => Ok(Ast::Atom(CharMatcher::Literal {
+                ch: '\r',
+                ignore_case: false,
+            })),
+            't' => Ok(Ast::Atom(CharMatcher::Literal {
+                ch: '\t',
+                ignore_case: false,
+            })),
+            other => Ok(Ast::Atom(CharMatcher::Literal {
+                ch: other,
+                ignore_case: flags.ignore_case,
+            })),
         }
     }
 
@@ -386,7 +557,11 @@ impl<'a> Parser<'a> {
         while let Some(c) = self.peek() {
             if c == ']' && !first {
                 self.next();
-                return Ok(Ast::Atom(CharMatcher::Class { negated, items }));
+                return Ok(Ast::Atom(CharMatcher::Class {
+                    negated,
+                    flags: self.flags,
+                    items,
+                }));
             }
             first = false;
             let item = self.parse_class_item()?;
@@ -509,8 +684,9 @@ impl<'a> Parser<'a> {
     }
 }
 
-fn emit(ast: &Ast, out: &mut Vec<Inst>) -> Result<(), ()> {
-    if out.len() >= MAX_INSTS {
+fn emit(ast: &Ast, out: &mut Vec<Inst>, steps: &mut usize) -> Result<(), ()> {
+    *steps += 1;
+    if *steps > MAX_COMPILE_STEPS || out.len() >= MAX_INSTS {
         return Err(());
     }
     match ast {
@@ -521,24 +697,23 @@ fn emit(ast: &Ast, out: &mut Vec<Inst>) -> Result<(), ()> {
         Ast::EndStrictAnchor => out.push(Inst::EndStrictAnchor),
         Ast::Seq(items) => {
             for item in items {
-                emit(item, out)?;
+                emit(item, out, steps)?;
             }
         }
         Ast::Alt(branches) => {
-            // Chain `Split(branch_i, next_split)` ... `Jump(end)`.
             let mut jumps_to_end = Vec::with_capacity(branches.len());
             for (i, b) in branches.iter().enumerate() {
                 if i + 1 < branches.len() {
                     let split_idx = out.len();
                     out.push(Inst::Split(split_idx + 1, 0));
-                    emit(b, out)?;
+                    emit(b, out, steps)?;
                     let jmp_idx = out.len();
                     out.push(Inst::Jump(0));
                     jumps_to_end.push(jmp_idx);
                     let next_branch = out.len();
                     out[split_idx] = Inst::Split(split_idx + 1, next_branch);
                 } else {
-                    emit(b, out)?;
+                    emit(b, out, steps)?;
                 }
             }
             let end = out.len();
@@ -551,14 +726,14 @@ fn emit(ast: &Ast, out: &mut Vec<Inst>) -> Result<(), ()> {
                 return Err(());
             }
             for _ in 0..*min {
-                emit(node, out)?;
+                emit(node, out, steps)?;
             }
             match *max {
                 Some(m) => {
                     for _ in *min..m {
                         let split_idx = out.len();
                         out.push(Inst::Split(split_idx + 1, 0));
-                        emit(node, out)?;
+                        emit(node, out, steps)?;
                         let after = out.len();
                         out[split_idx] = Inst::Split(split_idx + 1, after);
                     }
@@ -566,7 +741,7 @@ fn emit(ast: &Ast, out: &mut Vec<Inst>) -> Result<(), ()> {
                 None => {
                     let split_idx = out.len();
                     out.push(Inst::Split(split_idx + 1, 0));
-                    emit(node, out)?;
+                    emit(node, out, steps)?;
                     out.push(Inst::Jump(split_idx));
                     let after = out.len();
                     out[split_idx] = Inst::Split(split_idx + 1, after);
@@ -574,7 +749,7 @@ fn emit(ast: &Ast, out: &mut Vec<Inst>) -> Result<(), ()> {
             }
         }
     }
-    if out.len() >= MAX_INSTS {
+    if *steps > MAX_COMPILE_STEPS || out.len() >= MAX_INSTS {
         return Err(());
     }
     Ok(())
@@ -587,46 +762,53 @@ fn compile(pattern: &str) -> Result<Vec<Inst>, ()> {
         return Err(());
     }
     let mut prog = Vec::new();
-    emit(&ast, &mut prog)?;
+    let mut steps = 0;
+    emit(&ast, &mut prog, &mut steps)?;
     prog.push(Inst::Match);
     Ok(prog)
 }
 
+/// Iterative epsilon-closure (no recursion, immune to stack overflow).
 fn add_state(
     prog: &[Inst],
-    idx: usize,
+    start: usize,
     pos: usize,
     chars: &[char],
     visited: &mut [bool],
+    work: &mut Vec<usize>,
     out: &mut Vec<usize>,
 ) {
-    if visited[idx] {
-        return;
-    }
-    visited[idx] = true;
-    match prog[idx] {
-        Inst::Jump(target) => add_state(prog, target, pos, chars, visited, out),
-        Inst::Split(a, b) => {
-            add_state(prog, a, pos, chars, visited, out);
-            add_state(prog, b, pos, chars, visited, out);
+    work.clear();
+    work.push(start);
+    while let Some(idx) = work.pop() {
+        if visited[idx] {
+            continue;
         }
-        Inst::StartAnchor => {
-            if pos == 0 {
-                add_state(prog, idx + 1, pos, chars, visited, out);
+        visited[idx] = true;
+        match prog[idx] {
+            Inst::Jump(target) => work.push(target),
+            Inst::Split(a, b) => {
+                work.push(b);
+                work.push(a);
             }
-        }
-        Inst::EndAnchor => {
-            // Python `$` matches at end of string, or right before a single trailing `\n`.
-            if pos == chars.len() || (pos + 1 == chars.len() && chars[pos] == '\n') {
-                add_state(prog, idx + 1, pos, chars, visited, out);
+            Inst::StartAnchor => {
+                if pos == 0 {
+                    work.push(idx + 1);
+                }
             }
-        }
-        Inst::EndStrictAnchor => {
-            if pos == chars.len() {
-                add_state(prog, idx + 1, pos, chars, visited, out);
+            Inst::EndAnchor => {
+                // Python `$` matches at end of string, or right before a single trailing `\n`.
+                if pos == chars.len() || (pos + 1 == chars.len() && chars[pos] == '\n') {
+                    work.push(idx + 1);
+                }
             }
+            Inst::EndStrictAnchor => {
+                if pos == chars.len() {
+                    work.push(idx + 1);
+                }
+            }
+            Inst::Char(_) | Inst::Match => out.push(idx),
         }
-        Inst::Char(_) | Inst::Match => out.push(idx),
     }
 }
 
@@ -634,9 +816,10 @@ fn run_nfa(prog: &[Inst], input: &str) -> bool {
     let chars: Vec<char> = input.chars().collect();
     let mut cur = Vec::new();
     let mut next = Vec::new();
+    let mut work = Vec::new();
     let mut visited = vec![false; prog.len()];
 
-    add_state(prog, 0, 0, &chars, &mut visited, &mut cur);
+    add_state(prog, 0, 0, &chars, &mut visited, &mut work, &mut cur);
     if cur.iter().any(|&pc| matches!(prog[pc], Inst::Match)) {
         return true;
     }
@@ -648,7 +831,15 @@ fn run_nfa(prog: &[Inst], input: &str) -> bool {
             if let Inst::Char(ref matcher) = prog[pc]
                 && matcher.matches(c)
             {
-                add_state(prog, pc + 1, i + 1, &chars, &mut visited, &mut next);
+                add_state(
+                    prog,
+                    pc + 1,
+                    i + 1,
+                    &chars,
+                    &mut visited,
+                    &mut work,
+                    &mut next,
+                );
             }
         }
         std::mem::swap(&mut cur, &mut next);
@@ -745,8 +936,22 @@ mod tests {
         assert!(code_format_matches(r"^[^a-z]+$", "1234"));
         assert!(!code_format_matches(r"^[^a-z]+$", "12a4"));
         assert!(code_format_matches(r".*", ""));
+        // Unicode decimal digits match `\d` (Python 3 default) unless `(?a)` is set.
+        assert!(code_format_matches(r"^\d{4}$", "１２３４"));
+        assert!(!code_format_matches(r"(?a)^\d{4}$", "１２３４"));
+        assert!(!code_format_matches(r"^\d$", "²")); // superscript is not Nd
+        // Inline case-insensitive flags `(?i)` and scoped `(?i:...)`.
+        assert!(code_format_matches(r"(?i)^ab[0-9]{2}$", "AB12"));
+        assert!(code_format_matches(r"(?i)^[a-f]{4}$", "AbCd"));
+        assert!(code_format_matches(r"^(?i:ab)cd$", "ABcd"));
+        assert!(!code_format_matches(r"^(?i:ab)cd$", "ABCD"));
         // Unclosed pattern fails closed without panicking.
         assert!(!code_format_matches(r"[0-9", "1"));
+        // Deeply nested groups and nested empty repetitions fail bounded & fast.
+        let deep = format!("{}{}", "(".repeat(200), ")".repeat(200));
+        assert!(!code_format_matches(&deep, ""));
+        let empty_bomb = "((()()){128}){128}";
+        assert!(!code_format_matches(empty_bomb, ""));
     }
 
     #[tokio::test]

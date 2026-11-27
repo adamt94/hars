@@ -58,7 +58,7 @@ pub trait Fan: Send + Sync {
     fn oscillate(&self, _oscillating: bool) -> BoxFuture<'_> {
         unsupported()
     }
-    fn set_direction(&self, _direction: Option<&str>) -> BoxFuture<'_> {
+    fn set_direction(&self, _direction: &str) -> BoxFuture<'_> {
         unsupported()
     }
 }
@@ -269,7 +269,13 @@ impl Fans {
                                     f.oscillate(osc).await
                                 }
                                 "set_direction" => {
-                                    let dir = data.get("direction").and_then(Value::as_str);
+                                    // HA's schema marks `direction` optional, then
+                                    // `FanEntity.async_set_direction(self, direction: str)` raises
+                                    // TypeError (-> unknown_error) when omitted.
+                                    let Some(dir) = data.get("direction").and_then(Value::as_str)
+                                    else {
+                                        return Err(ServiceError::Unknown("Unknown error".into()));
+                                    };
                                     f.set_direction(dir).await
                                 }
                                 "set_percentage" => {
@@ -382,8 +388,8 @@ mod tests {
         fn oscillate(&self, oscillating: bool) -> BoxFuture<'_> {
             self.record(format!("osc:{oscillating}"))
         }
-        fn set_direction(&self, direction: Option<&str>) -> BoxFuture<'_> {
-            self.record(format!("dir:{direction:?}"))
+        fn set_direction(&self, direction: &str) -> BoxFuture<'_> {
+            self.record(format!("dir:{direction}"))
         }
     }
 
@@ -512,7 +518,7 @@ mod tests {
                 "pct:66",
                 "pct:50",
                 "osc:true",
-                r#"dir:Some("reverse")"#,
+                "dir:reverse",
                 "preset:sleep",
                 "off",
                 "on:None:None",
@@ -561,6 +567,22 @@ mod tests {
             err,
             ServiceError::not_supported("fan", "oscillate", "fan.basic")
         );
+
+        // Omitting direction fails before reaching the entity (HA raises TypeError -> Unknown).
+        let before = f.calls.lock().len();
+        let err = hass
+            .call_service(
+                "fan",
+                "set_direction",
+                map_of(json!({"entity_id": "fan.bedroom"})),
+                None,
+                false,
+                None,
+            )
+            .await
+            .unwrap_err();
+        assert_eq!(err, ServiceError::Unknown("Unknown error".into()));
+        assert_eq!(f.calls.lock().len(), before);
     }
 
     #[test]

@@ -179,92 +179,104 @@ impl PluginEntityStore {
                 .and_then(|e| e.devices.get(ident).cloned())
         });
 
-        let (entity_id, disabled) = if let Some(registry) = self.components.registry() {
-            let mut patch = EntityPatch {
-                config_entry_id: Some(Some(params.entry_id.clone())),
-                device_id: Some(device_id.clone()),
-                has_entity_name: Some(true),
-                original_name: Some(params.name.clone()),
-                object_id_base: Some(
+        let (entity_id, disabled, lock_default_code) =
+            if let Some(registry) = self.components.registry() {
+                let mut patch = EntityPatch {
+                    config_entry_id: Some(Some(params.entry_id.clone())),
+                    device_id: Some(device_id.clone()),
+                    has_entity_name: Some(true),
+                    original_name: Some(params.name.clone()),
+                    object_id_base: Some(
+                        params
+                            .object_id_base
+                            .clone()
+                            .or_else(|| params.name.clone()),
+                    ),
+                    original_icon: params.original_icon.clone().map(Some),
+                    original_device_class: params.device_class.clone().map(Some),
+                    unit_of_measurement: params.unit_of_measurement.clone().map(Some),
+                    entity_category: params.entity_category.clone().map(Some),
+                    supported_features: Some(i64::from(params.supported_features)),
+                    ..Default::default()
+                };
+                if params.domain == "light" {
+                    let caps = parse_light_caps(&params);
+                    patch.capabilities = Some(Some(json!({
+                        "supported_color_modes": caps
+                            .modes
+                            .iter()
+                            .map(|m| m.as_str())
+                            .collect::<Vec<_>>(),
+                    })));
+                } else if params.domain == "vacuum"
+                    && let Some(fan_speeds) = &params.fan_speed_list
+                {
+                    patch.capabilities = Some(Some(json!({
+                        "fan_speed_list": fan_speeds,
+                    })));
+                } else if params.domain == "select" {
+                    let options = params.options.clone().unwrap_or_default();
+                    patch.capabilities = Some(Some(json!({
+                        "options": options,
+                    })));
+                } else if params.domain == "number" {
+                    let min = params.min_value.unwrap_or(number::DEFAULT_MIN_VALUE);
+                    let max = params.max_value.unwrap_or(number::DEFAULT_MAX_VALUE);
+                    let step = number::calculate_step(min, max, params.step);
+                    let mode = params.mode.as_deref().unwrap_or("auto");
+                    patch.capabilities = Some(Some(json!({
+                        "min": min,
+                        "max": max,
+                        "step": step,
+                        "mode": mode,
+                    })));
+                } else if params.domain == "fan"
+                    && (params.supported_features
+                        & (fan::feature::SET_SPEED | fan::feature::PRESET_MODE)
+                        != 0)
+                {
+                    patch.capabilities = Some(Some(json!({
+                        "preset_modes": params.preset_modes,
+                    })));
+                }
+                let row = registry.get_or_create_entity(
+                    &params.domain,
+                    &self.domain,
+                    &params.unique_id,
+                    None,
+                    patch,
+                );
+                let id = EntityId::parse(&row.entity_id)
+                    .map_err(|e| format!("invalid entity_id {:?}: {e}", row.entity_id))?;
+                let default_code = (params.domain == "lock")
+                    .then(|| {
+                        row.options
+                            .object()
+                            .get("lock")
+                            .and_then(|v| v.get("default_code"))
+                            .and_then(Value::as_str)
+                            .filter(|s| !s.is_empty())
+                            .map(str::to_owned)
+                    })
+                    .flatten();
+                (id, row.disabled_by.is_some(), default_code)
+            } else {
+                let slug = ha_core::slugify(
                     params
                         .object_id_base
-                        .clone()
-                        .or_else(|| params.name.clone()),
-                ),
-                original_icon: params.original_icon.clone().map(Some),
-                original_device_class: params.device_class.clone().map(Some),
-                unit_of_measurement: params.unit_of_measurement.clone().map(Some),
-                entity_category: params.entity_category.clone().map(Some),
-                supported_features: Some(i64::from(params.supported_features)),
-                ..Default::default()
+                        .as_deref()
+                        .or(params.name.as_deref())
+                        .unwrap_or(&params.unique_id),
+                );
+                let slug = if slug.is_empty() {
+                    ha_core::slugify(&params.unique_id)
+                } else {
+                    slug
+                };
+                let id = EntityId::parse(&format!("{}.{slug}", params.domain))
+                    .map_err(|e| format!("invalid entity_id: {e}"))?;
+                (id, false, None)
             };
-            if params.domain == "light" {
-                let caps = parse_light_caps(&params);
-                patch.capabilities = Some(Some(json!({
-                    "supported_color_modes": caps
-                        .modes
-                        .iter()
-                        .map(|m| m.as_str())
-                        .collect::<Vec<_>>(),
-                })));
-            } else if params.domain == "vacuum"
-                && let Some(fan_speeds) = &params.fan_speed_list
-            {
-                patch.capabilities = Some(Some(json!({
-                    "fan_speed_list": fan_speeds,
-                })));
-            } else if params.domain == "select" {
-                let options = params.options.clone().unwrap_or_default();
-                patch.capabilities = Some(Some(json!({
-                    "options": options,
-                })));
-            } else if params.domain == "number" {
-                let min = params.min_value.unwrap_or(number::DEFAULT_MIN_VALUE);
-                let max = params.max_value.unwrap_or(number::DEFAULT_MAX_VALUE);
-                let step = number::calculate_step(min, max, params.step);
-                let mode = params.mode.as_deref().unwrap_or("auto");
-                patch.capabilities = Some(Some(json!({
-                    "min": min,
-                    "max": max,
-                    "step": step,
-                    "mode": mode,
-                })));
-            } else if params.domain == "fan"
-                && (params.supported_features
-                    & (fan::feature::SET_SPEED | fan::feature::PRESET_MODE)
-                    != 0)
-            {
-                patch.capabilities = Some(Some(json!({
-                    "preset_modes": params.preset_modes,
-                })));
-            }
-            let row = registry.get_or_create_entity(
-                &params.domain,
-                &self.domain,
-                &params.unique_id,
-                None,
-                patch,
-            );
-            let id = EntityId::parse(&row.entity_id)
-                .map_err(|e| format!("invalid entity_id {:?}: {e}", row.entity_id))?;
-            (id, row.disabled_by.is_some())
-        } else {
-            let slug = ha_core::slugify(
-                params
-                    .object_id_base
-                    .as_deref()
-                    .or(params.name.as_deref())
-                    .unwrap_or(&params.unique_id),
-            );
-            let slug = if slug.is_empty() {
-                ha_core::slugify(&params.unique_id)
-            } else {
-                slug
-            };
-            let id = EntityId::parse(&format!("{}.{slug}", params.domain))
-                .map_err(|e| format!("invalid entity_id: {e}"))?;
-            (id, false)
-        };
 
         let friendly_name = params.name.clone().or_else(|| {
             device_id.as_deref().and_then(|did| {
@@ -340,24 +352,37 @@ impl PluginEntityStore {
         let entry = entries
             .get_mut(&params.entry_id)
             .expect("entry verified active above");
-        // Remove any previous adapter if re-registered.
-        if let Some(old) = entry.entities.remove(&params.unique_id) {
+        // Remove any previous adapter if re-registered, keeping its live state
+        // so metadata re-upserts do not reset availability/toggle/position
+        // before the next `state.set` arrives.
+        let prev_handle = entry.entities.remove(&params.unique_id).map(|old| {
             self.unregister_adapter(&old);
-        }
+            old.handle
+        });
 
         let handle = if disabled {
             EntityHandle::Disabled
         } else {
             match params.domain.as_str() {
                 "switch" => {
+                    let prev = match &prev_handle {
+                        Some(EntityHandle::Switch(old)) => {
+                            let s = old.state.read();
+                            SwitchInner {
+                                available: s.available,
+                                is_on: s.is_on,
+                            }
+                        }
+                        _ => SwitchInner {
+                            available: true,
+                            is_on: false,
+                        },
+                    };
                     let sw = Arc::new(PluginSwitch {
                         entity_id: entity_id.clone(),
                         entry_id: params.entry_id.clone(),
                         unique_id: params.unique_id.clone(),
-                        state: RwLock::new(SwitchInner {
-                            available: true,
-                            is_on: false,
-                        }),
+                        state: RwLock::new(prev),
                         call_plugin: self.call_plugin.clone(),
                     });
                     self.components.switches().add(sw.clone());
@@ -367,74 +392,116 @@ impl PluginEntityStore {
                     let caps = parse_light_caps(&params);
                     let min_k = params.min_color_temp_kelvin.unwrap_or(2000);
                     let max_k = params.max_color_temp_kelvin.unwrap_or(6535);
-                    let light = Arc::new(PluginLight {
-                        entity_id: entity_id.clone(),
-                        entry_id: params.entry_id.clone(),
-                        unique_id: params.unique_id.clone(),
-                        caps,
-                        state: RwLock::new(LightInner {
+                    let prev = match &prev_handle {
+                        Some(EntityHandle::Light(old)) => {
+                            let s = old.state.read();
+                            let mut light = s.light.clone();
+                            light.min_color_temp_kelvin = min_k;
+                            light.max_color_temp_kelvin = max_k;
+                            LightInner {
+                                available: s.available,
+                                light,
+                            }
+                        }
+                        _ => LightInner {
                             available: true,
                             light: LightState {
                                 min_color_temp_kelvin: min_k,
                                 max_color_temp_kelvin: max_k,
                                 ..Default::default()
                             },
-                        }),
+                        },
+                    };
+                    let light = Arc::new(PluginLight {
+                        entity_id: entity_id.clone(),
+                        entry_id: params.entry_id.clone(),
+                        unique_id: params.unique_id.clone(),
+                        caps,
+                        state: RwLock::new(prev),
                         call_plugin: self.call_plugin.clone(),
                     });
                     self.components.lights().add(light.clone());
                     EntityHandle::Light(light)
                 }
                 "button" => {
+                    let prev = match &prev_handle {
+                        Some(EntityHandle::Button(old)) => {
+                            let s = old.state.lock();
+                            ButtonInner {
+                                available: s.available,
+                                last_pressed: s.last_pressed.clone(),
+                            }
+                        }
+                        _ => ButtonInner {
+                            available: true,
+                            last_pressed: None,
+                        },
+                    };
                     let btn = Arc::new(PluginButton {
                         entity_id: entity_id.clone(),
                         entry_id: params.entry_id.clone(),
                         unique_id: params.unique_id.clone(),
                         hass: self.components.hass().clone(),
                         friendly_name: friendly_name.clone(),
-                        state: Mutex::new(ButtonInner {
-                            available: true,
-                            last_pressed: None,
-                        }),
+                        state: Mutex::new(prev),
                         call_plugin: self.call_plugin.clone(),
                     });
                     self.components.buttons().add(btn.clone());
                     EntityHandle::Button(btn)
                 }
                 "scene" => {
+                    let prev_avail = match &prev_handle {
+                        Some(EntityHandle::Scene(old)) => *old.available.read(),
+                        _ => true,
+                    };
                     let scene = Arc::new(PluginScene {
                         entity_id: entity_id.clone(),
                         entry_id: params.entry_id.clone(),
                         unique_id: params.unique_id.clone(),
                         hass: self.components.hass().clone(),
                         friendly_name: friendly_name.clone(),
-                        available: RwLock::new(true),
+                        available: RwLock::new(prev_avail),
                         call_plugin: self.call_plugin.clone(),
                     });
                     self.components.scenes().add(scene.clone());
                     EntityHandle::Scene(scene)
                 }
                 "vacuum" => {
+                    let prev_avail = match &prev_handle {
+                        Some(EntityHandle::Vacuum(old)) => *old.available.read(),
+                        _ => true,
+                    };
                     let vac = Arc::new(PluginVacuum {
                         entity_id: entity_id.clone(),
                         entry_id: params.entry_id.clone(),
                         unique_id: params.unique_id.clone(),
                         supported_features: params.supported_features,
-                        available: RwLock::new(true),
+                        available: RwLock::new(prev_avail),
                         call_plugin: self.call_plugin.clone(),
                     });
                     self.components.vacuums().add(vac.clone());
                     EntityHandle::Vacuum(vac)
                 }
                 "select" => {
+                    let (available, current_option, prev_opts) = match &prev_handle {
+                        Some(EntityHandle::Select(old)) => {
+                            let s = old.state.read();
+                            (
+                                s.available,
+                                s.current_option.clone(),
+                                Some(s.options.clone()),
+                            )
+                        }
+                        _ => (true, None, None),
+                    };
                     let sel = Arc::new(PluginSelect {
                         entity_id: entity_id.clone(),
                         entry_id: params.entry_id.clone(),
                         unique_id: params.unique_id.clone(),
                         state: RwLock::new(SelectInner {
-                            available: true,
-                            options: params.options.clone().unwrap_or_default(),
-                            current_option: None,
+                            available,
+                            options: params.options.clone().or(prev_opts).unwrap_or_default(),
+                            current_option,
                         }),
                         call_plugin: self.call_plugin.clone(),
                     });
@@ -442,19 +509,25 @@ impl PluginEntityStore {
                     EntityHandle::Select(sel)
                 }
                 "number" => {
+                    let prev_avail = match &prev_handle {
+                        Some(EntityHandle::Number(old)) => old.state.read().available,
+                        _ => true,
+                    };
                     let min = params.min_value.unwrap_or(number::DEFAULT_MIN_VALUE);
                     let max = params.max_value.unwrap_or(number::DEFAULT_MAX_VALUE);
                     let step = number::calculate_step(min, max, params.step);
+                    let mode = params.mode.clone().unwrap_or_else(|| "auto".into());
                     let num = Arc::new(PluginNumber {
                         entity_id: entity_id.clone(),
                         entry_id: params.entry_id.clone(),
                         unique_id: params.unique_id.clone(),
                         state: RwLock::new(NumberInner {
-                            available: true,
+                            available: prev_avail,
                             min,
                             max,
                             step,
                             explicit_step: params.step,
+                            mode,
                         }),
                         call_plugin: self.call_plugin.clone(),
                     });
@@ -462,12 +535,9 @@ impl PluginEntityStore {
                     EntityHandle::Number(num)
                 }
                 "cover" => {
-                    let cov = Arc::new(PluginCover {
-                        entity_id: entity_id.clone(),
-                        entry_id: params.entry_id.clone(),
-                        unique_id: params.unique_id.clone(),
-                        supported_features: params.supported_features,
-                        state: RwLock::new(CoverInner {
+                    let prev = match &prev_handle {
+                        Some(EntityHandle::Cover(old)) => old.state.read().clone(),
+                        _ => CoverInner {
                             available: true,
                             is_closed: None,
                             is_opening: None,
@@ -475,21 +545,33 @@ impl PluginEntityStore {
                             current_position: None,
                             current_tilt_position: None,
                             last_toggle_direction_open: true,
-                        }),
+                        },
+                    };
+                    let cov = Arc::new(PluginCover {
+                        entity_id: entity_id.clone(),
+                        entry_id: params.entry_id.clone(),
+                        unique_id: params.unique_id.clone(),
+                        supported_features: params.supported_features,
+                        state: RwLock::new(prev),
                         call_plugin: self.call_plugin.clone(),
                     });
                     self.components.covers().add(cov.clone());
                     EntityHandle::Cover(cov)
                 }
                 "lock" => {
+                    let prev_avail = match &prev_handle {
+                        Some(EntityHandle::Lock(old)) => old.state.read().available,
+                        _ => true,
+                    };
                     let lck = Arc::new(PluginLock {
                         entity_id: entity_id.clone(),
                         entry_id: params.entry_id.clone(),
                         unique_id: params.unique_id.clone(),
                         supported_features: params.supported_features,
                         state: RwLock::new(LockInner {
-                            available: true,
+                            available: prev_avail,
                             code_format: params.code_format.clone(),
+                            default_code: lock_default_code,
                         }),
                         call_plugin: self.call_plugin.clone(),
                     });
@@ -497,17 +579,24 @@ impl PluginEntityStore {
                     EntityHandle::Lock(lck)
                 }
                 "fan" => {
+                    let (available, is_on, percentage) = match &prev_handle {
+                        Some(EntityHandle::Fan(old)) => {
+                            let s = old.state.read();
+                            (s.available, s.is_on, s.percentage)
+                        }
+                        _ => (true, false, None),
+                    };
                     let f = Arc::new(PluginFan {
                         entity_id: entity_id.clone(),
                         entry_id: params.entry_id.clone(),
                         unique_id: params.unique_id.clone(),
                         supported_features: params.supported_features,
                         state: RwLock::new(FanInner {
-                            available: true,
-                            is_on: false,
-                            percentage: None,
+                            available,
+                            is_on,
+                            percentage,
                             speed_count: params.speed_count.unwrap_or(100).max(1),
-                            preset_modes: params.preset_modes.clone().unwrap_or_default(),
+                            preset_modes: params.preset_modes.clone(),
                         }),
                         call_plugin: self.call_plugin.clone(),
                     });
@@ -632,9 +721,13 @@ impl PluginEntityStore {
                 } else {
                     inner.step = number::calculate_step(inner.min, inner.max, inner.explicit_step);
                 }
+                if let Some(mode) = params.attributes.get("mode").and_then(Value::as_str) {
+                    inner.mode = mode.to_owned();
+                }
                 merged.insert("min".into(), json!(inner.min));
                 merged.insert("max".into(), json!(inner.max));
                 merged.insert("step".into(), json!(inner.step));
+                merged.insert("mode".into(), json!(inner.mode));
             }
             EntityHandle::Cover(cov) => {
                 let mut inner = cov.state.write();
@@ -689,25 +782,40 @@ impl PluginEntityStore {
                 if let Some(v) = params.attributes.get("code_format") {
                     inner.code_format = v.as_str().map(str::to_owned);
                 }
+                match &inner.code_format {
+                    Some(fmt) => {
+                        merged.insert("code_format".into(), json!(fmt));
+                    }
+                    None => {
+                        merged.remove("code_format");
+                    }
+                }
                 merged.insert("supported_features".into(), json!(lck.supported_features));
             }
             EntityHandle::Fan(f) => {
                 let mut inner = f.state.write();
                 inner.available = available;
                 inner.is_on = state_str == "on";
-                if let Some(p) = params.attributes.get("percentage") {
-                    inner.percentage = p.as_u64().map(|n| n.min(100) as u8);
-                }
-                if let Some(arr) = params
+                inner.percentage = params
                     .attributes
-                    .get("preset_modes")
-                    .and_then(Value::as_array)
-                {
-                    inner.preset_modes = arr
-                        .iter()
-                        .filter_map(Value::as_str)
-                        .map(str::to_owned)
-                        .collect();
+                    .get("percentage")
+                    .and_then(Value::as_u64)
+                    .map(|n| n.min(100) as u8);
+                if let Some(v) = params.attributes.get("preset_modes") {
+                    inner.preset_modes = v.as_array().map(|arr| {
+                        arr.iter()
+                            .filter_map(Value::as_str)
+                            .map(str::to_owned)
+                            .collect()
+                    });
+                }
+                match &inner.preset_modes {
+                    Some(modes) => {
+                        merged.insert("preset_modes".into(), json!(modes));
+                    }
+                    None => {
+                        merged.remove("preset_modes");
+                    }
                 }
                 merged.insert("supported_features".into(), json!(f.supported_features));
             }
@@ -741,8 +849,10 @@ impl PluginEntityStore {
     }
 
     /// Mark every entity of every active entry `unavailable` (called when the
-    /// plugin process crashes or disconnects). Holds `self.entries` across
-    /// state writes so deactivation cannot interleave.
+    /// plugin process crashes or disconnects). Preserves capability attributes,
+    /// unit of measurement, icon, device class, and `supported_features`,
+    /// matching HA's `Entity._async_calculate_state`. Holds `self.entries`
+    /// across state writes so deactivation cannot interleave.
     pub fn mark_all_unavailable(&self) {
         let entries = self.entries.lock();
         let hass = self.components.hass();
@@ -751,31 +861,60 @@ impl PluginEntityStore {
                 if matches!(reg.handle, EntityHandle::Disabled) {
                     continue;
                 }
+                let mut attrs = reg.base_attrs.clone();
+                if let Some(name) = &reg.friendly_name {
+                    attrs.entry("friendly_name").or_insert_with(|| json!(name));
+                }
                 match &reg.handle {
                     EntityHandle::Switch(sw) => sw.state.write().available = false,
                     EntityHandle::Light(light) => light.state.write().available = false,
                     EntityHandle::Button(btn) => {
                         let mut inner = btn.state.lock();
                         inner.available = false;
-                        let mut attrs = Attributes::new();
-                        if let Some(name) = &reg.friendly_name {
-                            attrs.insert("friendly_name".into(), json!(name));
-                        }
                         hass.set_state(reg.entity_id.clone(), "unavailable", attrs);
                         continue;
                     }
                     EntityHandle::Scene(scene) => *scene.available.write() = false,
                     EntityHandle::Vacuum(vac) => *vac.available.write() = false,
-                    EntityHandle::Select(sel) => sel.state.write().available = false,
-                    EntityHandle::Number(num) => num.state.write().available = false,
+                    EntityHandle::Select(sel) => {
+                        let mut inner = sel.state.write();
+                        inner.available = false;
+                        attrs.insert("options".into(), json!(inner.options));
+                    }
+                    EntityHandle::Number(num) => {
+                        let mut inner = num.state.write();
+                        inner.available = false;
+                        attrs.insert("min".into(), json!(inner.min));
+                        attrs.insert("max".into(), json!(inner.max));
+                        attrs.insert("step".into(), json!(inner.step));
+                        attrs.insert("mode".into(), json!(inner.mode));
+                    }
                     EntityHandle::Cover(cov) => cov.state.write().available = false,
-                    EntityHandle::Lock(lck) => lck.state.write().available = false,
-                    EntityHandle::Fan(f) => f.state.write().available = false,
+                    EntityHandle::Lock(lck) => {
+                        let mut inner = lck.state.write();
+                        inner.available = false;
+                        match &inner.code_format {
+                            Some(fmt) => {
+                                attrs.insert("code_format".into(), json!(fmt));
+                            }
+                            None => {
+                                attrs.remove("code_format");
+                            }
+                        }
+                    }
+                    EntityHandle::Fan(f) => {
+                        let mut inner = f.state.write();
+                        inner.available = false;
+                        match &inner.preset_modes {
+                            Some(modes) => {
+                                attrs.insert("preset_modes".into(), json!(modes));
+                            }
+                            None => {
+                                attrs.remove("preset_modes");
+                            }
+                        }
+                    }
                     EntityHandle::Passive | EntityHandle::Disabled => {}
-                }
-                let mut attrs = Attributes::new();
-                if let Some(name) = &reg.friendly_name {
-                    attrs.insert("friendly_name".into(), json!(name));
                 }
                 hass.set_state(reg.entity_id.clone(), "unavailable", attrs);
             }
@@ -1250,6 +1389,7 @@ struct NumberInner {
     max: f64,
     step: f64,
     explicit_step: Option<f64>,
+    mode: String,
 }
 
 struct PluginNumber {
@@ -1277,6 +1417,11 @@ impl Number for PluginNumber {
         self.state.read().max
     }
 
+    fn bounds(&self) -> (f64, f64) {
+        let s = self.state.read();
+        (s.min, s.max)
+    }
+
     fn step(&self) -> f64 {
         self.state.read().step
     }
@@ -1295,6 +1440,7 @@ impl Number for PluginNumber {
     }
 }
 
+#[derive(Clone)]
 struct CoverInner {
     available: bool,
     is_closed: Option<bool>,
@@ -1404,6 +1550,7 @@ impl Cover for PluginCover {
 struct LockInner {
     available: bool,
     code_format: Option<String>,
+    default_code: Option<String>,
 }
 
 struct PluginLock {
@@ -1449,6 +1596,13 @@ impl Lock for PluginLock {
         self.state.read().code_format.clone()
     }
 
+    fn default_code(&self) -> Option<String> {
+        let inner = self.state.read();
+        let def = inner.default_code.as_deref()?;
+        let fmt = inner.code_format.as_deref()?;
+        crate::lock::code_format_matches(fmt, def).then(|| def.to_owned())
+    }
+
     fn lock(&self, code: Option<&str>) -> BoxFuture<'_> {
         self.invoke("lock", code)
     }
@@ -1467,7 +1621,7 @@ struct FanInner {
     is_on: bool,
     percentage: Option<u8>,
     speed_count: u32,
-    preset_modes: Vec<String>,
+    preset_modes: Option<Vec<String>>,
 }
 
 struct PluginFan {
@@ -1518,7 +1672,7 @@ impl Fan for PluginFan {
     }
 
     fn preset_modes(&self) -> Vec<String> {
-        self.state.read().preset_modes.clone()
+        self.state.read().preset_modes.clone().unwrap_or_default()
     }
 
     fn turn_on(&self, percentage: Option<u8>, preset_mode: Option<&str>) -> BoxFuture<'_> {
@@ -1554,11 +1708,9 @@ impl Fan for PluginFan {
         self.invoke("oscillate", data)
     }
 
-    fn set_direction(&self, direction: Option<&str>) -> BoxFuture<'_> {
+    fn set_direction(&self, direction: &str) -> BoxFuture<'_> {
         let mut data = Map::new();
-        if let Some(d) = direction {
-            data.insert("direction".into(), json!(d));
-        }
+        data.insert("direction".into(), json!(direction));
         self.invoke("set_direction", data)
     }
 }

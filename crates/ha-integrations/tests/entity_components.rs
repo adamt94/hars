@@ -243,9 +243,10 @@ impl Fan for VecFan {
         self.calls.lock().push(json!(format!("oscillate:{s}")));
         Box::pin(async { Ok(()) })
     }
-    fn set_direction(&self, direction: Option<&str>) -> BoxFuture<'_> {
-        let d = direction.unwrap_or("None");
-        self.calls.lock().push(json!(format!("set_direction:{d}")));
+    fn set_direction(&self, direction: &str) -> BoxFuture<'_> {
+        self.calls
+            .lock()
+            .push(json!(format!("set_direction:{direction}")));
         Box::pin(async { Ok(()) })
     }
 }

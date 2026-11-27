@@ -41,6 +41,11 @@ pub trait Number: Send + Sync {
     fn max_value(&self) -> f64 {
         DEFAULT_MAX_VALUE
     }
+    /// Atomic `(min_value, max_value)` snapshot so concurrent updates cannot
+    /// tear the validated range.
+    fn bounds(&self) -> (f64, f64) {
+        (self.min_value(), self.max_value())
+    }
     fn step(&self) -> f64 {
         calculate_step(self.min_value(), self.max_value(), None)
     }
@@ -98,8 +103,7 @@ impl Numbers {
                         .and_then(Value::as_f64)
                         .unwrap_or(f64::NAN);
                     let calls = chosen.iter().map(|n| async move {
-                        let min = n.min_value();
-                        let max = n.max_value();
+                        let (min, max) = n.bounds();
                         if !value.is_finite() || value < min || value > max {
                             let val_s = crate::sun::py_float(value);
                             let min_s = crate::sun::py_float(min);
