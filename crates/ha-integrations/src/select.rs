@@ -56,11 +56,11 @@ fn validate_option(
 }
 
 /// Pick the option at `idx` (Python modulo indexing) or fail cleanly when
-/// `options` is empty (matching HA's WebSocket `unknown_error` / `"Unknown error"`).
+/// `options` is empty (matching Python 3.14 `ZeroDivisionError: division by zero`).
 fn pick_index(options: &[String], idx: isize) -> Result<&str, ServiceError> {
     let len = options.len() as isize;
     if len == 0 {
-        return Err(ServiceError::Unknown("Unknown error".into()));
+        return Err(ServiceError::Unknown("division by zero".into()));
     }
     let i = idx.rem_euclid(len) as usize;
     Ok(&options[i])
@@ -75,7 +75,12 @@ fn offset_option<'a>(
 ) -> Result<&'a str, ServiceError> {
     let len = options.len() as isize;
     if len == 0 {
-        return Err(ServiceError::Unknown("Unknown error".into()));
+        let msg = if cycle {
+            "division by zero"
+        } else {
+            "list index out of range"
+        };
+        return Err(ServiceError::Unknown(msg.into()));
     }
     let current_index = current
         .and_then(|c| options.iter().position(|o| o == c))

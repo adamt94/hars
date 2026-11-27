@@ -340,8 +340,10 @@ impl PluginEntityStore {
                 "supported_features".into(),
                 json!(params.supported_features),
             );
-            if let Some(modes) = &params.preset_modes {
-                base_attrs.insert("preset_modes".into(), json!(modes));
+            if params.supported_features & (fan::feature::SET_SPEED | fan::feature::PRESET_MODE)
+                != 0
+            {
+                base_attrs.insert("preset_modes".into(), json!(params.preset_modes));
             }
             if params.supported_features & fan::feature::SET_SPEED != 0 {
                 let sc = params.speed_count.unwrap_or(100).max(1);
@@ -398,6 +400,11 @@ impl PluginEntityStore {
                             let mut light = s.light.clone();
                             light.min_color_temp_kelvin = min_k;
                             light.max_color_temp_kelvin = max_k;
+                            if let Some(cm) = light.color_mode
+                                && !caps.modes.iter().any(|m| m == cm)
+                            {
+                                light.color_mode = None;
+                            }
                             LightInner {
                                 available: s.available,
                                 light,
@@ -483,16 +490,12 @@ impl PluginEntityStore {
                     EntityHandle::Vacuum(vac)
                 }
                 "select" => {
-                    let (available, current_option, prev_opts) = match &prev_handle {
+                    let (available, current_option) = match &prev_handle {
                         Some(EntityHandle::Select(old)) => {
                             let s = old.state.read();
-                            (
-                                s.available,
-                                s.current_option.clone(),
-                                Some(s.options.clone()),
-                            )
+                            (s.available, s.current_option.clone())
                         }
-                        _ => (true, None, None),
+                        _ => (true, None),
                     };
                     let sel = Arc::new(PluginSelect {
                         entity_id: entity_id.clone(),
@@ -500,7 +503,7 @@ impl PluginEntityStore {
                         unique_id: params.unique_id.clone(),
                         state: RwLock::new(SelectInner {
                             available,
-                            options: params.options.clone().or(prev_opts).unwrap_or_default(),
+                            options: params.options.clone().unwrap_or_default(),
                             current_option,
                         }),
                         call_plugin: self.call_plugin.clone(),
@@ -563,6 +566,16 @@ impl PluginEntityStore {
                         Some(EntityHandle::Lock(old)) => old.state.read().available,
                         _ => true,
                     };
+                    // Match HA's `LockEntity._async_read_entity_options`: accept
+                    // `options.lock.default_code` when the lock's registration
+                    // `code_format` matches it, then retain it even if a later
+                    // state update clears `code_format`.
+                    let default_code = lock_default_code.filter(|def| {
+                        params
+                            .code_format
+                            .as_deref()
+                            .is_some_and(|fmt| crate::lock::code_format_matches(fmt, def))
+                    });
                     let lck = Arc::new(PluginLock {
                         entity_id: entity_id.clone(),
                         entry_id: params.entry_id.clone(),
@@ -571,7 +584,7 @@ impl PluginEntityStore {
                         state: RwLock::new(LockInner {
                             available: prev_avail,
                             code_format: params.code_format.clone(),
-                            default_code: lock_default_code,
+                            default_code,
                         }),
                         call_plugin: self.call_plugin.clone(),
                     });
@@ -809,12 +822,17 @@ impl PluginEntityStore {
                             .collect()
                     });
                 }
-                match &inner.preset_modes {
-                    Some(modes) => {
-                        merged.insert("preset_modes".into(), json!(modes));
-                    }
-                    None => {
-                        merged.remove("preset_modes");
+                if f.supported_features & (fan::feature::SET_SPEED | fan::feature::PRESET_MODE) != 0
+                {
+                    merged.insert("preset_modes".into(), json!(inner.preset_modes));
+                } else {
+                    match &inner.preset_modes {
+                        Some(modes) => {
+                            merged.insert("preset_modes".into(), json!(modes));
+                        }
+                        None => {
+                            merged.remove("preset_modes");
+                        }
                     }
                 }
                 merged.insert("supported_features".into(), json!(f.supported_features));
@@ -867,7 +885,16 @@ impl PluginEntityStore {
                 }
                 match &reg.handle {
                     EntityHandle::Switch(sw) => sw.state.write().available = false,
-                    EntityHandle::Light(light) => light.state.write().available = false,
+                    EntityHandle::Light(light) => {
+                        let mut inner = light.state.write();
+                        inner.available = false;
+                        let mut light_attrs =
+                            crate::light::attributes(&light.caps, &inner.light, false);
+                        light_attrs.insert("supported_features".into(), json!(light.caps.features));
+                        for (k, v) in light_attrs {
+                            attrs.insert(k, v);
+                        }
+                    }
                     EntityHandle::Button(btn) => {
                         let mut inner = btn.state.lock();
                         inner.available = false;
@@ -891,27 +918,23 @@ impl PluginEntityStore {
                     }
                     EntityHandle::Cover(cov) => cov.state.write().available = false,
                     EntityHandle::Lock(lck) => {
-                        let mut inner = lck.state.write();
-                        inner.available = false;
-                        match &inner.code_format {
-                            Some(fmt) => {
-                                attrs.insert("code_format".into(), json!(fmt));
-                            }
-                            None => {
-                                attrs.remove("code_format");
-                            }
-                        }
+                        lck.state.write().available = false;
+                        // `code_format` is a state_attribute in HA's LockEntity, omitted when unavailable.
+                        attrs.remove("code_format");
                     }
                     EntityHandle::Fan(f) => {
                         let mut inner = f.state.write();
                         inner.available = false;
-                        match &inner.preset_modes {
-                            Some(modes) => {
-                                attrs.insert("preset_modes".into(), json!(modes));
-                            }
-                            None => {
-                                attrs.remove("preset_modes");
-                            }
+                        // `percentage_step` is a state_attribute in HA's FanEntity, omitted when unavailable;
+                        // `preset_modes` is a capability_attribute retained when SET_SPEED or PRESET_MODE is set.
+                        attrs.remove("percentage_step");
+                        if f.supported_features
+                            & (fan::feature::SET_SPEED | fan::feature::PRESET_MODE)
+                            != 0
+                        {
+                            attrs.insert("preset_modes".into(), json!(inner.preset_modes));
+                        } else {
+                            attrs.remove("preset_modes");
                         }
                     }
                     EntityHandle::Passive | EntityHandle::Disabled => {}
@@ -1597,10 +1620,7 @@ impl Lock for PluginLock {
     }
 
     fn default_code(&self) -> Option<String> {
-        let inner = self.state.read();
-        let def = inner.default_code.as_deref()?;
-        let fmt = inner.code_format.as_deref()?;
-        crate::lock::code_format_matches(fmt, def).then(|| def.to_owned())
+        self.state.read().default_code.clone()
     }
 
     fn lock(&self, code: Option<&str>) -> BoxFuture<'_> {

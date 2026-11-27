@@ -221,33 +221,61 @@ struct Flags {
     ascii: bool,
 }
 
-fn char_eq(a: char, b: char, ignore_case: bool) -> bool {
-    if !ignore_case {
+/// Python 3 `re` simple Unicode case-fold for the four non-ASCII characters
+/// that fold onto ASCII letters (`İ`/`ı`/`ſ`/`K`).
+fn py_re_fold(c: char) -> char {
+    match c {
+        '\u{0130}' | '\u{0131}' => 'i',
+        '\u{017F}' => 's',
+        '\u{212A}' => 'k',
+        other => other,
+    }
+}
+
+fn char_eq(a: char, b: char, flags: Flags) -> bool {
+    if !flags.ignore_case {
         return a == b;
     }
+    if flags.ascii {
+        return a.eq_ignore_ascii_case(&b);
+    }
+    let a = py_re_fold(a);
+    let b = py_re_fold(b);
     a == b || a.to_lowercase().eq(b.to_lowercase())
 }
 
-fn char_in_range(c: char, lo: char, hi: char, ignore_case: bool) -> bool {
+fn char_in_range(c: char, lo: char, hi: char, flags: Flags) -> bool {
     if lo <= c && c <= hi {
         return true;
     }
-    if !ignore_case {
+    if !flags.ignore_case {
         return false;
     }
-    if c.is_ascii_alphabetic() {
-        let low = c.to_ascii_lowercase();
-        let up = c.to_ascii_uppercase();
+    if flags.ascii {
+        if c.is_ascii_alphabetic() {
+            let low = c.to_ascii_lowercase();
+            let up = c.to_ascii_uppercase();
+            return (lo <= low && low <= hi) || (lo <= up && up <= hi);
+        }
+        return false;
+    }
+    let folded = py_re_fold(c);
+    if lo <= folded && folded <= hi {
+        return true;
+    }
+    if folded.is_ascii_alphabetic() {
+        let low = folded.to_ascii_lowercase();
+        let up = folded.to_ascii_uppercase();
         return (lo <= low && low <= hi) || (lo <= up && up <= hi);
     }
-    let mut lc = c.to_lowercase();
+    let mut lc = folded.to_lowercase();
     if let (Some(only), None) = (lc.next(), lc.next())
         && lo <= only
         && only <= hi
     {
         return true;
     }
-    let mut uc = c.to_uppercase();
+    let mut uc = folded.to_uppercase();
     if let (Some(only), None) = (uc.next(), uc.next())
         && lo <= only
         && only <= hi
@@ -261,7 +289,7 @@ fn char_in_range(c: char, lo: char, hi: char, ignore_case: bool) -> bool {
 enum CharMatcher {
     Literal {
         ch: char,
-        ignore_case: bool,
+        flags: Flags,
     },
     AnyNonNewline,
     Class {
@@ -283,7 +311,7 @@ enum ClassItem {
 impl CharMatcher {
     fn matches(&self, c: char) -> bool {
         match self {
-            CharMatcher::Literal { ch, ignore_case } => char_eq(c, *ch, *ignore_case),
+            CharMatcher::Literal { ch, flags } => char_eq(c, *ch, *flags),
             CharMatcher::AnyNonNewline => c != '\n',
             CharMatcher::Class {
                 negated,
@@ -291,8 +319,8 @@ impl CharMatcher {
                 items,
             } => {
                 let hit = items.iter().any(|item| match *item {
-                    ClassItem::Single(x) => char_eq(c, x, flags.ignore_case),
-                    ClassItem::Range(a, b) => char_in_range(c, a, b, flags.ignore_case),
+                    ClassItem::Single(x) => char_eq(c, x, *flags),
+                    ClassItem::Range(a, b) => char_in_range(c, a, b, *flags),
                     ClassItem::Digit(inv) => {
                         let d = if flags.ascii {
                             c.is_ascii_digit()
@@ -430,7 +458,7 @@ impl Parser {
             '*' | '+' | '?' | '{' => Err(()),
             lit => Ok(Ast::Atom(CharMatcher::Literal {
                 ch: lit,
-                ignore_case: self.flags.ignore_case,
+                flags: self.flags,
             })),
         }
     }
@@ -528,20 +556,17 @@ impl Parser {
             'Z' => Ok(Ast::EndStrictAnchor),
             'n' => Ok(Ast::Atom(CharMatcher::Literal {
                 ch: '\n',
-                ignore_case: false,
+                flags: Flags::default(),
             })),
             'r' => Ok(Ast::Atom(CharMatcher::Literal {
                 ch: '\r',
-                ignore_case: false,
+                flags: Flags::default(),
             })),
             't' => Ok(Ast::Atom(CharMatcher::Literal {
                 ch: '\t',
-                ignore_case: false,
+                flags: Flags::default(),
             })),
-            other => Ok(Ast::Atom(CharMatcher::Literal {
-                ch: other,
-                ignore_case: flags.ignore_case,
-            })),
+            other => Ok(Ast::Atom(CharMatcher::Literal { ch: other, flags })),
         }
     }
 
@@ -945,6 +970,11 @@ mod tests {
         assert!(code_format_matches(r"(?i)^[a-f]{4}$", "AbCd"));
         assert!(code_format_matches(r"^(?i:ab)cd$", "ABcd"));
         assert!(!code_format_matches(r"^(?i:ab)cd$", "ABCD"));
+        // ASCII vs Unicode casefolding parity with Python 3.14 `re`.
+        assert!(code_format_matches(r"(?i)^k$", "\u{212A}"));
+        assert!(!code_format_matches(r"(?ai)^k$", "\u{212A}"));
+        assert!(code_format_matches(r"(?i)^[a-z]$", "\u{0130}"));
+        assert!(!code_format_matches(r"(?ai)^[a-z]$", "\u{0130}"));
         // Unclosed pattern fails closed without panicking.
         assert!(!code_format_matches(r"[0-9", "1"));
         // Deeply nested groups and nested empty repetitions fail bounded & fast.

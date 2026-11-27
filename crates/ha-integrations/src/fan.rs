@@ -274,7 +274,10 @@ impl Fans {
                                     // TypeError (-> unknown_error) when omitted.
                                     let Some(dir) = data.get("direction").and_then(Value::as_str)
                                     else {
-                                        return Err(ServiceError::Unknown("Unknown error".into()));
+                                        return Err(ServiceError::Unknown(
+                                            "FanEntity.async_set_direction() missing 1 required positional argument: 'direction'"
+                                                .into(),
+                                        ));
                                     };
                                     f.set_direction(dir).await
                                 }
@@ -581,7 +584,13 @@ mod tests {
             )
             .await
             .unwrap_err();
-        assert_eq!(err, ServiceError::Unknown("Unknown error".into()));
+        assert_eq!(
+            err,
+            ServiceError::Unknown(
+                "FanEntity.async_set_direction() missing 1 required positional argument: 'direction'"
+                    .into()
+            )
+        );
         assert_eq!(f.calls.lock().len(), before);
     }
 

@@ -1859,12 +1859,14 @@ async fn plugin_supports_select_number_cover_lock_and_fan() {
         .states()
         .get(&ha_core::EntityId::parse(&lck_id).unwrap())
         .unwrap();
-    assert_eq!(lck_st.attributes["code_format"], json!(r"^\d{4}$"));
+    // `code_format` is a state_attribute in HA's LockEntity, omitted when unavailable.
+    assert!(lck_st.attributes.get("code_format").is_none());
     let fan_st = hass
         .states()
         .get(&ha_core::EntityId::parse(&fan_id).unwrap())
         .unwrap();
     assert_eq!(fan_st.attributes["preset_modes"], json!(["auto", "sleep"]));
+    assert!(fan_st.attributes.get("percentage_step").is_none());
 
     store.deactivate_entry("e1");
     for id in [&sel_id, &num_id, &cov_id, &lck_id, &fan_id] {
@@ -1899,7 +1901,13 @@ async fn plugin_round1_edge_cases_default_code_reupsert_dynamic_attrs_and_droppe
             args: vec![],
         },
         capabilities: Capabilities {
-            entity_domains: vec!["cover".into(), "lock".into(), "fan".into()],
+            entity_domains: vec![
+                "cover".into(),
+                "lock".into(),
+                "fan".into(),
+                "light".into(),
+                "select".into(),
+            ],
             config_entry_version: 1,
         },
     };
@@ -2001,6 +2009,25 @@ async fn plugin_round1_edge_cases_default_code_reupsert_dynamic_attrs_and_droppe
         .await
         .is_err()
     );
+    // Clearing `code_format` still forwards the saved default_code, matching HA.
+    store
+        .set_state(protocol::StateSetParams {
+            entry_id: "e1".into(),
+            unique_id: "lck_imported".into(),
+            state: "locked".into(),
+            attributes: json!({"code_format": null}).as_object().cloned().unwrap(),
+        })
+        .unwrap();
+    hass.call_service(
+        "lock",
+        "unlock",
+        json!({"entity_id": lck_id}).as_object().cloned().unwrap(),
+        None,
+        false,
+        None,
+    )
+    .await
+    .unwrap();
 
     // 2. Re-upsert preserves live fan `is_on` and cover `is_opening` state;
     //    dropped fan `percentage` resets `increase_speed` to 33%; dynamic
@@ -2131,6 +2158,99 @@ async fn plugin_round1_edge_cases_default_code_reupsert_dynamic_attrs_and_droppe
     .await
     .unwrap();
 
+    // 4. Re-upserting a color_temp light as brightness-only drops the stale
+    //    unsupported color_mode; disconnect preserves light capabilities.
+    let light_id = store
+        .upsert_entity(protocol::EntityUpsertParams {
+            entry_id: "e1".into(),
+            unique_id: "light_edge".into(),
+            domain: "light".into(),
+            name: Some("Edge Lamp".into()),
+            supported_color_modes: vec!["color_temp".into()],
+            min_color_temp_kelvin: Some(2200),
+            max_color_temp_kelvin: Some(6000),
+            ..Default::default()
+        })
+        .unwrap();
+    store
+        .set_state(protocol::StateSetParams {
+            entry_id: "e1".into(),
+            unique_id: "light_edge".into(),
+            state: "on".into(),
+            attributes: json!({"color_mode": "color_temp", "color_temp_kelvin": 3000})
+                .as_object()
+                .cloned()
+                .unwrap(),
+        })
+        .unwrap();
+    store
+        .upsert_entity(protocol::EntityUpsertParams {
+            entry_id: "e1".into(),
+            unique_id: "light_edge".into(),
+            domain: "light".into(),
+            name: Some("Edge Lamp".into()),
+            supported_color_modes: vec!["brightness".into()],
+            ..Default::default()
+        })
+        .unwrap();
+    store
+        .set_state(protocol::StateSetParams {
+            entry_id: "e1".into(),
+            unique_id: "light_edge".into(),
+            state: "on".into(),
+            attributes: json!({"brightness": 128}).as_object().cloned().unwrap(),
+        })
+        .unwrap();
+    let light_eid = ha_core::EntityId::parse(&light_id).unwrap();
+    let light_st = hass.states().get(&light_eid).unwrap();
+    assert_eq!(light_st.attributes["color_mode"], json!("brightness"));
+    assert_eq!(
+        light_st.attributes["supported_color_modes"],
+        json!(["brightness"])
+    );
+    store.mark_all_unavailable();
+    assert_eq!(
+        hass.states().get(&light_eid).unwrap().attributes["supported_color_modes"],
+        json!(["brightness"])
+    );
+
+    // 5. Re-upserting a select with omitted options clears them (matches registry `[]`).
+    let sel_id = store
+        .upsert_entity(protocol::EntityUpsertParams {
+            entry_id: "e1".into(),
+            unique_id: "sel_edge".into(),
+            domain: "select".into(),
+            name: Some("Edge Select".into()),
+            options: Some(vec!["a".into(), "b".into()]),
+            ..Default::default()
+        })
+        .unwrap();
+    store
+        .upsert_entity(protocol::EntityUpsertParams {
+            entry_id: "e1".into(),
+            unique_id: "sel_edge".into(),
+            domain: "select".into(),
+            name: Some("Edge Select".into()),
+            options: None,
+            ..Default::default()
+        })
+        .unwrap();
+    assert!(
+        hass.call_service(
+            "select",
+            "select_option",
+            json!({"entity_id": sel_id, "option": "a"})
+                .as_object()
+                .cloned()
+                .unwrap(),
+            None,
+            false,
+            None,
+        )
+        .await
+        .is_err()
+    );
+
     let calls: Vec<(String, String, Value)> = recorded
         .lock()
         .iter()
@@ -2145,6 +2265,7 @@ async fn plugin_round1_edge_cases_default_code_reupsert_dynamic_attrs_and_droppe
     assert_eq!(
         calls,
         vec![
+            ("lock".into(), "unlock".into(), json!({"code": "4321"})),
             ("lock".into(), "unlock".into(), json!({"code": "4321"})),
             ("fan".into(), "turn_off".into(), json!({})),
             (
