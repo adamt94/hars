@@ -2760,16 +2760,22 @@ async fn plugin_media_player_and_remote_round1_edge_cases() {
         })
     );
 
-    // 3. Explicit `state.set("unavailable", ...)` strips state_attributes while keeping capabilities.
+    // 3. Explicit `state.set("unavailable", ...)` strips state_attributes while keeping
+    // capabilities and HA base entity attributes (`attribution`, `assumed_state`, etc.).
     store
         .set_state(protocol::StateSetParams {
             entry_id: "e1".into(),
             unique_id: "shared_uid".into(),
             state: "unavailable".into(),
-            attributes: json!({"media_title": "Stale", "volume_level": 0.5})
-                .as_object()
-                .cloned()
-                .unwrap(),
+            attributes: json!({
+                "media_title": "Stale",
+                "volume_level": 0.5,
+                "attribution": "Data provided by TV",
+                "assumed_state": true
+            })
+            .as_object()
+            .cloned()
+            .unwrap(),
         })
         .unwrap();
     let mp_eid = ha_core::EntityId::parse(&mp_id).unwrap();
@@ -2780,10 +2786,36 @@ async fn plugin_media_player_and_remote_round1_edge_cases() {
         json!(["HDMI 1", "Spotify"])
     );
     assert_eq!(mp_st.attributes["sound_mode_list"], json!(["Movie"]));
+    assert_eq!(
+        mp_st.attributes["attribution"],
+        json!("Data provided by TV")
+    );
+    assert_eq!(mp_st.attributes["assumed_state"], json!(true));
     assert!(!mp_st.attributes.contains_key("media_title"));
     assert!(!mp_st.attributes.contains_key("volume_level"));
 
-    // Explicit `state.set("unavailable", ...)` on remote strips `current_activity` & `activity_list`.
+    // Clearing all live capability lists writes `capabilities: {}` (matching HA's dict return).
+    store
+        .set_state(protocol::StateSetParams {
+            entry_id: "e1".into(),
+            unique_id: "shared_uid".into(),
+            state: "idle".into(),
+            attributes: json!({"source_list": [], "sound_mode_list": []})
+                .as_object()
+                .cloned()
+                .unwrap(),
+        })
+        .unwrap();
+    let snap3 = registry.snapshot();
+    let row3 = snap3
+        .entities
+        .iter()
+        .find(|e| e.entity_id == mp_id)
+        .unwrap();
+    assert_eq!(serde_json::to_value(&row3.capabilities).unwrap(), json!({}));
+
+    // Explicit `state.set("unavailable", ...)` on remote strips `current_activity` & `activity_list`,
+    // while retaining HA base entity attributes (`attribution`, `assumed_state`).
     let rem_id = store
         .upsert_entity(protocol::EntityUpsertParams {
             entry_id: "e1".into(),
@@ -2799,15 +2831,22 @@ async fn plugin_media_player_and_remote_round1_edge_cases() {
             entry_id: "e1".into(),
             unique_id: "rem_uid".into(),
             state: "unavailable".into(),
-            attributes: json!({"current_activity": "TV", "activity_list": ["TV"]})
-                .as_object()
-                .cloned()
-                .unwrap(),
+            attributes: json!({
+                "current_activity": "TV",
+                "activity_list": ["TV"],
+                "attribution": "IR Hub",
+                "assumed_state": true
+            })
+            .as_object()
+            .cloned()
+            .unwrap(),
         })
         .unwrap();
     let rem_eid = ha_core::EntityId::parse(&rem_id).unwrap();
     let rem_st = hass.states().get(&rem_eid).unwrap();
     assert_eq!(rem_st.state.as_str(), "unavailable");
+    assert_eq!(rem_st.attributes["attribution"], json!("IR Hub"));
+    assert_eq!(rem_st.attributes["assumed_state"], json!(true));
     assert!(!rem_st.attributes.contains_key("current_activity"));
     assert!(!rem_st.attributes.contains_key("activity_list"));
 

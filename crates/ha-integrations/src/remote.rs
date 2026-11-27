@@ -182,8 +182,11 @@ impl Remotes {
                             &indirect,
                         );
                         let data = &call.data;
-                        let calls = list.iter().map(|r| async move {
-                            match name {
+                        // Run every selected entity even if an earlier one fails (matching HA),
+                        // without allocating a boxed future list or exceeding per-plugin in-flight limits.
+                        let mut first_err: Option<ServiceError> = None;
+                        for r in &list {
+                            let res = match name {
                                 "turn_on" => {
                                     r.turn_on(data.get("activity").and_then(Value::as_str))
                                         .await
@@ -243,12 +246,16 @@ impl Remotes {
                                     r.delete_command(cmd).await
                                 }
                                 _ => Ok(()),
+                            };
+                            if let Err(e) = res
+                                && first_err.is_none()
+                            {
+                                first_err = Some(e);
                             }
-                        });
-                        crate::light::join_all(calls)
-                            .await
-                            .into_iter()
-                            .collect::<Result<Vec<()>, _>>()?;
+                        }
+                        if let Some(e) = first_err {
+                            return Err(e);
+                        }
                         Ok(None)
                     }
                 },

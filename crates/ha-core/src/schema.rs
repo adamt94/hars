@@ -306,6 +306,7 @@ fn check(kind: &Kind, value: &Value) -> Checked {
                 "0" | "false" | "no" | "off" | "disable" => Ok(Some(Value::Bool(false))),
                 other => err(format!("invalid boolean value {other}")),
             },
+            Value::Null => err("invalid boolean value None".into()),
             other => err(format!("invalid boolean value {other}")),
         },
         Kind::Int(range) => {
@@ -1115,6 +1116,13 @@ mod tests {
                 json!({"entity_id": "media_player.tv", "target": "media_player.tv", "mode": "bogus"})
             ),
             "invalid boolean value bogus for dictionary value @ data['mode']"
+        );
+        assert_eq!(
+            err(
+                &schema,
+                json!({"entity_id": "media_player.tv", "target": "media_player.tv", "mode": null})
+            ),
+            "invalid boolean value None for dictionary value @ data['mode']"
         );
 
         // Unicode digits and Unicode casefolding match HA's `cv.entity_id`.

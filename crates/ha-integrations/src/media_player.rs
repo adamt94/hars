@@ -388,8 +388,11 @@ impl MediaPlayers {
                         let list =
                             chosen(&players.items.read(), &target, &indirect, required, name)?;
                         let data = &call.data;
-                        let calls = list.iter().map(|p| async move {
-                            match name {
+                        // Run every selected entity even if an earlier one fails (matching HA),
+                        // without allocating a boxed future list or exceeding per-plugin in-flight limits.
+                        let mut first_err: Option<ServiceError> = None;
+                        for p in &list {
+                            let res = match name {
                                 "turn_on" => p.turn_on().await,
                                 "turn_off" => p.turn_off().await,
                                 "toggle" => p.toggle().await,
@@ -498,12 +501,16 @@ impl MediaPlayers {
                                     p.join_players(&members).await
                                 }
                                 _ => Ok(()),
+                            };
+                            if let Err(e) = res
+                                && first_err.is_none()
+                            {
+                                first_err = Some(e);
                             }
-                        });
-                        crate::light::join_all(calls)
-                            .await
-                            .into_iter()
-                            .collect::<Result<Vec<()>, _>>()?;
+                        }
+                        if let Some(e) = first_err {
+                            return Err(e);
+                        }
                         Ok(None)
                     }
                 },

@@ -279,11 +279,11 @@ impl PluginEntityStore {
                         "preset_modes": params.preset_modes,
                     })));
                 } else if params.domain == "media_player" {
-                    patch.capabilities = Some(media_player_capabilities(
+                    patch.capabilities = Some(Some(media_player_capabilities(
                         params.supported_features,
                         &resolved_media_source_list,
                         &resolved_media_sound_mode_list,
-                    ));
+                    )));
                 }
                 let row = registry.get_or_create_entity(
                     &params.domain,
@@ -983,12 +983,9 @@ impl PluginEntityStore {
                         }
                     }
                     if !available {
-                        // HA omits state_attributes when unavailable, retaining only
-                        // base + capability_attributes + supported_features.
-                        merged = reg.base_attrs.clone();
-                        if let Some(name) = &reg.friendly_name {
-                            merged.entry("friendly_name").or_insert_with(|| json!(name));
-                        }
+                        // HA omits state_attributes when unavailable, retaining
+                        // base entity attributes + capability_attributes + supported_features.
+                        merged = unavailable_base_attrs(reg, &params.attributes);
                     }
                     if mp.supported_features & media_player::feature::SELECT_SOURCE != 0 {
                         match &inner.source_list {
@@ -1033,7 +1030,7 @@ impl PluginEntityStore {
                     registry.update_entity(
                         reg.entity_id.as_str(),
                         EntityPatch {
-                            capabilities: Some(new_caps),
+                            capabilities: Some(Some(new_caps)),
                             ..Default::default()
                         },
                     );
@@ -1044,10 +1041,7 @@ impl PluginEntityStore {
                 inner.available = available;
                 inner.is_on = available && state_str == "on";
                 if !available {
-                    merged = reg.base_attrs.clone();
-                    if let Some(name) = &reg.friendly_name {
-                        merged.entry("friendly_name").or_insert_with(|| json!(name));
-                    }
+                    merged = unavailable_base_attrs(reg, &params.attributes);
                 }
                 merged.insert("supported_features".into(), json!(rem.supported_features));
             }
@@ -2026,11 +2020,42 @@ fn same_string_list_val(cached: &Option<Value>, incoming: &Value) -> bool {
     }
 }
 
+/// Build the attribute map for an explicit `state.set("unavailable", ...)`
+/// frame, mirroring HA's `Entity._async_calculate_state` when `not available`:
+/// keep registration `base_attrs`, `friendly_name`, and any incoming base entity
+/// attributes (`unit_of_measurement`, `assumed_state`, `attribution`,
+/// `device_class`, `entity_picture`, `icon`, `friendly_name`), while dropping
+/// live `state_attributes` and `extra_state_attributes`.
+fn unavailable_base_attrs(reg: &RegisteredEntity, incoming: &Map<String, Value>) -> Attributes {
+    const BASE_ENTITY_KEYS: &[&str] = &[
+        "unit_of_measurement",
+        "assumed_state",
+        "attribution",
+        "device_class",
+        "entity_picture",
+        "icon",
+        "friendly_name",
+    ];
+    let mut out = reg.base_attrs.clone();
+    for &key in BASE_ENTITY_KEYS {
+        if let Some(v) = incoming.get(key)
+            && !v.is_null()
+            && !(key == "assumed_state" && v == &Value::Bool(false))
+        {
+            out.insert(key.into(), v.clone());
+        }
+    }
+    if let Some(name) = &reg.friendly_name {
+        out.entry("friendly_name").or_insert_with(|| json!(name));
+    }
+    out
+}
+
 fn media_player_capabilities(
     supported_features: u32,
     source_list: &Option<Value>,
     sound_mode_list: &Option<Value>,
-) -> Option<Value> {
+) -> Value {
     let mut caps = Map::new();
     if supported_features & media_player::feature::SELECT_SOURCE != 0
         && let Some(sources) = source_list
@@ -2042,7 +2067,7 @@ fn media_player_capabilities(
     {
         caps.insert("sound_mode_list".into(), modes.clone());
     }
-    (!caps.is_empty()).then_some(Value::Object(caps))
+    Value::Object(caps)
 }
 
 struct MediaPlayerInner {
