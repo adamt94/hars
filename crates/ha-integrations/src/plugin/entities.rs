@@ -401,7 +401,7 @@ impl PluginEntityStore {
                             light.min_color_temp_kelvin = min_k;
                             light.max_color_temp_kelvin = max_k;
                             if let Some(cm) = light.color_mode
-                                && !caps.modes.iter().any(|m| m == cm)
+                                && !is_valid_light_color_mode(cm, &caps, light.effect.as_deref())
                             {
                                 light.color_mode = None;
                             }
@@ -1009,6 +1009,26 @@ fn parse_light_caps(params: &EntityUpsertParams) -> LightCaps {
         modes,
         features: params.supported_features,
         effect_list: params.effect_list.clone(),
+    }
+}
+
+/// Mirror HA's `LightEntity.__validate_color_mode`: while an active effect
+/// (not `None`/`""`/`"off"`) is running on a light with `FEATURE_EFFECT`,
+/// `onoff` is always permitted and `brightness` is permitted whenever the
+/// light supports brightness.
+fn is_valid_light_color_mode(cm: ColorMode, caps: &LightCaps, effect: Option<&str>) -> bool {
+    if caps.modes.contains(cm) {
+        return true;
+    }
+    let effect_active = caps.features & crate::light::FEATURE_EFFECT != 0
+        && effect.is_some_and(|e| !e.is_empty() && e != "off");
+    if !effect_active {
+        return false;
+    }
+    match cm {
+        ColorMode::Onoff => true,
+        ColorMode::Brightness => caps.modes.iter().any(|m| m != ColorMode::Onoff),
+        _ => false,
     }
 }
 

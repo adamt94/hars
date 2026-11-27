@@ -2214,6 +2214,60 @@ async fn plugin_round1_edge_cases_default_code_reupsert_dynamic_attrs_and_droppe
         json!(["brightness"])
     );
 
+    // 4b. Re-upserting an `hs` light while an effect is active retains `brightness`
+    // (HA permits `onoff`/`brightness` during active effects).
+    let fx_light_id = store
+        .upsert_entity(protocol::EntityUpsertParams {
+            entry_id: "e1".into(),
+            unique_id: "light_fx".into(),
+            domain: "light".into(),
+            name: Some("FX Lamp".into()),
+            supported_color_modes: vec!["hs".into()],
+            supported_features: crate::light::FEATURE_EFFECT,
+            effect_list: Some(vec!["rainbow".into()]),
+            ..Default::default()
+        })
+        .unwrap();
+    store
+        .set_state(protocol::StateSetParams {
+            entry_id: "e1".into(),
+            unique_id: "light_fx".into(),
+            state: "on".into(),
+            attributes: json!({
+                "color_mode": "brightness",
+                "brightness": 200,
+                "effect": "rainbow"
+            })
+            .as_object()
+            .cloned()
+            .unwrap(),
+        })
+        .unwrap();
+    store
+        .upsert_entity(protocol::EntityUpsertParams {
+            entry_id: "e1".into(),
+            unique_id: "light_fx".into(),
+            domain: "light".into(),
+            name: Some("FX Lamp".into()),
+            supported_color_modes: vec!["hs".into()],
+            supported_features: crate::light::FEATURE_EFFECT,
+            effect_list: Some(vec!["rainbow".into()]),
+            ..Default::default()
+        })
+        .unwrap();
+    store
+        .set_state(protocol::StateSetParams {
+            entry_id: "e1".into(),
+            unique_id: "light_fx".into(),
+            state: "on".into(),
+            attributes: json!({"brightness": 180}).as_object().cloned().unwrap(),
+        })
+        .unwrap();
+    let fx_eid = ha_core::EntityId::parse(&fx_light_id).unwrap();
+    let fx_st = hass.states().get(&fx_eid).unwrap();
+    assert_eq!(fx_st.attributes["color_mode"], json!("brightness"));
+    assert_eq!(fx_st.attributes["effect"], json!("rainbow"));
+
     // 5. Re-upserting a select with omitted options clears them (matches registry `[]`).
     let sel_id = store
         .upsert_entity(protocol::EntityUpsertParams {

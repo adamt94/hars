@@ -221,14 +221,85 @@ struct Flags {
     ascii: bool,
 }
 
-/// Python 3 `re` simple Unicode case-fold for the four non-ASCII characters
-/// that fold onto ASCII letters (`İ`/`ı`/`ſ`/`K`).
-fn py_re_fold(c: char) -> char {
+/// Return the exact Python 3.14 `re` `(?i)` Unicode case-equivalence class for
+/// `c` (1..=4 characters, always including `c` itself).
+///
+/// Covers every codepoint whose Python `re` equivalence class differs from
+/// `{c, single(c.to_lowercase()), single(c.to_uppercase())}`: Python's
+/// `re._casefix._EXTRA_CASES`, Unicode titlecase digraphs, compatibility
+/// uppercase signs (`K`, `Å`, `Ω`), `ß`/`ẞ`, and the Greek iota-subscript
+/// lowercase/titlecase pairs.
+fn py_unicode_case_class(c: char) -> ([char; 4], usize) {
+    // 24 contiguous Greek iota-subscript pairs: U+1F80..=1F87 <-> +8,
+    // U+1F90..=1F97 <-> +8, U+1FA0..=1FA7 <-> +8.
+    let cp = u32::from(c);
+    if matches!(cp, 0x1F80..=0x1F87 | 0x1F90..=0x1F97 | 0x1FA0..=0x1FA7) {
+        return ([c, char::from_u32(cp + 8).unwrap_or(c), '\0', '\0'], 2);
+    }
+    if matches!(cp, 0x1F88..=0x1F8F | 0x1F98..=0x1F9F | 0x1FA8..=0x1FAF) {
+        return ([char::from_u32(cp - 8).unwrap_or(c), c, '\0', '\0'], 2);
+    }
     match c {
-        '\u{0130}' | '\u{0131}' => 'i',
-        '\u{017F}' => 's',
-        '\u{212A}' => 'k',
-        other => other,
+        'I' | 'i' | '\u{0130}' | '\u{0131}' => (['I', 'i', '\u{0130}', '\u{0131}'], 4),
+        'K' | 'k' | '\u{212A}' => (['K', 'k', '\u{212A}', '\0'], 3),
+        'S' | 's' | '\u{017F}' => (['S', 's', '\u{017F}', '\0'], 3),
+        '\u{00B5}' | '\u{039C}' | '\u{03BC}' => (['\u{00B5}', '\u{039C}', '\u{03BC}', '\0'], 3),
+        '\u{00DF}' | '\u{1E9E}' => (['\u{00DF}', '\u{1E9E}', '\0', '\0'], 2),
+        '\u{00C5}' | '\u{00E5}' | '\u{212B}' => (['\u{00C5}', '\u{00E5}', '\u{212B}', '\0'], 3),
+        '\u{01C4}' | '\u{01C5}' | '\u{01C6}' => (['\u{01C4}', '\u{01C5}', '\u{01C6}', '\0'], 3),
+        '\u{01C7}' | '\u{01C8}' | '\u{01C9}' => (['\u{01C7}', '\u{01C8}', '\u{01C9}', '\0'], 3),
+        '\u{01CA}' | '\u{01CB}' | '\u{01CC}' => (['\u{01CA}', '\u{01CB}', '\u{01CC}', '\0'], 3),
+        '\u{01F1}' | '\u{01F2}' | '\u{01F3}' => (['\u{01F1}', '\u{01F2}', '\u{01F3}', '\0'], 3),
+        '\u{0345}' | '\u{0399}' | '\u{03B9}' | '\u{1FBE}' => {
+            (['\u{0345}', '\u{0399}', '\u{03B9}', '\u{1FBE}'], 4)
+        }
+        '\u{0390}' | '\u{1FD3}' => (['\u{0390}', '\u{1FD3}', '\0', '\0'], 2),
+        '\u{03B0}' | '\u{1FE3}' => (['\u{03B0}', '\u{1FE3}', '\0', '\0'], 2),
+        '\u{0392}' | '\u{03B2}' | '\u{03D0}' => (['\u{0392}', '\u{03B2}', '\u{03D0}', '\0'], 3),
+        '\u{0395}' | '\u{03B5}' | '\u{03F5}' => (['\u{0395}', '\u{03B5}', '\u{03F5}', '\0'], 3),
+        '\u{0398}' | '\u{03B8}' | '\u{03D1}' | '\u{03F4}' => {
+            (['\u{0398}', '\u{03B8}', '\u{03D1}', '\u{03F4}'], 4)
+        }
+        '\u{039A}' | '\u{03BA}' | '\u{03F0}' => (['\u{039A}', '\u{03BA}', '\u{03F0}', '\0'], 3),
+        '\u{03A0}' | '\u{03C0}' | '\u{03D6}' => (['\u{03A0}', '\u{03C0}', '\u{03D6}', '\0'], 3),
+        '\u{03A1}' | '\u{03C1}' | '\u{03F1}' => (['\u{03A1}', '\u{03C1}', '\u{03F1}', '\0'], 3),
+        '\u{03A3}' | '\u{03C2}' | '\u{03C3}' => (['\u{03A3}', '\u{03C2}', '\u{03C3}', '\0'], 3),
+        '\u{03A6}' | '\u{03C6}' | '\u{03D5}' => (['\u{03A6}', '\u{03C6}', '\u{03D5}', '\0'], 3),
+        '\u{03A9}' | '\u{03C9}' | '\u{2126}' => (['\u{03A9}', '\u{03C9}', '\u{2126}', '\0'], 3),
+        '\u{0412}' | '\u{0432}' | '\u{1C80}' => (['\u{0412}', '\u{0432}', '\u{1C80}', '\0'], 3),
+        '\u{0414}' | '\u{0434}' | '\u{1C81}' => (['\u{0414}', '\u{0434}', '\u{1C81}', '\0'], 3),
+        '\u{041E}' | '\u{043E}' | '\u{1C82}' => (['\u{041E}', '\u{043E}', '\u{1C82}', '\0'], 3),
+        '\u{0421}' | '\u{0441}' | '\u{1C83}' => (['\u{0421}', '\u{0441}', '\u{1C83}', '\0'], 3),
+        '\u{0422}' | '\u{0442}' | '\u{1C84}' | '\u{1C85}' => {
+            (['\u{0422}', '\u{0442}', '\u{1C84}', '\u{1C85}'], 4)
+        }
+        '\u{042A}' | '\u{044A}' | '\u{1C86}' => (['\u{042A}', '\u{044A}', '\u{1C86}', '\0'], 3),
+        '\u{0462}' | '\u{0463}' | '\u{1C87}' => (['\u{0462}', '\u{0463}', '\u{1C87}', '\0'], 3),
+        '\u{1C88}' | '\u{A64A}' | '\u{A64B}' => (['\u{1C88}', '\u{A64A}', '\u{A64B}', '\0'], 3),
+        '\u{1E60}' | '\u{1E61}' | '\u{1E9B}' => (['\u{1E60}', '\u{1E61}', '\u{1E9B}', '\0'], 3),
+        '\u{1FB3}' | '\u{1FBC}' => (['\u{1FB3}', '\u{1FBC}', '\0', '\0'], 2),
+        '\u{1FC3}' | '\u{1FCC}' => (['\u{1FC3}', '\u{1FCC}', '\0', '\0'], 2),
+        '\u{1FF3}' | '\u{1FFC}' => (['\u{1FF3}', '\u{1FFC}', '\0', '\0'], 2),
+        '\u{FB05}' | '\u{FB06}' => (['\u{FB05}', '\u{FB06}', '\0', '\0'], 2),
+        _ => {
+            let mut out = [c, '\0', '\0', '\0'];
+            let mut len = 1;
+            let mut lc = c.to_lowercase();
+            if let (Some(l), None) = (lc.next(), lc.next())
+                && l != c
+            {
+                out[len] = l;
+                len += 1;
+            }
+            let mut uc = c.to_uppercase();
+            if let (Some(u), None) = (uc.next(), uc.next())
+                && !out[..len].contains(&u)
+            {
+                out[len] = u;
+                len += 1;
+            }
+            (out, len)
+        }
     }
 }
 
@@ -239,9 +310,11 @@ fn char_eq(a: char, b: char, flags: Flags) -> bool {
     if flags.ascii {
         return a.eq_ignore_ascii_case(&b);
     }
-    let a = py_re_fold(a);
-    let b = py_re_fold(b);
-    a == b || a.to_lowercase().eq(b.to_lowercase())
+    if a == b {
+        return true;
+    }
+    let (cls, len) = py_unicode_case_class(a);
+    cls[..len].contains(&b)
 }
 
 fn char_in_range(c: char, lo: char, hi: char, flags: Flags) -> bool {
@@ -259,30 +332,8 @@ fn char_in_range(c: char, lo: char, hi: char, flags: Flags) -> bool {
         }
         return false;
     }
-    let folded = py_re_fold(c);
-    if lo <= folded && folded <= hi {
-        return true;
-    }
-    if folded.is_ascii_alphabetic() {
-        let low = folded.to_ascii_lowercase();
-        let up = folded.to_ascii_uppercase();
-        return (lo <= low && low <= hi) || (lo <= up && up <= hi);
-    }
-    let mut lc = folded.to_lowercase();
-    if let (Some(only), None) = (lc.next(), lc.next())
-        && lo <= only
-        && only <= hi
-    {
-        return true;
-    }
-    let mut uc = folded.to_uppercase();
-    if let (Some(only), None) = (uc.next(), uc.next())
-        && lo <= only
-        && only <= hi
-    {
-        return true;
-    }
-    false
+    let (cls, len) = py_unicode_case_class(c);
+    cls[..len].iter().any(|&x| lo <= x && x <= hi)
 }
 
 #[derive(Clone)]
@@ -975,6 +1026,11 @@ mod tests {
         assert!(!code_format_matches(r"(?ai)^k$", "\u{212A}"));
         assert!(code_format_matches(r"(?i)^[a-z]$", "\u{0130}"));
         assert!(!code_format_matches(r"(?ai)^[a-z]$", "\u{0130}"));
+        assert!(code_format_matches(r"(?i)^σ$", "ς"));
+        assert!(code_format_matches(r"(?i)^[İ-ı]$", "i"));
+        assert!(code_format_matches(r"(?i)^[İ-ı]$", "I"));
+        assert!(code_format_matches(r"(?i)^ß$", "ẞ"));
+        assert!(code_format_matches(r"(?i)^[ᾀ-ᾇ]$", "ᾈ"));
         // Unclosed pattern fails closed without panicking.
         assert!(!code_format_matches(r"[0-9", "1"));
         // Deeply nested groups and nested empty repetitions fail bounded & fast.
