@@ -276,6 +276,12 @@ shows how.
 | `scene` | `scene.turn_on` |
 | `button` | `button.press` |
 | `climate` | Home Assistant's ten `climate` services |
+| `vacuum` | `start`, `pause`, `stop`, `return_to_base`, `clean_spot`, `locate`, `set_fan_speed`, `send_command` |
+| `select` | `select_option`, `select_first`, `select_last`, `select_next`, `select_previous` |
+| `number` | `set_value` |
+| `cover` | `open_cover`, `close_cover`, `stop_cover`, `set_cover_position`, `toggle`, and the five `*_tilt` services |
+| `lock` | `lock`, `unlock`, `open` |
+| `fan` | `turn_on`, `turn_off`, `toggle`, `set_percentage`, `increase_speed`, `decrease_speed`, `set_preset_mode`, `oscillate`, `set_direction` |
 | `weather` | `weather.get_forecasts` |
 | `notify` | `notify.send_message`, for the companion app |
 | `sensor`, `binary_sensor`, `device_tracker` | None. These types are states only |

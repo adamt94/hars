@@ -895,6 +895,7 @@ async fn entity_store_guards_foreign_devices_duplicates_and_attribute_growth() {
             min_color_temp_kelvin: None,
             max_color_temp_kelvin: None,
             fan_speed_list: None,
+            ..Default::default()
         })
         .unwrap();
     let dup = store.upsert_entity(protocol::EntityUpsertParams {
@@ -914,6 +915,7 @@ async fn entity_store_guards_foreign_devices_duplicates_and_attribute_growth() {
         min_color_temp_kelvin: None,
         max_color_temp_kelvin: None,
         fan_speed_list: None,
+        ..Default::default()
     });
     assert!(dup.is_err());
 
@@ -1467,6 +1469,7 @@ async fn user_disabled_plugin_vacuum_cannot_be_commanded() {
             min_color_temp_kelvin: None,
             max_color_temp_kelvin: None,
             fan_speed_list: None,
+            ..Default::default()
         })
         .unwrap();
     store
@@ -1515,6 +1518,7 @@ async fn user_disabled_plugin_vacuum_cannot_be_commanded() {
             min_color_temp_kelvin: None,
             max_color_temp_kelvin: None,
             fan_speed_list: None,
+            ..Default::default()
         })
         .unwrap();
     let btn_eid = ha_core::EntityId::parse(&btn_id).unwrap();
@@ -1562,6 +1566,769 @@ async fn user_disabled_plugin_vacuum_cannot_be_commanded() {
     assert_eq!(
         hass.states().get(&btn_eid).unwrap().state.as_str(),
         pressed_ts
+    );
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[tokio::test]
+async fn plugin_supports_select_number_cover_lock_and_fan() {
+    use crate::{cover, fan, lock};
+
+    let dir = temp_dir("foundation-domains");
+    let plugin_dir = dir.join("plugins/multi_dev");
+    std::fs::create_dir_all(plugin_dir.join("bin")).unwrap();
+    let manifest = PluginManifest {
+        schema_version: 1,
+        domain: "multi_dev".into(),
+        name: "Multi Device".into(),
+        version: "0.1.0".into(),
+        iot_class: "local_push".into(),
+        config_flow: true,
+        documentation: None,
+        description: None,
+        transport: Transport::Stdio {
+            command: "bin/multi".into(),
+            args: vec![],
+        },
+        capabilities: Capabilities {
+            entity_domains: vec![
+                "select".into(),
+                "number".into(),
+                "cover".into(),
+                "lock".into(),
+                "fan".into(),
+            ],
+            config_entry_version: 1,
+        },
+    };
+    std::fs::write(
+        plugin_dir.join("plugin.json"),
+        serde_json::to_string_pretty(&manifest).unwrap(),
+    )
+    .unwrap();
+    std::fs::write(plugin_dir.join("bin/multi"), b"").unwrap();
+    let installed = Arc::new(InstalledPlugin::load(&plugin_dir).unwrap());
+
+    let hass = Hass::new();
+    let registry = Registry::new(&hass, &dir, Registries::default());
+    let components = Components::new(&hass, registry, Profiles::default());
+
+    let recorded: Arc<parking_lot::Mutex<Vec<protocol::EntityCallParams>>> = Default::default();
+    let rec = recorded.clone();
+    let store = entities::PluginEntityStore::new(
+        installed,
+        components.clone(),
+        Arc::new(move |params| {
+            rec.lock().push(params);
+            Box::pin(async { Ok(()) })
+        }),
+    );
+    store.activate_entry("e1");
+
+    // 1. select
+    let sel_id = store
+        .upsert_entity(protocol::EntityUpsertParams {
+            entry_id: "e1".into(),
+            unique_id: "sel_1".into(),
+            domain: "select".into(),
+            name: Some("Mode".into()),
+            options: Some(vec!["eco".into(), "normal".into(), "turbo".into()]),
+            ..Default::default()
+        })
+        .unwrap();
+    store
+        .set_state(protocol::StateSetParams {
+            entry_id: "e1".into(),
+            unique_id: "sel_1".into(),
+            state: "eco".into(),
+            attributes: Map::new(),
+        })
+        .unwrap();
+
+    // 2. number
+    let num_id = store
+        .upsert_entity(protocol::EntityUpsertParams {
+            entry_id: "e1".into(),
+            unique_id: "num_1".into(),
+            domain: "number".into(),
+            name: Some("Brightness".into()),
+            min_value: Some(0.0),
+            max_value: Some(50.0),
+            step: Some(5.0),
+            mode: Some("slider".into()),
+            ..Default::default()
+        })
+        .unwrap();
+    store
+        .set_state(protocol::StateSetParams {
+            entry_id: "e1".into(),
+            unique_id: "num_1".into(),
+            state: "25".into(),
+            attributes: Map::new(),
+        })
+        .unwrap();
+
+    // 3. cover
+    let cov_id = store
+        .upsert_entity(protocol::EntityUpsertParams {
+            entry_id: "e1".into(),
+            unique_id: "cov_1".into(),
+            domain: "cover".into(),
+            name: Some("Blinds".into()),
+            supported_features: cover::feature::OPEN
+                | cover::feature::CLOSE
+                | cover::feature::SET_POSITION
+                | cover::feature::STOP,
+            ..Default::default()
+        })
+        .unwrap();
+    store
+        .set_state(protocol::StateSetParams {
+            entry_id: "e1".into(),
+            unique_id: "cov_1".into(),
+            state: "closed".into(),
+            attributes: json!({"current_position": 0}).as_object().cloned().unwrap(),
+        })
+        .unwrap();
+
+    // 4. lock
+    let lck_id = store
+        .upsert_entity(protocol::EntityUpsertParams {
+            entry_id: "e1".into(),
+            unique_id: "lck_1".into(),
+            domain: "lock".into(),
+            name: Some("Front Door".into()),
+            supported_features: lock::feature::OPEN,
+            code_format: Some(r"^\d{4}$".into()),
+            ..Default::default()
+        })
+        .unwrap();
+    store
+        .set_state(protocol::StateSetParams {
+            entry_id: "e1".into(),
+            unique_id: "lck_1".into(),
+            state: "locked".into(),
+            attributes: Map::new(),
+        })
+        .unwrap();
+
+    // 5. fan
+    let fan_id = store
+        .upsert_entity(protocol::EntityUpsertParams {
+            entry_id: "e1".into(),
+            unique_id: "fan_1".into(),
+            domain: "fan".into(),
+            name: Some("Ceiling Fan".into()),
+            supported_features: fan::feature::TURN_ON
+                | fan::feature::TURN_OFF
+                | fan::feature::SET_SPEED
+                | fan::feature::PRESET_MODE,
+            preset_modes: Some(vec!["auto".into(), "sleep".into()]),
+            speed_count: Some(3),
+            ..Default::default()
+        })
+        .unwrap();
+    store
+        .set_state(protocol::StateSetParams {
+            entry_id: "e1".into(),
+            unique_id: "fan_1".into(),
+            state: "on".into(),
+            attributes: json!({"percentage": 33}).as_object().cloned().unwrap(),
+        })
+        .unwrap();
+
+    let call = |domain: &'static str, svc: &'static str, v: Value| {
+        let hass = hass.clone();
+        async move {
+            hass.call_service(
+                domain,
+                svc,
+                v.as_object().cloned().unwrap(),
+                None,
+                false,
+                None,
+            )
+            .await
+        }
+    };
+    call("select", "select_next", json!({"entity_id": sel_id}))
+        .await
+        .unwrap();
+    call(
+        "number",
+        "set_value",
+        json!({"entity_id": num_id, "value": 35}),
+    )
+    .await
+    .unwrap();
+    call("cover", "toggle", json!({"entity_id": cov_id}))
+        .await
+        .unwrap();
+    call(
+        "lock",
+        "unlock",
+        json!({"entity_id": lck_id, "code": "1234"}),
+    )
+    .await
+    .unwrap();
+    call("fan", "increase_speed", json!({"entity_id": fan_id}))
+        .await
+        .unwrap();
+
+    // Validation failures do not reach the plugin.
+    assert!(
+        call(
+            "number",
+            "set_value",
+            json!({"entity_id": num_id, "value": 99})
+        )
+        .await
+        .is_err()
+    );
+    assert!(
+        call(
+            "lock",
+            "unlock",
+            json!({"entity_id": lck_id, "code": "bad"})
+        )
+        .await
+        .is_err()
+    );
+
+    let calls: Vec<(String, String, Value)> = recorded
+        .lock()
+        .iter()
+        .map(|c| {
+            (
+                c.domain.clone(),
+                c.service.clone(),
+                Value::Object(c.data.clone()),
+            )
+        })
+        .collect();
+    assert_eq!(
+        calls,
+        vec![
+            (
+                "select".into(),
+                "select_option".into(),
+                json!({"option": "normal"})
+            ),
+            ("number".into(), "set_value".into(), json!({"value": 35.0})),
+            ("cover".into(), "open_cover".into(), json!({})),
+            ("lock".into(), "unlock".into(), json!({"code": "1234"})),
+            (
+                "fan".into(),
+                "set_percentage".into(),
+                json!({"percentage": 66})
+            ),
+        ]
+    );
+
+    // Crash marks all five unavailable while preserving capabilities & units,
+    // and deactivate_entry unregisters them.
+    store.mark_all_unavailable();
+    for id in [&sel_id, &num_id, &cov_id, &lck_id, &fan_id] {
+        assert_eq!(
+            hass.states()
+                .get(&ha_core::EntityId::parse(id).unwrap())
+                .unwrap()
+                .state
+                .as_str(),
+            "unavailable"
+        );
+    }
+    let sel_st = hass
+        .states()
+        .get(&ha_core::EntityId::parse(&sel_id).unwrap())
+        .unwrap();
+    assert_eq!(
+        sel_st.attributes["options"],
+        json!(["eco", "normal", "turbo"])
+    );
+    let num_st = hass
+        .states()
+        .get(&ha_core::EntityId::parse(&num_id).unwrap())
+        .unwrap();
+    assert_eq!(num_st.attributes["min"], json!(0.0));
+    assert_eq!(num_st.attributes["max"], json!(50.0));
+    assert_eq!(num_st.attributes["step"], json!(5.0));
+    assert_eq!(num_st.attributes["mode"], json!("slider"));
+    let lck_st = hass
+        .states()
+        .get(&ha_core::EntityId::parse(&lck_id).unwrap())
+        .unwrap();
+    // `code_format` is a state_attribute in HA's LockEntity, omitted when unavailable.
+    assert!(lck_st.attributes.get("code_format").is_none());
+    let fan_st = hass
+        .states()
+        .get(&ha_core::EntityId::parse(&fan_id).unwrap())
+        .unwrap();
+    assert_eq!(fan_st.attributes["preset_modes"], json!(["auto", "sleep"]));
+    assert!(fan_st.attributes.get("percentage_step").is_none());
+
+    store.deactivate_entry("e1");
+    for id in [&sel_id, &num_id, &cov_id, &lck_id, &fan_id] {
+        assert!(
+            hass.states()
+                .get(&ha_core::EntityId::parse(id).unwrap())
+                .is_none()
+        );
+    }
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[tokio::test]
+async fn plugin_round1_edge_cases_default_code_reupsert_dynamic_attrs_and_dropped_pct() {
+    use crate::{cover, fan, lock};
+
+    let dir = temp_dir("foundation-edge-cases");
+    let plugin_dir = dir.join("plugins/edge_dev");
+    std::fs::create_dir_all(plugin_dir.join("bin")).unwrap();
+    let manifest = PluginManifest {
+        schema_version: 1,
+        domain: "edge_dev".into(),
+        name: "Edge Device".into(),
+        version: "0.1.0".into(),
+        iot_class: "local_push".into(),
+        config_flow: true,
+        documentation: None,
+        description: None,
+        transport: Transport::Stdio {
+            command: "bin/edge".into(),
+            args: vec![],
+        },
+        capabilities: Capabilities {
+            entity_domains: vec![
+                "cover".into(),
+                "lock".into(),
+                "fan".into(),
+                "light".into(),
+                "select".into(),
+            ],
+            config_entry_version: 1,
+        },
+    };
+    std::fs::write(
+        plugin_dir.join("plugin.json"),
+        serde_json::to_string_pretty(&manifest).unwrap(),
+    )
+    .unwrap();
+    std::fs::write(plugin_dir.join("bin/edge"), b"").unwrap();
+    let installed = Arc::new(InstalledPlugin::load(&plugin_dir).unwrap());
+
+    let hass = Hass::new();
+    // Seed an imported lock row carrying `options.lock.default_code`.
+    let seeded_row: ha_registry::Entity = serde_json::from_value(json!({
+        "entity_id": "lock.imported_door",
+        "platform": "edge_dev",
+        "unique_id": "lck_imported",
+        "config_entry_id": "e1",
+        "options": { "lock": { "default_code": "4321" } }
+    }))
+    .unwrap();
+    let initial = Registries {
+        entities: vec![Arc::new(seeded_row)],
+        ..Default::default()
+    };
+    let registry = Registry::new(&hass, &dir, initial);
+    let components = Components::new(&hass, registry, Profiles::default());
+
+    let recorded: Arc<parking_lot::Mutex<Vec<protocol::EntityCallParams>>> = Default::default();
+    let rec = recorded.clone();
+    let store = entities::PluginEntityStore::new(
+        installed,
+        components.clone(),
+        Arc::new(move |params| {
+            rec.lock().push(params);
+            Box::pin(async { Ok(()) })
+        }),
+    );
+    store.activate_entry("e1");
+
+    // 1. Imported lock uses `options.lock.default_code` when `code` is omitted.
+    let lck_id = store
+        .upsert_entity(protocol::EntityUpsertParams {
+            entry_id: "e1".into(),
+            unique_id: "lck_imported".into(),
+            domain: "lock".into(),
+            name: Some("Imported Door".into()),
+            supported_features: lock::feature::OPEN,
+            code_format: Some(r"^\d{4}$".into()),
+            ..Default::default()
+        })
+        .unwrap();
+    assert_eq!(lck_id, "lock.imported_door");
+    hass.call_service(
+        "lock",
+        "unlock",
+        json!({"entity_id": lck_id}).as_object().cloned().unwrap(),
+        None,
+        false,
+        None,
+    )
+    .await
+    .unwrap();
+    // Dynamic code_format override persists across later frames without it.
+    store
+        .set_state(protocol::StateSetParams {
+            entry_id: "e1".into(),
+            unique_id: "lck_imported".into(),
+            state: "unlocked".into(),
+            attributes: json!({"code_format": r"^\d{6}$"})
+                .as_object()
+                .cloned()
+                .unwrap(),
+        })
+        .unwrap();
+    store
+        .set_state(protocol::StateSetParams {
+            entry_id: "e1".into(),
+            unique_id: "lck_imported".into(),
+            state: "locked".into(),
+            attributes: Map::new(),
+        })
+        .unwrap();
+    let lck_eid = ha_core::EntityId::parse(&lck_id).unwrap();
+    assert_eq!(
+        hass.states().get(&lck_eid).unwrap().attributes["code_format"],
+        json!(r"^\d{6}$")
+    );
+    // Old 4-digit default_code no longer matches `^\d{6}$`, so unlock without code fails.
+    assert!(
+        hass.call_service(
+            "lock",
+            "unlock",
+            json!({"entity_id": lck_id}).as_object().cloned().unwrap(),
+            None,
+            false,
+            None,
+        )
+        .await
+        .is_err()
+    );
+    // Clearing `code_format` still forwards the saved default_code, matching HA.
+    store
+        .set_state(protocol::StateSetParams {
+            entry_id: "e1".into(),
+            unique_id: "lck_imported".into(),
+            state: "locked".into(),
+            attributes: json!({"code_format": null}).as_object().cloned().unwrap(),
+        })
+        .unwrap();
+    hass.call_service(
+        "lock",
+        "unlock",
+        json!({"entity_id": lck_id}).as_object().cloned().unwrap(),
+        None,
+        false,
+        None,
+    )
+    .await
+    .unwrap();
+
+    // 2. Re-upsert preserves live fan `is_on` and cover `is_opening` state;
+    //    dropped fan `percentage` resets `increase_speed` to 33%; dynamic
+    //    `preset_modes` stay synced with published attributes.
+    let fan_id = store
+        .upsert_entity(protocol::EntityUpsertParams {
+            entry_id: "e1".into(),
+            unique_id: "fan_edge".into(),
+            domain: "fan".into(),
+            name: Some("Edge Fan".into()),
+            supported_features: fan::feature::TURN_ON
+                | fan::feature::TURN_OFF
+                | fan::feature::SET_SPEED
+                | fan::feature::PRESET_MODE,
+            preset_modes: Some(vec!["auto".into()]),
+            speed_count: Some(3),
+            ..Default::default()
+        })
+        .unwrap();
+    store
+        .set_state(protocol::StateSetParams {
+            entry_id: "e1".into(),
+            unique_id: "fan_edge".into(),
+            state: "on".into(),
+            attributes: json!({"percentage": 66, "preset_modes": ["sleep"]})
+                .as_object()
+                .cloned()
+                .unwrap(),
+        })
+        .unwrap();
+    // Subsequent state frame omitting preset_modes still advertises ["sleep"].
+    store
+        .set_state(protocol::StateSetParams {
+            entry_id: "e1".into(),
+            unique_id: "fan_edge".into(),
+            state: "on".into(),
+            attributes: json!({"percentage": 66}).as_object().cloned().unwrap(),
+        })
+        .unwrap();
+    let fan_eid = ha_core::EntityId::parse(&fan_id).unwrap();
+    assert_eq!(
+        hass.states().get(&fan_eid).unwrap().attributes["preset_modes"],
+        json!(["sleep"])
+    );
+    // Re-upserting metadata preserves `is_on = true`, so toggle sends `turn_off`.
+    store
+        .upsert_entity(protocol::EntityUpsertParams {
+            entry_id: "e1".into(),
+            unique_id: "fan_edge".into(),
+            domain: "fan".into(),
+            name: Some("Edge Fan".into()),
+            supported_features: fan::feature::TURN_ON
+                | fan::feature::TURN_OFF
+                | fan::feature::SET_SPEED
+                | fan::feature::PRESET_MODE,
+            preset_modes: Some(vec!["sleep".into()]),
+            speed_count: Some(3),
+            ..Default::default()
+        })
+        .unwrap();
+    hass.call_service(
+        "fan",
+        "toggle",
+        json!({"entity_id": fan_id}).as_object().cloned().unwrap(),
+        None,
+        false,
+        None,
+    )
+    .await
+    .unwrap();
+    // Turning off without `percentage` drops cached percentage -> increase_speed sends 33%.
+    store
+        .set_state(protocol::StateSetParams {
+            entry_id: "e1".into(),
+            unique_id: "fan_edge".into(),
+            state: "off".into(),
+            attributes: Map::new(),
+        })
+        .unwrap();
+    hass.call_service(
+        "fan",
+        "increase_speed",
+        json!({"entity_id": fan_id}).as_object().cloned().unwrap(),
+        None,
+        false,
+        None,
+    )
+    .await
+    .unwrap();
+
+    // 3. Re-upserting a moving cover preserves `is_opening` -> toggle sends `stop_cover`.
+    let cov_id = store
+        .upsert_entity(protocol::EntityUpsertParams {
+            entry_id: "e1".into(),
+            unique_id: "cov_edge".into(),
+            domain: "cover".into(),
+            name: Some("Edge Blinds".into()),
+            supported_features: cover::feature::OPEN | cover::feature::CLOSE | cover::feature::STOP,
+            ..Default::default()
+        })
+        .unwrap();
+    store
+        .set_state(protocol::StateSetParams {
+            entry_id: "e1".into(),
+            unique_id: "cov_edge".into(),
+            state: "opening".into(),
+            attributes: Map::new(),
+        })
+        .unwrap();
+    store
+        .upsert_entity(protocol::EntityUpsertParams {
+            entry_id: "e1".into(),
+            unique_id: "cov_edge".into(),
+            domain: "cover".into(),
+            name: Some("Edge Blinds".into()),
+            supported_features: cover::feature::OPEN | cover::feature::CLOSE | cover::feature::STOP,
+            ..Default::default()
+        })
+        .unwrap();
+    hass.call_service(
+        "cover",
+        "toggle",
+        json!({"entity_id": cov_id}).as_object().cloned().unwrap(),
+        None,
+        false,
+        None,
+    )
+    .await
+    .unwrap();
+
+    // 4. Re-upserting a color_temp light as brightness-only drops the stale
+    //    unsupported color_mode; disconnect preserves light capabilities.
+    let light_id = store
+        .upsert_entity(protocol::EntityUpsertParams {
+            entry_id: "e1".into(),
+            unique_id: "light_edge".into(),
+            domain: "light".into(),
+            name: Some("Edge Lamp".into()),
+            supported_color_modes: vec!["color_temp".into()],
+            min_color_temp_kelvin: Some(2200),
+            max_color_temp_kelvin: Some(6000),
+            ..Default::default()
+        })
+        .unwrap();
+    store
+        .set_state(protocol::StateSetParams {
+            entry_id: "e1".into(),
+            unique_id: "light_edge".into(),
+            state: "on".into(),
+            attributes: json!({"color_mode": "color_temp", "color_temp_kelvin": 3000})
+                .as_object()
+                .cloned()
+                .unwrap(),
+        })
+        .unwrap();
+    store
+        .upsert_entity(protocol::EntityUpsertParams {
+            entry_id: "e1".into(),
+            unique_id: "light_edge".into(),
+            domain: "light".into(),
+            name: Some("Edge Lamp".into()),
+            supported_color_modes: vec!["brightness".into()],
+            ..Default::default()
+        })
+        .unwrap();
+    store
+        .set_state(protocol::StateSetParams {
+            entry_id: "e1".into(),
+            unique_id: "light_edge".into(),
+            state: "on".into(),
+            attributes: json!({"brightness": 128}).as_object().cloned().unwrap(),
+        })
+        .unwrap();
+    let light_eid = ha_core::EntityId::parse(&light_id).unwrap();
+    let light_st = hass.states().get(&light_eid).unwrap();
+    assert_eq!(light_st.attributes["color_mode"], json!("brightness"));
+    assert_eq!(
+        light_st.attributes["supported_color_modes"],
+        json!(["brightness"])
+    );
+    store.mark_all_unavailable();
+    assert_eq!(
+        hass.states().get(&light_eid).unwrap().attributes["supported_color_modes"],
+        json!(["brightness"])
+    );
+
+    // 4b. Re-upserting an `hs` light while an effect is active retains `brightness`
+    // (HA permits `onoff`/`brightness` during active effects).
+    let fx_light_id = store
+        .upsert_entity(protocol::EntityUpsertParams {
+            entry_id: "e1".into(),
+            unique_id: "light_fx".into(),
+            domain: "light".into(),
+            name: Some("FX Lamp".into()),
+            supported_color_modes: vec!["hs".into()],
+            supported_features: crate::light::FEATURE_EFFECT,
+            effect_list: Some(vec!["rainbow".into()]),
+            ..Default::default()
+        })
+        .unwrap();
+    store
+        .set_state(protocol::StateSetParams {
+            entry_id: "e1".into(),
+            unique_id: "light_fx".into(),
+            state: "on".into(),
+            attributes: json!({
+                "color_mode": "brightness",
+                "brightness": 200,
+                "effect": "rainbow"
+            })
+            .as_object()
+            .cloned()
+            .unwrap(),
+        })
+        .unwrap();
+    store
+        .upsert_entity(protocol::EntityUpsertParams {
+            entry_id: "e1".into(),
+            unique_id: "light_fx".into(),
+            domain: "light".into(),
+            name: Some("FX Lamp".into()),
+            supported_color_modes: vec!["hs".into()],
+            supported_features: crate::light::FEATURE_EFFECT,
+            effect_list: Some(vec!["rainbow".into()]),
+            ..Default::default()
+        })
+        .unwrap();
+    store
+        .set_state(protocol::StateSetParams {
+            entry_id: "e1".into(),
+            unique_id: "light_fx".into(),
+            state: "on".into(),
+            attributes: json!({"brightness": 180}).as_object().cloned().unwrap(),
+        })
+        .unwrap();
+    let fx_eid = ha_core::EntityId::parse(&fx_light_id).unwrap();
+    let fx_st = hass.states().get(&fx_eid).unwrap();
+    assert_eq!(fx_st.attributes["color_mode"], json!("brightness"));
+    assert_eq!(fx_st.attributes["effect"], json!("rainbow"));
+
+    // 5. Re-upserting a select with omitted options clears them (matches registry `[]`).
+    let sel_id = store
+        .upsert_entity(protocol::EntityUpsertParams {
+            entry_id: "e1".into(),
+            unique_id: "sel_edge".into(),
+            domain: "select".into(),
+            name: Some("Edge Select".into()),
+            options: Some(vec!["a".into(), "b".into()]),
+            ..Default::default()
+        })
+        .unwrap();
+    store
+        .upsert_entity(protocol::EntityUpsertParams {
+            entry_id: "e1".into(),
+            unique_id: "sel_edge".into(),
+            domain: "select".into(),
+            name: Some("Edge Select".into()),
+            options: None,
+            ..Default::default()
+        })
+        .unwrap();
+    assert!(
+        hass.call_service(
+            "select",
+            "select_option",
+            json!({"entity_id": sel_id, "option": "a"})
+                .as_object()
+                .cloned()
+                .unwrap(),
+            None,
+            false,
+            None,
+        )
+        .await
+        .is_err()
+    );
+
+    let calls: Vec<(String, String, Value)> = recorded
+        .lock()
+        .iter()
+        .map(|c| {
+            (
+                c.domain.clone(),
+                c.service.clone(),
+                Value::Object(c.data.clone()),
+            )
+        })
+        .collect();
+    assert_eq!(
+        calls,
+        vec![
+            ("lock".into(), "unlock".into(), json!({"code": "4321"})),
+            ("lock".into(), "unlock".into(), json!({"code": "4321"})),
+            ("fan".into(), "turn_off".into(), json!({})),
+            (
+                "fan".into(),
+                "set_percentage".into(),
+                json!({"percentage": 33})
+            ),
+            ("cover".into(), "stop_cover".into(), json!({})),
+        ]
     );
 
     let _ = std::fs::remove_dir_all(&dir);

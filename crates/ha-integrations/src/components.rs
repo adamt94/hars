@@ -5,8 +5,13 @@
 
 use crate::button::Buttons;
 use crate::climate::Climates;
+use crate::cover::Covers;
+use crate::fan::Fans;
 use crate::light::{Lights, Profiles};
+use crate::lock::Locks;
+use crate::number::Numbers;
 use crate::scene::Scenes;
+use crate::select::Selects;
 use crate::switch::Switches;
 use crate::vacuum::Vacuums;
 use ha_core::Hass;
@@ -47,6 +52,11 @@ pub struct Components {
     buttons: OnceLock<Arc<Buttons>>,
     climates: OnceLock<Arc<Climates>>,
     vacuums: OnceLock<Arc<Vacuums>>,
+    selects: OnceLock<Arc<Selects>>,
+    numbers: OnceLock<Arc<Numbers>>,
+    covers: OnceLock<Arc<Covers>>,
+    locks: OnceLock<Arc<Locks>>,
+    fans: OnceLock<Arc<Fans>>,
     /// What every Hue bridge shares, made with the first.
     hue: OnceLock<Arc<crate::hue::Platforms>>,
     /// The entries that follow the registry, by entry id, from their
@@ -93,6 +103,11 @@ impl Components {
             buttons: OnceLock::new(),
             climates: OnceLock::new(),
             vacuums: OnceLock::new(),
+            selects: OnceLock::new(),
+            numbers: OnceLock::new(),
+            covers: OnceLock::new(),
+            locks: OnceLock::new(),
+            fans: OnceLock::new(),
             hue: OnceLock::new(),
             followers: Mutex::default(),
             running: Mutex::default(),
@@ -226,6 +241,56 @@ impl Components {
             })
             .clone()
     }
+
+    pub fn selects(&self) -> Arc<Selects> {
+        self.selects
+            .get_or_init(|| {
+                let c = Arc::new(Selects::default());
+                c.register_services(&self.hass, self.registries.clone());
+                c
+            })
+            .clone()
+    }
+
+    pub fn numbers(&self) -> Arc<Numbers> {
+        self.numbers
+            .get_or_init(|| {
+                let c = Arc::new(Numbers::default());
+                c.register_services(&self.hass, self.registries.clone());
+                c
+            })
+            .clone()
+    }
+
+    pub fn covers(&self) -> Arc<Covers> {
+        self.covers
+            .get_or_init(|| {
+                let c = Arc::new(Covers::default());
+                c.register_services(&self.hass, self.registries.clone());
+                c
+            })
+            .clone()
+    }
+
+    pub fn locks(&self) -> Arc<Locks> {
+        self.locks
+            .get_or_init(|| {
+                let c = Arc::new(Locks::default());
+                c.register_services(&self.hass, self.registries.clone());
+                c
+            })
+            .clone()
+    }
+
+    pub fn fans(&self) -> Arc<Fans> {
+        self.fans
+            .get_or_init(|| {
+                let c = Arc::new(Fans::default());
+                c.register_services(&self.hass, self.registries.clone());
+                c
+            })
+            .clone()
+    }
 }
 
 /// Points in the code where a test runs something of its own, once, on
@@ -282,5 +347,15 @@ mod tests {
         assert!(!hass.services().has_service("button", "press"));
         let _ = c.buttons();
         assert!(hass.services().has_service("button", "press"));
+        assert!(Arc::ptr_eq(&c.selects(), &c.selects()));
+        assert!(hass.services().has_service("select", "select_option"));
+        assert!(Arc::ptr_eq(&c.numbers(), &c.numbers()));
+        assert!(hass.services().has_service("number", "set_value"));
+        assert!(Arc::ptr_eq(&c.covers(), &c.covers()));
+        assert!(hass.services().has_service("cover", "open_cover"));
+        assert!(Arc::ptr_eq(&c.locks(), &c.locks()));
+        assert!(hass.services().has_service("lock", "unlock"));
+        assert!(Arc::ptr_eq(&c.fans(), &c.fans()));
+        assert!(hass.services().has_service("fan", "set_percentage"));
     }
 }

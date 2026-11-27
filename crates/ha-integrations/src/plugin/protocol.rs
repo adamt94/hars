@@ -224,12 +224,13 @@ pub struct DeviceUpsertParams {
 }
 
 /// Parameters sent by a plugin in `entity.upsert`.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct EntityUpsertParams {
     pub entry_id: String,
     pub unique_id: String,
-    /// Entity domain (`light`, `switch`, `button`, `scene`, `sensor`,
-    /// `binary_sensor`). Must be listed in `plugin.json` capabilities.
+    /// Entity domain (`light`, `switch`, `button`, `scene`, `vacuum`,
+    /// `select`, `number`, `cover`, `lock`, `fan`, `sensor`, `binary_sensor`).
+    /// Must be listed in `plugin.json` capabilities.
     pub domain: String,
     /// Optional device identifier previously registered via `device.upsert`.
     #[serde(default)]
@@ -261,6 +262,27 @@ pub struct EntityUpsertParams {
     /// For `vacuum` entities: available fan speeds (`fan_speed_list`).
     #[serde(default)]
     pub fan_speed_list: Option<Vec<String>>,
+    /// For `select` entities: selectable options (`options`).
+    #[serde(default)]
+    pub options: Option<Vec<String>>,
+    /// For `number` entities: range and UI mode (`min`, `max`, `step`, `mode`).
+    #[serde(default)]
+    pub min_value: Option<f64>,
+    #[serde(default)]
+    pub max_value: Option<f64>,
+    #[serde(default)]
+    pub step: Option<f64>,
+    #[serde(default)]
+    pub mode: Option<String>,
+    /// For `lock` entities: optional regex pattern validating `code`.
+    #[serde(default)]
+    pub code_format: Option<String>,
+    /// For `fan` entities: available preset modes (`preset_modes`) and
+    /// discrete speed count (`speed_count`, default 100).
+    #[serde(default)]
+    pub preset_modes: Option<Vec<String>>,
+    #[serde(default)]
+    pub speed_count: Option<u32>,
 }
 
 /// Parameters sent by a plugin in `state.set`.

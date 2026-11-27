@@ -291,9 +291,9 @@ fn check(kind: &Kind, value: &Value) -> Checked {
             let (n, changed) = match value {
                 Value::Number(n) => (n.as_f64().unwrap_or(0.0), false),
                 Value::Bool(b) => (f64::from(u8::from(*b)), true),
-                Value::String(s) => match s.trim().parse::<f64>() {
-                    Ok(f) => (f, true),
-                    Err(_) => return err("expected float".into()),
+                Value::String(s) => match parse_python_float(s) {
+                    Some(f) => (f, true),
+                    None => return err("expected float".into()),
                 },
                 _ => return err("expected float".into()),
             };
@@ -379,8 +379,8 @@ fn check(kind: &Kind, value: &Value) -> Checked {
             let n = match value {
                 Value::Number(n) => n.as_f64().unwrap_or(0.0),
                 Value::Bool(b) => f64::from(u8::from(*b)),
-                Value::String(s) => match s.trim().parse::<f64>() {
-                    Ok(f) if !f.is_nan() => f,
+                Value::String(s) => match parse_python_float(s) {
+                    Some(f) if !f.is_nan() => f,
                     _ => return err("expected float".into()),
                 },
                 _ => return err("expected float".into()),
@@ -465,6 +465,29 @@ fn is_python_int(s: &str) -> bool {
         && !digits.ends_with('_')
         && !digits.contains("__")
         && digits.bytes().all(|b| b.is_ascii_digit() || b == b'_')
+}
+
+/// Python's `float(str)`: surrounding whitespace, optional sign, and single
+/// `_` separators strictly between ASCII digits.
+fn parse_python_float(s: &str) -> Option<f64> {
+    let t = s.trim();
+    if !t.contains('_') {
+        return t.parse::<f64>().ok();
+    }
+    let bytes = t.as_bytes();
+    let mut cleaned = String::with_capacity(t.len());
+    for (i, &b) in bytes.iter().enumerate() {
+        if b == b'_' {
+            let prev_digit = i > 0 && bytes[i - 1].is_ascii_digit();
+            let next_digit = i + 1 < bytes.len() && bytes[i + 1].is_ascii_digit();
+            if !(prev_digit && next_digit) {
+                return None;
+            }
+        } else {
+            cleaned.push(b as char);
+        }
+    }
+    cleaned.parse::<f64>().ok()
 }
 
 /// Python's `int(str)`: surrounding whitespace, an optional sign, and
@@ -797,6 +820,18 @@ mod tests {
             err(&b, json!({ "b": " BAD " })),
             "invalid boolean value bad for dictionary value @ data['b']"
         );
+        // Python underscore float literals coerce like `float("1_0") == 10.0`.
+        let out = f
+            .validate(&data(json!({ "f": "1_0.5_0" })))
+            .unwrap()
+            .unwrap();
+        assert_eq!(out["f"], json!(10.5));
+        for bad in ["_1", "1_", "1__0", "1._5", "1_.5"] {
+            assert!(
+                f.validate(&data(json!({ "f": bad }))).is_err(),
+                "{bad} should be rejected"
+            );
+        }
     }
 
     /// Each against voluptuous 0.15.2 with HA's light schema.
