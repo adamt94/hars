@@ -31,7 +31,7 @@ Place a plugin under `<config>/plugins/<domain>/`:
     "args": []
   },
   "capabilities": {
-    "entity_domains": ["switch", "light", "button", "scene", "vacuum", "select", "number", "cover", "lock", "fan", "sensor", "binary_sensor"],
+    "entity_domains": ["switch", "light", "button", "scene", "vacuum", "select", "number", "cover", "lock", "fan", "media_player", "remote", "sensor", "binary_sensor"],
     "config_entry_version": 1
   }
 }

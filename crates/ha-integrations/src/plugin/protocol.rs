@@ -229,8 +229,8 @@ pub struct EntityUpsertParams {
     pub entry_id: String,
     pub unique_id: String,
     /// Entity domain (`light`, `switch`, `button`, `scene`, `vacuum`,
-    /// `select`, `number`, `cover`, `lock`, `fan`, `sensor`, `binary_sensor`).
-    /// Must be listed in `plugin.json` capabilities.
+    /// `select`, `number`, `cover`, `lock`, `fan`, `media_player`, `remote`,
+    /// `sensor`, `binary_sensor`). Must be listed in `plugin.json` capabilities.
     pub domain: String,
     /// Optional device identifier previously registered via `device.upsert`.
     #[serde(default)]
@@ -283,6 +283,14 @@ pub struct EntityUpsertParams {
     pub preset_modes: Option<Vec<String>>,
     #[serde(default)]
     pub speed_count: Option<u32>,
+    /// For `media_player` entities: available input sources (`source_list`),
+    /// sound modes (`sound_mode_list`), and default volume step (default 0.1).
+    #[serde(default)]
+    pub source_list: Option<Vec<String>>,
+    #[serde(default)]
+    pub sound_mode_list: Option<Vec<String>>,
+    #[serde(default)]
+    pub volume_step: Option<f64>,
 }
 
 /// Parameters sent by a plugin in `state.set`.

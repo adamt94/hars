@@ -8,6 +8,7 @@
 //! `"on"` → `true` for a boolean); the handler sees the coerced data, while
 //! the `call_service` event keeps the data as sent, as in HA.
 
+use crate::EntityId;
 use crate::service::{ServiceData, ServiceError, validate_entity_ids};
 use serde_json::{Number, Value};
 
@@ -27,8 +28,12 @@ pub enum Kind {
     String,
     /// `vol.In([...])`.
     OneOf(&'static [&'static str]),
+    /// `cv.entity_id`: a single entity ID string, lowercased.
+    EntityId,
     /// `cv.comp_entity_ids`: see [`crate::ServiceCall::entity_ids`].
     EntityIds,
+    /// `vol.Any(...)`: first matching kind wins; otherwise the last error.
+    AnyOf(Vec<Kind>),
     /// `vol.All(cv.ensure_list, [kind])`: a single value becomes a list.
     List(Box<Kind>),
     /// `vol.All(vol.Coerce(int), vol.Clamp(min, max))`.
@@ -79,10 +84,14 @@ struct Field {
     kind: Kind,
 }
 
+/// Optional pre-validation transform (`vol.All(fn, schema)`).
+pub type PreValidateFn = fn(&ServiceData) -> Result<Option<ServiceData>, ServiceError>;
+
 /// A service's data schema. Like `vol.Schema`, unknown keys are rejected
 /// unless [`Schema::allow_extra`] is set.
 #[derive(Debug, Clone, Default)]
 pub struct Schema {
+    pre_validate: Option<PreValidateFn>,
     fields: Vec<Field>,
     /// `vol.Exclusive` groups: (group name, keys).
     exclusive: Vec<(&'static str, &'static [&'static str])>,
@@ -150,6 +159,13 @@ impl Schema {
         self
     }
 
+    /// Run a pre-validation transform before checking schema fields
+    /// (`vol.All(pre, schema)`).
+    pub fn pre_validate(mut self, f: PreValidateFn) -> Self {
+        self.pre_validate = Some(f);
+        self
+    }
+
     /// Keep unknown keys instead of rejecting them (`extra=vol.ALLOW_EXTRA`).
     pub fn allow_extra(mut self) -> Self {
         self.allow_extra = true;
@@ -160,8 +176,16 @@ impl Schema {
     /// common case, which allocates nothing) or `Ok(Some(coerced))` when a
     /// value had to be coerced. Errors use voluptuous's wording.
     pub fn validate(&self, data: &ServiceData) -> Result<Option<ServiceData>, ServiceError> {
+        let orig = data;
+        let mut owned: Option<ServiceData> = None;
+        if let Some(pre) = self.pre_validate
+            && let Some(transformed) = pre(orig)?
+        {
+            owned = Some(transformed);
+        }
+        let data = owned.as_ref().unwrap_or(orig);
         let invalid = |msg: String| Err(ServiceError::Invalid(msg));
-        let mut coerced: Vec<(&str, Value)> = Vec::new();
+        let mut coerced: Vec<(&'static str, Value)> = Vec::new();
         let mut drop_metadata = false;
         if let Some(keys) = self.at_least_one
             && !data.keys().any(|k| keys.contains(&k.as_str()))
@@ -195,12 +219,16 @@ impl Schema {
                     }
                     Err((msg, Some(i))) => return invalid(format!("{msg} @ data['{key}'][{i}]")),
                 }
-            } else if self.entity_service && TARGET_KEYS.contains(&key) {
-                match check_target(key, value) {
-                    Ok(Some(v)) => coerced.push((key, v)),
+            } else if self.entity_service
+                && let Some(&target_key) = TARGET_KEYS.iter().find(|&&k| k == key)
+            {
+                match check_target(target_key, value) {
+                    Ok(Some(v)) => coerced.push((target_key, v)),
                     Ok(None) => {}
                     Err((msg, _)) => {
-                        return invalid(format!("{msg} for dictionary value @ data['{key}']"));
+                        return invalid(format!(
+                            "{msg} for dictionary value @ data['{target_key}']"
+                        ));
                     }
                 }
             } else if self.entity_service && key == "metadata" && value.is_object() {
@@ -228,9 +256,9 @@ impl Schema {
         }
 
         if coerced.is_empty() && !drop_metadata {
-            return Ok(None);
+            return Ok(owned);
         }
-        let mut out = data.clone();
+        let mut out = owned.unwrap_or_else(|| orig.clone());
         if drop_metadata {
             out.remove("metadata");
         }
@@ -324,7 +352,36 @@ fn check(kind: &Kind, value: &Value) -> Checked {
                 err(format!("value must be one of [{}]", list.join(", ")))
             }
         },
+        Kind::EntityId => {
+            let coerced_str = match check(&Kind::String, value)? {
+                Some(Value::String(s)) => Some(s),
+                _ => None,
+            };
+            let raw = coerced_str
+                .as_deref()
+                .or_else(|| value.as_str())
+                .unwrap_or_default();
+            let lower = raw.to_ascii_lowercase();
+            if EntityId::parse(&lower).is_err() {
+                return err(format!("Entity ID {raw} is an invalid entity ID"));
+            }
+            if coerced_str.is_some() || lower != raw {
+                Ok(Some(Value::String(lower)))
+            } else {
+                Ok(None)
+            }
+        }
         Kind::EntityIds => check_target("entity_id", value),
+        Kind::AnyOf(kinds) => {
+            let mut last_err = ("not a valid value".to_owned(), None);
+            for k in kinds {
+                match check(k, value) {
+                    Ok(v) => return Ok(v),
+                    Err(e) => last_err = e,
+                }
+            }
+            Err(last_err)
+        }
         Kind::StrictBool => match value {
             Value::Bool(_) => Ok(None),
             _ => err("expected bool".into()),
@@ -964,5 +1021,64 @@ mod tests {
         ] {
             assert_eq!(bad(v.clone()), msg, "{v}");
         }
+    }
+
+    #[test]
+    fn entity_id_any_of_and_pre_validate() {
+        fn promote(data: &ServiceData) -> Result<Option<ServiceData>, ServiceError> {
+            let Some(Value::Object(inner)) = data.get("nested") else {
+                return Ok(None);
+            };
+            let mut out = data.clone();
+            if let Some(v) = inner.get("target") {
+                out.insert("target".into(), v.clone());
+            }
+            out.remove("nested");
+            Ok(Some(out))
+        }
+
+        let schema = Schema::entity_service()
+            .pre_validate(promote)
+            .required("target", Kind::EntityId)
+            .optional(
+                "mode",
+                Kind::AnyOf(vec![Kind::Boolean, Kind::Enum("Mode", &["add", "play"])]),
+            );
+
+        let coerced = schema
+            .validate(&data(json!({
+                "entity_id": "media_player.tv",
+                "nested": {"target": "media_player.Kitchen"},
+                "mode": "add"
+            })))
+            .unwrap()
+            .unwrap();
+        assert_eq!(coerced["target"], json!("media_player.kitchen"));
+        assert!(!coerced.contains_key("nested"));
+
+        let coerced_bool = schema
+            .validate(&data(json!({
+                "entity_id": "media_player.tv",
+                "target": "media_player.kitchen",
+                "mode": "on"
+            })))
+            .unwrap()
+            .unwrap();
+        assert_eq!(coerced_bool["mode"], json!(true));
+
+        assert_eq!(
+            err(
+                &schema,
+                json!({"entity_id": "media_player.tv", "target": "not_valid"})
+            ),
+            "Entity ID not_valid is an invalid entity ID for dictionary value @ data['target']"
+        );
+        assert_eq!(
+            err(
+                &schema,
+                json!({"entity_id": "media_player.tv", "target": "media_player.tv", "mode": "bogus"})
+            ),
+            "expected Mode or one of 'add', 'play' for dictionary value @ data['mode']"
+        );
     }
 }

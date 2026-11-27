@@ -2333,3 +2333,322 @@ async fn plugin_round1_edge_cases_default_code_reupsert_dynamic_attrs_and_droppe
 
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[tokio::test]
+async fn plugin_media_player_and_remote_lifecycle_and_services() {
+    let dir = std::env::temp_dir().join(format!("hars-plugin-mp-rem-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let plug_dir = dir.join("plugins").join("tv_plug");
+    std::fs::create_dir_all(&plug_dir).unwrap();
+    std::fs::write(
+        plug_dir.join("plugin.json"),
+        serde_json::to_vec(&json!({
+            "schema_version": 1,
+            "domain": "tv_plug",
+            "name": "TV Plugin",
+            "version": "1.0.0",
+            "transport": { "type": "unix_socket" },
+            "capabilities": {
+                "entity_domains": ["media_player", "remote"]
+            }
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+    let installed = Arc::new(manifest::InstalledPlugin::load(&plug_dir).unwrap());
+    let hass = ha_core::Hass::new();
+    let reg = Arc::new(ha_registry::Registries::default());
+    let components = crate::components::Components::new(&hass, reg.clone(), Default::default());
+
+    let recorded: Arc<parking_lot::Mutex<Vec<protocol::EntityCallParams>>> =
+        Arc::new(parking_lot::Mutex::new(Vec::new()));
+    let rec2 = recorded.clone();
+    let call_fn: entities::CallPluginFn = Arc::new(move |params| {
+        rec2.lock().push(params);
+        Box::pin(async { Ok(()) })
+    });
+    let store = entities::PluginEntityStore::new(installed, components, call_fn);
+    store.activate_entry("e1");
+
+    // 1. Register a full media_player (VOLUME_SET only, no VOLUME_STEP) and a VOLUME_STEP-only player.
+    let mp_feats = crate::media_player::feature::TURN_ON
+        | crate::media_player::feature::TURN_OFF
+        | crate::media_player::feature::PLAY
+        | crate::media_player::feature::PAUSE
+        | crate::media_player::feature::VOLUME_SET
+        | crate::media_player::feature::VOLUME_MUTE
+        | crate::media_player::feature::SEEK
+        | crate::media_player::feature::PLAY_MEDIA
+        | crate::media_player::feature::SELECT_SOURCE
+        | crate::media_player::feature::SELECT_SOUND_MODE
+        | crate::media_player::feature::SHUFFLE_SET
+        | crate::media_player::feature::REPEAT_SET
+        | crate::media_player::feature::GROUPING
+        | crate::media_player::feature::CLEAR_PLAYLIST;
+    let mp_id = store
+        .upsert_entity(protocol::EntityUpsertParams {
+            entry_id: "e1".into(),
+            unique_id: "mp_main".into(),
+            domain: "media_player".into(),
+            name: Some("Living Room TV".into()),
+            supported_features: mp_feats,
+            source_list: Some(vec!["HDMI 1".into(), "Netflix".into()]),
+            sound_mode_list: Some(vec!["Movie".into()]),
+            volume_step: Some(0.2),
+            ..Default::default()
+        })
+        .unwrap();
+    let mp_step_id = store
+        .upsert_entity(protocol::EntityUpsertParams {
+            entry_id: "e1".into(),
+            unique_id: "mp_step".into(),
+            domain: "media_player".into(),
+            name: Some("Step Speaker".into()),
+            supported_features: crate::media_player::feature::VOLUME_STEP,
+            ..Default::default()
+        })
+        .unwrap();
+    let rem_id = store
+        .upsert_entity(protocol::EntityUpsertParams {
+            entry_id: "e1".into(),
+            unique_id: "rem_main".into(),
+            domain: "remote".into(),
+            name: Some("Living Room Remote".into()),
+            supported_features: crate::remote::feature::ACTIVITY,
+            ..Default::default()
+        })
+        .unwrap();
+
+    // Push live state to both entities.
+    store
+        .set_state(protocol::StateSetParams {
+            entry_id: "e1".into(),
+            unique_id: "mp_main".into(),
+            state: "playing".into(),
+            attributes: json!({"volume_level": 0.5, "media_title": "Intro"})
+                .as_object()
+                .cloned()
+                .unwrap(),
+        })
+        .unwrap();
+    store
+        .set_state(protocol::StateSetParams {
+            entry_id: "e1".into(),
+            unique_id: "mp_step".into(),
+            state: "idle".into(),
+            attributes: Default::default(),
+        })
+        .unwrap();
+    store
+        .set_state(protocol::StateSetParams {
+            entry_id: "e1".into(),
+            unique_id: "rem_main".into(),
+            state: "on".into(),
+            attributes: json!({"activity_list": ["TV"], "current_activity": "TV"})
+                .as_object()
+                .cloned()
+                .unwrap(),
+        })
+        .unwrap();
+
+    // Re-upsert preserves live state/volume_level on media_player and is_on on remote!
+    store
+        .upsert_entity(protocol::EntityUpsertParams {
+            entry_id: "e1".into(),
+            unique_id: "mp_main".into(),
+            domain: "media_player".into(),
+            name: Some("Living Room TV".into()),
+            supported_features: mp_feats,
+            source_list: Some(vec!["HDMI 1".into(), "Netflix".into()]),
+            sound_mode_list: Some(vec!["Movie".into()]),
+            volume_step: Some(0.2),
+            ..Default::default()
+        })
+        .unwrap();
+    store
+        .upsert_entity(protocol::EntityUpsertParams {
+            entry_id: "e1".into(),
+            unique_id: "rem_main".into(),
+            domain: "remote".into(),
+            name: Some("Living Room Remote".into()),
+            supported_features: crate::remote::feature::ACTIVITY,
+            ..Default::default()
+        })
+        .unwrap();
+
+    // Exercise media_player services across re-upsert.
+    for (service, data) in [
+        ("toggle", json!({"entity_id": mp_id})),
+        ("media_play_pause", json!({"entity_id": mp_id})),
+        ("volume_up", json!({"entity_id": mp_id})),
+        ("volume_down", json!({"entity_id": mp_step_id})),
+        (
+            "play_media",
+            json!({
+                "entity_id": mp_id,
+                "media": {
+                    "media_content_type": "music",
+                    "media_content_id": "http://example.com/song.mp3"
+                },
+                "enqueue": true,
+                "extra": {"thumb": "ok"}
+            }),
+        ),
+        (
+            "join",
+            json!({"entity_id": mp_id, "group_members": "media_player.Step_Speaker"}),
+        ),
+        (
+            "select_source",
+            json!({"entity_id": mp_id, "source": "Netflix"}),
+        ),
+        ("repeat_set", json!({"entity_id": mp_id, "repeat": "all"})),
+    ] {
+        hass.call_service(
+            "media_player",
+            service,
+            data.as_object().cloned().unwrap(),
+            None,
+            false,
+            None,
+        )
+        .await
+        .unwrap();
+    }
+
+    // Exercise remote services across re-upsert (toggle while on -> turn_off).
+    for (service, data) in [
+        ("toggle", json!({"entity_id": rem_id, "activity": "TV"})),
+        (
+            "send_command",
+            json!({"entity_id": rem_id, "command": "Power", "device": "tv"}),
+        ),
+        (
+            "learn_command",
+            json!({"entity_id": rem_id, "device": "tv", "command": "Mute", "timeout": 15}),
+        ),
+        (
+            "delete_command",
+            json!({"entity_id": rem_id, "command": ["Mute"], "device": "tv"}),
+        ),
+    ] {
+        hass.call_service(
+            "remote",
+            service,
+            data.as_object().cloned().unwrap(),
+            None,
+            false,
+            None,
+        )
+        .await
+        .unwrap();
+    }
+
+    let calls: Vec<(String, String, Value)> = recorded
+        .lock()
+        .iter()
+        .map(|c| {
+            (
+                c.domain.clone(),
+                c.service.clone(),
+                Value::Object(c.data.clone()),
+            )
+        })
+        .collect();
+    assert_eq!(
+        calls,
+        vec![
+            ("media_player".into(), "turn_off".into(), json!({})),
+            ("media_player".into(), "media_pause".into(), json!({})),
+            (
+                "media_player".into(),
+                "volume_set".into(),
+                json!({"volume_level": 0.7})
+            ),
+            ("media_player".into(), "volume_down".into(), json!({})),
+            (
+                "media_player".into(),
+                "play_media".into(),
+                json!({
+                    "media_content_type": "music",
+                    "media_content_id": "http://example.com/song.mp3",
+                    "enqueue": "add",
+                    "extra": {"thumb": "ok"}
+                })
+            ),
+            (
+                "media_player".into(),
+                "join".into(),
+                json!({"group_members": ["media_player.step_speaker"]})
+            ),
+            (
+                "media_player".into(),
+                "select_source".into(),
+                json!({"source": "Netflix"})
+            ),
+            (
+                "media_player".into(),
+                "repeat_set".into(),
+                json!({"repeat": "all"})
+            ),
+            (
+                "remote".into(),
+                "turn_off".into(),
+                json!({"activity": "TV"})
+            ),
+            (
+                "remote".into(),
+                "send_command".into(),
+                json!({
+                    "command": ["Power"],
+                    "device": "tv",
+                    "num_repeats": 1,
+                    "hold_secs": 0.0
+                })
+            ),
+            (
+                "remote".into(),
+                "learn_command".into(),
+                json!({
+                    "device": "tv",
+                    "command": ["Mute"],
+                    "timeout": 15
+                })
+            ),
+            (
+                "remote".into(),
+                "delete_command".into(),
+                json!({
+                    "command": ["Mute"],
+                    "device": "tv"
+                })
+            ),
+        ]
+    );
+
+    // Disconnect (`mark_all_unavailable`) preserves media_player capability_attributes
+    // (`source_list`, `sound_mode_list`) and omits state_attributes (`media_title`,
+    // `volume_level`, and remote's `activity_list`/`current_activity`).
+    store.mark_all_unavailable();
+    let mp_eid = ha_core::EntityId::parse(&mp_id).unwrap();
+    let mp_unavail = hass.states().get(&mp_eid).unwrap();
+    assert_eq!(mp_unavail.state.as_str(), "unavailable");
+    assert_eq!(
+        mp_unavail.attributes["source_list"],
+        json!(["HDMI 1", "Netflix"])
+    );
+    assert_eq!(mp_unavail.attributes["sound_mode_list"], json!(["Movie"]));
+    assert!(!mp_unavail.attributes.contains_key("media_title"));
+    assert!(!mp_unavail.attributes.contains_key("volume_level"));
+
+    let rem_eid = ha_core::EntityId::parse(&rem_id).unwrap();
+    let rem_unavail = hass.states().get(&rem_eid).unwrap();
+    assert_eq!(rem_unavail.state.as_str(), "unavailable");
+    assert!(!rem_unavail.attributes.contains_key("activity_list"));
+    assert!(!rem_unavail.attributes.contains_key("current_activity"));
+
+    store.deactivate_entry("e1");
+    assert!(hass.states().get(&mp_eid).is_none());
+    assert!(hass.states().get(&rem_eid).is_none());
+    let _ = std::fs::remove_dir_all(&dir);
+}

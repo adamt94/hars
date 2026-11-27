@@ -1,0 +1,1096 @@
+{
+  "ha_version": "2026.6.1",
+  "unrecorded_attributes": {
+    "media_player": [
+      "entity_picture",
+      "entity_picture_local",
+      "media_position",
+      "media_position_updated_at",
+      "sound_mode_list",
+      "source_list"
+    ],
+    "remote": []
+  },
+  "capability_attributes": {
+    "media_player_full": {
+      "source_list": [
+        "HDMI 1",
+        "Spotify"
+      ],
+      "sound_mode_list": [
+        "Movie",
+        "Music"
+      ]
+    },
+    "remote_with_activity": null
+  },
+  "cases": [
+    {
+      "name": "mp_turn_on",
+      "domain": "media_player",
+      "service": "turn_on",
+      "data": {
+        "entity_id": "media_player.living_room"
+      },
+      "calls": {
+        "media_player.living_room": [
+          [
+            "turn_on"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "mp_turn_off",
+      "domain": "media_player",
+      "service": "turn_off",
+      "data": {
+        "entity_id": "media_player.living_room"
+      },
+      "calls": {
+        "media_player.living_room": [
+          [
+            "turn_off"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "mp_toggle_playing_turns_off",
+      "domain": "media_player",
+      "service": "toggle",
+      "data": {
+        "entity_id": "media_player.living_room"
+      },
+      "calls": {
+        "media_player.living_room": [
+          [
+            "turn_off"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "mp_toggle_off_turns_on",
+      "domain": "media_player",
+      "service": "toggle",
+      "data": {
+        "entity_id": "media_player.bedroom"
+      },
+      "calls": {
+        "media_player.bedroom": [
+          [
+            "turn_on"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "mp_toggle_standby_turns_on",
+      "domain": "media_player",
+      "service": "toggle",
+      "data": {
+        "entity_id": "media_player.den"
+      },
+      "calls": {
+        "media_player.den": [
+          [
+            "turn_on"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "mp_toggle_needs_both_turn_on_and_off",
+      "domain": "media_player",
+      "service": "toggle",
+      "data": {
+        "entity_id": "media_player.turn_on_only"
+      },
+      "error": {
+        "kind": "validation",
+        "domain": "homeassistant",
+        "key": "service_not_supported",
+        "placeholders": {
+          "domain": "media_player",
+          "service": "toggle",
+          "entity_id": "media_player.turn_on_only"
+        },
+        "message": "service_not_supported"
+      }
+    },
+    {
+      "name": "mp_play_pause_playing_pauses",
+      "domain": "media_player",
+      "service": "media_play_pause",
+      "data": {
+        "entity_id": "media_player.living_room"
+      },
+      "calls": {
+        "media_player.living_room": [
+          [
+            "media_pause"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "mp_play_pause_off_plays",
+      "domain": "media_player",
+      "service": "media_play_pause",
+      "data": {
+        "entity_id": "media_player.bedroom"
+      },
+      "calls": {
+        "media_player.bedroom": [
+          [
+            "media_play"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "mp_play_pause_needs_both_play_and_pause",
+      "domain": "media_player",
+      "service": "media_play_pause",
+      "data": {
+        "entity_id": "media_player.turn_on_only"
+      },
+      "error": {
+        "kind": "validation",
+        "domain": "homeassistant",
+        "key": "service_not_supported",
+        "placeholders": {
+          "domain": "media_player",
+          "service": "media_play_pause",
+          "entity_id": "media_player.turn_on_only"
+        },
+        "message": "service_not_supported"
+      }
+    },
+    {
+      "name": "mp_media_play",
+      "domain": "media_player",
+      "service": "media_play",
+      "data": {
+        "entity_id": "media_player.living_room"
+      },
+      "calls": {
+        "media_player.living_room": [
+          [
+            "media_play"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "mp_media_pause",
+      "domain": "media_player",
+      "service": "media_pause",
+      "data": {
+        "entity_id": "media_player.living_room"
+      },
+      "calls": {
+        "media_player.living_room": [
+          [
+            "media_pause"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "mp_media_stop",
+      "domain": "media_player",
+      "service": "media_stop",
+      "data": {
+        "entity_id": "media_player.living_room"
+      },
+      "calls": {
+        "media_player.living_room": [
+          [
+            "media_stop"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "mp_media_next_track",
+      "domain": "media_player",
+      "service": "media_next_track",
+      "data": {
+        "entity_id": "media_player.living_room"
+      },
+      "calls": {
+        "media_player.living_room": [
+          [
+            "media_next_track"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "mp_media_previous_track",
+      "domain": "media_player",
+      "service": "media_previous_track",
+      "data": {
+        "entity_id": "media_player.living_room"
+      },
+      "calls": {
+        "media_player.living_room": [
+          [
+            "media_previous_track"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "mp_clear_playlist",
+      "domain": "media_player",
+      "service": "clear_playlist",
+      "data": {
+        "entity_id": "media_player.living_room"
+      },
+      "calls": {
+        "media_player.living_room": [
+          [
+            "clear_playlist"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "mp_volume_up_steps_volume_set",
+      "domain": "media_player",
+      "service": "volume_up",
+      "data": {
+        "entity_id": "media_player.living_room"
+      },
+      "calls": {
+        "media_player.living_room": [
+          [
+            "set_volume_level",
+            0.6
+          ]
+        ]
+      }
+    },
+    {
+      "name": "mp_volume_up_clamps_to_1",
+      "domain": "media_player",
+      "service": "volume_up",
+      "data": {
+        "entity_id": "media_player.bedroom"
+      },
+      "calls": {
+        "media_player.bedroom": [
+          [
+            "set_volume_level",
+            1
+          ]
+        ]
+      }
+    },
+    {
+      "name": "mp_volume_up_noop_at_1",
+      "domain": "media_player",
+      "service": "volume_up",
+      "data": {
+        "entity_id": "media_player.edge_vol"
+      },
+      "calls": {}
+    },
+    {
+      "name": "mp_volume_up_noop_when_none",
+      "domain": "media_player",
+      "service": "volume_up",
+      "data": {
+        "entity_id": "media_player.none_vol"
+      },
+      "calls": {}
+    },
+    {
+      "name": "mp_volume_up_step_only",
+      "domain": "media_player",
+      "service": "volume_up",
+      "data": {
+        "entity_id": "media_player.step_only"
+      },
+      "calls": {
+        "media_player.step_only": [
+          [
+            "volume_up"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "mp_volume_up_unsupported",
+      "domain": "media_player",
+      "service": "volume_up",
+      "data": {
+        "entity_id": "media_player.turn_on_only"
+      },
+      "error": {
+        "kind": "validation",
+        "domain": "homeassistant",
+        "key": "service_not_supported",
+        "placeholders": {
+          "domain": "media_player",
+          "service": "volume_up",
+          "entity_id": "media_player.turn_on_only"
+        },
+        "message": "service_not_supported"
+      }
+    },
+    {
+      "name": "mp_volume_down_steps_volume_set",
+      "domain": "media_player",
+      "service": "volume_down",
+      "data": {
+        "entity_id": "media_player.living_room"
+      },
+      "calls": {
+        "media_player.living_room": [
+          [
+            "set_volume_level",
+            0.4
+          ]
+        ]
+      }
+    },
+    {
+      "name": "mp_volume_down_clamps_to_0",
+      "domain": "media_player",
+      "service": "volume_down",
+      "data": {
+        "entity_id": "media_player.den"
+      },
+      "calls": {
+        "media_player.den": [
+          [
+            "set_volume_level",
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "name": "mp_volume_down_noop_at_0",
+      "domain": "media_player",
+      "service": "volume_down",
+      "data": {
+        "entity_id": "media_player.zero_vol"
+      },
+      "calls": {}
+    },
+    {
+      "name": "mp_volume_down_step_only",
+      "domain": "media_player",
+      "service": "volume_down",
+      "data": {
+        "entity_id": "media_player.step_only"
+      },
+      "calls": {
+        "media_player.step_only": [
+          [
+            "volume_down"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "mp_volume_set_valid",
+      "domain": "media_player",
+      "service": "volume_set",
+      "data": {
+        "entity_id": "media_player.living_room",
+        "volume_level": "0.25"
+      },
+      "calls": {
+        "media_player.living_room": [
+          [
+            "set_volume_level",
+            0.25
+          ]
+        ]
+      }
+    },
+    {
+      "name": "mp_volume_set_too_high",
+      "domain": "media_player",
+      "service": "volume_set",
+      "data": {
+        "entity_id": "media_player.living_room",
+        "volume_level": 1.1
+      },
+      "error": {
+        "kind": "invalid",
+        "message": "value must be at most 1 for dictionary value @ data['volume_level']"
+      }
+    },
+    {
+      "name": "mp_volume_set_negative",
+      "domain": "media_player",
+      "service": "volume_set",
+      "data": {
+        "entity_id": "media_player.living_room",
+        "volume_level": -0.1
+      },
+      "error": {
+        "kind": "invalid",
+        "message": "value must be at least 0 for dictionary value @ data['volume_level']"
+      }
+    },
+    {
+      "name": "mp_volume_mute",
+      "domain": "media_player",
+      "service": "volume_mute",
+      "data": {
+        "entity_id": "media_player.living_room",
+        "is_volume_muted": "on"
+      },
+      "calls": {
+        "media_player.living_room": [
+          [
+            "mute_volume",
+            true
+          ]
+        ]
+      }
+    },
+    {
+      "name": "mp_media_seek_valid",
+      "domain": "media_player",
+      "service": "media_seek",
+      "data": {
+        "entity_id": "media_player.living_room",
+        "seek_position": 42.5
+      },
+      "calls": {
+        "media_player.living_room": [
+          [
+            "media_seek",
+            42.5
+          ]
+        ]
+      }
+    },
+    {
+      "name": "mp_media_seek_zero",
+      "domain": "media_player",
+      "service": "media_seek",
+      "data": {
+        "entity_id": "media_player.living_room",
+        "seek_position": 0
+      },
+      "calls": {
+        "media_player.living_room": [
+          [
+            "media_seek",
+            0.0
+          ]
+        ]
+      }
+    },
+    {
+      "name": "mp_media_seek_negative",
+      "domain": "media_player",
+      "service": "media_seek",
+      "data": {
+        "entity_id": "media_player.living_room",
+        "seek_position": -1
+      },
+      "error": {
+        "kind": "invalid",
+        "message": "value must be at least 0 for dictionary value @ data['seek_position']"
+      }
+    },
+    {
+      "name": "mp_select_source",
+      "domain": "media_player",
+      "service": "select_source",
+      "data": {
+        "entity_id": "media_player.living_room",
+        "source": "Anything"
+      },
+      "calls": {
+        "media_player.living_room": [
+          [
+            "select_source",
+            "Anything"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "mp_select_sound_mode",
+      "domain": "media_player",
+      "service": "select_sound_mode",
+      "data": {
+        "entity_id": "media_player.living_room",
+        "sound_mode": "Movie"
+      },
+      "calls": {
+        "media_player.living_room": [
+          [
+            "select_sound_mode",
+            "Movie"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "mp_shuffle_set",
+      "domain": "media_player",
+      "service": "shuffle_set",
+      "data": {
+        "entity_id": "media_player.living_room",
+        "shuffle": true
+      },
+      "calls": {
+        "media_player.living_room": [
+          [
+            "set_shuffle",
+            true
+          ]
+        ]
+      }
+    },
+    {
+      "name": "mp_repeat_set_valid",
+      "domain": "media_player",
+      "service": "repeat_set",
+      "data": {
+        "entity_id": "media_player.living_room",
+        "repeat": "one"
+      },
+      "calls": {
+        "media_player.living_room": [
+          [
+            "set_repeat",
+            "one"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "mp_repeat_set_invalid",
+      "domain": "media_player",
+      "service": "repeat_set",
+      "data": {
+        "entity_id": "media_player.living_room",
+        "repeat": "twice"
+      },
+      "error": {
+        "kind": "invalid",
+        "message": "expected RepeatMode or one of 'all', 'off', 'one' for dictionary value @ data['repeat']"
+      }
+    },
+    {
+      "name": "mp_join_single_string_lowercased",
+      "domain": "media_player",
+      "service": "join",
+      "data": {
+        "entity_id": "media_player.living_room",
+        "group_members": "media_player.Bedroom"
+      },
+      "calls": {
+        "media_player.living_room": [
+          [
+            "join_players",
+            [
+              "media_player.bedroom"
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "name": "mp_join_list",
+      "domain": "media_player",
+      "service": "join",
+      "data": {
+        "entity_id": "media_player.living_room",
+        "group_members": [
+          "media_player.bedroom",
+          "media_player.den"
+        ]
+      },
+      "calls": {
+        "media_player.living_room": [
+          [
+            "join_players",
+            [
+              "media_player.bedroom",
+              "media_player.den"
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "name": "mp_join_invalid_entity_id",
+      "domain": "media_player",
+      "service": "join",
+      "data": {
+        "entity_id": "media_player.living_room",
+        "group_members": [
+          "not_an_id"
+        ]
+      },
+      "error": {
+        "kind": "invalid",
+        "message": "Entity ID not_an_id is an invalid entity ID @ data['group_members'][0]"
+      }
+    },
+    {
+      "name": "mp_unjoin",
+      "domain": "media_player",
+      "service": "unjoin",
+      "data": {
+        "entity_id": "media_player.living_room"
+      },
+      "calls": {
+        "media_player.living_room": [
+          [
+            "unjoin_player"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "mp_play_media_basic",
+      "domain": "media_player",
+      "service": "play_media",
+      "data": {
+        "entity_id": "media_player.living_room",
+        "media_content_type": "music",
+        "media_content_id": "http://example.com/a.mp3"
+      },
+      "calls": {
+        "media_player.living_room": [
+          [
+            "play_media",
+            "music",
+            "http://example.com/a.mp3",
+            {
+              "extra": {}
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "name": "mp_play_media_promote_media_dict",
+      "domain": "media_player",
+      "service": "play_media",
+      "data": {
+        "entity_id": "media_player.living_room",
+        "media": {
+          "media_content_type": "music",
+          "media_content_id": "http://example.com/b.mp3"
+        }
+      },
+      "calls": {
+        "media_player.living_room": [
+          [
+            "play_media",
+            "music",
+            "http://example.com/b.mp3",
+            {
+              "extra": {}
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "name": "mp_play_media_conflict_media_and_id",
+      "domain": "media_player",
+      "service": "play_media",
+      "data": {
+        "entity_id": "media_player.living_room",
+        "media": {
+          "media_content_type": "music",
+          "media_content_id": "a"
+        },
+        "media_content_id": "b"
+      },
+      "error": {
+        "kind": "invalid",
+        "message": "Play media cannot contain 'media' and 'media_content_id' or 'media_content_type'"
+      }
+    },
+    {
+      "name": "mp_play_media_enqueue_true",
+      "domain": "media_player",
+      "service": "play_media",
+      "data": {
+        "entity_id": "media_player.living_room",
+        "media_content_type": "music",
+        "media_content_id": "a",
+        "enqueue": true
+      },
+      "calls": {
+        "media_player.living_room": [
+          [
+            "play_media",
+            "music",
+            "a",
+            {
+              "extra": {},
+              "enqueue": "add"
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "name": "mp_play_media_enqueue_false",
+      "domain": "media_player",
+      "service": "play_media",
+      "data": {
+        "entity_id": "media_player.living_room",
+        "media_content_type": "music",
+        "media_content_id": "a",
+        "enqueue": false
+      },
+      "calls": {
+        "media_player.living_room": [
+          [
+            "play_media",
+            "music",
+            "a",
+            {
+              "extra": {},
+              "enqueue": "play"
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "name": "mp_play_media_enqueue_enum",
+      "domain": "media_player",
+      "service": "play_media",
+      "data": {
+        "entity_id": "media_player.living_room",
+        "media_content_type": "music",
+        "media_content_id": "a",
+        "enqueue": "next"
+      },
+      "calls": {
+        "media_player.living_room": [
+          [
+            "play_media",
+            "music",
+            "a",
+            {
+              "extra": {},
+              "enqueue": "next"
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "name": "mp_play_media_announce_and_extra",
+      "domain": "media_player",
+      "service": "play_media",
+      "data": {
+        "entity_id": "media_player.living_room",
+        "media_content_type": "music",
+        "media_content_id": "a",
+        "announce": true,
+        "extra": {
+          "thumb": "x"
+        }
+      },
+      "calls": {
+        "media_player.living_room": [
+          [
+            "play_media",
+            "music",
+            "a",
+            {
+              "announce": true,
+              "extra": {
+                "thumb": "x"
+              }
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "name": "mp_play_media_enqueue_and_announce_exclusive",
+      "domain": "media_player",
+      "service": "play_media",
+      "data": {
+        "entity_id": "media_player.living_room",
+        "media_content_type": "music",
+        "media_content_id": "a",
+        "enqueue": "add",
+        "announce": true
+      },
+      "error": {
+        "kind": "invalid",
+        "message": "two or more values in the same group of exclusion 'enqueue_announce' @ data[<enqueue_announce>]"
+      }
+    },
+    {
+      "name": "mp_play_media_bad_extra",
+      "domain": "media_player",
+      "service": "play_media",
+      "data": {
+        "entity_id": "media_player.living_room",
+        "media_content_type": "music",
+        "media_content_id": "a",
+        "extra": "nope"
+      },
+      "error": {
+        "kind": "invalid",
+        "message": "expected dict for dictionary value @ data['extra']"
+      }
+    },
+    {
+      "name": "remote_turn_on_no_activity",
+      "domain": "remote",
+      "service": "turn_on",
+      "data": {
+        "entity_id": "remote.living_room"
+      },
+      "calls": {
+        "remote.living_room": [
+          [
+            "turn_on",
+            {}
+          ]
+        ]
+      }
+    },
+    {
+      "name": "remote_turn_on_with_activity",
+      "domain": "remote",
+      "service": "turn_on",
+      "data": {
+        "entity_id": "remote.living_room",
+        "activity": "Watch TV"
+      },
+      "calls": {
+        "remote.living_room": [
+          [
+            "turn_on",
+            {
+              "activity": "Watch TV"
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "name": "remote_turn_off_with_activity",
+      "domain": "remote",
+      "service": "turn_off",
+      "data": {
+        "entity_id": "remote.bedroom",
+        "activity": "Sleep"
+      },
+      "calls": {
+        "remote.bedroom": [
+          [
+            "turn_off",
+            {
+              "activity": "Sleep"
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "name": "remote_toggle_off_turns_on",
+      "domain": "remote",
+      "service": "toggle",
+      "data": {
+        "entity_id": "remote.living_room",
+        "activity": "Listen"
+      },
+      "calls": {
+        "remote.living_room": [
+          [
+            "turn_on",
+            {
+              "activity": "Listen"
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "name": "remote_toggle_on_turns_off",
+      "domain": "remote",
+      "service": "toggle",
+      "data": {
+        "entity_id": "remote.bedroom"
+      },
+      "calls": {
+        "remote.bedroom": [
+          [
+            "turn_off",
+            {}
+          ]
+        ]
+      }
+    },
+    {
+      "name": "remote_send_command_single_string_defaults",
+      "domain": "remote",
+      "service": "send_command",
+      "data": {
+        "entity_id": "remote.living_room",
+        "command": "Power"
+      },
+      "calls": {
+        "remote.living_room": [
+          [
+            "send_command",
+            [
+              "Power"
+            ],
+            {
+              "hold_secs": 0.0,
+              "num_repeats": 1
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "name": "remote_send_command_list_all_opts",
+      "domain": "remote",
+      "service": "send_command",
+      "data": {
+        "entity_id": "remote.living_room",
+        "command": [
+          "VolUp",
+          "VolUp"
+        ],
+        "device": "tv",
+        "num_repeats": 3,
+        "delay_secs": 0.25,
+        "hold_secs": 1.5
+      },
+      "calls": {
+        "remote.living_room": [
+          [
+            "send_command",
+            [
+              "VolUp",
+              "VolUp"
+            ],
+            {
+              "device": "tv",
+              "num_repeats": 3,
+              "delay_secs": 0.25,
+              "hold_secs": 1.5
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "name": "remote_send_command_negative_repeats",
+      "domain": "remote",
+      "service": "send_command",
+      "data": {
+        "entity_id": "remote.living_room",
+        "command": "Power",
+        "num_repeats": -1
+      },
+      "error": {
+        "kind": "invalid",
+        "message": "value must be at least 0 for dictionary value @ data['num_repeats']"
+      }
+    },
+    {
+      "name": "remote_learn_command_no_feature_required",
+      "domain": "remote",
+      "service": "learn_command",
+      "data": {
+        "entity_id": "remote.bedroom",
+        "device": "tv",
+        "command": "Mute",
+        "command_type": "ir",
+        "alternative": true,
+        "timeout": 30
+      },
+      "calls": {
+        "remote.bedroom": [
+          [
+            "learn_command",
+            {
+              "device": "tv",
+              "command": [
+                "Mute"
+              ],
+              "command_type": "ir",
+              "alternative": true,
+              "timeout": 30
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "name": "remote_learn_command_empty_opts",
+      "domain": "remote",
+      "service": "learn_command",
+      "data": {
+        "entity_id": "remote.bedroom"
+      },
+      "calls": {
+        "remote.bedroom": [
+          [
+            "learn_command",
+            {}
+          ]
+        ]
+      }
+    },
+    {
+      "name": "remote_delete_command_no_feature_required",
+      "domain": "remote",
+      "service": "delete_command",
+      "data": {
+        "entity_id": "remote.bedroom",
+        "command": "Mute",
+        "device": "tv"
+      },
+      "calls": {
+        "remote.bedroom": [
+          [
+            "delete_command",
+            {
+              "command": [
+                "Mute"
+              ],
+              "device": "tv"
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "name": "remote_delete_command_missing_command",
+      "domain": "remote",
+      "service": "delete_command",
+      "data": {
+        "entity_id": "remote.bedroom"
+      },
+      "error": {
+        "kind": "invalid",
+        "message": "required key not provided @ data['command']"
+      }
+    }
+  ]
+}

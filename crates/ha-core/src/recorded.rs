@@ -55,6 +55,15 @@ pub fn domain_unrecorded(domain: &str) -> &'static [&'static str] {
         "fan" => &["preset_modes"],
         // `vacuum/__init__.py` StateVacuumEntity.
         "vacuum" => &["fan_speed_list"],
+        // `media_player/__init__.py` MediaPlayerEntity.
+        "media_player" => &[
+            "entity_picture_local",
+            "entity_picture",
+            "source_list",
+            "media_position_updated_at",
+            "media_position",
+            "sound_mode_list",
+        ],
         // `automation/__init__.py` BaseAutomationEntity.
         "automation" => &["last_triggered", "mode", "current", "max", "id"],
         // `person/__init__.py` Person.
@@ -164,6 +173,20 @@ mod tests {
         assert!(cover.domain.is_empty());
         let lock = hass.unrecorded(&EntityId::parse("lock.front").unwrap());
         assert!(lock.domain.is_empty());
+        let mp = hass.unrecorded(&EntityId::parse("media_player.tv").unwrap());
+        for attr in [
+            "entity_picture",
+            "entity_picture_local",
+            "media_position",
+            "media_position_updated_at",
+            "sound_mode_list",
+            "source_list",
+        ] {
+            assert!(mp.excludes(attr), "{attr}");
+        }
+        assert!(!mp.excludes("volume_level"));
+        let remote = hass.unrecorded(&EntityId::parse("remote.tv").unwrap());
+        assert!(remote.domain.is_empty());
     }
 
     #[test]

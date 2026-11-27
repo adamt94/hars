@@ -265,7 +265,7 @@ Assistant's own storage files, so an import keeps them.
 ## Entity types
 
 An integration creates entities of the types below. An integration that needs
-another type, such as `cover`, `fan`, `lock`, or `media_player`, needs that
+another type, such as `camera`, `alarm_control_panel`, or `humidifier`, needs that
 type added first. [Add an entity component](guides/add-an-entity-component.md)
 shows how.
 
@@ -282,6 +282,8 @@ shows how.
 | `cover` | `open_cover`, `close_cover`, `stop_cover`, `set_cover_position`, `toggle`, and the five `*_tilt` services |
 | `lock` | `lock`, `unlock`, `open` |
 | `fan` | `turn_on`, `turn_off`, `toggle`, `set_percentage`, `increase_speed`, `decrease_speed`, `set_preset_mode`, `oscillate`, `set_direction` |
+| `media_player` | `turn_on`, `turn_off`, `toggle`, `volume_up`, `volume_down`, `volume_set`, `volume_mute`, `media_play_pause`, `media_play`, `media_pause`, `media_stop`, `media_next_track`, `media_previous_track`, `media_seek`, `play_media`, `select_source`, `select_sound_mode`, `shuffle_set`, `repeat_set`, `join`, `unjoin`, `clear_playlist` |
+| `remote` | `turn_on`, `turn_off`, `toggle`, `send_command`, `learn_command`, `delete_command` |
 | `weather` | `weather.get_forecasts` |
 | `notify` | `notify.send_message`, for the companion app |
 | `sensor`, `binary_sensor`, `device_tracker` | None. These types are states only |
