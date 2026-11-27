@@ -9,11 +9,16 @@ use super::manifest::InstalledPlugin;
 use super::protocol::{DeviceUpsertParams, EntityCallParams, EntityUpsertParams, StateSetParams};
 use crate::button::Button;
 use crate::components::Components;
+use crate::cover::Cover;
+use crate::fan::{self, Fan};
 use crate::light::{
     BoxFuture, Capabilities as LightCaps, ColorMode, Flash, Light, LightState, Modes, Params,
     TurnOff, White,
 };
+use crate::lock::Lock;
+use crate::number::{self, Number};
 use crate::scene::Scene;
+use crate::select::Select;
 use crate::switch::Switch;
 use crate::vacuum::Vacuum;
 use ha_core::{Attributes, Context, EntityId, Hass, ServiceError};
@@ -71,6 +76,11 @@ enum EntityHandle {
     Button(Arc<PluginButton>),
     Scene(Arc<PluginScene>),
     Vacuum(Arc<PluginVacuum>),
+    Select(Arc<PluginSelect>),
+    Number(Arc<PluginNumber>),
+    Cover(Arc<PluginCover>),
+    Lock(Arc<PluginLock>),
+    Fan(Arc<PluginFan>),
     Passive,
     /// Registry row has `disabled_by` set: no service adapter or state writes.
     Disabled,
@@ -203,6 +213,30 @@ impl PluginEntityStore {
                 patch.capabilities = Some(Some(json!({
                     "fan_speed_list": fan_speeds,
                 })));
+            } else if params.domain == "select" {
+                let options = params.options.clone().unwrap_or_default();
+                patch.capabilities = Some(Some(json!({
+                    "options": options,
+                })));
+            } else if params.domain == "number" {
+                let min = params.min_value.unwrap_or(number::DEFAULT_MIN_VALUE);
+                let max = params.max_value.unwrap_or(number::DEFAULT_MAX_VALUE);
+                let step = number::calculate_step(min, max, params.step);
+                let mode = params.mode.as_deref().unwrap_or("auto");
+                patch.capabilities = Some(Some(json!({
+                    "min": min,
+                    "max": max,
+                    "step": step,
+                    "mode": mode,
+                })));
+            } else if params.domain == "fan"
+                && (params.supported_features
+                    & (fan::feature::SET_SPEED | fan::feature::PRESET_MODE)
+                    != 0)
+            {
+                patch.capabilities = Some(Some(json!({
+                    "preset_modes": params.preset_modes,
+                })));
             }
             let row = registry.get_or_create_entity(
                 &params.domain,
@@ -262,6 +296,44 @@ impl PluginEntityStore {
             );
             if let Some(fan_speeds) = &params.fan_speed_list {
                 base_attrs.insert("fan_speed_list".into(), json!(fan_speeds));
+            }
+        } else if params.domain == "select" {
+            if let Some(options) = &params.options {
+                base_attrs.insert("options".into(), json!(options));
+            }
+        } else if params.domain == "number" {
+            let min = params.min_value.unwrap_or(number::DEFAULT_MIN_VALUE);
+            let max = params.max_value.unwrap_or(number::DEFAULT_MAX_VALUE);
+            let step = number::calculate_step(min, max, params.step);
+            let mode = params.mode.as_deref().unwrap_or("auto");
+            base_attrs.insert("min".into(), json!(min));
+            base_attrs.insert("max".into(), json!(max));
+            base_attrs.insert("step".into(), json!(step));
+            base_attrs.insert("mode".into(), json!(mode));
+        } else if params.domain == "cover" {
+            base_attrs.insert(
+                "supported_features".into(),
+                json!(params.supported_features),
+            );
+        } else if params.domain == "lock" {
+            base_attrs.insert(
+                "supported_features".into(),
+                json!(params.supported_features),
+            );
+            if let Some(fmt) = &params.code_format {
+                base_attrs.insert("code_format".into(), json!(fmt));
+            }
+        } else if params.domain == "fan" {
+            base_attrs.insert(
+                "supported_features".into(),
+                json!(params.supported_features),
+            );
+            if let Some(modes) = &params.preset_modes {
+                base_attrs.insert("preset_modes".into(), json!(modes));
+            }
+            if params.supported_features & fan::feature::SET_SPEED != 0 {
+                let sc = params.speed_count.unwrap_or(100).max(1);
+                base_attrs.insert("percentage_step".into(), json!(100.0 / f64::from(sc)));
             }
         }
 
@@ -354,6 +426,94 @@ impl PluginEntityStore {
                     self.components.vacuums().add(vac.clone());
                     EntityHandle::Vacuum(vac)
                 }
+                "select" => {
+                    let sel = Arc::new(PluginSelect {
+                        entity_id: entity_id.clone(),
+                        entry_id: params.entry_id.clone(),
+                        unique_id: params.unique_id.clone(),
+                        state: RwLock::new(SelectInner {
+                            available: true,
+                            options: params.options.clone().unwrap_or_default(),
+                            current_option: None,
+                        }),
+                        call_plugin: self.call_plugin.clone(),
+                    });
+                    self.components.selects().add(sel.clone());
+                    EntityHandle::Select(sel)
+                }
+                "number" => {
+                    let min = params.min_value.unwrap_or(number::DEFAULT_MIN_VALUE);
+                    let max = params.max_value.unwrap_or(number::DEFAULT_MAX_VALUE);
+                    let step = number::calculate_step(min, max, params.step);
+                    let num = Arc::new(PluginNumber {
+                        entity_id: entity_id.clone(),
+                        entry_id: params.entry_id.clone(),
+                        unique_id: params.unique_id.clone(),
+                        state: RwLock::new(NumberInner {
+                            available: true,
+                            min,
+                            max,
+                            step,
+                            explicit_step: params.step,
+                        }),
+                        call_plugin: self.call_plugin.clone(),
+                    });
+                    self.components.numbers().add(num.clone());
+                    EntityHandle::Number(num)
+                }
+                "cover" => {
+                    let cov = Arc::new(PluginCover {
+                        entity_id: entity_id.clone(),
+                        entry_id: params.entry_id.clone(),
+                        unique_id: params.unique_id.clone(),
+                        supported_features: params.supported_features,
+                        state: RwLock::new(CoverInner {
+                            available: true,
+                            is_closed: None,
+                            is_opening: None,
+                            is_closing: None,
+                            current_position: None,
+                            current_tilt_position: None,
+                            last_toggle_direction_open: true,
+                        }),
+                        call_plugin: self.call_plugin.clone(),
+                    });
+                    self.components.covers().add(cov.clone());
+                    EntityHandle::Cover(cov)
+                }
+                "lock" => {
+                    let lck = Arc::new(PluginLock {
+                        entity_id: entity_id.clone(),
+                        entry_id: params.entry_id.clone(),
+                        unique_id: params.unique_id.clone(),
+                        supported_features: params.supported_features,
+                        state: RwLock::new(LockInner {
+                            available: true,
+                            code_format: params.code_format.clone(),
+                        }),
+                        call_plugin: self.call_plugin.clone(),
+                    });
+                    self.components.locks().add(lck.clone());
+                    EntityHandle::Lock(lck)
+                }
+                "fan" => {
+                    let f = Arc::new(PluginFan {
+                        entity_id: entity_id.clone(),
+                        entry_id: params.entry_id.clone(),
+                        unique_id: params.unique_id.clone(),
+                        supported_features: params.supported_features,
+                        state: RwLock::new(FanInner {
+                            available: true,
+                            is_on: false,
+                            percentage: None,
+                            speed_count: params.speed_count.unwrap_or(100).max(1),
+                            preset_modes: params.preset_modes.clone().unwrap_or_default(),
+                        }),
+                        call_plugin: self.call_plugin.clone(),
+                    });
+                    self.components.fans().add(f.clone());
+                    EntityHandle::Fan(f)
+                }
                 _ => EntityHandle::Passive,
             }
         };
@@ -441,6 +601,116 @@ impl PluginEntityStore {
                 *vac.available.write() = available;
                 merged.insert("supported_features".into(), json!(vac.supported_features));
             }
+            EntityHandle::Select(sel) => {
+                let mut inner = sel.state.write();
+                inner.available = available;
+                if let Some(arr) = params.attributes.get("options").and_then(Value::as_array) {
+                    inner.options = arr
+                        .iter()
+                        .filter_map(Value::as_str)
+                        .map(str::to_owned)
+                        .collect();
+                }
+                inner.current_option = match state_str.as_str() {
+                    "unknown" | "unavailable" => None,
+                    other => Some(other.to_owned()),
+                };
+                merged.insert("options".into(), json!(inner.options));
+            }
+            EntityHandle::Number(num) => {
+                let mut inner = num.state.write();
+                inner.available = available;
+                if let Some(min) = params.attributes.get("min").and_then(Value::as_f64) {
+                    inner.min = min;
+                }
+                if let Some(max) = params.attributes.get("max").and_then(Value::as_f64) {
+                    inner.max = max;
+                }
+                if let Some(step) = params.attributes.get("step").and_then(Value::as_f64) {
+                    inner.explicit_step = Some(step);
+                    inner.step = step;
+                } else {
+                    inner.step = number::calculate_step(inner.min, inner.max, inner.explicit_step);
+                }
+                merged.insert("min".into(), json!(inner.min));
+                merged.insert("max".into(), json!(inner.max));
+                merged.insert("step".into(), json!(inner.step));
+            }
+            EntityHandle::Cover(cov) => {
+                let mut inner = cov.state.write();
+                inner.available = available;
+                match state_str.as_str() {
+                    "opening" => {
+                        inner.is_opening = Some(true);
+                        inner.is_closing = Some(false);
+                        inner.is_closed = Some(false);
+                        inner.last_toggle_direction_open = true;
+                    }
+                    "closing" => {
+                        inner.is_opening = Some(false);
+                        inner.is_closing = Some(true);
+                        inner.is_closed = Some(false);
+                        inner.last_toggle_direction_open = false;
+                    }
+                    "closed" => {
+                        inner.is_opening = Some(false);
+                        inner.is_closing = Some(false);
+                        inner.is_closed = Some(true);
+                    }
+                    "open" => {
+                        inner.is_opening = Some(false);
+                        inner.is_closing = Some(false);
+                        inner.is_closed = Some(false);
+                    }
+                    _ => {
+                        inner.is_opening = None;
+                        inner.is_closing = None;
+                        inner.is_closed = None;
+                    }
+                }
+                if let Some(c) = params.attributes.get("is_closed").and_then(Value::as_bool) {
+                    inner.is_closed = Some(c);
+                }
+                inner.current_position = params
+                    .attributes
+                    .get("current_position")
+                    .and_then(Value::as_u64)
+                    .map(|p| p.min(100) as u8);
+                inner.current_tilt_position = params
+                    .attributes
+                    .get("current_tilt_position")
+                    .and_then(Value::as_u64)
+                    .map(|p| p.min(100) as u8);
+                merged.insert("supported_features".into(), json!(cov.supported_features));
+            }
+            EntityHandle::Lock(lck) => {
+                let mut inner = lck.state.write();
+                inner.available = available;
+                if let Some(v) = params.attributes.get("code_format") {
+                    inner.code_format = v.as_str().map(str::to_owned);
+                }
+                merged.insert("supported_features".into(), json!(lck.supported_features));
+            }
+            EntityHandle::Fan(f) => {
+                let mut inner = f.state.write();
+                inner.available = available;
+                inner.is_on = state_str == "on";
+                if let Some(p) = params.attributes.get("percentage") {
+                    inner.percentage = p.as_u64().map(|n| n.min(100) as u8);
+                }
+                if let Some(arr) = params
+                    .attributes
+                    .get("preset_modes")
+                    .and_then(Value::as_array)
+                {
+                    inner.preset_modes = arr
+                        .iter()
+                        .filter_map(Value::as_str)
+                        .map(str::to_owned)
+                        .collect();
+                }
+                merged.insert("supported_features".into(), json!(f.supported_features));
+            }
             EntityHandle::Passive => {}
             EntityHandle::Disabled => return Ok(()),
         }
@@ -496,6 +766,11 @@ impl PluginEntityStore {
                     }
                     EntityHandle::Scene(scene) => *scene.available.write() = false,
                     EntityHandle::Vacuum(vac) => *vac.available.write() = false,
+                    EntityHandle::Select(sel) => sel.state.write().available = false,
+                    EntityHandle::Number(num) => num.state.write().available = false,
+                    EntityHandle::Cover(cov) => cov.state.write().available = false,
+                    EntityHandle::Lock(lck) => lck.state.write().available = false,
+                    EntityHandle::Fan(f) => f.state.write().available = false,
                     EntityHandle::Passive | EntityHandle::Disabled => {}
                 }
                 let mut attrs = Attributes::new();
@@ -532,6 +807,11 @@ impl PluginEntityStore {
             "button" => self.components.buttons().remove(&reg.entity_id),
             "scene" => self.components.scenes().remove(&reg.entity_id),
             "vacuum" => self.components.vacuums().remove(&reg.entity_id),
+            "select" => self.components.selects().remove(&reg.entity_id),
+            "number" => self.components.numbers().remove(&reg.entity_id),
+            "cover" => self.components.covers().remove(&reg.entity_id),
+            "lock" => self.components.locks().remove(&reg.entity_id),
+            "fan" => self.components.fans().remove(&reg.entity_id),
             _ => {}
         }
     }
@@ -916,5 +1196,369 @@ impl Vacuum for PluginVacuum {
             data.insert("params".into(), params);
         }
         self.invoke("send_command", data)
+    }
+}
+
+struct SelectInner {
+    available: bool,
+    options: Vec<String>,
+    current_option: Option<String>,
+}
+
+struct PluginSelect {
+    entity_id: EntityId,
+    entry_id: String,
+    unique_id: String,
+    state: RwLock<SelectInner>,
+    call_plugin: CallPluginFn,
+}
+
+impl Select for PluginSelect {
+    fn entity_id(&self) -> &EntityId {
+        &self.entity_id
+    }
+
+    fn available(&self) -> bool {
+        self.state.read().available
+    }
+
+    fn options(&self) -> Vec<String> {
+        self.state.read().options.clone()
+    }
+
+    fn current_option(&self) -> Option<String> {
+        self.state.read().current_option.clone()
+    }
+
+    fn select_option(&self, option: &str) -> BoxFuture<'_> {
+        let mut data = Map::new();
+        data.insert("option".into(), json!(option));
+        let call = (self.call_plugin)(EntityCallParams {
+            entry_id: self.entry_id.clone(),
+            unique_id: self.unique_id.clone(),
+            domain: "select".into(),
+            service: "select_option".into(),
+            data,
+        });
+        Box::pin(call)
+    }
+}
+
+struct NumberInner {
+    available: bool,
+    min: f64,
+    max: f64,
+    step: f64,
+    explicit_step: Option<f64>,
+}
+
+struct PluginNumber {
+    entity_id: EntityId,
+    entry_id: String,
+    unique_id: String,
+    state: RwLock<NumberInner>,
+    call_plugin: CallPluginFn,
+}
+
+impl Number for PluginNumber {
+    fn entity_id(&self) -> &EntityId {
+        &self.entity_id
+    }
+
+    fn available(&self) -> bool {
+        self.state.read().available
+    }
+
+    fn min_value(&self) -> f64 {
+        self.state.read().min
+    }
+
+    fn max_value(&self) -> f64 {
+        self.state.read().max
+    }
+
+    fn step(&self) -> f64 {
+        self.state.read().step
+    }
+
+    fn set_value(&self, value: f64) -> BoxFuture<'_> {
+        let mut data = Map::new();
+        data.insert("value".into(), json!(value));
+        let call = (self.call_plugin)(EntityCallParams {
+            entry_id: self.entry_id.clone(),
+            unique_id: self.unique_id.clone(),
+            domain: "number".into(),
+            service: "set_value".into(),
+            data,
+        });
+        Box::pin(call)
+    }
+}
+
+struct CoverInner {
+    available: bool,
+    is_closed: Option<bool>,
+    is_opening: Option<bool>,
+    is_closing: Option<bool>,
+    current_position: Option<u8>,
+    current_tilt_position: Option<u8>,
+    last_toggle_direction_open: bool,
+}
+
+struct PluginCover {
+    entity_id: EntityId,
+    entry_id: String,
+    unique_id: String,
+    supported_features: u32,
+    state: RwLock<CoverInner>,
+    call_plugin: CallPluginFn,
+}
+
+impl PluginCover {
+    fn invoke(&self, service: &str, data: Map<String, Value>) -> BoxFuture<'_> {
+        let call = (self.call_plugin)(EntityCallParams {
+            entry_id: self.entry_id.clone(),
+            unique_id: self.unique_id.clone(),
+            domain: "cover".into(),
+            service: service.into(),
+            data,
+        });
+        Box::pin(call)
+    }
+}
+
+impl Cover for PluginCover {
+    fn entity_id(&self) -> &EntityId {
+        &self.entity_id
+    }
+
+    fn available(&self) -> bool {
+        self.state.read().available
+    }
+
+    fn supported_features(&self) -> u32 {
+        self.supported_features
+    }
+
+    fn is_closed(&self) -> Option<bool> {
+        self.state.read().is_closed
+    }
+
+    fn is_opening(&self) -> Option<bool> {
+        self.state.read().is_opening
+    }
+
+    fn is_closing(&self) -> Option<bool> {
+        self.state.read().is_closing
+    }
+
+    fn current_position(&self) -> Option<u8> {
+        self.state.read().current_position
+    }
+
+    fn current_tilt_position(&self) -> Option<u8> {
+        self.state.read().current_tilt_position
+    }
+
+    fn last_toggle_direction_open(&self) -> bool {
+        self.state.read().last_toggle_direction_open
+    }
+
+    fn open_cover(&self) -> BoxFuture<'_> {
+        self.invoke("open_cover", Map::new())
+    }
+
+    fn close_cover(&self) -> BoxFuture<'_> {
+        self.invoke("close_cover", Map::new())
+    }
+
+    fn stop_cover(&self) -> BoxFuture<'_> {
+        self.invoke("stop_cover", Map::new())
+    }
+
+    fn set_cover_position(&self, position: u8) -> BoxFuture<'_> {
+        let mut data = Map::new();
+        data.insert("position".into(), json!(position));
+        self.invoke("set_cover_position", data)
+    }
+
+    fn open_cover_tilt(&self) -> BoxFuture<'_> {
+        self.invoke("open_cover_tilt", Map::new())
+    }
+
+    fn close_cover_tilt(&self) -> BoxFuture<'_> {
+        self.invoke("close_cover_tilt", Map::new())
+    }
+
+    fn stop_cover_tilt(&self) -> BoxFuture<'_> {
+        self.invoke("stop_cover_tilt", Map::new())
+    }
+
+    fn set_cover_tilt_position(&self, tilt_position: u8) -> BoxFuture<'_> {
+        let mut data = Map::new();
+        data.insert("tilt_position".into(), json!(tilt_position));
+        self.invoke("set_cover_tilt_position", data)
+    }
+}
+
+struct LockInner {
+    available: bool,
+    code_format: Option<String>,
+}
+
+struct PluginLock {
+    entity_id: EntityId,
+    entry_id: String,
+    unique_id: String,
+    supported_features: u32,
+    state: RwLock<LockInner>,
+    call_plugin: CallPluginFn,
+}
+
+impl PluginLock {
+    fn invoke(&self, service: &str, code: Option<&str>) -> BoxFuture<'_> {
+        let mut data = Map::new();
+        if let Some(code) = code {
+            data.insert("code".into(), json!(code));
+        }
+        let call = (self.call_plugin)(EntityCallParams {
+            entry_id: self.entry_id.clone(),
+            unique_id: self.unique_id.clone(),
+            domain: "lock".into(),
+            service: service.into(),
+            data,
+        });
+        Box::pin(call)
+    }
+}
+
+impl Lock for PluginLock {
+    fn entity_id(&self) -> &EntityId {
+        &self.entity_id
+    }
+
+    fn available(&self) -> bool {
+        self.state.read().available
+    }
+
+    fn supported_features(&self) -> u32 {
+        self.supported_features
+    }
+
+    fn code_format(&self) -> Option<String> {
+        self.state.read().code_format.clone()
+    }
+
+    fn lock(&self, code: Option<&str>) -> BoxFuture<'_> {
+        self.invoke("lock", code)
+    }
+
+    fn unlock(&self, code: Option<&str>) -> BoxFuture<'_> {
+        self.invoke("unlock", code)
+    }
+
+    fn open(&self, code: Option<&str>) -> BoxFuture<'_> {
+        self.invoke("open", code)
+    }
+}
+
+struct FanInner {
+    available: bool,
+    is_on: bool,
+    percentage: Option<u8>,
+    speed_count: u32,
+    preset_modes: Vec<String>,
+}
+
+struct PluginFan {
+    entity_id: EntityId,
+    entry_id: String,
+    unique_id: String,
+    supported_features: u32,
+    state: RwLock<FanInner>,
+    call_plugin: CallPluginFn,
+}
+
+impl PluginFan {
+    fn invoke(&self, service: &str, data: Map<String, Value>) -> BoxFuture<'_> {
+        let call = (self.call_plugin)(EntityCallParams {
+            entry_id: self.entry_id.clone(),
+            unique_id: self.unique_id.clone(),
+            domain: "fan".into(),
+            service: service.into(),
+            data,
+        });
+        Box::pin(call)
+    }
+}
+
+impl Fan for PluginFan {
+    fn entity_id(&self) -> &EntityId {
+        &self.entity_id
+    }
+
+    fn available(&self) -> bool {
+        self.state.read().available
+    }
+
+    fn supported_features(&self) -> u32 {
+        self.supported_features
+    }
+
+    fn is_on(&self) -> bool {
+        self.state.read().is_on
+    }
+
+    fn percentage(&self) -> Option<u8> {
+        self.state.read().percentage
+    }
+
+    fn speed_count(&self) -> u32 {
+        self.state.read().speed_count
+    }
+
+    fn preset_modes(&self) -> Vec<String> {
+        self.state.read().preset_modes.clone()
+    }
+
+    fn turn_on(&self, percentage: Option<u8>, preset_mode: Option<&str>) -> BoxFuture<'_> {
+        let mut data = Map::new();
+        if let Some(p) = percentage {
+            data.insert("percentage".into(), json!(p));
+        }
+        if let Some(pm) = preset_mode {
+            data.insert("preset_mode".into(), json!(pm));
+        }
+        self.invoke("turn_on", data)
+    }
+
+    fn turn_off(&self) -> BoxFuture<'_> {
+        self.invoke("turn_off", Map::new())
+    }
+
+    fn set_percentage(&self, percentage: u8) -> BoxFuture<'_> {
+        let mut data = Map::new();
+        data.insert("percentage".into(), json!(percentage));
+        self.invoke("set_percentage", data)
+    }
+
+    fn set_preset_mode(&self, preset_mode: &str) -> BoxFuture<'_> {
+        let mut data = Map::new();
+        data.insert("preset_mode".into(), json!(preset_mode));
+        self.invoke("set_preset_mode", data)
+    }
+
+    fn oscillate(&self, oscillating: bool) -> BoxFuture<'_> {
+        let mut data = Map::new();
+        data.insert("oscillating".into(), json!(oscillating));
+        self.invoke("oscillate", data)
+    }
+
+    fn set_direction(&self, direction: Option<&str>) -> BoxFuture<'_> {
+        let mut data = Map::new();
+        if let Some(d) = direction {
+            data.insert("direction".into(), json!(d));
+        }
+        self.invoke("set_direction", data)
     }
 }

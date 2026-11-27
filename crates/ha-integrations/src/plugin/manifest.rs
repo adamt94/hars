@@ -27,6 +27,11 @@ pub const SUPPORTED_ENTITY_DOMAINS: &[&str] = &[
     "button",
     "scene",
     "vacuum",
+    "select",
+    "number",
+    "cover",
+    "lock",
+    "fan",
     "sensor",
     "binary_sensor",
 ];
@@ -41,7 +46,9 @@ const BUILTIN_DOMAINS: &[&str] = &[
     "button",
     "climate",
     "config",
+    "cover",
     "device_tracker",
+    "fan",
     "frontend",
     "hars_plugins",
     "history",
@@ -51,11 +58,13 @@ const BUILTIN_DOMAINS: &[&str] = &[
     "labs",
     "lifx",
     "light",
+    "lock",
     "logbook",
     "lovelace",
     "met",
     "mobile_app",
     "notify",
+    "number",
     "onboarding",
     "persistent_notification",
     "person",
@@ -63,6 +72,7 @@ const BUILTIN_DOMAINS: &[&str] = &[
     "repairs",
     "run",
     "scene",
+    "select",
     "sensor",
     "sun",
     "switch",
@@ -677,7 +687,7 @@ mod tests {
         );
         // Unsupported entity domain rejected.
         let mut bad_cap = sample_manifest("tplink", "bin/tplink");
-        bad_cap.capabilities.entity_domains.push("lock".into());
+        bad_cap.capabilities.entity_domains.push("camera".into());
         assert!(bad_cap.validate(Some("tplink")).is_err());
     }
 

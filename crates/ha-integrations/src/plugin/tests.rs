@@ -895,6 +895,7 @@ async fn entity_store_guards_foreign_devices_duplicates_and_attribute_growth() {
             min_color_temp_kelvin: None,
             max_color_temp_kelvin: None,
             fan_speed_list: None,
+            ..Default::default()
         })
         .unwrap();
     let dup = store.upsert_entity(protocol::EntityUpsertParams {
@@ -914,6 +915,7 @@ async fn entity_store_guards_foreign_devices_duplicates_and_attribute_growth() {
         min_color_temp_kelvin: None,
         max_color_temp_kelvin: None,
         fan_speed_list: None,
+        ..Default::default()
     });
     assert!(dup.is_err());
 
@@ -1467,6 +1469,7 @@ async fn user_disabled_plugin_vacuum_cannot_be_commanded() {
             min_color_temp_kelvin: None,
             max_color_temp_kelvin: None,
             fan_speed_list: None,
+            ..Default::default()
         })
         .unwrap();
     store
@@ -1515,6 +1518,7 @@ async fn user_disabled_plugin_vacuum_cannot_be_commanded() {
             min_color_temp_kelvin: None,
             max_color_temp_kelvin: None,
             fan_speed_list: None,
+            ..Default::default()
         })
         .unwrap();
     let btn_eid = ha_core::EntityId::parse(&btn_id).unwrap();
@@ -1563,6 +1567,285 @@ async fn user_disabled_plugin_vacuum_cannot_be_commanded() {
         hass.states().get(&btn_eid).unwrap().state.as_str(),
         pressed_ts
     );
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[tokio::test]
+async fn plugin_supports_select_number_cover_lock_and_fan() {
+    use crate::{cover, fan, lock};
+
+    let dir = temp_dir("foundation-domains");
+    let plugin_dir = dir.join("plugins/multi_dev");
+    std::fs::create_dir_all(plugin_dir.join("bin")).unwrap();
+    let manifest = PluginManifest {
+        schema_version: 1,
+        domain: "multi_dev".into(),
+        name: "Multi Device".into(),
+        version: "0.1.0".into(),
+        iot_class: "local_push".into(),
+        config_flow: true,
+        documentation: None,
+        description: None,
+        transport: Transport::Stdio {
+            command: "bin/multi".into(),
+            args: vec![],
+        },
+        capabilities: Capabilities {
+            entity_domains: vec![
+                "select".into(),
+                "number".into(),
+                "cover".into(),
+                "lock".into(),
+                "fan".into(),
+            ],
+            config_entry_version: 1,
+        },
+    };
+    std::fs::write(
+        plugin_dir.join("plugin.json"),
+        serde_json::to_string_pretty(&manifest).unwrap(),
+    )
+    .unwrap();
+    std::fs::write(plugin_dir.join("bin/multi"), b"").unwrap();
+    let installed = Arc::new(InstalledPlugin::load(&plugin_dir).unwrap());
+
+    let hass = Hass::new();
+    let registry = Registry::new(&hass, &dir, Registries::default());
+    let components = Components::new(&hass, registry, Profiles::default());
+
+    let recorded: Arc<parking_lot::Mutex<Vec<protocol::EntityCallParams>>> = Default::default();
+    let rec = recorded.clone();
+    let store = entities::PluginEntityStore::new(
+        installed,
+        components.clone(),
+        Arc::new(move |params| {
+            rec.lock().push(params);
+            Box::pin(async { Ok(()) })
+        }),
+    );
+    store.activate_entry("e1");
+
+    // 1. select
+    let sel_id = store
+        .upsert_entity(protocol::EntityUpsertParams {
+            entry_id: "e1".into(),
+            unique_id: "sel_1".into(),
+            domain: "select".into(),
+            name: Some("Mode".into()),
+            options: Some(vec!["eco".into(), "normal".into(), "turbo".into()]),
+            ..Default::default()
+        })
+        .unwrap();
+    store
+        .set_state(protocol::StateSetParams {
+            entry_id: "e1".into(),
+            unique_id: "sel_1".into(),
+            state: "eco".into(),
+            attributes: Map::new(),
+        })
+        .unwrap();
+
+    // 2. number
+    let num_id = store
+        .upsert_entity(protocol::EntityUpsertParams {
+            entry_id: "e1".into(),
+            unique_id: "num_1".into(),
+            domain: "number".into(),
+            name: Some("Brightness".into()),
+            min_value: Some(0.0),
+            max_value: Some(50.0),
+            step: Some(5.0),
+            mode: Some("slider".into()),
+            ..Default::default()
+        })
+        .unwrap();
+    store
+        .set_state(protocol::StateSetParams {
+            entry_id: "e1".into(),
+            unique_id: "num_1".into(),
+            state: "25".into(),
+            attributes: Map::new(),
+        })
+        .unwrap();
+
+    // 3. cover
+    let cov_id = store
+        .upsert_entity(protocol::EntityUpsertParams {
+            entry_id: "e1".into(),
+            unique_id: "cov_1".into(),
+            domain: "cover".into(),
+            name: Some("Blinds".into()),
+            supported_features: cover::feature::OPEN
+                | cover::feature::CLOSE
+                | cover::feature::SET_POSITION
+                | cover::feature::STOP,
+            ..Default::default()
+        })
+        .unwrap();
+    store
+        .set_state(protocol::StateSetParams {
+            entry_id: "e1".into(),
+            unique_id: "cov_1".into(),
+            state: "closed".into(),
+            attributes: json!({"current_position": 0}).as_object().cloned().unwrap(),
+        })
+        .unwrap();
+
+    // 4. lock
+    let lck_id = store
+        .upsert_entity(protocol::EntityUpsertParams {
+            entry_id: "e1".into(),
+            unique_id: "lck_1".into(),
+            domain: "lock".into(),
+            name: Some("Front Door".into()),
+            supported_features: lock::feature::OPEN,
+            code_format: Some(r"^\d{4}$".into()),
+            ..Default::default()
+        })
+        .unwrap();
+    store
+        .set_state(protocol::StateSetParams {
+            entry_id: "e1".into(),
+            unique_id: "lck_1".into(),
+            state: "locked".into(),
+            attributes: Map::new(),
+        })
+        .unwrap();
+
+    // 5. fan
+    let fan_id = store
+        .upsert_entity(protocol::EntityUpsertParams {
+            entry_id: "e1".into(),
+            unique_id: "fan_1".into(),
+            domain: "fan".into(),
+            name: Some("Ceiling Fan".into()),
+            supported_features: fan::feature::TURN_ON
+                | fan::feature::TURN_OFF
+                | fan::feature::SET_SPEED
+                | fan::feature::PRESET_MODE,
+            preset_modes: Some(vec!["auto".into(), "sleep".into()]),
+            speed_count: Some(3),
+            ..Default::default()
+        })
+        .unwrap();
+    store
+        .set_state(protocol::StateSetParams {
+            entry_id: "e1".into(),
+            unique_id: "fan_1".into(),
+            state: "on".into(),
+            attributes: json!({"percentage": 33}).as_object().cloned().unwrap(),
+        })
+        .unwrap();
+
+    let call = |domain: &'static str, svc: &'static str, v: Value| {
+        let hass = hass.clone();
+        async move {
+            hass.call_service(
+                domain,
+                svc,
+                v.as_object().cloned().unwrap(),
+                None,
+                false,
+                None,
+            )
+            .await
+        }
+    };
+    call("select", "select_next", json!({"entity_id": sel_id}))
+        .await
+        .unwrap();
+    call(
+        "number",
+        "set_value",
+        json!({"entity_id": num_id, "value": 35}),
+    )
+    .await
+    .unwrap();
+    call("cover", "toggle", json!({"entity_id": cov_id}))
+        .await
+        .unwrap();
+    call(
+        "lock",
+        "unlock",
+        json!({"entity_id": lck_id, "code": "1234"}),
+    )
+    .await
+    .unwrap();
+    call("fan", "increase_speed", json!({"entity_id": fan_id}))
+        .await
+        .unwrap();
+
+    // Validation failures do not reach the plugin.
+    assert!(
+        call(
+            "number",
+            "set_value",
+            json!({"entity_id": num_id, "value": 99})
+        )
+        .await
+        .is_err()
+    );
+    assert!(
+        call(
+            "lock",
+            "unlock",
+            json!({"entity_id": lck_id, "code": "bad"})
+        )
+        .await
+        .is_err()
+    );
+
+    let calls: Vec<(String, String, Value)> = recorded
+        .lock()
+        .iter()
+        .map(|c| {
+            (
+                c.domain.clone(),
+                c.service.clone(),
+                Value::Object(c.data.clone()),
+            )
+        })
+        .collect();
+    assert_eq!(
+        calls,
+        vec![
+            (
+                "select".into(),
+                "select_option".into(),
+                json!({"option": "normal"})
+            ),
+            ("number".into(), "set_value".into(), json!({"value": 35.0})),
+            ("cover".into(), "open_cover".into(), json!({})),
+            ("lock".into(), "unlock".into(), json!({"code": "1234"})),
+            (
+                "fan".into(),
+                "set_percentage".into(),
+                json!({"percentage": 66})
+            ),
+        ]
+    );
+
+    // Crash marks all five unavailable, and deactivate_entry unregisters them.
+    store.mark_all_unavailable();
+    for id in [&sel_id, &num_id, &cov_id, &lck_id, &fan_id] {
+        assert_eq!(
+            hass.states()
+                .get(&ha_core::EntityId::parse(id).unwrap())
+                .unwrap()
+                .state
+                .as_str(),
+            "unavailable"
+        );
+    }
+    store.deactivate_entry("e1");
+    for id in [&sel_id, &num_id, &cov_id, &lck_id, &fan_id] {
+        assert!(
+            hass.states()
+                .get(&ha_core::EntityId::parse(id).unwrap())
+                .is_none()
+        );
+    }
 
     let _ = std::fs::remove_dir_all(&dir);
 }
