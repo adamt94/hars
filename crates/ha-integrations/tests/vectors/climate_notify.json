@@ -1,0 +1,477 @@
+{
+  "ha_version": "2026.6.1",
+  "capability_attributes": {
+    "climate_full": {
+      "hvac_modes": [
+        "off",
+        "heat",
+        "cool",
+        "auto"
+      ],
+      "min_temp": 16,
+      "max_temp": 30,
+      "min_humidity": 30,
+      "max_humidity": 80,
+      "fan_modes": [
+        "auto",
+        "low",
+        "high"
+      ],
+      "preset_modes": [
+        "eco",
+        "boost",
+        "away"
+      ],
+      "swing_modes": [
+        "off",
+        "vertical"
+      ],
+      "swing_horizontal_modes": [
+        "off",
+        "horizontal"
+      ]
+    },
+    "notify_with_title": null
+  },
+  "notify_state_is_timestamp": true,
+  "cases": [
+    {
+      "name": "climate_set_preset_mode_ok",
+      "domain": "climate",
+      "service": "set_preset_mode",
+      "data": {
+        "entity_id": "climate.living_room",
+        "preset_mode": "eco"
+      },
+      "calls": {
+        "climate.living_room": [
+          [
+            "set_preset_mode",
+            "eco"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "climate_set_preset_mode_invalid",
+      "domain": "climate",
+      "service": "set_preset_mode",
+      "data": {
+        "entity_id": "climate.living_room",
+        "preset_mode": "turbo"
+      },
+      "error": {
+        "kind": "validation",
+        "domain": "climate",
+        "key": "not_valid_preset_mode",
+        "placeholders": {
+          "mode": "turbo",
+          "modes": "eco, boost, away"
+        },
+        "message": "not_valid_preset_mode"
+      }
+    },
+    {
+      "name": "climate_set_preset_mode_unsupported",
+      "domain": "climate",
+      "service": "set_preset_mode",
+      "data": {
+        "entity_id": "climate.minimal",
+        "preset_mode": "eco"
+      },
+      "error": {
+        "kind": "validation",
+        "domain": "homeassistant",
+        "key": "service_not_supported",
+        "placeholders": {
+          "domain": "climate",
+          "service": "set_preset_mode",
+          "entity_id": "climate.minimal"
+        },
+        "message": "service_not_supported"
+      }
+    },
+    {
+      "name": "climate_set_humidity_ok",
+      "domain": "climate",
+      "service": "set_humidity",
+      "data": {
+        "entity_id": "climate.living_room",
+        "humidity": 55
+      },
+      "calls": {
+        "climate.living_room": [
+          [
+            "set_humidity",
+            55
+          ]
+        ]
+      }
+    },
+    {
+      "name": "climate_set_humidity_low",
+      "domain": "climate",
+      "service": "set_humidity",
+      "data": {
+        "entity_id": "climate.living_room",
+        "humidity": 20
+      },
+      "error": {
+        "kind": "validation",
+        "domain": "climate",
+        "key": "humidity_out_of_range",
+        "placeholders": {
+          "humidity": "20",
+          "min_humidity": "30",
+          "max_humidity": "80"
+        },
+        "message": "humidity_out_of_range"
+      }
+    },
+    {
+      "name": "climate_set_humidity_high",
+      "domain": "climate",
+      "service": "set_humidity",
+      "data": {
+        "entity_id": "climate.living_room",
+        "humidity": 90
+      },
+      "error": {
+        "kind": "validation",
+        "domain": "climate",
+        "key": "humidity_out_of_range",
+        "placeholders": {
+          "humidity": "90",
+          "min_humidity": "30",
+          "max_humidity": "80"
+        },
+        "message": "humidity_out_of_range"
+      }
+    },
+    {
+      "name": "climate_set_humidity_unsupported",
+      "domain": "climate",
+      "service": "set_humidity",
+      "data": {
+        "entity_id": "climate.minimal",
+        "humidity": 50
+      },
+      "error": {
+        "kind": "validation",
+        "domain": "homeassistant",
+        "key": "service_not_supported",
+        "placeholders": {
+          "domain": "climate",
+          "service": "set_humidity",
+          "entity_id": "climate.minimal"
+        },
+        "message": "service_not_supported"
+      }
+    },
+    {
+      "name": "climate_set_swing_mode_ok",
+      "domain": "climate",
+      "service": "set_swing_mode",
+      "data": {
+        "entity_id": "climate.living_room",
+        "swing_mode": "vertical"
+      },
+      "calls": {
+        "climate.living_room": [
+          [
+            "set_swing_mode",
+            "vertical"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "climate_set_swing_mode_invalid",
+      "domain": "climate",
+      "service": "set_swing_mode",
+      "data": {
+        "entity_id": "climate.living_room",
+        "swing_mode": "both"
+      },
+      "error": {
+        "kind": "validation",
+        "domain": "climate",
+        "key": "not_valid_swing_mode",
+        "placeholders": {
+          "mode": "both",
+          "modes": "off, vertical"
+        },
+        "message": "not_valid_swing_mode"
+      }
+    },
+    {
+      "name": "climate_set_swing_mode_unsupported",
+      "domain": "climate",
+      "service": "set_swing_mode",
+      "data": {
+        "entity_id": "climate.minimal",
+        "swing_mode": "vertical"
+      },
+      "error": {
+        "kind": "validation",
+        "domain": "homeassistant",
+        "key": "service_not_supported",
+        "placeholders": {
+          "domain": "climate",
+          "service": "set_swing_mode",
+          "entity_id": "climate.minimal"
+        },
+        "message": "service_not_supported"
+      }
+    },
+    {
+      "name": "climate_set_swing_horizontal_mode_ok",
+      "domain": "climate",
+      "service": "set_swing_horizontal_mode",
+      "data": {
+        "entity_id": "climate.living_room",
+        "swing_horizontal_mode": "horizontal"
+      },
+      "calls": {
+        "climate.living_room": [
+          [
+            "set_swing_horizontal_mode",
+            "horizontal"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "climate_set_swing_horizontal_mode_invalid",
+      "domain": "climate",
+      "service": "set_swing_horizontal_mode",
+      "data": {
+        "entity_id": "climate.living_room",
+        "swing_horizontal_mode": "wide"
+      },
+      "error": {
+        "kind": "validation",
+        "domain": "climate",
+        "key": "not_valid_horizontal_swing_mode",
+        "placeholders": {
+          "mode": "wide",
+          "modes": "off, horizontal"
+        },
+        "message": "not_valid_horizontal_swing_mode"
+      }
+    },
+    {
+      "name": "climate_set_swing_horizontal_mode_unsupported",
+      "domain": "climate",
+      "service": "set_swing_horizontal_mode",
+      "data": {
+        "entity_id": "climate.minimal",
+        "swing_horizontal_mode": "horizontal"
+      },
+      "error": {
+        "kind": "validation",
+        "domain": "homeassistant",
+        "key": "service_not_supported",
+        "placeholders": {
+          "domain": "climate",
+          "service": "set_swing_horizontal_mode",
+          "entity_id": "climate.minimal"
+        },
+        "message": "service_not_supported"
+      }
+    },
+    {
+      "name": "climate_set_temperature_range_ok",
+      "domain": "climate",
+      "service": "set_temperature",
+      "data": {
+        "entity_id": "climate.living_room",
+        "target_temp_low": 19,
+        "target_temp_high": 24,
+        "hvac_mode": "auto"
+      },
+      "calls": {
+        "climate.living_room": [
+          [
+            "set_temperature",
+            {
+              "entity_id": [
+                "climate.living_room"
+              ],
+              "target_temp_low": 19.0,
+              "target_temp_high": 24.0,
+              "hvac_mode": "auto"
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "name": "climate_set_temperature_range_inverted",
+      "domain": "climate",
+      "service": "set_temperature",
+      "data": {
+        "entity_id": "climate.living_room",
+        "target_temp_low": 25,
+        "target_temp_high": 20
+      },
+      "error": {
+        "kind": "validation",
+        "domain": "climate",
+        "key": "low_temp_higher_than_high_temp",
+        "placeholders": null,
+        "message": "low_temp_higher_than_high_temp"
+      }
+    },
+    {
+      "name": "climate_set_hvac_mode_ok",
+      "domain": "climate",
+      "service": "set_hvac_mode",
+      "data": {
+        "entity_id": "climate.living_room",
+        "hvac_mode": "heat"
+      },
+      "calls": {
+        "climate.living_room": [
+          [
+            "set_hvac_mode",
+            "heat"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "climate_set_fan_mode_ok",
+      "domain": "climate",
+      "service": "set_fan_mode",
+      "data": {
+        "entity_id": "climate.living_room",
+        "fan_mode": "high"
+      },
+      "calls": {
+        "climate.living_room": [
+          [
+            "set_fan_mode",
+            "high"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "climate_turn_on",
+      "domain": "climate",
+      "service": "turn_on",
+      "data": {
+        "entity_id": "climate.living_room"
+      },
+      "calls": {
+        "climate.living_room": [
+          [
+            "set_hvac_mode",
+            "heat"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "climate_turn_off",
+      "domain": "climate",
+      "service": "turn_off",
+      "data": {
+        "entity_id": "climate.living_room"
+      },
+      "calls": {
+        "climate.living_room": [
+          [
+            "set_hvac_mode",
+            "off"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "climate_toggle_off_turns_on",
+      "domain": "climate",
+      "service": "toggle",
+      "data": {
+        "entity_id": "climate.living_room"
+      },
+      "calls": {
+        "climate.living_room": [
+          [
+            "set_hvac_mode",
+            "heat"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "notify_send_message_with_title_supported",
+      "domain": "notify",
+      "service": "send_message",
+      "data": {
+        "entity_id": "notify.telegram",
+        "message": "Hello",
+        "title": "Alert"
+      },
+      "calls": {
+        "notify.telegram": [
+          [
+            "send_message",
+            "Hello",
+            "Alert"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "notify_send_message_without_title",
+      "domain": "notify",
+      "service": "send_message",
+      "data": {
+        "entity_id": "notify.telegram",
+        "message": "Hello"
+      },
+      "calls": {
+        "notify.telegram": [
+          [
+            "send_message",
+            "Hello",
+            null
+          ]
+        ]
+      }
+    },
+    {
+      "name": "notify_send_message_strips_title_when_unsupported",
+      "domain": "notify",
+      "service": "send_message",
+      "data": {
+        "entity_id": "notify.plain",
+        "message": "Hello",
+        "title": "Ignored"
+      },
+      "calls": {
+        "notify.plain": [
+          [
+            "send_message",
+            "Hello",
+            null
+          ]
+        ]
+      }
+    },
+    {
+      "name": "notify_send_message_missing_message",
+      "domain": "notify",
+      "service": "send_message",
+      "data": {
+        "entity_id": "notify.telegram"
+      },
+      "error": {
+        "kind": "invalid",
+        "message": "required key not provided @ data['message']"
+      }
+    }
+  ]
+}

@@ -10,6 +10,7 @@ use crate::fan::Fans;
 use crate::light::{Lights, Profiles};
 use crate::lock::Locks;
 use crate::media_player::MediaPlayers;
+use crate::notify::Notifiers;
 use crate::number::Numbers;
 use crate::remote::Remotes;
 use crate::scene::Scenes;
@@ -61,6 +62,7 @@ pub struct Components {
     fans: OnceLock<Arc<Fans>>,
     media_players: OnceLock<Arc<MediaPlayers>>,
     remotes: OnceLock<Arc<Remotes>>,
+    notifiers: OnceLock<Arc<Notifiers>>,
     /// What every Hue bridge shares, made with the first.
     hue: OnceLock<Arc<crate::hue::Platforms>>,
     /// The entries that follow the registry, by entry id, from their
@@ -71,6 +73,12 @@ pub struct Components {
     /// The devices an entry runs, as (unique id, entry id): one entry each.
     /// Empty, and unallocated, on an install with none.
     running: Mutex<Vec<(String, String)>>,
+}
+
+impl std::fmt::Debug for Components {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Components").finish_non_exhaustive()
+    }
 }
 
 impl Components {
@@ -114,6 +122,7 @@ impl Components {
             fans: OnceLock::new(),
             media_players: OnceLock::new(),
             remotes: OnceLock::new(),
+            notifiers: OnceLock::new(),
             hue: OnceLock::new(),
             followers: Mutex::default(),
             running: Mutex::default(),
@@ -317,6 +326,16 @@ impl Components {
             })
             .clone()
     }
+
+    pub fn notifiers(&self) -> Arc<Notifiers> {
+        self.notifiers
+            .get_or_init(|| {
+                let c = Arc::new(Notifiers::default());
+                c.register_services(&self.hass, self.registries.clone());
+                c
+            })
+            .clone()
+    }
 }
 
 /// Points in the code where a test runs something of its own, once, on
@@ -387,5 +406,7 @@ mod tests {
         assert!(hass.services().has_service("media_player", "play_media"));
         assert!(Arc::ptr_eq(&c.remotes(), &c.remotes()));
         assert!(hass.services().has_service("remote", "send_command"));
+        assert!(Arc::ptr_eq(&c.notifiers(), &c.notifiers()));
+        assert!(hass.services().has_service("notify", "send_message"));
     }
 }

@@ -26,6 +26,7 @@ pub const SUPPORTED_ENTITY_DOMAINS: &[&str] = &[
     "switch",
     "button",
     "scene",
+    "climate",
     "vacuum",
     "select",
     "number",
@@ -34,6 +35,7 @@ pub const SUPPORTED_ENTITY_DOMAINS: &[&str] = &[
     "fan",
     "media_player",
     "remote",
+    "notify",
     "sensor",
     "binary_sensor",
 ];

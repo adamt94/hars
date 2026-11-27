@@ -113,19 +113,61 @@ impl Session {
         params: Value,
         timeout: Duration,
     ) -> Result<Value, RuntimeError> {
+        self.call_guarded(method, params, timeout, |enqueue| {
+            enqueue();
+            true
+        })
+        .await
+        .transpose()
+        .expect("unconditional guard always runs")
+    }
+
+    /// Reserve an outbox slot, then run `admit` with a synchronous `enqueue`
+    /// callback that registers `pending` and commits the frame to the FIFO
+    /// `outbox`. Callers can hold their own state lock across BOTH admission
+    /// checks and `enqueue()` so no concurrent unload can interleave.
+    async fn call_guarded(
+        &self,
+        method: &str,
+        params: Value,
+        timeout: Duration,
+        admit: impl FnOnce(&mut dyn FnMut()) -> bool,
+    ) -> Result<Option<Value>, RuntimeError> {
         let id = self.next_id.fetch_add(1, Ordering::Relaxed);
         let req = RpcRequest::new(id, method, params);
         let mut line = serde_json::to_string(&req)
             .map_err(|e| RuntimeError::InvalidPayload(self.domain.clone(), e.to_string()))?;
         line.push('\n');
 
+        let deadline = tokio::time::Instant::now() + timeout;
+        let Ok(permit_res) = tokio::time::timeout_at(deadline, self.outbox.reserve()).await else {
+            return Err(RuntimeError::Timeout(self.domain.clone()));
+        };
+        let Ok(permit) = permit_res else {
+            return Err(RuntimeError::Disconnected(self.domain.clone()));
+        };
+
         let (tx, rx) = oneshot::channel();
-        {
+        let mut busy = false;
+        let mut permit = Some(permit);
+        let mut tx = Some(tx);
+        let mut line = Some(line);
+        let admitted = admit(&mut || {
             let mut pending = self.pending.lock();
             if pending.len() >= MAX_PENDING_CALLS {
-                return Err(RuntimeError::Busy(self.domain.clone()));
+                busy = true;
+                return;
             }
-            pending.insert(id, tx);
+            if let (Some(tx), Some(permit), Some(line)) = (tx.take(), permit.take(), line.take()) {
+                pending.insert(id, tx);
+                permit.send(line);
+            }
+        });
+        if !admitted {
+            return Ok(None);
+        }
+        if busy {
+            return Err(RuntimeError::Busy(self.domain.clone()));
         }
         // RAII guard ensures `pending.remove(&id)` runs on normal completion,
         // timeout, error, AND future drop/cancellation (e.g. aborted config
@@ -144,21 +186,9 @@ impl Session {
             id,
         };
 
-        // Cover BOTH queueing into `outbox` and awaiting the response with the
-        // same timeout so a stalled plugin can never hang callers or shutdown.
-        let result = tokio::time::timeout(timeout, async {
-            if self.outbox.send(line).await.is_err() {
-                return Err(RuntimeError::Disconnected(self.domain.clone()));
-            }
-            match rx.await {
-                Ok(res) => res,
-                Err(_) => Err(RuntimeError::Disconnected(self.domain.clone())),
-            }
-        })
-        .await;
-
-        match result {
-            Ok(res) => res,
+        match tokio::time::timeout_at(deadline, rx).await {
+            Ok(Ok(res)) => res.map(Some),
+            Ok(Err(_)) => Err(RuntimeError::Disconnected(self.domain.clone())),
             Err(_) => Err(RuntimeError::Timeout(self.domain.clone())),
         }
     }
@@ -851,9 +881,21 @@ impl PluginHost {
             .ok_or_else(|| {
                 ServiceError::Unknown(format!("plugin {} is not running", self.plugin.domain()))
             })?;
+        let entry_id = params.entry_id.clone();
         let val = serde_json::to_value(params).expect("serialisable");
+        // Hold `self.entries` across the membership check AND committing the
+        // frame to the FIFO outbox (via `reserve` + `permit.send`) so
+        // `unload_entry` can never remove `entry_id` and queue `entry.unload`
+        // before a stale `entity.call` is queued.
         session
-            .call("entity.call", val, CALL_TIMEOUT)
+            .call_guarded("entity.call", val, CALL_TIMEOUT, |enqueue| {
+                let entries = self.entries.lock();
+                if !entries.contains_key(&entry_id) {
+                    return false;
+                }
+                enqueue();
+                true
+            })
             .await
             .map(|_| ())
             .map_err(|e| ServiceError::Unknown(e.to_string()))

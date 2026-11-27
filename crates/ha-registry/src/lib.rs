@@ -11,7 +11,7 @@
 mod live;
 pub use live::{
     AreaRefusal, DeviceInfo, DevicePatch, DeviceRefusal, EntityPatch, EntryInfo, EntryLookup,
-    Lookup, NewArea, Registry, RenameRefusal, available_entity_id,
+    Lookup, NewArea, Registry, RenameRefusal, WeakLookup, available_entity_id,
 };
 
 use ha_core::storage::{Store, StoreError};

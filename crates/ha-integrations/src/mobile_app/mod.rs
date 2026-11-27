@@ -248,6 +248,7 @@ pub struct MobileApp {
     /// Where cloud pushes go, if not [`notify::HttpRelay`].
     relay: std::sync::OnceLock<Arc<dyn notify::Relay>>,
     entries: std::sync::OnceLock<Arc<crate::config_entries::ConfigEntries>>,
+    entities: std::sync::OnceLock<Arc<crate::components::Components>>,
 }
 
 /// The webhook's view of an id.
@@ -312,7 +313,15 @@ impl MobileApp {
             notifier: std::sync::OnceLock::new(),
             relay: std::sync::OnceLock::new(),
             entries: std::sync::OnceLock::new(),
+            entities: std::sync::OnceLock::new(),
         }
+    }
+
+    /// Share `Components` so `mobile_app`'s `notify` entities attach to the
+    /// shared `notify` component (`notify.send_message`). Call before
+    /// [`MobileApp::setup`].
+    pub fn set_entities(&self, entities: Arc<crate::components::Components>) {
+        let _ = self.entities.set(entities);
     }
 
     /// Send cloud pushes to `relay` instead of over HTTPS (tests answer
@@ -350,7 +359,13 @@ impl MobileApp {
                 .get()
                 .cloned()
                 .unwrap_or_else(|| Arc::new(notify::HttpRelay));
-            notify::Notifier::new(hass, registry.clone(), self.registrations.clone(), relay)
+            notify::Notifier::with_components(
+                hass,
+                registry.clone(),
+                self.registrations.clone(),
+                relay,
+                self.entities.get().cloned(),
+            )
         });
         // HA registers the notify services whenever `mobile_app` is set up;
         // hars sets it up only with a registration.
@@ -549,8 +564,15 @@ impl MobileApp {
         if let Some(t) = self.trackers.get() {
             t.unload(&reg.entry_id);
         }
-        notify::unload_entity(&ctx.hass, &ctx.registry, reg);
-        self.registrations.write().remove(&*reg.webhook_id);
+        // Remove the registration and unload its notify entity under the same
+        // write lock so an in-flight `Notifier::record` (which holds the read
+        // lock across its ptr_eq check and state write) cannot recreate the
+        // unloaded state or overwrite a re-paired replacement.
+        {
+            let mut regs = self.registrations.write();
+            regs.remove(&*reg.webhook_id);
+            notify::unload_entity(&ctx.hass, &ctx.registry, reg);
+        }
         // `notify.async_reload`.
         if let Some(n) = self.notifier.get() {
             n.register_services();

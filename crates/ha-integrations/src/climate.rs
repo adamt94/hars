@@ -44,8 +44,12 @@ pub const HVAC_MODES: &[&str] = &[
 ];
 
 /// HA's `DEFAULT_MIN_TEMP` / `DEFAULT_MAX_TEMP` (ints, in °C).
-const DEFAULT_MIN_TEMP: i64 = 7;
-const DEFAULT_MAX_TEMP: i64 = 35;
+pub const DEFAULT_MIN_TEMP: i64 = 7;
+pub const DEFAULT_MAX_TEMP: i64 = 35;
+
+/// HA's `DEFAULT_MIN_HUMIDITY` / `DEFAULT_MAX_HUMIDITY` (`components/climate/const.py`).
+pub const DEFAULT_MIN_HUMIDITY: i64 = 30;
+pub const DEFAULT_MAX_HUMIDITY: i64 = 99;
 
 /// A temperature as HA holds it: Python keeps ints and floats apart, and
 /// so does the attribute (`21` against `21.0`).
@@ -113,11 +117,26 @@ pub trait Climate: Send + Sync {
     /// The state; `None` is `unknown`.
     fn hvac_mode(&self) -> Option<String>;
     fn hvac_modes(&self) -> &[&'static str];
+    fn hvac_modes_vec(&self) -> Vec<String> {
+        self.hvac_modes().iter().map(|s| (*s).to_owned()).collect()
+    }
     fn fan_mode(&self) -> Option<String> {
         None
     }
     fn fan_modes(&self) -> &[&'static str] {
         &[]
+    }
+    fn fan_modes_vec(&self) -> Vec<String> {
+        self.fan_modes().iter().map(|s| (*s).to_owned()).collect()
+    }
+    fn preset_modes_vec(&self) -> Vec<String> {
+        Vec::new()
+    }
+    fn swing_modes_vec(&self) -> Vec<String> {
+        Vec::new()
+    }
+    fn swing_horizontal_modes_vec(&self) -> Vec<String> {
+        Vec::new()
     }
     fn precision(&self) -> Precision {
         // HA's default for a system in °C.
@@ -128,6 +147,17 @@ pub trait Climate: Send + Sync {
     }
     fn max_temp(&self) -> Temp {
         Temp::Int(DEFAULT_MAX_TEMP)
+    }
+    /// Atomic snapshot of `(min_temp, max_temp)`.
+    fn temp_bounds(&self) -> (Temp, Temp) {
+        (self.min_temp(), self.max_temp())
+    }
+    /// Atomic snapshot of `(min_humidity, max_humidity)`.
+    fn humidity_bounds(&self) -> (Temp, Temp) {
+        (
+            Temp::Int(DEFAULT_MIN_HUMIDITY),
+            Temp::Int(DEFAULT_MAX_HUMIDITY),
+        )
     }
     fn target_temperature_step(&self) -> Option<Temp> {
         None
@@ -146,31 +176,63 @@ pub trait Climate: Send + Sync {
     fn set_fan_mode(&self, _mode: &str) -> BoxFuture<'_> {
         unsupported()
     }
+    fn set_preset_mode(&self, _mode: &str) -> BoxFuture<'_> {
+        unsupported()
+    }
+    fn set_humidity(&self, _humidity: i64) -> BoxFuture<'_> {
+        unsupported()
+    }
+    /// Exact canonical integer string variant of [`Self::set_humidity`] so
+    /// validated integers outside `i64` are never silently clamped.
+    fn set_humidity_str(&self, humidity: &str) -> BoxFuture<'_> {
+        match humidity.parse::<i64>() {
+            Ok(h) => self.set_humidity(h),
+            Err(_) => unsupported(),
+        }
+    }
+    fn set_swing_mode(&self, _mode: &str) -> BoxFuture<'_> {
+        unsupported()
+    }
+    fn set_swing_horizontal_mode(&self, _mode: &str) -> BoxFuture<'_> {
+        unsupported()
+    }
     fn set_temperature(&self, _args: SetTemperature) -> BoxFuture<'_> {
         unsupported()
     }
     /// The base `async_turn_on`: the only other mode when there are two
     /// and one is `off`, else the first of heat_cool, heat, cool.
     fn turn_on(&self) -> BoxFuture<'_> {
-        let modes = self.hvac_modes();
-        let only = (modes.len() == 2 && modes.contains(&"off"))
-            .then(|| modes.iter().find(|m| **m != "off"))
-            .flatten();
+        let modes = self.hvac_modes_vec();
+        let has_off = modes.iter().any(|m| m == "off");
+        let only = (modes.len() == 2 && has_off)
+            .then(|| modes.iter().find(|m| m.as_str() != "off"))
+            .flatten()
+            .cloned();
         let fake = || {
             ["heat_cool", "heat", "cool"]
                 .into_iter()
-                .find(|m| modes.contains(m))
+                .find(|m| modes.iter().any(|x| x == m))
+                .map(str::to_owned)
         };
-        match only.copied().or_else(fake) {
-            Some(mode) => self.set_hvac_mode(mode),
+        match only.or_else(fake) {
+            Some(mode) => Box::pin(async move { self.set_hvac_mode(&mode).await }),
             None => unsupported(),
         }
     }
     /// The base `async_turn_off`: `off`, if it's a mode.
     fn turn_off(&self) -> BoxFuture<'_> {
-        match self.hvac_modes().contains(&"off") {
+        match self.hvac_modes_vec().iter().any(|m| m == "off") {
             true => self.set_hvac_mode("off"),
             false => unsupported(),
+        }
+    }
+    /// The base `async_toggle`: `off` -> `turn_on`, anything else -> `turn_off`.
+    /// Platforms and plugins may override this to handle `climate.toggle` directly.
+    fn toggle(&self) -> BoxFuture<'_> {
+        if self.hvac_mode().as_deref() == Some("off") {
+            self.turn_on()
+        } else {
+            self.turn_off()
         }
     }
 }
@@ -226,10 +288,10 @@ pub fn attributes(c: &dyn Climate) -> Attributes {
     a
 }
 
-/// `_valid_mode_or_raise`; `label` names the mode in the message (`HVAC`
-/// or `fan`).
-fn valid_mode(kind: &str, label: &str, mode: &str, modes: &[&str]) -> Result<(), ServiceError> {
-    if modes.contains(&mode) {
+/// `_valid_mode_or_raise`; `label` names the mode in the message (`HVAC`,
+/// `fan`, `preset`, `swing`, or `horizontal swing`).
+fn valid_mode(kind: &str, label: &str, mode: &str, modes: &[String]) -> Result<(), ServiceError> {
+    if modes.iter().any(|m| m == mode) {
         return Ok(());
     }
     let modes = modes.join(", ");
@@ -246,6 +308,85 @@ fn valid_mode(kind: &str, label: &str, mode: &str, modes: &[&str]) -> Result<(),
             &label[1..]
         ),
     ))
+}
+
+/// Compare two canonical base-10 integer strings (no `+`, no leading zeros except `"0"`).
+fn cmp_canonical_int(a: &str, b: &str) -> std::cmp::Ordering {
+    let a_neg = a.starts_with('-');
+    let b_neg = b.starts_with('-');
+    match (a_neg, b_neg) {
+        (true, false) => std::cmp::Ordering::Less,
+        (false, true) => std::cmp::Ordering::Greater,
+        (false, false) => a.len().cmp(&b.len()).then_with(|| a.cmp(b)),
+        (true, true) => b.len().cmp(&a.len()).then_with(|| b.cmp(a)),
+    }
+}
+
+/// Exact comparison between a canonical base-10 integer string and a `Temp` bound,
+/// avoiding `f64` rounding loss for integers beyond 2^53.
+fn cmp_bigint_temp(canonical: &str, bound: Temp) -> std::cmp::Ordering {
+    match bound {
+        Temp::Int(i) => cmp_canonical_int(canonical, &i.to_string()),
+        Temp::Float(f) if f.is_nan() => std::cmp::Ordering::Equal,
+        Temp::Float(f) if f == f64::INFINITY => std::cmp::Ordering::Less,
+        Temp::Float(f) if f == f64::NEG_INFINITY => std::cmp::Ordering::Greater,
+        Temp::Float(f) => {
+            let floor = f.floor();
+            let floor_str = if floor == 0.0 {
+                "0".to_owned()
+            } else {
+                format!("{floor:.0}")
+            };
+            let ord = cmp_canonical_int(canonical, &floor_str);
+            if f.fract() == 0.0 {
+                ord
+            } else {
+                // `floor < f < floor + 1`, so an integer `n <= floor` is strictly `< f`
+                // and `n > floor` is strictly `> f`.
+                match ord {
+                    std::cmp::Ordering::Less | std::cmp::Ordering::Equal => {
+                        std::cmp::Ordering::Less
+                    }
+                    std::cmp::Ordering::Greater => std::cmp::Ordering::Greater,
+                }
+            }
+        }
+    }
+}
+
+/// `async_service_humidity_set`'s range check, then the entity's call.
+async fn set_humidity(c: &dyn Climate, data: &Map<String, Value>) -> Result<(), ServiceError> {
+    let (min, max) = c.humidity_bounds();
+    let shown: String = match data.get("humidity") {
+        Some(Value::Number(n)) => {
+            if let Some(i) = n.as_i64() {
+                i.to_string()
+            } else if let Some(u) = n.as_u64() {
+                u.to_string()
+            } else {
+                "0".into()
+            }
+        }
+        Some(Value::String(s)) => s.clone(),
+        _ => "0".into(),
+    };
+    if cmp_bigint_temp(&shown, min).is_lt() || cmp_bigint_temp(&shown, max).is_gt() {
+        let mut p = Map::new();
+        p.insert("humidity".into(), json!(shown));
+        p.insert("min_humidity".into(), json!(min.py_str()));
+        p.insert("max_humidity".into(), json!(max.py_str()));
+        return Err(ServiceError::validation(
+            DOMAIN,
+            "humidity_out_of_range",
+            Some(p),
+            format!(
+                "Provided humidity {shown} is not valid. Accepted range is {} to {}",
+                min.py_str(),
+                max.py_str()
+            ),
+        ));
+    }
+    c.set_humidity_str(&shown).await
 }
 
 /// `async_service_temperature_set`'s checks, then the entity's call.
@@ -276,7 +417,7 @@ async fn set_temperature(c: &dyn Climate, data: &Map<String, Value>) -> Result<(
             "'Lower target temperature' cannot be higher than 'Upper target temperature'",
         );
     }
-    let (min, max) = (c.min_temp(), c.max_temp());
+    let (min, max) = c.temp_bounds();
     // HA checks in the caller's key order; the data here is in key order
     // (serde_json's map), so with two out of range the one named can
     // differ.
@@ -353,9 +494,67 @@ fn chosen(
     Ok(out)
 }
 
+fn dispatch_one<'a>(
+    c: &'a dyn Climate,
+    name: &'static str,
+    data: &'a Map<String, Value>,
+) -> BoxFuture<'a> {
+    let str_of = |k: &str| data.get(k).and_then(Value::as_str).unwrap_or("");
+    match name {
+        "turn_on" => c.turn_on(),
+        "turn_off" => c.turn_off(),
+        "toggle" => c.toggle(),
+        "set_hvac_mode" => {
+            let mode = str_of("hvac_mode");
+            if let Err(e) = valid_mode("hvac", "HVAC", mode, &c.hvac_modes_vec()) {
+                return Box::pin(async move { Err(e) });
+            }
+            c.set_hvac_mode(mode)
+        }
+        "set_fan_mode" => {
+            let mode = str_of("fan_mode");
+            if let Err(e) = valid_mode("fan", "fan", mode, &c.fan_modes_vec()) {
+                return Box::pin(async move { Err(e) });
+            }
+            c.set_fan_mode(mode)
+        }
+        "set_preset_mode" => {
+            let mode = str_of("preset_mode");
+            if let Err(e) = valid_mode("preset", "preset", mode, &c.preset_modes_vec()) {
+                return Box::pin(async move { Err(e) });
+            }
+            c.set_preset_mode(mode)
+        }
+        "set_swing_mode" => {
+            let mode = str_of("swing_mode");
+            if let Err(e) = valid_mode("swing", "swing", mode, &c.swing_modes_vec()) {
+                return Box::pin(async move { Err(e) });
+            }
+            c.set_swing_mode(mode)
+        }
+        "set_swing_horizontal_mode" => {
+            let mode = str_of("swing_horizontal_mode");
+            if let Err(e) = valid_mode(
+                "horizontal_swing",
+                "horizontal swing",
+                mode,
+                &c.swing_horizontal_modes_vec(),
+            ) {
+                return Box::pin(async move { Err(e) });
+            }
+            c.set_swing_horizontal_mode(mode)
+        }
+        "set_humidity" => Box::pin(set_humidity(c, data)),
+        "set_temperature" => Box::pin(set_temperature(c, data)),
+        _ => Box::pin(async { Ok(()) }),
+    }
+}
+
 impl Climates {
     pub fn add(&self, c: Arc<dyn Climate>) {
-        self.items.write().push(c);
+        let mut items = self.items.write();
+        items.retain(|existing| existing.entity_id() != c.entity_id());
+        items.push(c);
     }
 
     pub fn remove(&self, entity_id: &EntityId) {
@@ -398,7 +597,7 @@ impl Climates {
             ),
             (
                 "set_humidity",
-                entity().required("humidity", Kind::Int(Range::ANY)),
+                entity().required("humidity", Kind::BigInt),
                 &[TARGET_HUMIDITY],
             ),
             (
@@ -431,39 +630,28 @@ impl Climates {
                     async move {
                         let target = call.entity_ids()?;
                         let indirect = registries.get().target_entities(&call.data);
-                        let items = climates.items.read().clone();
-                        let chosen = chosen(&items, &target, &indirect, required, name)?;
+                        let chosen =
+                            chosen(&climates.items.read(), &target, &indirect, required, name)?;
                         let data = &call.data;
-                        let str_of = |k: &str| data.get(k).and_then(Value::as_str).unwrap_or("");
-                        let calls = chosen.iter().map(|c| async move {
-                            match name {
-                                "turn_on" => c.turn_on().await,
-                                "turn_off" => c.turn_off().await,
-                                "toggle" if c.hvac_mode().as_deref() == Some("off") => {
-                                    c.turn_on().await
-                                }
-                                "toggle" => c.turn_off().await,
-                                "set_hvac_mode" => {
-                                    let mode = str_of("hvac_mode");
-                                    valid_mode("hvac", "HVAC", mode, c.hvac_modes())?;
-                                    c.set_hvac_mode(mode).await
-                                }
-                                "set_fan_mode" => {
-                                    let mode = str_of("fan_mode");
-                                    valid_mode("fan", "fan", mode, c.fan_modes())?;
-                                    c.set_fan_mode(mode).await
-                                }
-                                "set_temperature" => set_temperature(c.as_ref(), data).await,
-                                // Features no entity in scope has.
-                                _ => Err(ServiceError::Unknown(format!(
-                                    "climate.{name} is not supported by hars yet"
-                                ))),
-                            }
-                        });
-                        crate::light::join_all(calls)
+                        if let [only] = chosen.as_slice() {
+                            dispatch_one(&**only, name, data).await?;
+                        } else if !chosen.is_empty() {
+                            let mut first_err: Option<ServiceError> = None;
+                            for res in crate::light::join_all(
+                                chosen.iter().map(|c| dispatch_one(&**c, name, data)),
+                            )
                             .await
-                            .into_iter()
-                            .collect::<Result<Vec<()>, _>>()?;
+                            {
+                                if let Err(e) = res
+                                    && first_err.is_none()
+                                {
+                                    first_err = Some(e);
+                                }
+                            }
+                            if let Some(e) = first_err {
+                                return Err(e);
+                            }
+                        }
                         Ok(None)
                     }
                 },

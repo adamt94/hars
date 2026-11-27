@@ -285,7 +285,7 @@ shows how.
 | `media_player` | `turn_on`, `turn_off`, `toggle`, `volume_up`, `volume_down`, `volume_set`, `volume_mute`, `media_play_pause`, `media_play`, `media_pause`, `media_stop`, `media_next_track`, `media_previous_track`, `media_seek`, `play_media`, `select_source`, `select_sound_mode`, `shuffle_set`, `repeat_set`, `join`, `unjoin`, `clear_playlist` |
 | `remote` | `turn_on`, `turn_off`, `toggle`, `send_command`, `learn_command`, `delete_command` |
 | `weather` | `weather.get_forecasts` |
-| `notify` | `notify.send_message`, for the companion app |
+| `notify` | `notify.send_message` (shared across `mobile_app` and plugins) |
 | `sensor`, `binary_sensor`, `device_tracker` | None. These types are states only |
 
 ## Planned
