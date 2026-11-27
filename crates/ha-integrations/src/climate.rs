@@ -302,32 +302,68 @@ fn valid_mode(kind: &str, label: &str, mode: &str, modes: &[String]) -> Result<(
     ))
 }
 
+/// Compare two canonical base-10 integer strings (no `+`, no leading zeros except `"0"`).
+fn cmp_canonical_int(a: &str, b: &str) -> std::cmp::Ordering {
+    let a_neg = a.starts_with('-');
+    let b_neg = b.starts_with('-');
+    match (a_neg, b_neg) {
+        (true, false) => std::cmp::Ordering::Less,
+        (false, true) => std::cmp::Ordering::Greater,
+        (false, false) => a.len().cmp(&b.len()).then_with(|| a.cmp(b)),
+        (true, true) => b.len().cmp(&a.len()).then_with(|| b.cmp(a)),
+    }
+}
+
+/// Exact comparison between a canonical base-10 integer string and a `Temp` bound,
+/// avoiding `f64` rounding loss for integers beyond 2^53.
+fn cmp_bigint_temp(canonical: &str, bound: Temp) -> std::cmp::Ordering {
+    match bound {
+        Temp::Int(i) => cmp_canonical_int(canonical, &i.to_string()),
+        Temp::Float(f) if f.is_nan() => std::cmp::Ordering::Equal,
+        Temp::Float(f) if f == f64::INFINITY => std::cmp::Ordering::Less,
+        Temp::Float(f) if f == f64::NEG_INFINITY => std::cmp::Ordering::Greater,
+        Temp::Float(f) => {
+            let floor = f.floor();
+            let floor_str = if floor == 0.0 {
+                "0".to_owned()
+            } else {
+                format!("{floor:.0}")
+            };
+            let ord = cmp_canonical_int(canonical, &floor_str);
+            if f.fract() == 0.0 {
+                ord
+            } else {
+                // `floor < f < floor + 1`, so an integer `n <= floor` is strictly `< f`
+                // and `n > floor` is strictly `> f`.
+                match ord {
+                    std::cmp::Ordering::Less | std::cmp::Ordering::Equal => {
+                        std::cmp::Ordering::Less
+                    }
+                    std::cmp::Ordering::Greater => std::cmp::Ordering::Greater,
+                }
+            }
+        }
+    }
+}
+
 /// `async_service_humidity_set`'s range check, then the entity's call.
 async fn set_humidity(c: &dyn Climate, data: &Map<String, Value>) -> Result<(), ServiceError> {
     let (min, max) = c.humidity_bounds();
     let val = data.get("humidity");
-    let (h_f, shown, parsed_i64): (f64, String, Option<i64>) = match val {
+    let (shown, parsed_i64): (String, Option<i64>) = match val {
         Some(Value::Number(n)) => {
             if let Some(i) = n.as_i64() {
-                (i as f64, i.to_string(), Some(i))
+                (i.to_string(), Some(i))
             } else if let Some(u) = n.as_u64() {
-                (u as f64, u.to_string(), i64::try_from(u).ok())
+                (u.to_string(), i64::try_from(u).ok())
             } else {
-                (0.0, "0".into(), Some(0))
+                ("0".into(), Some(0))
             }
         }
-        Some(Value::String(s)) => {
-            // Canonical base-10 integer string outside 64-bit JSON range (from `Kind::BigInt`).
-            let f = s.parse::<f64>().unwrap_or(if s.starts_with('-') {
-                f64::NEG_INFINITY
-            } else {
-                f64::INFINITY
-            });
-            (f, s.clone(), None)
-        }
-        _ => (0.0, "0".into(), Some(0)),
+        Some(Value::String(s)) => (s.clone(), None),
+        _ => ("0".into(), Some(0)),
     };
-    if h_f < min.get() || h_f > max.get() {
+    if cmp_bigint_temp(&shown, min).is_lt() || cmp_bigint_temp(&shown, max).is_gt() {
         let mut p = Map::new();
         p.insert("humidity".into(), json!(shown));
         p.insert("min_humidity".into(), json!(min.py_str()));

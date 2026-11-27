@@ -564,8 +564,15 @@ impl MobileApp {
         if let Some(t) = self.trackers.get() {
             t.unload(&reg.entry_id);
         }
-        notify::unload_entity(&ctx.hass, &ctx.registry, reg);
-        self.registrations.write().remove(&*reg.webhook_id);
+        // Remove the registration and unload its notify entity under the same
+        // write lock so an in-flight `Notifier::record` (which holds the read
+        // lock across its ptr_eq check and state write) cannot recreate the
+        // unloaded state or overwrite a re-paired replacement.
+        {
+            let mut regs = self.registrations.write();
+            regs.remove(&*reg.webhook_id);
+            notify::unload_entity(&ctx.hass, &ctx.registry, reg);
+        }
         // `notify.async_reload`.
         if let Some(n) = self.notifier.get() {
             n.register_services();

@@ -827,11 +827,13 @@ impl Notifier {
 
     /// `_async_record_notification`: the notify entity's state becomes now.
     fn record(&self, reg: &Arc<Registration>, context: Option<Context>) {
-        // Drop writes from a removed or re-paired registration so an in-flight
-        // send can never overwrite its replacement entity.
-        let is_live = self
-            .registrations
-            .read()
+        // Hold the registrations read lock across the liveness check AND the
+        // state write so `MobileApp::unload` (which removes the registration
+        // and unloads the notify state under the write lock) cannot interleave
+        // to let an in-flight send recreate an unloaded entity or overwrite a
+        // re-paired replacement.
+        let regs = self.registrations.read();
+        let is_live = regs
             .get(&reg.webhook_id)
             .is_some_and(|cur| Arc::ptr_eq(cur, reg));
         if !is_live {

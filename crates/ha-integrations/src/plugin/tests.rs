@@ -3682,14 +3682,14 @@ async fn climate_and_notify_round1_regressions() {
             .await
     });
     tokio::task::yield_now().await;
-    // Re-upsert while send is in flight with a new name.
+    // Re-upsert while send is in flight with a new name AND cleared TITLE feature mask.
     store
         .upsert_entity(protocol::EntityUpsertParams {
             entry_id: "e1".into(),
             unique_id: "n1".into(),
             domain: "notify".into(),
             name: Some("Renamed Notify".into()),
-            supported_features: crate::notify::feature::TITLE,
+            supported_features: 0,
             ..Default::default()
         })
         .unwrap();
@@ -3703,6 +3703,11 @@ async fn climate_and_notify_round1_regressions() {
     assert_eq!(
         after_send.attributes["friendly_name"],
         json!("Renamed Notify")
+    );
+    assert_eq!(
+        after_send.attributes["supported_features"],
+        json!(0),
+        "completion must publish the latest re-upserted supported_features"
     );
     assert_ne!(
         after_send.context.id, orig_ctx_id,
@@ -3769,6 +3774,100 @@ async fn climate_and_notify_round1_regressions() {
     gate.notify_one();
     fan_task.await.unwrap().unwrap();
 
+    // 3. Exact arbitrary-precision humidity check: 18446744073709551617 > 18446744073709551616.0
+    //    must fail range validation instead of rounding equal in f64.
+    let big_clim_id = store
+        .upsert_entity(protocol::EntityUpsertParams {
+            entry_id: "e1".into(),
+            unique_id: "c_big".into(),
+            domain: "climate".into(),
+            name: Some("Big Bound Stat".into()),
+            supported_features: cf::TARGET_HUMIDITY,
+            hvac_modes: Some(vec!["off".into(), "heat".into()]),
+            min_humidity: json!(0).as_number().cloned(),
+            max_humidity: json!(18446744073709551616.0_f64).as_number().cloned(),
+            ..Default::default()
+        })
+        .unwrap();
+    let err_exact = hass
+        .call_service(
+            "climate",
+            "set_humidity",
+            json!({"entity_id": big_clim_id, "humidity": "18446744073709551617"})
+                .as_object()
+                .cloned()
+                .unwrap(),
+            None,
+            false,
+            None,
+        )
+        .await
+        .unwrap_err();
+    match err_exact {
+        ServiceError::Validation(r) => {
+            assert_eq!(r.key, "humidity_out_of_range");
+            assert_eq!(
+                r.placeholders.as_ref().unwrap()["humidity"],
+                "18446744073709551617"
+            );
+        }
+        other => panic!("expected validation error, got {other:?}"),
+    }
+
+    // 4. US customary (°F) uses whole-degree precision for climate min_temp/max_temp (68.6 -> 69).
+    let mut us_cfg = (*hass.config()).clone();
+    us_cfg.unit_system_v2 = "us_customary".into();
+    hass.set_config(us_cfg);
+    let us_clim_id = store
+        .upsert_entity(protocol::EntityUpsertParams {
+            entry_id: "e1".into(),
+            unique_id: "c_us".into(),
+            domain: "climate".into(),
+            name: Some("US Stat".into()),
+            supported_features: cf::TARGET_TEMPERATURE,
+            hvac_modes: Some(vec!["off".into(), "heat".into()]),
+            min_temp: json!(68.6).as_number().cloned(),
+            max_temp: json!(80.4).as_number().cloned(),
+            ..Default::default()
+        })
+        .unwrap();
+    let us_snap = registry.snapshot();
+    let us_row = us_snap
+        .entities
+        .iter()
+        .find(|e| e.entity_id == us_clim_id)
+        .unwrap();
+    let us_caps = serde_json::to_value(&us_row.capabilities).unwrap();
+    assert_eq!(us_caps["min_temp"], json!(69));
+    assert_eq!(us_caps["max_temp"], json!(80));
+
+    // 5. Deactivating a plugin entry before a constructed notify future is polled skips the RPC.
+    seen_calls.lock().clear();
+    let deferred_fut = {
+        let hass_d = hass.clone();
+        let n_id_d = n_id.clone();
+        async move {
+            hass_d
+                .call_service(
+                    "notify",
+                    "send_message",
+                    json!({"entity_id": n_id_d, "message": "should skip"})
+                        .as_object()
+                        .cloned()
+                        .unwrap(),
+                    None,
+                    false,
+                    None,
+                )
+                .await
+        }
+    };
     store.deactivate_entry("e1");
+    deferred_fut.await.unwrap();
+    assert!(
+        seen_calls.lock().is_empty(),
+        "deactivated notify entry must not receive RPC"
+    );
+
     let _ = std::fs::remove_dir_all(&dir);
 }

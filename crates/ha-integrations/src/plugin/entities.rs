@@ -292,6 +292,7 @@ impl PluginEntityStore {
             let mut inner = ClimateInner {
                 available: prev_climate_caps.as_ref().is_none_or(|c| c.available),
                 hvac_mode: prev_climate_caps.as_ref().and_then(|c| c.hvac_mode.clone()),
+                precision: climate_precision(self.components.hass()),
                 min_temp,
                 max_temp,
                 target_temp_step,
@@ -1219,6 +1220,11 @@ impl PluginEntityStore {
                         }
                     }
                     let mut caps_changed = false;
+                    let cur_precision = climate_precision(self.components.hass());
+                    if inner.precision != cur_precision {
+                        inner.precision = cur_precision;
+                        caps_changed = true;
+                    }
                     if let Some(t) = params.attributes.get("min_temp").and_then(temp_from_value)
                         && inner.min_temp != t
                     {
@@ -1520,6 +1526,12 @@ impl PluginEntityStore {
                     EntityHandle::Climate(clim) => {
                         let mut inner = clim.state.write();
                         inner.available = false;
+                        let cur_precision = climate_precision(hass);
+                        if inner.precision != cur_precision {
+                            inner.precision = cur_precision;
+                            inner.cached_caps =
+                                climate_capabilities_map(clim.supported_features, &inner);
+                        }
                         for (k, v) in &inner.cached_caps {
                             attrs.insert(k.clone(), v.clone());
                         }
@@ -2775,16 +2787,24 @@ fn temp_json(t: Temp) -> Value {
     }
 }
 
+fn climate_precision(hass: &Hass) -> climate::Precision {
+    if hass.config().unit_system_v2 == "us_customary" {
+        climate::Precision::Whole
+    } else {
+        climate::Precision::Tenths
+    }
+}
+
 fn climate_capabilities_map(supported_features: u32, c: &ClimateInner) -> Map<String, Value> {
     let mut caps = Map::new();
     caps.insert("hvac_modes".into(), json!(c.hvac_modes));
     caps.insert(
         "min_temp".into(),
-        climate::display_temp(Some(c.min_temp), climate::Precision::Tenths),
+        climate::display_temp(Some(c.min_temp), c.precision),
     );
     caps.insert(
         "max_temp".into(),
-        climate::display_temp(Some(c.max_temp), climate::Precision::Tenths),
+        climate::display_temp(Some(c.max_temp), c.precision),
     );
     if let Some(step) = c.target_temp_step.filter(|s| s.get() != 0.0) {
         caps.insert("target_temp_step".into(), temp_json(step));
@@ -2818,6 +2838,7 @@ fn climate_capabilities_map(supported_features: u32, c: &ClimateInner) -> Map<St
 struct ClimateInner {
     available: bool,
     hvac_mode: Option<String>,
+    precision: climate::Precision,
     min_temp: Temp,
     max_temp: Temp,
     target_temp_step: Option<Temp>,
@@ -3012,24 +3033,24 @@ impl Notify for PluginNotify {
         title: Option<&'a str>,
         context: Context,
     ) -> BoxFuture<'a> {
-        if !self.state.lock().active {
-            return Box::pin(async { Ok(()) });
-        }
         let context_set = self.hass.clock().instant();
-        let mut data = Map::new();
-        data.insert("message".into(), json!(message));
-        if let Some(t) = title {
-            data.insert("title".into(), json!(t));
-        }
-        let call = (self.call_plugin)(EntityCallParams {
-            entry_id: self.entry_id.clone(),
-            unique_id: self.unique_id.clone(),
-            domain: "notify".into(),
-            service: "send_message".into(),
-            data,
-        });
         Box::pin(async move {
-            call.await?;
+            if !self.state.lock().active {
+                return Ok(());
+            }
+            let mut data = Map::new();
+            data.insert("message".into(), json!(message));
+            if let Some(t) = title {
+                data.insert("title".into(), json!(t));
+            }
+            (self.call_plugin)(EntityCallParams {
+                entry_id: self.entry_id.clone(),
+                unique_id: self.unique_id.clone(),
+                domain: "notify".into(),
+                service: "send_message".into(),
+                data,
+            })
+            .await?;
             // Record last notification timestamp (`NotifyEntity._async_record_notification`),
             // serialized with availability and deactivation under `self.state`.
             let ts = ha_core::isoformat(self.hass.clock().now());
@@ -3045,8 +3066,9 @@ impl Notify for PluginNotify {
             }
             inner.last_notified = Some(ts.clone());
             if inner.available {
-                let mut attrs = inner.base_attrs.clone();
-                attrs.insert("supported_features".into(), json!(self.supported_features));
+                // `inner.base_attrs` already carries the latest `supported_features`
+                // and metadata from any concurrent re-upsert.
+                let attrs = inner.base_attrs.clone();
                 self.hass
                     .set_state_with_context(self.entity_id.clone(), ts, attrs, ctx);
             }

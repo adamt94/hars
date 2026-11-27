@@ -851,6 +851,9 @@ impl PluginHost {
             .ok_or_else(|| {
                 ServiceError::Unknown(format!("plugin {} is not running", self.plugin.domain()))
             })?;
+        if !self.entries.lock().contains_key(&params.entry_id) {
+            return Ok(());
+        }
         let val = serde_json::to_value(params).expect("serialisable");
         session
             .call("entity.call", val, CALL_TIMEOUT)
