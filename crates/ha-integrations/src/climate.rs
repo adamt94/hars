@@ -182,6 +182,14 @@ pub trait Climate: Send + Sync {
     fn set_humidity(&self, _humidity: i64) -> BoxFuture<'_> {
         unsupported()
     }
+    /// Exact canonical integer string variant of [`Self::set_humidity`] so
+    /// validated integers outside `i64` are never silently clamped.
+    fn set_humidity_str(&self, humidity: &str) -> BoxFuture<'_> {
+        match humidity.parse::<i64>() {
+            Ok(h) => self.set_humidity(h),
+            Err(_) => unsupported(),
+        }
+    }
     fn set_swing_mode(&self, _mode: &str) -> BoxFuture<'_> {
         unsupported()
     }
@@ -349,19 +357,18 @@ fn cmp_bigint_temp(canonical: &str, bound: Temp) -> std::cmp::Ordering {
 /// `async_service_humidity_set`'s range check, then the entity's call.
 async fn set_humidity(c: &dyn Climate, data: &Map<String, Value>) -> Result<(), ServiceError> {
     let (min, max) = c.humidity_bounds();
-    let val = data.get("humidity");
-    let (shown, parsed_i64): (String, Option<i64>) = match val {
+    let shown: String = match data.get("humidity") {
         Some(Value::Number(n)) => {
             if let Some(i) = n.as_i64() {
-                (i.to_string(), Some(i))
+                i.to_string()
             } else if let Some(u) = n.as_u64() {
-                (u.to_string(), i64::try_from(u).ok())
+                u.to_string()
             } else {
-                ("0".into(), Some(0))
+                "0".into()
             }
         }
-        Some(Value::String(s)) => (s.clone(), None),
-        _ => ("0".into(), Some(0)),
+        Some(Value::String(s)) => s.clone(),
+        _ => "0".into(),
     };
     if cmp_bigint_temp(&shown, min).is_lt() || cmp_bigint_temp(&shown, max).is_gt() {
         let mut p = Map::new();
@@ -379,8 +386,7 @@ async fn set_humidity(c: &dyn Climate, data: &Map<String, Value>) -> Result<(), 
             ),
         ));
     }
-    let humidity = parsed_i64.unwrap_or(i64::MAX);
-    c.set_humidity(humidity).await
+    c.set_humidity_str(&shown).await
 }
 
 /// `async_service_temperature_set`'s checks, then the entity's call.

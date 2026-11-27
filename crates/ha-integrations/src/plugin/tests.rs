@@ -3813,8 +3813,46 @@ async fn climate_and_notify_round1_regressions() {
         }
         other => panic!("expected validation error, got {other:?}"),
     }
+    // Validated large integers must not be silently clamped to `i64::MAX`.
+    seen_calls.lock().clear();
+    hass.call_service(
+        "climate",
+        "set_humidity",
+        json!({"entity_id": big_clim_id, "humidity": 10_000_000_000_000_000_000_u64})
+            .as_object()
+            .cloned()
+            .unwrap(),
+        None,
+        false,
+        None,
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        seen_calls.lock().last().unwrap().data["humidity"],
+        json!(10_000_000_000_000_000_000_u64)
+    );
+    hass.call_service(
+        "climate",
+        "set_humidity",
+        json!({"entity_id": big_clim_id, "humidity": "18446744073709551616"})
+            .as_object()
+            .cloned()
+            .unwrap(),
+        None,
+        false,
+        None,
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        seen_calls.lock().last().unwrap().data["humidity"],
+        json!("18446744073709551616")
+    );
 
-    // 4. US customary (°F) uses whole-degree precision for climate min_temp/max_temp (68.6 -> 69).
+    // 4. US customary (°F): explicit bounds round to whole degrees (68.6 -> 69),
+    //    and omitted bounds convert HA's Celsius defaults 7..35°C -> 44.6..95.0°F (displayed 45..95)
+    //    so a normal 68°F setpoint succeeds.
     let mut us_cfg = (*hass.config()).clone();
     us_cfg.unit_system_v2 = "us_customary".into();
     hass.set_config(us_cfg);
@@ -3831,6 +3869,17 @@ async fn climate_and_notify_round1_regressions() {
             ..Default::default()
         })
         .unwrap();
+    let us_default_id = store
+        .upsert_entity(protocol::EntityUpsertParams {
+            entry_id: "e1".into(),
+            unique_id: "c_us_def".into(),
+            domain: "climate".into(),
+            name: Some("US Default Stat".into()),
+            supported_features: cf::TARGET_TEMPERATURE,
+            hvac_modes: Some(vec!["off".into(), "heat".into()]),
+            ..Default::default()
+        })
+        .unwrap();
     let us_snap = registry.snapshot();
     let us_row = us_snap
         .entities
@@ -3840,33 +3889,53 @@ async fn climate_and_notify_round1_regressions() {
     let us_caps = serde_json::to_value(&us_row.capabilities).unwrap();
     assert_eq!(us_caps["min_temp"], json!(69));
     assert_eq!(us_caps["max_temp"], json!(80));
+    let us_def_row = us_snap
+        .entities
+        .iter()
+        .find(|e| e.entity_id == us_default_id)
+        .unwrap();
+    let us_def_caps = serde_json::to_value(&us_def_row.capabilities).unwrap();
+    assert_eq!(us_def_caps["min_temp"], json!(45));
+    assert_eq!(us_def_caps["max_temp"], json!(95));
+    hass.call_service(
+        "climate",
+        "set_temperature",
+        json!({"entity_id": us_default_id, "temperature": 68})
+            .as_object()
+            .cloned()
+            .unwrap(),
+        None,
+        false,
+        None,
+    )
+    .await
+    .unwrap();
+    assert!(
+        hass.call_service(
+            "climate",
+            "set_temperature",
+            json!({"entity_id": us_default_id, "temperature": 44})
+                .as_object()
+                .cloned()
+                .unwrap(),
+            None,
+            false,
+            None,
+        )
+        .await
+        .is_err()
+    );
 
-    // 5. Deactivating a plugin entry before a constructed notify future is polled skips the RPC.
+    // 5. Deactivating a plugin entry AFTER constructing a `PluginNotify::send_message` future
+    //    (before polling it) skips invoking `call_plugin` cleanly.
     seen_calls.lock().clear();
-    let deferred_fut = {
-        let hass_d = hass.clone();
-        let n_id_d = n_id.clone();
-        async move {
-            hass_d
-                .call_service(
-                    "notify",
-                    "send_message",
-                    json!({"entity_id": n_id_d, "message": "should skip"})
-                        .as_object()
-                        .cloned()
-                        .unwrap(),
-                    None,
-                    false,
-                    None,
-                )
-                .await
-        }
-    };
+    let adapter = components.notifiers().find(&n_eid).unwrap();
+    let send_fut = adapter.send_message("should skip", None, Context::new());
     store.deactivate_entry("e1");
-    deferred_fut.await.unwrap();
+    send_fut.await.unwrap();
     assert!(
         seen_calls.lock().is_empty(),
-        "deactivated notify entry must not receive RPC"
+        "deactivated notify adapter must not invoke call_plugin when polled"
     );
 
     let _ = std::fs::remove_dir_all(&dir);

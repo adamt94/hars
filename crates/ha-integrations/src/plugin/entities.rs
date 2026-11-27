@@ -225,18 +225,20 @@ impl PluginEntityStore {
                 _ => None,
             });
         let resolved_climate = if params.domain == "climate" {
-            let min_temp = params
+            let precision = climate_precision(self.components.hass());
+            let (def_min, def_max) = default_climate_temp_bounds(precision);
+            let explicit_min_temp = params
                 .min_temp
                 .as_ref()
                 .and_then(temp_from_number)
-                .or_else(|| prev_climate_caps.as_ref().map(|c| c.min_temp))
-                .unwrap_or(Temp::Int(climate::DEFAULT_MIN_TEMP));
-            let max_temp = params
+                .or_else(|| prev_climate_caps.as_ref().and_then(|c| c.explicit_min_temp));
+            let explicit_max_temp = params
                 .max_temp
                 .as_ref()
                 .and_then(temp_from_number)
-                .or_else(|| prev_climate_caps.as_ref().map(|c| c.max_temp))
-                .unwrap_or(Temp::Int(climate::DEFAULT_MAX_TEMP));
+                .or_else(|| prev_climate_caps.as_ref().and_then(|c| c.explicit_max_temp));
+            let min_temp = explicit_min_temp.unwrap_or(def_min);
+            let max_temp = explicit_max_temp.unwrap_or(def_max);
             let target_temp_step = params
                 .target_temp_step
                 .as_ref()
@@ -292,7 +294,9 @@ impl PluginEntityStore {
             let mut inner = ClimateInner {
                 available: prev_climate_caps.as_ref().is_none_or(|c| c.available),
                 hvac_mode: prev_climate_caps.as_ref().and_then(|c| c.hvac_mode.clone()),
-                precision: climate_precision(self.components.hass()),
+                precision,
+                explicit_min_temp,
+                explicit_max_temp,
                 min_temp,
                 max_temp,
                 target_temp_step,
@@ -1223,19 +1227,24 @@ impl PluginEntityStore {
                     let cur_precision = climate_precision(self.components.hass());
                     if inner.precision != cur_precision {
                         inner.precision = cur_precision;
+                        let (def_min, def_max) = default_climate_temp_bounds(cur_precision);
+                        inner.min_temp = inner.explicit_min_temp.unwrap_or(def_min);
+                        inner.max_temp = inner.explicit_max_temp.unwrap_or(def_max);
                         caps_changed = true;
                     }
-                    if let Some(t) = params.attributes.get("min_temp").and_then(temp_from_value)
-                        && inner.min_temp != t
-                    {
-                        inner.min_temp = t;
-                        caps_changed = true;
+                    if let Some(t) = params.attributes.get("min_temp").and_then(temp_from_value) {
+                        inner.explicit_min_temp = Some(t);
+                        if inner.min_temp != t {
+                            inner.min_temp = t;
+                            caps_changed = true;
+                        }
                     }
-                    if let Some(t) = params.attributes.get("max_temp").and_then(temp_from_value)
-                        && inner.max_temp != t
-                    {
-                        inner.max_temp = t;
-                        caps_changed = true;
+                    if let Some(t) = params.attributes.get("max_temp").and_then(temp_from_value) {
+                        inner.explicit_max_temp = Some(t);
+                        if inner.max_temp != t {
+                            inner.max_temp = t;
+                            caps_changed = true;
+                        }
                     }
                     if let Some(raw) = params.attributes.get("target_temp_step") {
                         let next = match raw {
@@ -1529,6 +1538,9 @@ impl PluginEntityStore {
                         let cur_precision = climate_precision(hass);
                         if inner.precision != cur_precision {
                             inner.precision = cur_precision;
+                            let (def_min, def_max) = default_climate_temp_bounds(cur_precision);
+                            inner.min_temp = inner.explicit_min_temp.unwrap_or(def_min);
+                            inner.max_temp = inner.explicit_max_temp.unwrap_or(def_max);
                             inner.cached_caps =
                                 climate_capabilities_map(clim.supported_features, &inner);
                         }
@@ -2795,6 +2807,19 @@ fn climate_precision(hass: &Hass) -> climate::Precision {
     }
 }
 
+/// HA's `ClimateEntity.min_temp` / `max_temp` defaults: 7°C / 35°C in metric,
+/// converted via `TemperatureConverter.convert(7/35, °C, °F)` -> 44.6°F / 95.0°F
+/// (displayed as 45 / 95 under whole-degree precision) in US customary mode.
+fn default_climate_temp_bounds(precision: climate::Precision) -> (Temp, Temp) {
+    match precision {
+        climate::Precision::Whole => (Temp::Float(44.6), Temp::Float(95.0)),
+        climate::Precision::Halves | climate::Precision::Tenths => (
+            Temp::Int(climate::DEFAULT_MIN_TEMP),
+            Temp::Int(climate::DEFAULT_MAX_TEMP),
+        ),
+    }
+}
+
 fn climate_capabilities_map(supported_features: u32, c: &ClimateInner) -> Map<String, Value> {
     let mut caps = Map::new();
     caps.insert("hvac_modes".into(), json!(c.hvac_modes));
@@ -2839,6 +2864,8 @@ struct ClimateInner {
     available: bool,
     hvac_mode: Option<String>,
     precision: climate::Precision,
+    explicit_min_temp: Option<Temp>,
+    explicit_max_temp: Option<Temp>,
     min_temp: Temp,
     max_temp: Temp,
     target_temp_step: Option<Temp>,
@@ -2963,6 +2990,19 @@ impl Climate for PluginClimate {
     fn set_humidity(&self, humidity: i64) -> BoxFuture<'_> {
         let mut data = Map::new();
         data.insert("humidity".into(), json!(humidity));
+        self.invoke("set_humidity", data)
+    }
+
+    fn set_humidity_str(&self, humidity: &str) -> BoxFuture<'_> {
+        let mut data = Map::new();
+        let val = if let Ok(i) = humidity.parse::<i64>() {
+            json!(i)
+        } else if let Ok(u) = humidity.parse::<u64>() {
+            json!(u)
+        } else {
+            json!(humidity)
+        };
+        data.insert("humidity".into(), val);
         self.invoke("set_humidity", data)
     }
 

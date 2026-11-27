@@ -64,6 +64,15 @@ impl Notifiers {
         self.items.write().retain(|n| !Arc::ptr_eq(n, target));
     }
 
+    #[cfg(test)]
+    pub(crate) fn find(&self, entity_id: &EntityId) -> Option<Arc<dyn Notify>> {
+        self.items
+            .read()
+            .iter()
+            .find(|n| n.entity_id().as_ref() == Some(entity_id))
+            .cloned()
+    }
+
     /// Register `notify.send_message` on `hass`.
     pub fn register_services(
         self: &Arc<Self>,
