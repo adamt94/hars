@@ -3,7 +3,9 @@
 
 use ha_core::{EntityId, Hass, ServiceError};
 use ha_integrations::light::BoxFuture;
-use ha_integrations::media_player::{MediaPlayer, MediaPlayers, PlayMedia, feature as mp_feat};
+use ha_integrations::media_player::{
+    MediaPlayer, MediaPlayerState, MediaPlayers, PlayMedia, feature as mp_feat,
+};
 use ha_integrations::remote::{DeleteCommand, LearnCommand, Remote, Remotes, SendCommand};
 use parking_lot::Mutex;
 use serde_json::{Map, Value, json};
@@ -12,7 +14,7 @@ use std::sync::Arc;
 struct FakePlayer {
     id: EntityId,
     features: u32,
-    state: Option<String>,
+    state: Option<MediaPlayerState>,
     volume_level: Option<f64>,
     volume_step: f64,
     step_override: bool,
@@ -31,7 +33,7 @@ impl FakePlayer {
         Arc::new(Self {
             id: EntityId::parse(id).unwrap(),
             features,
-            state: state.map(str::to_owned),
+            state: state.map(MediaPlayerState::parse),
             volume_level,
             volume_step,
             step_override,
@@ -55,8 +57,8 @@ impl MediaPlayer for FakePlayer {
     fn supported_features(&self) -> u32 {
         self.features
     }
-    fn state(&self) -> Option<String> {
-        self.state.clone()
+    fn state(&self) -> Option<MediaPlayerState> {
+        self.state
     }
     fn volume_info(&self) -> (Option<f64>, f64) {
         (self.volume_level, self.volume_step)

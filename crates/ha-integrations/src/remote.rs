@@ -17,7 +17,7 @@ pub mod feature {
     pub const ACTIVITY: u32 = 4;
 }
 
-pub const DEFAULT_NUM_REPEATS: i64 = 1;
+pub const DEFAULT_NUM_REPEATS: u64 = 1;
 pub const DEFAULT_HOLD_SECS: f64 = 0.0;
 
 /// Validated arguments for `remote.send_command`.
@@ -25,7 +25,7 @@ pub const DEFAULT_HOLD_SECS: f64 = 0.0;
 pub struct SendCommand {
     pub command: Vec<String>,
     pub device: Option<String>,
-    pub num_repeats: i64,
+    pub num_repeats: u64,
     pub delay_secs: Option<f64>,
     pub hold_secs: f64,
 }
@@ -37,7 +37,7 @@ pub struct LearnCommand {
     pub command: Option<Vec<String>>,
     pub command_type: Option<String>,
     pub alternative: Option<bool>,
-    pub timeout: Option<i64>,
+    pub timeout: Option<u64>,
 }
 
 /// Validated arguments for `remote.delete_command`.
@@ -182,19 +182,18 @@ impl Remotes {
                             &indirect,
                         );
                         let data = &call.data;
-                        for r in list {
+                        let calls = list.iter().map(|r| async move {
                             match name {
                                 "turn_on" => {
                                     r.turn_on(data.get("activity").and_then(Value::as_str))
-                                        .await?;
+                                        .await
                                 }
                                 "turn_off" => {
                                     r.turn_off(data.get("activity").and_then(Value::as_str))
-                                        .await?;
+                                        .await
                                 }
                                 "toggle" => {
-                                    r.toggle(data.get("activity").and_then(Value::as_str))
-                                        .await?;
+                                    r.toggle(data.get("activity").and_then(Value::as_str)).await
                                 }
                                 "send_command" => {
                                     let cmd = SendCommand {
@@ -205,7 +204,7 @@ impl Remotes {
                                             .map(str::to_owned),
                                         num_repeats: data
                                             .get("num_repeats")
-                                            .and_then(Value::as_i64)
+                                            .and_then(Value::as_u64)
                                             .unwrap_or(DEFAULT_NUM_REPEATS),
                                         delay_secs: data.get("delay_secs").and_then(Value::as_f64),
                                         hold_secs: data
@@ -213,7 +212,7 @@ impl Remotes {
                                             .and_then(Value::as_f64)
                                             .unwrap_or(DEFAULT_HOLD_SECS),
                                     };
-                                    r.send_command(cmd).await?;
+                                    r.send_command(cmd).await
                                 }
                                 "learn_command" => {
                                     let cmd = LearnCommand {
@@ -229,9 +228,9 @@ impl Remotes {
                                         alternative: data
                                             .get("alternative")
                                             .and_then(Value::as_bool),
-                                        timeout: data.get("timeout").and_then(Value::as_i64),
+                                        timeout: data.get("timeout").and_then(Value::as_u64),
                                     };
-                                    r.learn_command(cmd).await?;
+                                    r.learn_command(cmd).await
                                 }
                                 "delete_command" => {
                                     let cmd = DeleteCommand {
@@ -241,11 +240,15 @@ impl Remotes {
                                             .and_then(Value::as_str)
                                             .map(str::to_owned),
                                     };
-                                    r.delete_command(cmd).await?;
+                                    r.delete_command(cmd).await
                                 }
-                                _ => {}
+                                _ => Ok(()),
                             }
-                        }
+                        });
+                        crate::light::join_all(calls)
+                            .await
+                            .into_iter()
+                            .collect::<Result<Vec<()>, _>>()?;
                         Ok(None)
                     }
                 },
@@ -264,6 +267,7 @@ mod tests {
         id: EntityId,
         available: bool,
         is_on: bool,
+        fail_send: bool,
         calls: Mutex<Vec<String>>,
     }
 
@@ -285,6 +289,23 @@ mod tests {
             self.calls.lock().push(format!("turn_off:{activity:?}"));
             Box::pin(async { Ok(()) })
         }
+        fn send_command(&self, cmd: SendCommand) -> BoxFuture<'_> {
+            self.calls
+                .lock()
+                .push(format!("send:{:?}:{}", cmd.command, cmd.num_repeats));
+            let fail = self.fail_send;
+            Box::pin(async move {
+                if fail {
+                    Err(ServiceError::Failed("send failed".into()))
+                } else {
+                    Ok(())
+                }
+            })
+        }
+        fn learn_command(&self, cmd: LearnCommand) -> BoxFuture<'_> {
+            self.calls.lock().push(format!("learn:{:?}", cmd.timeout));
+            Box::pin(async { Ok(()) })
+        }
     }
 
     #[tokio::test]
@@ -297,6 +318,7 @@ mod tests {
             id: EntityId::parse("remote.offline").unwrap(),
             available: false,
             is_on: false,
+            fail_send: false,
             calls: Mutex::new(Vec::new()),
         });
         remotes.add(offline.clone());
@@ -318,5 +340,73 @@ mod tests {
         let weak = Arc::downgrade(&remotes);
         drop((hass, remotes));
         assert!(weak.upgrade().is_none());
+    }
+
+    #[tokio::test]
+    async fn large_u64_ints_preserved_and_multi_target_runs_all() {
+        let hass = Hass::new();
+        let remotes = Arc::new(Remotes::default());
+        remotes.register_services(&hass, Arc::new(ha_registry::Registries::default()));
+
+        let first = Arc::new(DummyRemote {
+            id: EntityId::parse("remote.first").unwrap(),
+            available: true,
+            is_on: false,
+            fail_send: true,
+            calls: Mutex::new(Vec::new()),
+        });
+        let second = Arc::new(DummyRemote {
+            id: EntityId::parse("remote.second").unwrap(),
+            available: true,
+            is_on: false,
+            fail_send: false,
+            calls: Mutex::new(Vec::new()),
+        });
+        remotes.add(first.clone());
+        remotes.add(second.clone());
+
+        let big: u64 = 9_223_372_036_854_775_808; // i64::MAX as u64 + 1
+        let err = hass
+            .call_service(
+                "remote",
+                "send_command",
+                json!({
+                    "entity_id": ["remote.first", "remote.second"],
+                    "command": "Power",
+                    "num_repeats": big
+                })
+                .as_object()
+                .cloned()
+                .unwrap(),
+                None,
+                false,
+                None,
+            )
+            .await
+            .unwrap_err();
+        assert_eq!(err, ServiceError::Failed("send failed".into()));
+        assert_eq!(*first.calls.lock(), vec![format!("send:[\"Power\"]:{big}")]);
+        assert_eq!(
+            *second.calls.lock(),
+            vec![format!("send:[\"Power\"]:{big}")]
+        );
+
+        hass.call_service(
+            "remote",
+            "learn_command",
+            json!({"entity_id": "remote.second", "timeout": big})
+                .as_object()
+                .cloned()
+                .unwrap(),
+            None,
+            false,
+            None,
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            second.calls.lock().last().map(String::as_str),
+            Some(format!("learn:Some({big})").as_str())
+        );
     }
 }

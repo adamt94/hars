@@ -2652,3 +2652,167 @@ async fn plugin_media_player_and_remote_lifecycle_and_services() {
     assert!(hass.states().get(&rem_eid).is_none());
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[tokio::test]
+async fn plugin_media_player_and_remote_round1_edge_cases() {
+    let dir = std::env::temp_dir().join(format!("hars-plugin-mp-edge-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let plug_dir = dir.join("plugins").join("tv_edge");
+    std::fs::create_dir_all(&plug_dir).unwrap();
+    std::fs::write(
+        plug_dir.join("plugin.json"),
+        serde_json::to_vec(&json!({
+            "schema_version": 1,
+            "domain": "tv_edge",
+            "name": "TV Edge",
+            "version": "1.0.0",
+            "transport": { "type": "unix_socket" },
+            "capabilities": {
+                "entity_domains": ["media_player", "remote"]
+            }
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+    let installed = Arc::new(manifest::InstalledPlugin::load(&plug_dir).unwrap());
+    let hass = ha_core::Hass::new();
+    let registry = ha_registry::Registry::in_memory(&hass, ha_registry::Registries::default());
+    let components =
+        crate::components::Components::new(&hass, registry.clone(), Default::default());
+    let call_fn: entities::CallPluginFn = Arc::new(move |_| Box::pin(async { Ok(()) }));
+    let store = entities::PluginEntityStore::new(installed, components, call_fn);
+    store.activate_entry("e1");
+
+    let mp_feats = crate::media_player::feature::SELECT_SOURCE
+        | crate::media_player::feature::SELECT_SOUND_MODE;
+    let mp_id = store
+        .upsert_entity(protocol::EntityUpsertParams {
+            entry_id: "e1".into(),
+            unique_id: "shared_uid".into(),
+            domain: "media_player".into(),
+            name: Some("TV".into()),
+            supported_features: mp_feats,
+            ..Default::default()
+        })
+        .unwrap();
+
+    // 1. Same-entry cross-domain unique_id collision is rejected without touching the first entity.
+    let err = store
+        .upsert_entity(protocol::EntityUpsertParams {
+            entry_id: "e1".into(),
+            unique_id: "shared_uid".into(),
+            domain: "remote".into(),
+            name: Some("TV Remote".into()),
+            ..Default::default()
+        })
+        .unwrap_err();
+    assert!(err.contains("already registered in domain"), "{err}");
+
+    // 2. Live `state.set` capability updates sync to entity registry and survive omitted re-upsert.
+    store
+        .set_state(protocol::StateSetParams {
+            entry_id: "e1".into(),
+            unique_id: "shared_uid".into(),
+            state: "playing".into(),
+            attributes: json!({
+                "source_list": ["HDMI 1", "Spotify"],
+                "sound_mode_list": ["Movie"],
+                "media_title": "Song",
+                "volume_level": 0.5
+            })
+            .as_object()
+            .cloned()
+            .unwrap(),
+        })
+        .unwrap();
+    let snap = registry.snapshot();
+    let row = snap.entities.iter().find(|e| e.entity_id == mp_id).unwrap();
+    assert_eq!(
+        serde_json::to_value(&row.capabilities).unwrap(),
+        json!({
+            "source_list": ["HDMI 1", "Spotify"],
+            "sound_mode_list": ["Movie"]
+        })
+    );
+
+    // Re-upsert omitting source_list / sound_mode_list retains the live capabilities in registry & state.
+    store
+        .upsert_entity(protocol::EntityUpsertParams {
+            entry_id: "e1".into(),
+            unique_id: "shared_uid".into(),
+            domain: "media_player".into(),
+            name: Some("TV".into()),
+            supported_features: mp_feats,
+            ..Default::default()
+        })
+        .unwrap();
+    let snap2 = registry.snapshot();
+    let row2 = snap2
+        .entities
+        .iter()
+        .find(|e| e.entity_id == mp_id)
+        .unwrap();
+    assert_eq!(
+        serde_json::to_value(&row2.capabilities).unwrap(),
+        json!({
+            "source_list": ["HDMI 1", "Spotify"],
+            "sound_mode_list": ["Movie"]
+        })
+    );
+
+    // 3. Explicit `state.set("unavailable", ...)` strips state_attributes while keeping capabilities.
+    store
+        .set_state(protocol::StateSetParams {
+            entry_id: "e1".into(),
+            unique_id: "shared_uid".into(),
+            state: "unavailable".into(),
+            attributes: json!({"media_title": "Stale", "volume_level": 0.5})
+                .as_object()
+                .cloned()
+                .unwrap(),
+        })
+        .unwrap();
+    let mp_eid = ha_core::EntityId::parse(&mp_id).unwrap();
+    let mp_st = hass.states().get(&mp_eid).unwrap();
+    assert_eq!(mp_st.state.as_str(), "unavailable");
+    assert_eq!(
+        mp_st.attributes["source_list"],
+        json!(["HDMI 1", "Spotify"])
+    );
+    assert_eq!(mp_st.attributes["sound_mode_list"], json!(["Movie"]));
+    assert!(!mp_st.attributes.contains_key("media_title"));
+    assert!(!mp_st.attributes.contains_key("volume_level"));
+
+    // Explicit `state.set("unavailable", ...)` on remote strips `current_activity` & `activity_list`.
+    let rem_id = store
+        .upsert_entity(protocol::EntityUpsertParams {
+            entry_id: "e1".into(),
+            unique_id: "rem_uid".into(),
+            domain: "remote".into(),
+            name: Some("TV Remote".into()),
+            supported_features: crate::remote::feature::ACTIVITY,
+            ..Default::default()
+        })
+        .unwrap();
+    store
+        .set_state(protocol::StateSetParams {
+            entry_id: "e1".into(),
+            unique_id: "rem_uid".into(),
+            state: "unavailable".into(),
+            attributes: json!({"current_activity": "TV", "activity_list": ["TV"]})
+                .as_object()
+                .cloned()
+                .unwrap(),
+        })
+        .unwrap();
+    let rem_eid = ha_core::EntityId::parse(&rem_id).unwrap();
+    let rem_st = hass.states().get(&rem_eid).unwrap();
+    assert_eq!(rem_st.state.as_str(), "unavailable");
+    assert!(!rem_st.attributes.contains_key("current_activity"));
+    assert!(!rem_st.attributes.contains_key("activity_list"));
+
+    store.deactivate_entry("e1");
+    assert!(hass.states().get(&mp_eid).is_none());
+    assert!(hass.states().get(&rem_eid).is_none());
+    let _ = std::fs::remove_dir_all(&dir);
+}

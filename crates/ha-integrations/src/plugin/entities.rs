@@ -16,7 +16,7 @@ use crate::light::{
     TurnOff, White,
 };
 use crate::lock::Lock;
-use crate::media_player::{self, MediaPlayer, PlayMedia};
+use crate::media_player::{self, MediaPlayer, MediaPlayerState, PlayMedia};
 use crate::number::{self, Number};
 use crate::remote::{DeleteCommand, LearnCommand, Remote, SendCommand};
 use crate::scene::Scene;
@@ -166,6 +166,16 @@ impl PluginEntityStore {
                 params.entry_id, self.domain
             ));
         }
+        if let Some(existing) = entries
+            .get(&params.entry_id)
+            .and_then(|e| e.entities.get(&params.unique_id))
+            && existing.domain != params.domain
+        {
+            return Err(format!(
+                "unique_id {:?} is already registered in domain {:?} for entry {:?}",
+                params.unique_id, existing.domain, params.entry_id
+            ));
+        }
         for (other_eid, other) in entries.iter() {
             if other_eid != &params.entry_id
                 && let Some(existing) = other.entities.get(&params.unique_id)
@@ -177,6 +187,32 @@ impl PluginEntityStore {
                 ));
             }
         }
+        let prev_media_caps = entries
+            .get(&params.entry_id)
+            .and_then(|e| e.entities.get(&params.unique_id))
+            .and_then(|reg| match &reg.handle {
+                EntityHandle::MediaPlayer(old) => {
+                    let s = old.state.read();
+                    Some((s.source_list.clone(), s.sound_mode_list.clone()))
+                }
+                _ => None,
+            });
+        let resolved_media_source_list = if params.domain == "media_player" {
+            match &params.source_list {
+                Some(list) => normalize_string_list_vec(list),
+                None => prev_media_caps.as_ref().and_then(|(s, _)| s.clone()),
+            }
+        } else {
+            None
+        };
+        let resolved_media_sound_mode_list = if params.domain == "media_player" {
+            match &params.sound_mode_list {
+                Some(list) => normalize_string_list_vec(list),
+                None => prev_media_caps.as_ref().and_then(|(_, m)| m.clone()),
+            }
+        } else {
+            None
+        };
         let device_id = params.device_identifier.as_ref().and_then(|ident| {
             entries
                 .get(&params.entry_id)
@@ -243,20 +279,11 @@ impl PluginEntityStore {
                         "preset_modes": params.preset_modes,
                     })));
                 } else if params.domain == "media_player" {
-                    let mut caps = Map::new();
-                    if params.supported_features & media_player::feature::SELECT_SOURCE != 0
-                        && let Some(sources) = &params.source_list
-                        && !sources.is_empty()
-                    {
-                        caps.insert("source_list".into(), json!(sources));
-                    }
-                    if params.supported_features & media_player::feature::SELECT_SOUND_MODE != 0
-                        && let Some(modes) = &params.sound_mode_list
-                        && !modes.is_empty()
-                    {
-                        caps.insert("sound_mode_list".into(), json!(modes));
-                    }
-                    patch.capabilities = Some((!caps.is_empty()).then_some(Value::Object(caps)));
+                    patch.capabilities = Some(media_player_capabilities(
+                        params.supported_features,
+                        &resolved_media_source_list,
+                        &resolved_media_sound_mode_list,
+                    ));
                 }
                 let row = registry.get_or_create_entity(
                     &params.domain,
@@ -374,16 +401,14 @@ impl PluginEntityStore {
                 json!(params.supported_features),
             );
             if params.supported_features & media_player::feature::SELECT_SOURCE != 0
-                && let Some(sources) = &params.source_list
-                && !sources.is_empty()
+                && let Some(sources) = &resolved_media_source_list
             {
-                base_attrs.insert("source_list".into(), json!(sources));
+                base_attrs.insert("source_list".into(), sources.clone());
             }
             if params.supported_features & media_player::feature::SELECT_SOUND_MODE != 0
-                && let Some(modes) = &params.sound_mode_list
-                && !modes.is_empty()
+                && let Some(modes) = &resolved_media_sound_mode_list
             {
-                base_attrs.insert("sound_mode_list".into(), json!(modes));
+                base_attrs.insert("sound_mode_list".into(), modes.clone());
             }
         } else if params.domain == "remote" {
             base_attrs.insert(
@@ -661,7 +686,7 @@ impl PluginEntityStore {
                     let (available, state, volume_level) = match &prev_handle {
                         Some(EntityHandle::MediaPlayer(old)) => {
                             let s = old.state.read();
-                            (s.available, s.state.clone(), s.volume_level)
+                            (s.available, s.state, s.volume_level)
                         }
                         _ => (true, None, None),
                     };
@@ -679,8 +704,8 @@ impl PluginEntityStore {
                             state,
                             volume_level,
                             volume_step,
-                            source_list: params.source_list.clone(),
-                            sound_mode_list: params.sound_mode_list.clone(),
+                            source_list: resolved_media_source_list,
+                            sound_mode_list: resolved_media_sound_mode_list,
                         }),
                         call_plugin: self.call_plugin.clone(),
                     });
@@ -928,51 +953,102 @@ impl PluginEntityStore {
                 merged.insert("supported_features".into(), json!(f.supported_features));
             }
             EntityHandle::MediaPlayer(mp) => {
-                let mut inner = mp.state.write();
-                inner.available = available;
-                inner.state = available.then(|| state_str.clone());
-                inner.volume_level = params
-                    .attributes
-                    .get("volume_level")
-                    .and_then(Value::as_f64);
-                if let Some(v) = params.attributes.get("source_list") {
-                    inner.source_list = v.as_array().map(|arr| {
-                        arr.iter()
-                            .filter_map(Value::as_str)
-                            .map(str::to_owned)
-                            .collect()
-                    });
-                }
-                if let Some(v) = params.attributes.get("sound_mode_list") {
-                    inner.sound_mode_list = v.as_array().map(|arr| {
-                        arr.iter()
-                            .filter_map(Value::as_str)
-                            .map(str::to_owned)
-                            .collect()
-                    });
-                }
-                if mp.supported_features & media_player::feature::SELECT_SOURCE != 0
-                    && let Some(sources) = &inner.source_list
-                    && !sources.is_empty()
+                let updated_caps = {
+                    let mut inner = mp.state.write();
+                    inner.available = available;
+                    inner.state = available.then(|| MediaPlayerState::parse(&state_str));
+                    inner.volume_level = available
+                        .then(|| {
+                            params
+                                .attributes
+                                .get("volume_level")
+                                .and_then(Value::as_f64)
+                        })
+                        .flatten();
+                    let mut caps_changed = false;
+                    if let Some(v) = params.attributes.get("source_list")
+                        && !same_string_list_val(&inner.source_list, v)
+                    {
+                        inner.source_list = normalize_string_list_val(v);
+                        if mp.supported_features & media_player::feature::SELECT_SOURCE != 0 {
+                            caps_changed = true;
+                        }
+                    }
+                    if let Some(v) = params.attributes.get("sound_mode_list")
+                        && !same_string_list_val(&inner.sound_mode_list, v)
+                    {
+                        inner.sound_mode_list = normalize_string_list_val(v);
+                        if mp.supported_features & media_player::feature::SELECT_SOUND_MODE != 0 {
+                            caps_changed = true;
+                        }
+                    }
+                    if !available {
+                        // HA omits state_attributes when unavailable, retaining only
+                        // base + capability_attributes + supported_features.
+                        merged = reg.base_attrs.clone();
+                        if let Some(name) = &reg.friendly_name {
+                            merged.entry("friendly_name").or_insert_with(|| json!(name));
+                        }
+                    }
+                    if mp.supported_features & media_player::feature::SELECT_SOURCE != 0 {
+                        match &inner.source_list {
+                            Some(sources) => {
+                                if merged.get("source_list") != Some(sources) {
+                                    merged.insert("source_list".into(), sources.clone());
+                                }
+                            }
+                            None => {
+                                merged.remove("source_list");
+                            }
+                        }
+                    } else {
+                        merged.remove("source_list");
+                    }
+                    if mp.supported_features & media_player::feature::SELECT_SOUND_MODE != 0 {
+                        match &inner.sound_mode_list {
+                            Some(modes) => {
+                                if merged.get("sound_mode_list") != Some(modes) {
+                                    merged.insert("sound_mode_list".into(), modes.clone());
+                                }
+                            }
+                            None => {
+                                merged.remove("sound_mode_list");
+                            }
+                        }
+                    } else {
+                        merged.remove("sound_mode_list");
+                    }
+                    merged.insert("supported_features".into(), json!(mp.supported_features));
+                    caps_changed.then(|| {
+                        media_player_capabilities(
+                            mp.supported_features,
+                            &inner.source_list,
+                            &inner.sound_mode_list,
+                        )
+                    })
+                };
+                if let Some(new_caps) = updated_caps
+                    && let Some(registry) = self.components.registry()
                 {
-                    merged.insert("source_list".into(), json!(sources));
-                } else {
-                    merged.remove("source_list");
+                    registry.update_entity(
+                        reg.entity_id.as_str(),
+                        EntityPatch {
+                            capabilities: Some(new_caps),
+                            ..Default::default()
+                        },
+                    );
                 }
-                if mp.supported_features & media_player::feature::SELECT_SOUND_MODE != 0
-                    && let Some(modes) = &inner.sound_mode_list
-                    && !modes.is_empty()
-                {
-                    merged.insert("sound_mode_list".into(), json!(modes));
-                } else {
-                    merged.remove("sound_mode_list");
-                }
-                merged.insert("supported_features".into(), json!(mp.supported_features));
             }
             EntityHandle::Remote(rem) => {
                 let mut inner = rem.state.write();
                 inner.available = available;
-                inner.is_on = state_str == "on";
+                inner.is_on = available && state_str == "on";
+                if !available {
+                    merged = reg.base_attrs.clone();
+                    if let Some(name) = &reg.friendly_name {
+                        merged.entry("friendly_name").or_insert_with(|| json!(name));
+                    }
+                }
                 merged.insert("supported_features".into(), json!(rem.supported_features));
             }
             EntityHandle::Passive => {}
@@ -1080,17 +1156,15 @@ impl PluginEntityStore {
                         inner.available = false;
                         if mp.supported_features & media_player::feature::SELECT_SOURCE != 0
                             && let Some(sources) = &inner.source_list
-                            && !sources.is_empty()
                         {
-                            attrs.insert("source_list".into(), json!(sources));
+                            attrs.insert("source_list".into(), sources.clone());
                         } else {
                             attrs.remove("source_list");
                         }
                         if mp.supported_features & media_player::feature::SELECT_SOUND_MODE != 0
                             && let Some(modes) = &inner.sound_mode_list
-                            && !modes.is_empty()
                         {
-                            attrs.insert("sound_mode_list".into(), json!(modes));
+                            attrs.insert("sound_mode_list".into(), modes.clone());
                         } else {
                             attrs.remove("sound_mode_list");
                         }
@@ -1918,13 +1992,66 @@ impl Fan for PluginFan {
     }
 }
 
+fn normalize_string_list_vec(list: &[String]) -> Option<Value> {
+    if list.is_empty() {
+        None
+    } else {
+        Some(json!(list))
+    }
+}
+
+fn normalize_string_list_val(v: &Value) -> Option<Value> {
+    let arr = v.as_array()?;
+    if arr.is_empty() {
+        return None;
+    }
+    if arr.iter().all(Value::is_string) {
+        return Some(v.clone());
+    }
+    let filtered: Vec<Value> = arr.iter().filter(|x| x.is_string()).cloned().collect();
+    (!filtered.is_empty()).then_some(Value::Array(filtered))
+}
+
+fn same_string_list_val(cached: &Option<Value>, incoming: &Value) -> bool {
+    match incoming {
+        Value::Array(arr) if arr.iter().all(Value::is_string) => {
+            if arr.is_empty() {
+                cached.is_none()
+            } else {
+                cached.as_ref() == Some(incoming)
+            }
+        }
+        Value::Null => cached.is_none(),
+        _ => cached == &normalize_string_list_val(incoming),
+    }
+}
+
+fn media_player_capabilities(
+    supported_features: u32,
+    source_list: &Option<Value>,
+    sound_mode_list: &Option<Value>,
+) -> Option<Value> {
+    let mut caps = Map::new();
+    if supported_features & media_player::feature::SELECT_SOURCE != 0
+        && let Some(sources) = source_list
+    {
+        caps.insert("source_list".into(), sources.clone());
+    }
+    if supported_features & media_player::feature::SELECT_SOUND_MODE != 0
+        && let Some(modes) = sound_mode_list
+    {
+        caps.insert("sound_mode_list".into(), modes.clone());
+    }
+    (!caps.is_empty()).then_some(Value::Object(caps))
+}
+
 struct MediaPlayerInner {
     available: bool,
-    state: Option<String>,
+    state: Option<MediaPlayerState>,
     volume_level: Option<f64>,
     volume_step: f64,
-    source_list: Option<Vec<String>>,
-    sound_mode_list: Option<Vec<String>>,
+    source_list: Option<Value>,
+    sound_mode_list: Option<Value>,
 }
 
 struct PluginMediaPlayer {
@@ -1962,8 +2089,8 @@ impl MediaPlayer for PluginMediaPlayer {
         self.supported_features
     }
 
-    fn state(&self) -> Option<String> {
-        self.state.read().state.clone()
+    fn state(&self) -> Option<MediaPlayerState> {
+        self.state.read().state
     }
 
     fn volume_info(&self) -> (Option<f64>, f64) {

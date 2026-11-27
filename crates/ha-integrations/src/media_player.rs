@@ -48,6 +48,34 @@ pub const REPEAT_MODES: &[&str] = &["all", "off", "one"];
 /// `MediaPlayerEnqueue` values (`components/media_player/__init__.py`).
 pub const ENQUEUE_MODES: &[&str] = &["add", "next", "play", "replace"];
 
+/// `MediaPlayerState` (`components/media_player/const.py`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MediaPlayerState {
+    Off,
+    On,
+    Idle,
+    Playing,
+    Paused,
+    Standby,
+    Buffering,
+    Other,
+}
+
+impl MediaPlayerState {
+    pub fn parse(s: &str) -> Self {
+        match s {
+            "off" => Self::Off,
+            "on" => Self::On,
+            "idle" => Self::Idle,
+            "playing" => Self::Playing,
+            "paused" => Self::Paused,
+            "standby" => Self::Standby,
+            "buffering" => Self::Buffering,
+            _ => Self::Other,
+        }
+    }
+}
+
 /// Validated arguments for `media_player.play_media`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct PlayMedia {
@@ -69,9 +97,8 @@ pub trait MediaPlayer: Send + Sync {
     fn available(&self) -> bool;
     fn supported_features(&self) -> u32;
 
-    /// Current player state string (e.g. `"off"`, `"standby"`, `"idle"`,
-    /// `"playing"`, `"paused"`, `"on"`, `"buffering"`), if known.
-    fn state(&self) -> Option<String> {
+    /// Current player state (`MediaPlayerState`), if known.
+    fn state(&self) -> Option<MediaPlayerState> {
         None
     }
 
@@ -88,7 +115,10 @@ pub trait MediaPlayer: Send + Sync {
         unsupported()
     }
     fn toggle(&self) -> BoxFuture<'_> {
-        let is_off = matches!(self.state().as_deref(), Some("off" | "standby"));
+        let is_off = matches!(
+            self.state(),
+            Some(MediaPlayerState::Off | MediaPlayerState::Standby)
+        );
         if is_off {
             self.turn_on()
         } else {
@@ -128,7 +158,7 @@ pub trait MediaPlayer: Send + Sync {
         unsupported()
     }
     fn media_play_pause(&self) -> BoxFuture<'_> {
-        if self.state().as_deref() == Some("playing") {
+        if self.state() == Some(MediaPlayerState::Playing) {
             self.media_pause()
         } else {
             self.media_play()
@@ -358,41 +388,41 @@ impl MediaPlayers {
                         let list =
                             chosen(&players.items.read(), &target, &indirect, required, name)?;
                         let data = &call.data;
-                        for p in list {
+                        let calls = list.iter().map(|p| async move {
                             match name {
-                                "turn_on" => p.turn_on().await?,
-                                "turn_off" => p.turn_off().await?,
-                                "toggle" => p.toggle().await?,
-                                "volume_up" => p.volume_up().await?,
-                                "volume_down" => p.volume_down().await?,
-                                "media_play_pause" => p.media_play_pause().await?,
-                                "media_play" => p.media_play().await?,
-                                "media_pause" => p.media_pause().await?,
-                                "media_stop" => p.media_stop().await?,
-                                "media_next_track" => p.media_next_track().await?,
-                                "media_previous_track" => p.media_previous_track().await?,
-                                "clear_playlist" => p.clear_playlist().await?,
-                                "unjoin" => p.unjoin_player().await?,
+                                "turn_on" => p.turn_on().await,
+                                "turn_off" => p.turn_off().await,
+                                "toggle" => p.toggle().await,
+                                "volume_up" => p.volume_up().await,
+                                "volume_down" => p.volume_down().await,
+                                "media_play_pause" => p.media_play_pause().await,
+                                "media_play" => p.media_play().await,
+                                "media_pause" => p.media_pause().await,
+                                "media_stop" => p.media_stop().await,
+                                "media_next_track" => p.media_next_track().await,
+                                "media_previous_track" => p.media_previous_track().await,
+                                "clear_playlist" => p.clear_playlist().await,
+                                "unjoin" => p.unjoin_player().await,
                                 "volume_set" => {
                                     let v = data
                                         .get("volume_level")
                                         .and_then(Value::as_f64)
                                         .unwrap_or(0.0);
-                                    p.set_volume_level(v).await?;
+                                    p.set_volume_level(v).await
                                 }
                                 "volume_mute" => {
                                     let m = data
                                         .get("is_volume_muted")
                                         .and_then(Value::as_bool)
                                         .unwrap_or(false);
-                                    p.mute_volume(m).await?;
+                                    p.mute_volume(m).await
                                 }
                                 "media_seek" => {
                                     let pos = data
                                         .get("seek_position")
                                         .and_then(Value::as_f64)
                                         .unwrap_or(0.0);
-                                    p.media_seek(pos).await?;
+                                    p.media_seek(pos).await
                                 }
                                 "play_media" => {
                                     let media_type = data
@@ -425,35 +455,35 @@ impl MediaPlayers {
                                         announce,
                                         extra,
                                     })
-                                    .await?;
+                                    .await
                                 }
                                 "select_source" => {
                                     let src = data
                                         .get("source")
                                         .and_then(Value::as_str)
                                         .unwrap_or_default();
-                                    p.select_source(src).await?;
+                                    p.select_source(src).await
                                 }
                                 "select_sound_mode" => {
                                     let mode = data
                                         .get("sound_mode")
                                         .and_then(Value::as_str)
                                         .unwrap_or_default();
-                                    p.select_sound_mode(mode).await?;
+                                    p.select_sound_mode(mode).await
                                 }
                                 "shuffle_set" => {
                                     let s = data
                                         .get("shuffle")
                                         .and_then(Value::as_bool)
                                         .unwrap_or(false);
-                                    p.set_shuffle(s).await?;
+                                    p.set_shuffle(s).await
                                 }
                                 "repeat_set" => {
                                     let r = data
                                         .get("repeat")
                                         .and_then(Value::as_str)
                                         .unwrap_or_default();
-                                    p.set_repeat(r).await?;
+                                    p.set_repeat(r).await
                                 }
                                 "join" => {
                                     let members: Vec<String> = data
@@ -465,11 +495,15 @@ impl MediaPlayers {
                                                 .collect()
                                         })
                                         .unwrap_or_default();
-                                    p.join_players(&members).await?;
+                                    p.join_players(&members).await
                                 }
-                                _ => {}
+                                _ => Ok(()),
                             }
-                        }
+                        });
+                        crate::light::join_all(calls)
+                            .await
+                            .into_iter()
+                            .collect::<Result<Vec<()>, _>>()?;
                         Ok(None)
                     }
                 },
@@ -488,8 +522,9 @@ mod tests {
         id: EntityId,
         available: bool,
         features: u32,
-        state: Option<String>,
+        state: Option<MediaPlayerState>,
         volume: Option<f64>,
+        fail_turn_on: bool,
         calls: Mutex<Vec<String>>,
     }
 
@@ -503,15 +538,22 @@ mod tests {
         fn supported_features(&self) -> u32 {
             self.features
         }
-        fn state(&self) -> Option<String> {
-            self.state.clone()
+        fn state(&self) -> Option<MediaPlayerState> {
+            self.state
         }
         fn volume_info(&self) -> (Option<f64>, f64) {
             (self.volume, 0.1)
         }
         fn turn_on(&self) -> BoxFuture<'_> {
             self.calls.lock().push("turn_on".into());
-            Box::pin(async { Ok(()) })
+            let fail = self.fail_turn_on;
+            Box::pin(async move {
+                if fail {
+                    Err(ServiceError::Failed("boom".into()))
+                } else {
+                    Ok(())
+                }
+            })
         }
         fn turn_off(&self) -> BoxFuture<'_> {
             self.calls.lock().push("turn_off".into());
@@ -519,6 +561,13 @@ mod tests {
         }
         fn set_volume_level(&self, volume: f64) -> BoxFuture<'_> {
             self.calls.lock().push(format!("vol:{volume:.2}"));
+            Box::pin(async { Ok(()) })
+        }
+        fn play_media(&self, params: PlayMedia) -> BoxFuture<'_> {
+            self.calls.lock().push(format!(
+                "play:{}:{}:{:?}",
+                params.media_type, params.media_id, params.enqueue
+            ));
             Box::pin(async { Ok(()) })
         }
     }
@@ -533,8 +582,9 @@ mod tests {
             id: EntityId::parse("media_player.offline").unwrap(),
             available: false,
             features: feature::TURN_ON | feature::TURN_OFF | feature::VOLUME_SET,
-            state: Some("off".into()),
+            state: Some(MediaPlayerState::Off),
             volume: Some(0.5),
+            fail_turn_on: false,
             calls: Mutex::new(Vec::new()),
         });
         players.add(offline.clone());
@@ -556,5 +606,93 @@ mod tests {
         let weak = Arc::downgrade(&players);
         drop((hass, players));
         assert!(weak.upgrade().is_none());
+    }
+
+    #[tokio::test]
+    async fn play_media_event_promotes_media_and_multi_target_runs_all() {
+        let hass = Hass::new();
+        let mut rx = hass.bus().subscribe();
+        let players = Arc::new(MediaPlayers::default());
+        players.register_services(&hass, Arc::new(ha_registry::Registries::default()));
+
+        let first = Arc::new(DummyPlayer {
+            id: EntityId::parse("media_player.first").unwrap(),
+            available: true,
+            features: feature::TURN_ON | feature::PLAY_MEDIA,
+            state: Some(MediaPlayerState::Idle),
+            volume: None,
+            fail_turn_on: true,
+            calls: Mutex::new(Vec::new()),
+        });
+        let second = Arc::new(DummyPlayer {
+            id: EntityId::parse("media_player.second").unwrap(),
+            available: true,
+            features: feature::TURN_ON | feature::PLAY_MEDIA,
+            state: Some(MediaPlayerState::Idle),
+            volume: None,
+            fail_turn_on: false,
+            calls: Mutex::new(Vec::new()),
+        });
+        players.add(first.clone());
+        players.add(second.clone());
+
+        // Nested `media` dict is promoted in `call_service` event while `"enqueue": "on"` stays uncoerced.
+        hass.call_service(
+            "media_player",
+            "play_media",
+            json!({
+                "entity_id": "media_player.second",
+                "media": {
+                    "media_content_type": "music",
+                    "media_content_id": "http://example.com/a.mp3"
+                },
+                "enqueue": "on"
+            })
+            .as_object()
+            .cloned()
+            .unwrap(),
+            None,
+            false,
+            None,
+        )
+        .await
+        .unwrap();
+        let ev = rx.try_recv().unwrap();
+        let ha_core::EventKind::CallService { service_data, .. } = &ev.kind else {
+            panic!("expected call_service");
+        };
+        assert_eq!(service_data["media_content_type"], json!("music"));
+        assert_eq!(
+            service_data["media_content_id"],
+            json!("http://example.com/a.mp3")
+        );
+        assert!(!service_data.contains_key("media"));
+        assert_eq!(service_data["enqueue"], json!("on"));
+        assert_eq!(
+            *second.calls.lock(),
+            vec!["play:music:http://example.com/a.mp3:Some(\"add\")"]
+        );
+
+        // Multi-target call runs every target even if the first errors.
+        let err = hass
+            .call_service(
+                "media_player",
+                "turn_on",
+                json!({"entity_id": ["media_player.first", "media_player.second"]})
+                    .as_object()
+                    .cloned()
+                    .unwrap(),
+                None,
+                false,
+                None,
+            )
+            .await
+            .unwrap_err();
+        assert_eq!(err, ServiceError::Failed("boom".into()));
+        assert_eq!(*first.calls.lock(), vec!["turn_on"]);
+        assert_eq!(
+            second.calls.lock().last().map(String::as_str),
+            Some("turn_on")
+        );
     }
 }

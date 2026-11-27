@@ -71,7 +71,7 @@ Every message is one JSON object followed by `\n` (max 256 KiB per line).
 Send without `"id"` for fire-and-forget, or include `"id"` to receive `{"result": ...}` / `{"error": ...}`:
 
 - **`device.upsert`**: `{"entry_id", "identifier", "name", "manufacturer", "model", "sw_version", "suggested_area"}` (devices are matched strictly by `(domain, identifier)` so plugins cannot collide with other integrations)
-- **`entity.upsert`**: `{"entry_id", "unique_id", "domain", "device_identifier", "name", "original_icon", "device_class", "unit_of_measurement", "supported_features", "supported_color_modes": [...]}`
+- **`entity.upsert`**: `{"entry_id", "unique_id", "domain", "device_identifier", "name", "original_icon", "device_class", "unit_of_measurement", "supported_features", "supported_color_modes": [...], "source_list": [...], "sound_mode_list": [...], "volume_step": 0.1}` (domain-specific fields like `options`, `min_value`/`max_value`/`step`/`mode`, `code_format`, `preset_modes`/`speed_count`, `fan_speed_list`, `source_list`/`sound_mode_list`/`volume_step` are optional)
 - **`state.set`**: `{"entry_id", "unique_id", "state", "attributes": {...}}`
 - **`entry.status`**: `{"entry_id", "state": "loaded" | "setup_retry" | "setup_error", "reason": "..."}`
 - **`log`**: `{"level": "info" | "warn" | "error" | "debug", "message": "..."}`

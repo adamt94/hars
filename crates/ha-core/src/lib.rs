@@ -210,10 +210,11 @@ impl Hass {
             data.extend(target);
         }
 
-        // HA validates before firing `call_service`; the event keeps the data
-        // as sent and the handler gets the coerced copy, if one was needed.
+        // HA validates before firing `call_service`; mutating pre-validators
+        // (such as `media_player._promote_media_fields`) update `data` in place
+        // before the event fires, while field coercions go only to the handler.
         let coerced = match &handler.schema {
-            Some(schema) => schema.validate(&data)?,
+            Some(schema) => schema.validate_call(&mut data)?,
             None => None,
         };
         let data = Arc::new(data);

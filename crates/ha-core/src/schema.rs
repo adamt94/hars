@@ -8,7 +8,6 @@
 //! `"on"` → `true` for a boolean); the handler sees the coerced data, while
 //! the `call_service` event keeps the data as sent, as in HA.
 
-use crate::EntityId;
 use crate::service::{ServiceData, ServiceError, validate_entity_ids};
 use serde_json::{Number, Value};
 
@@ -172,18 +171,41 @@ impl Schema {
         self
     }
 
+    /// Validate `data` for a service call (`Hass::call_service`). Runs any
+    /// `pre_validate` transform in place on `data` (matching HA's mutating
+    /// pre-validators like `media_player._promote_media_fields`, whose
+    /// promotion appears in the `call_service` event while field coercions stay
+    /// handler-only).
+    pub fn validate_call(
+        &self,
+        data: &mut ServiceData,
+    ) -> Result<Option<ServiceData>, ServiceError> {
+        if let Some(pre) = self.pre_validate
+            && let Some(transformed) = pre(data)?
+        {
+            *data = transformed;
+        }
+        self.validate_fields(data)
+    }
+
     /// Validate `data`. Returns `Ok(None)` when it is valid as it is (the
     /// common case, which allocates nothing) or `Ok(Some(coerced))` when a
     /// value had to be coerced. Errors use voluptuous's wording.
     pub fn validate(&self, data: &ServiceData) -> Result<Option<ServiceData>, ServiceError> {
-        let orig = data;
         let mut owned: Option<ServiceData> = None;
         if let Some(pre) = self.pre_validate
-            && let Some(transformed) = pre(orig)?
+            && let Some(transformed) = pre(data)?
         {
             owned = Some(transformed);
         }
-        let data = owned.as_ref().unwrap_or(orig);
+        let view = owned.as_ref().unwrap_or(data);
+        match self.validate_fields(view)? {
+            Some(coerced) => Ok(Some(coerced)),
+            None => Ok(owned),
+        }
+    }
+
+    fn validate_fields(&self, data: &ServiceData) -> Result<Option<ServiceData>, ServiceError> {
         let invalid = |msg: String| Err(ServiceError::Invalid(msg));
         let mut coerced: Vec<(&'static str, Value)> = Vec::new();
         let mut drop_metadata = false;
@@ -256,9 +278,9 @@ impl Schema {
         }
 
         if coerced.is_empty() && !drop_metadata {
-            return Ok(owned);
+            return Ok(None);
         }
-        let mut out = owned.unwrap_or_else(|| orig.clone());
+        let mut out = data.clone();
         if drop_metadata {
             out.remove("metadata");
         }
@@ -361,8 +383,15 @@ fn check(kind: &Kind, value: &Value) -> Checked {
                 .as_deref()
                 .or_else(|| value.as_str())
                 .unwrap_or_default();
-            let lower = raw.to_ascii_lowercase();
-            if EntityId::parse(&lower).is_err() {
+            // Fast path: avoid allocating when already lowercase ASCII.
+            if raw.bytes().all(|b| b.is_ascii() && !b.is_ascii_uppercase()) {
+                if !crate::valid_entity_id(raw) {
+                    return err(format!("Entity ID {raw} is an invalid entity ID"));
+                }
+                return Ok(coerced_str.map(Value::String));
+            }
+            let lower = raw.to_lowercase();
+            if !crate::valid_entity_id(&lower) {
                 return err(format!("Entity ID {raw} is an invalid entity ID"));
             }
             if coerced_str.is_some() || lower != raw {
@@ -373,14 +402,21 @@ fn check(kind: &Kind, value: &Value) -> Checked {
         }
         Kind::EntityIds => check_target("entity_id", value),
         Kind::AnyOf(kinds) => {
-            let mut last_err = ("not a valid value".to_owned(), None);
+            // Voluptuous `Any` keeps the deepest error, and the first error on ties.
+            let mut best: Option<(String, Option<usize>)> = None;
             for k in kinds {
                 match check(k, value) {
                     Ok(v) => return Ok(v),
-                    Err(e) => last_err = e,
+                    Err(e) => {
+                        let deeper =
+                            matches!((&best, &e.1), (None, _) | (Some((_, None)), Some(_)));
+                        if deeper {
+                            best = Some(e);
+                        }
+                    }
                 }
             }
-            Err(last_err)
+            Err(best.unwrap_or_else(|| ("not a valid value".to_owned(), None)))
         }
         Kind::StrictBool => match value {
             Value::Bool(_) => Ok(None),
@@ -1078,7 +1114,37 @@ mod tests {
                 &schema,
                 json!({"entity_id": "media_player.tv", "target": "media_player.tv", "mode": "bogus"})
             ),
-            "expected Mode or one of 'add', 'play' for dictionary value @ data['mode']"
+            "invalid boolean value bogus for dictionary value @ data['mode']"
         );
+
+        // Unicode digits and Unicode casefolding match HA's `cv.entity_id`.
+        let uni = schema
+            .validate(&data(json!({
+                "entity_id": "media_player.tv",
+                "target": "media_player.tv\u{0661}"
+            })))
+            .unwrap();
+        assert_eq!(uni, None);
+        let kelvin = schema
+            .validate(&data(json!({
+                "entity_id": "media_player.tv",
+                "target": "media_player.\u{212a}"
+            })))
+            .unwrap()
+            .unwrap();
+        assert_eq!(kelvin["target"], json!("media_player.k"));
+
+        // `validate_call` promotes in place on `data` while keeping field coercions separate.
+        let mut call_data = data(json!({
+            "entity_id": "media_player.tv",
+            "nested": {"target": "media_player.Kitchen"},
+            "mode": "on"
+        }));
+        let coerced = schema.validate_call(&mut call_data).unwrap().unwrap();
+        assert_eq!(call_data["target"], json!("media_player.Kitchen"));
+        assert_eq!(call_data["mode"], json!("on"));
+        assert!(!call_data.contains_key("nested"));
+        assert_eq!(coerced["target"], json!("media_player.kitchen"));
+        assert_eq!(coerced["mode"], json!(true));
     }
 }
