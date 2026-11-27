@@ -267,6 +267,122 @@ fn promote_media_fields(data: &ServiceData) -> Result<Option<ServiceData>, Servi
     Ok(Some(out))
 }
 
+fn dispatch_one<'a>(
+    p: &'a dyn MediaPlayer,
+    name: &'static str,
+    data: &'a ServiceData,
+) -> BoxFuture<'a> {
+    match name {
+        "turn_on" => p.turn_on(),
+        "turn_off" => p.turn_off(),
+        "toggle" => p.toggle(),
+        "volume_up" => p.volume_up(),
+        "volume_down" => p.volume_down(),
+        "media_play_pause" => p.media_play_pause(),
+        "media_play" => p.media_play(),
+        "media_pause" => p.media_pause(),
+        "media_stop" => p.media_stop(),
+        "media_next_track" => p.media_next_track(),
+        "media_previous_track" => p.media_previous_track(),
+        "clear_playlist" => p.clear_playlist(),
+        "unjoin" => p.unjoin_player(),
+        "volume_set" => {
+            let v = data
+                .get("volume_level")
+                .and_then(Value::as_f64)
+                .unwrap_or(0.0);
+            p.set_volume_level(v)
+        }
+        "volume_mute" => {
+            let m = data
+                .get("is_volume_muted")
+                .and_then(Value::as_bool)
+                .unwrap_or(false);
+            p.mute_volume(m)
+        }
+        "media_seek" => {
+            let pos = data
+                .get("seek_position")
+                .and_then(Value::as_f64)
+                .unwrap_or(0.0);
+            p.media_seek(pos)
+        }
+        "play_media" => {
+            let media_type = data
+                .get("media_content_type")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .to_owned();
+            let media_id = data
+                .get("media_content_id")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .to_owned();
+            // Mirror HA's `_rewrite_enqueue`: True -> "add", False -> "play".
+            let enqueue = data.get("enqueue").and_then(|v| match v {
+                Value::Bool(true) => Some("add".to_owned()),
+                Value::Bool(false) => Some("play".to_owned()),
+                Value::String(s) => Some(s.clone()),
+                _ => None,
+            });
+            let announce = data.get("announce").and_then(Value::as_bool);
+            let extra = data
+                .get("extra")
+                .and_then(Value::as_object)
+                .cloned()
+                .unwrap_or_default();
+            p.play_media(PlayMedia {
+                media_type,
+                media_id,
+                enqueue,
+                announce,
+                extra,
+            })
+        }
+        "select_source" => {
+            let src = data
+                .get("source")
+                .and_then(Value::as_str)
+                .unwrap_or_default();
+            p.select_source(src)
+        }
+        "select_sound_mode" => {
+            let mode = data
+                .get("sound_mode")
+                .and_then(Value::as_str)
+                .unwrap_or_default();
+            p.select_sound_mode(mode)
+        }
+        "shuffle_set" => {
+            let s = data
+                .get("shuffle")
+                .and_then(Value::as_bool)
+                .unwrap_or(false);
+            p.set_shuffle(s)
+        }
+        "repeat_set" => {
+            let r = data
+                .get("repeat")
+                .and_then(Value::as_str)
+                .unwrap_or_default();
+            p.set_repeat(r)
+        }
+        "join" => {
+            let members: Vec<String> = data
+                .get("group_members")
+                .and_then(Value::as_array)
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|v| v.as_str().map(str::to_owned))
+                        .collect()
+                })
+                .unwrap_or_default();
+            Box::pin(async move { p.join_players(&members).await })
+        }
+        _ => Box::pin(async { Ok(()) }),
+    }
+}
+
 impl MediaPlayers {
     pub fn add(&self, player: Arc<dyn MediaPlayer>) {
         let mut items = self.items.write();
@@ -388,128 +504,29 @@ impl MediaPlayers {
                         let list =
                             chosen(&players.items.read(), &target, &indirect, required, name)?;
                         let data = &call.data;
-                        // Run every selected entity even if an earlier one fails (matching HA),
-                        // without allocating a boxed future list or exceeding per-plugin in-flight limits.
-                        let mut first_err: Option<ServiceError> = None;
-                        for p in &list {
-                            let res = match name {
-                                "turn_on" => p.turn_on().await,
-                                "turn_off" => p.turn_off().await,
-                                "toggle" => p.toggle().await,
-                                "volume_up" => p.volume_up().await,
-                                "volume_down" => p.volume_down().await,
-                                "media_play_pause" => p.media_play_pause().await,
-                                "media_play" => p.media_play().await,
-                                "media_pause" => p.media_pause().await,
-                                "media_stop" => p.media_stop().await,
-                                "media_next_track" => p.media_next_track().await,
-                                "media_previous_track" => p.media_previous_track().await,
-                                "clear_playlist" => p.clear_playlist().await,
-                                "unjoin" => p.unjoin_player().await,
-                                "volume_set" => {
-                                    let v = data
-                                        .get("volume_level")
-                                        .and_then(Value::as_f64)
-                                        .unwrap_or(0.0);
-                                    p.set_volume_level(v).await
+                        // Single-target fast path (no fan-out buffers); multi-target runs
+                        // concurrently in bounded batches (<= 32) so unrelated targets start
+                        // immediately without overflowing per-plugin 64-call RPC limits.
+                        if let [only] = list.as_slice() {
+                            dispatch_one(&**only, name, data).await?;
+                        } else {
+                            let mut first_err: Option<ServiceError> = None;
+                            for chunk in list.chunks(32) {
+                                for res in crate::light::join_all(
+                                    chunk.iter().map(|p| dispatch_one(&**p, name, data)),
+                                )
+                                .await
+                                {
+                                    if let Err(e) = res
+                                        && first_err.is_none()
+                                    {
+                                        first_err = Some(e);
+                                    }
                                 }
-                                "volume_mute" => {
-                                    let m = data
-                                        .get("is_volume_muted")
-                                        .and_then(Value::as_bool)
-                                        .unwrap_or(false);
-                                    p.mute_volume(m).await
-                                }
-                                "media_seek" => {
-                                    let pos = data
-                                        .get("seek_position")
-                                        .and_then(Value::as_f64)
-                                        .unwrap_or(0.0);
-                                    p.media_seek(pos).await
-                                }
-                                "play_media" => {
-                                    let media_type = data
-                                        .get("media_content_type")
-                                        .and_then(Value::as_str)
-                                        .unwrap_or_default()
-                                        .to_owned();
-                                    let media_id = data
-                                        .get("media_content_id")
-                                        .and_then(Value::as_str)
-                                        .unwrap_or_default()
-                                        .to_owned();
-                                    // Mirror HA's `_rewrite_enqueue`: True -> "add", False -> "play".
-                                    let enqueue = data.get("enqueue").and_then(|v| match v {
-                                        Value::Bool(true) => Some("add".to_owned()),
-                                        Value::Bool(false) => Some("play".to_owned()),
-                                        Value::String(s) => Some(s.clone()),
-                                        _ => None,
-                                    });
-                                    let announce = data.get("announce").and_then(Value::as_bool);
-                                    let extra = data
-                                        .get("extra")
-                                        .and_then(Value::as_object)
-                                        .cloned()
-                                        .unwrap_or_default();
-                                    p.play_media(PlayMedia {
-                                        media_type,
-                                        media_id,
-                                        enqueue,
-                                        announce,
-                                        extra,
-                                    })
-                                    .await
-                                }
-                                "select_source" => {
-                                    let src = data
-                                        .get("source")
-                                        .and_then(Value::as_str)
-                                        .unwrap_or_default();
-                                    p.select_source(src).await
-                                }
-                                "select_sound_mode" => {
-                                    let mode = data
-                                        .get("sound_mode")
-                                        .and_then(Value::as_str)
-                                        .unwrap_or_default();
-                                    p.select_sound_mode(mode).await
-                                }
-                                "shuffle_set" => {
-                                    let s = data
-                                        .get("shuffle")
-                                        .and_then(Value::as_bool)
-                                        .unwrap_or(false);
-                                    p.set_shuffle(s).await
-                                }
-                                "repeat_set" => {
-                                    let r = data
-                                        .get("repeat")
-                                        .and_then(Value::as_str)
-                                        .unwrap_or_default();
-                                    p.set_repeat(r).await
-                                }
-                                "join" => {
-                                    let members: Vec<String> = data
-                                        .get("group_members")
-                                        .and_then(Value::as_array)
-                                        .map(|arr| {
-                                            arr.iter()
-                                                .filter_map(|v| v.as_str().map(str::to_owned))
-                                                .collect()
-                                        })
-                                        .unwrap_or_default();
-                                    p.join_players(&members).await
-                                }
-                                _ => Ok(()),
-                            };
-                            if let Err(e) = res
-                                && first_err.is_none()
-                            {
-                                first_err = Some(e);
                             }
-                        }
-                        if let Some(e) = first_err {
-                            return Err(e);
+                            if let Some(e) = first_err {
+                                return Err(e);
+                            }
                         }
                         Ok(None)
                     }
@@ -701,5 +718,61 @@ mod tests {
             second.calls.lock().last().map(String::as_str),
             Some("turn_on")
         );
+
+        // Second target starts concurrently while the first is still pending.
+        struct BarrierPlayer {
+            id: EntityId,
+            wait_for: Option<Arc<tokio::sync::Notify>>,
+            signal: Option<Arc<tokio::sync::Notify>>,
+        }
+        impl MediaPlayer for BarrierPlayer {
+            fn entity_id(&self) -> &EntityId {
+                &self.id
+            }
+            fn available(&self) -> bool {
+                true
+            }
+            fn supported_features(&self) -> u32 {
+                feature::TURN_OFF
+            }
+            fn turn_off(&self) -> BoxFuture<'_> {
+                let wait_for = self.wait_for.clone();
+                let signal = self.signal.clone();
+                Box::pin(async move {
+                    if let Some(s) = signal {
+                        s.notify_one();
+                    }
+                    if let Some(w) = wait_for {
+                        w.notified().await;
+                    }
+                    Ok(())
+                })
+            }
+        }
+        let notify = Arc::new(tokio::sync::Notify::new());
+        players.add(Arc::new(BarrierPlayer {
+            id: EntityId::parse("media_player.slow").unwrap(),
+            wait_for: Some(notify.clone()),
+            signal: None,
+        }));
+        players.add(Arc::new(BarrierPlayer {
+            id: EntityId::parse("media_player.fast").unwrap(),
+            wait_for: None,
+            signal: Some(notify),
+        }));
+        // Completes only if `fast` runs while `slow` is awaiting `notify`.
+        hass.call_service(
+            "media_player",
+            "turn_off",
+            json!({"entity_id": ["media_player.slow", "media_player.fast"]})
+                .as_object()
+                .cloned()
+                .unwrap(),
+            None,
+            false,
+            None,
+        )
+        .await
+        .unwrap();
     }
 }

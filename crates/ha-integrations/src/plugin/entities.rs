@@ -2020,12 +2020,23 @@ fn same_string_list_val(cached: &Option<Value>, incoming: &Value) -> bool {
     }
 }
 
+fn is_py_truthy(v: &Value) -> bool {
+    match v {
+        Value::Null => false,
+        Value::Bool(b) => *b,
+        Value::Number(n) => n.as_f64().is_some_and(|f| f != 0.0),
+        Value::String(s) => !s.is_empty(),
+        Value::Array(a) => !a.is_empty(),
+        Value::Object(m) => !m.is_empty(),
+    }
+}
+
 /// Build the attribute map for an explicit `state.set("unavailable", ...)`
 /// frame, mirroring HA's `Entity._async_calculate_state` when `not available`:
 /// keep registration `base_attrs`, `friendly_name`, and any incoming base entity
-/// attributes (`unit_of_measurement`, `assumed_state`, `attribution`,
-/// `device_class`, `entity_picture`, `icon`, `friendly_name`), while dropping
-/// live `state_attributes` and `extra_state_attributes`.
+/// attributes (`unit_of_measurement`, `assumed_state` when Python-truthy,
+/// `attribution`, `device_class`, `entity_picture`, `icon`, `friendly_name`),
+/// while dropping live `state_attributes` and `extra_state_attributes`.
 fn unavailable_base_attrs(reg: &RegisteredEntity, incoming: &Map<String, Value>) -> Attributes {
     const BASE_ENTITY_KEYS: &[&str] = &[
         "unit_of_measurement",
@@ -2040,7 +2051,7 @@ fn unavailable_base_attrs(reg: &RegisteredEntity, incoming: &Map<String, Value>)
     for &key in BASE_ENTITY_KEYS {
         if let Some(v) = incoming.get(key)
             && !v.is_null()
-            && !(key == "assumed_state" && v == &Value::Bool(false))
+            && !(key == "assumed_state" && !is_py_truthy(v))
         {
             out.insert(key.into(), v.clone());
         }

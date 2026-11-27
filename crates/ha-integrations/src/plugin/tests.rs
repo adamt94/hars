@@ -2850,6 +2850,26 @@ async fn plugin_media_player_and_remote_round1_edge_cases() {
     assert!(!rem_st.attributes.contains_key("current_activity"));
     assert!(!rem_st.attributes.contains_key("activity_list"));
 
+    // Falsy `assumed_state` values (`0`, `""`, `false`) are omitted when unavailable, matching HA.
+    for falsy in [json!(0), json!(""), json!(false)] {
+        store
+            .set_state(protocol::StateSetParams {
+                entry_id: "e1".into(),
+                unique_id: "rem_uid".into(),
+                state: "unavailable".into(),
+                attributes: json!({"assumed_state": falsy})
+                    .as_object()
+                    .cloned()
+                    .unwrap(),
+            })
+            .unwrap();
+        let st = hass.states().get(&rem_eid).unwrap();
+        assert!(
+            !st.attributes.contains_key("assumed_state"),
+            "falsy {falsy} should be omitted"
+        );
+    }
+
     store.deactivate_entry("e1");
     assert!(hass.states().get(&mp_eid).is_none());
     assert!(hass.states().get(&rem_eid).is_none());

@@ -3,7 +3,7 @@
 
 use crate::light::BoxFuture;
 use crate::switch::select;
-use ha_core::{EntityId, Hass, Kind, Range, Schema, ServiceError, SupportsResponse};
+use ha_core::{EntityId, Hass, Kind, Range, Schema, ServiceData, ServiceError, SupportsResponse};
 use parking_lot::RwLock;
 use serde_json::Value;
 use std::sync::Arc;
@@ -98,6 +98,51 @@ fn string_list(v: Option<&Value>) -> Vec<String> {
         .unwrap_or_default()
 }
 
+fn dispatch_one<'a>(r: &'a dyn Remote, name: &'static str, data: &'a ServiceData) -> BoxFuture<'a> {
+    match name {
+        "turn_on" => r.turn_on(data.get("activity").and_then(Value::as_str)),
+        "turn_off" => r.turn_off(data.get("activity").and_then(Value::as_str)),
+        "toggle" => r.toggle(data.get("activity").and_then(Value::as_str)),
+        "send_command" => r.send_command(SendCommand {
+            command: string_list(data.get("command")),
+            device: data
+                .get("device")
+                .and_then(Value::as_str)
+                .map(str::to_owned),
+            num_repeats: data
+                .get("num_repeats")
+                .and_then(Value::as_u64)
+                .unwrap_or(DEFAULT_NUM_REPEATS),
+            delay_secs: data.get("delay_secs").and_then(Value::as_f64),
+            hold_secs: data
+                .get("hold_secs")
+                .and_then(Value::as_f64)
+                .unwrap_or(DEFAULT_HOLD_SECS),
+        }),
+        "learn_command" => r.learn_command(LearnCommand {
+            device: data
+                .get("device")
+                .and_then(Value::as_str)
+                .map(str::to_owned),
+            command: data.get("command").map(|v| string_list(Some(v))),
+            command_type: data
+                .get("command_type")
+                .and_then(Value::as_str)
+                .map(str::to_owned),
+            alternative: data.get("alternative").and_then(Value::as_bool),
+            timeout: data.get("timeout").and_then(Value::as_u64),
+        }),
+        "delete_command" => r.delete_command(DeleteCommand {
+            command: string_list(data.get("command")),
+            device: data
+                .get("device")
+                .and_then(Value::as_str)
+                .map(str::to_owned),
+        }),
+        _ => Box::pin(async { Ok(()) }),
+    }
+}
+
 impl Remotes {
     pub fn add(&self, remote: Arc<dyn Remote>) {
         let mut items = self.items.write();
@@ -182,79 +227,29 @@ impl Remotes {
                             &indirect,
                         );
                         let data = &call.data;
-                        // Run every selected entity even if an earlier one fails (matching HA),
-                        // without allocating a boxed future list or exceeding per-plugin in-flight limits.
-                        let mut first_err: Option<ServiceError> = None;
-                        for r in &list {
-                            let res = match name {
-                                "turn_on" => {
-                                    r.turn_on(data.get("activity").and_then(Value::as_str))
-                                        .await
+                        // Single-target fast path (no fan-out buffers); multi-target runs
+                        // concurrently in bounded batches (<= 32) so unrelated targets start
+                        // immediately without overflowing per-plugin 64-call RPC limits.
+                        if let [only] = list.as_slice() {
+                            dispatch_one(&**only, name, data).await?;
+                        } else {
+                            let mut first_err: Option<ServiceError> = None;
+                            for chunk in list.chunks(32) {
+                                for res in crate::light::join_all(
+                                    chunk.iter().map(|r| dispatch_one(&**r, name, data)),
+                                )
+                                .await
+                                {
+                                    if let Err(e) = res
+                                        && first_err.is_none()
+                                    {
+                                        first_err = Some(e);
+                                    }
                                 }
-                                "turn_off" => {
-                                    r.turn_off(data.get("activity").and_then(Value::as_str))
-                                        .await
-                                }
-                                "toggle" => {
-                                    r.toggle(data.get("activity").and_then(Value::as_str)).await
-                                }
-                                "send_command" => {
-                                    let cmd = SendCommand {
-                                        command: string_list(data.get("command")),
-                                        device: data
-                                            .get("device")
-                                            .and_then(Value::as_str)
-                                            .map(str::to_owned),
-                                        num_repeats: data
-                                            .get("num_repeats")
-                                            .and_then(Value::as_u64)
-                                            .unwrap_or(DEFAULT_NUM_REPEATS),
-                                        delay_secs: data.get("delay_secs").and_then(Value::as_f64),
-                                        hold_secs: data
-                                            .get("hold_secs")
-                                            .and_then(Value::as_f64)
-                                            .unwrap_or(DEFAULT_HOLD_SECS),
-                                    };
-                                    r.send_command(cmd).await
-                                }
-                                "learn_command" => {
-                                    let cmd = LearnCommand {
-                                        device: data
-                                            .get("device")
-                                            .and_then(Value::as_str)
-                                            .map(str::to_owned),
-                                        command: data.get("command").map(|v| string_list(Some(v))),
-                                        command_type: data
-                                            .get("command_type")
-                                            .and_then(Value::as_str)
-                                            .map(str::to_owned),
-                                        alternative: data
-                                            .get("alternative")
-                                            .and_then(Value::as_bool),
-                                        timeout: data.get("timeout").and_then(Value::as_u64),
-                                    };
-                                    r.learn_command(cmd).await
-                                }
-                                "delete_command" => {
-                                    let cmd = DeleteCommand {
-                                        command: string_list(data.get("command")),
-                                        device: data
-                                            .get("device")
-                                            .and_then(Value::as_str)
-                                            .map(str::to_owned),
-                                    };
-                                    r.delete_command(cmd).await
-                                }
-                                _ => Ok(()),
-                            };
-                            if let Err(e) = res
-                                && first_err.is_none()
-                            {
-                                first_err = Some(e);
                             }
-                        }
-                        if let Some(e) = first_err {
-                            return Err(e);
+                            if let Some(e) = first_err {
+                                return Err(e);
+                            }
                         }
                         Ok(None)
                     }
