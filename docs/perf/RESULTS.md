@@ -620,14 +620,14 @@ ha-server`):
 |---|---|
 | main (9c9116c) | 10,960,832 |
 | branch, without `mqtt`'s translations | 11,276,400 (+315,568) |
-| branch | 11,441,520 (+480,688) |
+| branch | 11,458,192 (+497,360) |
 
 Under the 512 KiB of [rule 10](../PERF.md#rules), so it stays a module of
 `ha-integrations`. Of the growth, 165,120 bytes are `mqtt`'s translations
 and icons, generated from HA's wheel as every integration's are; 118,213
 bytes of their source are the strings of HA's MQTT device subentry flow
 (`config_subentries`), which `hars` doesn't have. The code is the rest
-(308 KiB): the client, discovery, the entities, and the compiled-in
+(325 KiB): the client, discovery, the entities, and the compiled-in
 abbreviation, device-class and unit tables (`mqtt/tables.rs`).
 
 While connected and idle the entry's task sleeps until its keepalive
