@@ -604,3 +604,47 @@ builds; `start` now takes a plain `ha_registry::Lookup`. Two checkouts must
 not share one `CARGO_TARGET_DIR` for such a comparison: cargo names a
 workspace member's artifacts the same in both and can reuse the other
 tree's.
+
+### MQTT: sensors and binary sensors from discovery, 2026-11-28
+
+The `mqtt` integration (part of #92): a hand-rolled MQTT 3.1/3.1.1/5
+client over TCP, discovery of `sensor` and `binary_sensor`, and
+`mqtt.publish`. No new crate in the dependency tree (`smol_str`, already
+in it, is now also a dependency of `ha-integrations`). An install without
+an `mqtt` entry runs none of it: no task, socket or timer.
+
+Release binary (macOS arm64, stripped, `cargo build --release -p
+ha-server`):
+
+| | bytes |
+|---|---|
+| main (9c9116c) | 10,960,832 |
+| branch, without `mqtt`'s translations | 11,276,400 (+315,568) |
+| branch | 11,441,520 (+480,688) |
+
+Under the 512 KiB of [rule 10](../PERF.md#rules), so it stays a module of
+`ha-integrations`. Of the growth, 165,120 bytes are `mqtt`'s translations
+and icons, generated from HA's wheel as every integration's are; 118,213
+bytes of their source are the strings of HA's MQTT device subentry flow
+(`config_subentries`), which `hars` doesn't have. The code is the rest
+(308 KiB): the client, discovery, the entities, and the compiled-in
+abbreviation, device-class and unit tables (`mqtt/tables.rs`).
+
+While connected and idle the entry's task sleeps until its keepalive
+(a `PINGREQ` after 60 s with nothing sent or received; paho sends one
+every 60 s and ticks every second to check). The Linux harness could not
+be run: this machine's Docker VM has 972 MiB, and the release build in it
+was killed (out of memory) compiling `ha-integrations`. Indicative numbers
+from macOS instead, measured by hand (15 s warm-up, then a quiet minute,
+`ps` and `top`; a mosquitto 2.0.20 container holding six retained
+Zigbee2MQTT sensor configs and their state):
+
+| | RSS | CPU time over the minute | context switches over the minute |
+|---|---|---|---|
+| main (the entry isn't run) | 8.3 MiB | 0 (10 ms resolution) | 0 |
+| branch (connected, 6 entities) | 7.5 MiB | 0 (10 ms resolution) | 8 |
+
+A message is dispatched to its entities with their value templates
+rendered together on one render thread (HA renders on its event loop):
+2,000 Zigbee2MQTT messages, each for six templated sensors, took 61.6 µs a
+message end to end (release build, in-memory broker, two worker threads).
