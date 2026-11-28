@@ -43,6 +43,7 @@ rule have no script yet; they are listed
 | `entity_components.py` | `ha-integrations/tests/vectors/entity_components.json` (49 service calls, validation errors, feature-gate refusals, number steps, and unrecorded-attribute sets across `select`, `number`, `cover`, `lock`, and `fan`) | HA 2026.6.1's `components/{select,number,cover,lock,fan}` with `bootstrap.async_load_base_functionality` and fake entities |
 | `media_player_remote.py` | `ha-integrations/tests/vectors/media_player_remote.json` (62 service calls, validation errors, feature-gate refusals, capability/unrecorded-attribute sets across `media_player` and `remote`) | HA 2026.6.1's `components/{media_player,remote}` with `bootstrap.async_load_base_functionality` and fake entities |
 | `climate_notify.py` | `ha-integrations/tests/vectors/climate_notify.json` (24 service calls, validation errors, feature-gate refusals, capability sets, and notify timestamp state across `climate` and `notify`) | HA 2026.6.1's `components/{climate,notify}` with `bootstrap.async_load_base_functionality` and fake entities |
+| `mqtt.py` | `ha-integrations/src/mqtt/vectors/v5.json` (an entry as 2026.6.1's flow makes it, on an MQTT 5 broker: Zigbee2MQTT's, Tasmota's and a device-based discovery message, state and availability messages, a changed, an unchanged and an empty config, `off_delay` and `expire_after`, eight `mqtt.publish` calls, the broker going away and coming back) and `v311.json` (a version 1.1 entry on a 3.1.1 broker: the migration to 1.2, the refused try at MQTT 5, a client id, keepalive, prefix, birth and will of its own): each step's packets Home Assistant sent (decoded), what the broker sent it, the `mqtt` entities' states, the WARNING and ERROR lines, and at the end the entry and the registry rows; and `ha-integrations/src/mqtt/tables.rs` (`abbreviations.py`'s tables, `SUPPORTED_COMPONENTS`, the device classes' English names and units, and the display precisions `sensor` works out) | HA 2026.6.1's `components/mqtt` (`client.py`, `discovery.py`, `entity.py`, `sensor.py`, `binary_sensor.py`, the `publish` action) on paho-mqtt 2.1.0, the `sensor` and `binary_sensor` components and the registries, against a fake broker in the script on 127.0.0.1 that speaks MQTT 3.1.1 and 5 and records every packet; real time (about four minutes) |
 
 `render_template.py` and `template_functions.py` write two crates'
 vectors because they are two halves of one behaviour: the engine's answers
@@ -189,6 +190,21 @@ cargo test -p ha-api config_entries && cargo test -p ha-integrations flow
 .venv-template/bin/python -I scripts/vectors/device_names.py
 cargo test -p ha-api config_entries
 ```
+
+For `mqtt.py` (HA's own requirements, plus paho-mqtt and the supervisor
+client `mqtt`'s config flow imports):
+
+```sh
+python3.14 -m venv .venv-mqtt  # Python 3.14.2+ installed
+.venv-mqtt/bin/pip install homeassistant==2026.6.1 paho-mqtt==2.1.0 aiohasupervisor==0.4.3
+.venv-mqtt/bin/python -I scripts/vectors/mqtt.py         # or: … mqtt.py tables
+cargo test -p ha-integrations mqtt
+```
+
+It runs in real time (HA's 0.5 s and 5 s cooldowns, its 10 s reconnect,
+an `expire_after` of 120 s), so each packet's `at` (seconds since the
+broker started) moves a little from run to run; nothing else does. Client
+ids HA makes up are written as `<random>`.
 
 `automation_templates.py` and `automation_reload.py` run each scenario on an event loop whose clock moves only when a step
 says so (every timer due on the way runs, in order), with `time.time` and

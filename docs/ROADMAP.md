@@ -880,7 +880,15 @@ integration items below for users.
   blueprints
 - Config flows for adding the integrations beyond the MVP's; UI script editor
 - Long-term statistics
-- MQTT, ESPHome native API, zigbee2mqtt; `input_*` / `template` helpers, `todo`, TTS
+- MQTT ([#92](https://github.com/adamt94/hars/issues/92)): the client (3.1,
+  3.1.1 and 5 over TCP), discovery of `sensor` and `binary_sensor`, and
+  `mqtt.publish` are done (`crates/ha-integrations/src/mqtt/`); left: the
+  other discovered platforms, MQTT triggers, TLS and WebSockets, the config
+  flow, `mqtt:` YAML entities, `mqtt.dump`/`reload`, the WebSocket
+  commands, restoring `expire_after` sensors. Deliberate differences: no
+  subscriptions for other integrations' MQTT config flows, pings only when
+  the connection is idle ([`client.rs`](../crates/ha-integrations/src/mqtt/client.rs))
+- ESPHome native API; `input_*` / `template` helpers, `todo`, TTS
 - Synthetic-scale HA vs `hars` benchmark harness
 
 ## Decisions

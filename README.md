@@ -173,6 +173,7 @@ The [roadmap](docs/ROADMAP.md) tracks every item.
 | Philips Hue (`hue`) | Lights, rooms and zones, scenes, and motion, temperature, light-level, and battery sensors | **Settings > Devices & services > Add integration**, or import |
 | LIFX (`lifx`) | Colour and white bulbs, with identify and restart buttons | **Settings > Devices & services > Add integration**, or import |
 | SwitchBot Cloud (`switchbot_cloud`) | Bot, Hub 2 temperature and humidity, and an infrared air conditioner | **Settings > Devices & services > Add integration**, or import |
+| MQTT (`mqtt`) | Sensors and binary sensors that devices announce over MQTT (Zigbee2MQTT, Tasmota), and `mqtt.publish` | Import |
 | Weather (`met`) | The forecast for your home from met.no | Set during setup |
 | Sun (`sun`) | Sunrise, sunset, and the sun's position | On by default |
 | Companion app (`mobile_app`) | Your iPhone's sensors and location, and notifications to it | Log in from the app |
@@ -181,7 +182,8 @@ The [roadmap](docs/ROADMAP.md) tracks every item.
 "Import" means the integration comes across when you
 [move from Home Assistant](#move-from-home-assistant).
 
-MQTT, ESPHome, and zigbee2mqtt are planned.
+The other MQTT entity types (switches, lights and so on), ESPHome, and
+adding MQTT from the UI are planned.
 [Supported and planned integrations](docs/INTEGRATIONS.md) has the full
 list, the limits of each integration, and how to ask for a new one.
 
