@@ -989,10 +989,12 @@ fn check_entry_versions(entries: &[Map<String, Value>], ha_version: &str) -> any
         // A newer minor version is compatible by Home Assistant's rule, and
         // hars runs one. The import takes the ones it has seen (`hue` 1.2,
         // from 2026.10), not ones no fixture holds.
-        let seen = if domain == ha_integrations::hue::DOMAIN {
-            2
-        } else {
-            1
+        // `mqtt`: 1.2 is what 2026.6.1's own migration writes, and 2.1 its
+        // config flow (`entry_too_new` refuses what comes after).
+        let seen = match domain {
+            d if d == ha_integrations::hue::DOMAIN => 2,
+            d if d == ha_integrations::mqtt::DOMAIN => 2,
+            _ => 1,
         };
         let minor = e.get("minor_version").and_then(Value::as_u64).unwrap_or(1);
         if runs(domain) && (ha_integrations::entry_too_new(e) || minor > seen) {

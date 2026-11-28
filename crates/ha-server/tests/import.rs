@@ -1295,6 +1295,17 @@ fn what_hars_cannot_convert_is_refused() {
             |src| entry(src, "lifx", |e| e["minor_version"] = json!(2)),
             "the lifx integration's config entry \"Desk\" is version 2.2".into(),
         ),
+        // `mqtt`'s migration reads 1.x and 2.1 (`async_migrate_entry`).
+        (
+            "mqtt-2.2",
+            |src| {
+                entry(src, "mqtt", |e| {
+                    e["version"] = json!(2);
+                    e["minor_version"] = json!(2);
+                })
+            },
+            "the mqtt integration's config entry".into(),
+        ),
         (
             "hue-2",
             |src| entry(src, "hue", |e| e["version"] = json!(2)),
@@ -3772,5 +3783,35 @@ fn a_detached_entity_is_written_detached() {
     );
     for d in [temp("detached-src"), temp("detached-dest"), src, dest] {
         let _ = std::fs::remove_dir_all(d);
+    }
+}
+
+/// An `mqtt` entry as Home Assistant 2026.6.1 leaves it: 1.2 after its own
+/// migration (`async_migrate_entry` moves the options out of `data`), or
+/// 2.1 as its config flow writes it. Both import.
+#[test]
+fn mqtt_entries_of_every_version_2026_6_1_writes_import() {
+    for (version, minor) in [(1, 2), (2, 1)] {
+        let src = temp(&format!("mqtt-{version}.{minor}"));
+        let dest = temp(&format!("mqtt-{version}.{minor}-dest"));
+        release("2026.6.1", &src, &[]);
+        edit_store(&src, "core.config_entries", |s| {
+            let entries = s["data"]["entries"].as_array_mut().unwrap();
+            let e = entries.iter_mut().find(|e| e["domain"] == "mqtt").unwrap();
+            e["version"] = json!(version);
+            e["minor_version"] = json!(minor);
+            e["options"] = json!({"discovery": true});
+        });
+        let out = hars(&dest, &["import", src.to_str().unwrap()]);
+        assert!(out.status.success(), "{version}.{minor}: {out:?}");
+        let report = read_json(&dest.join("import-report.json"));
+        let mqtt = report["config_entries"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|e| e["domain"] == "mqtt")
+            .unwrap()
+            .clone();
+        assert_eq!(mqtt["supported"], true, "{version}.{minor}");
     }
 }
