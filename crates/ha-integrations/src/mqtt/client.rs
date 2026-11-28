@@ -77,6 +77,8 @@ pub const TIMEOUT_ACK: Duration = Duration::from_secs(10);
 pub const RECONNECT_INTERVAL: Duration = Duration::from_secs(10);
 pub const DISCOVERY_COOLDOWN: Duration = Duration::from_secs(5);
 const MAX_SUBSCRIBES_PER_CALL: usize = 500;
+/// An entity timer this far off is one that never fires: 100 years.
+const HORIZON: Duration = Duration::from_secs(100 * 365 * 86400);
 /// `MAX_LENGTH_STATE_STATE`.
 const MAX_STATE: usize = 255;
 /// QoS 2 messages a broker hasn't released yet, held at most this many
@@ -1550,9 +1552,13 @@ impl Client {
         }
     }
 
-    /// A timer `after` from now; `None` for one past what the clock can
-    /// hold, which never comes due (`cv.positive_int` has no bound).
+    /// A timer `after` from now; `None` for one past [`HORIZON`], which
+    /// never comes due (`cv.positive_int` has no bound, and a deadline near
+    /// the end of `Instant`'s range would panic in tokio's rounding).
     fn set_timer(&mut self, after: Duration, timer: Timer) -> Option<TimerKey> {
+        if after > HORIZON {
+            return None;
+        }
         let at = Instant::now().checked_add(after)?;
         self.timer_seq += 1;
         let key = (at, self.timer_seq);
@@ -3020,6 +3026,36 @@ mod unit {
             });
         }
         assert_eq!(client.next_mid(), 2);
+    }
+
+    fn client() -> Client {
+        let hass = Hass::new();
+        let components = crate::components::Components::new(
+            &hass,
+            Arc::new(ha_registry::Registries::default()),
+            crate::light::Profiles::default(),
+        );
+        let entry = json!({"entry_id": "e", "data": {"broker": "b"}});
+        let config = Config::of(entry.as_object().unwrap()).unwrap();
+        Client::new(hass, components, Arc::new(config), tcp())
+    }
+
+    /// Past 100 years an entity timer is never set, wherever `Instant`'s
+    /// range ends on the platform.
+    #[tokio::test]
+    async fn timers_past_the_horizon_are_never_set() {
+        let mut client = client();
+        let year = 365 * 86400;
+        assert!(
+            client
+                .set_timer(Duration::from_secs(99 * year), Timer::Expire(0))
+                .is_some()
+        );
+        assert!(
+            client
+                .set_timer(Duration::from_secs(101 * year), Timer::Expire(0))
+                .is_none()
+        );
     }
 
     #[test]
