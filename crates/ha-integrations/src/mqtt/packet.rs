@@ -273,29 +273,40 @@ pub struct Publish<'a> {
     pub identifiers: Ids,
 }
 
-/// A message's subscription identifiers, held inline: a broker sends one
-/// per subscription the message matches, rarely more than a few.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+/// A message's subscription identifiers: inline while there are a few
+/// (a broker sends one per subscription the message matches), on the heap
+/// past that, so every one is still checked.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Ids {
     ids: [u32; 8],
     len: u8,
-    /// More than fit: the message isn't filtered by them.
-    pub overflow: bool,
+    /// All of them, once there are more than fit inline.
+    spilled: Vec<u32>,
 }
 
 impl Ids {
     pub fn push(&mut self, id: u32) {
+        if !self.spilled.is_empty() {
+            self.spilled.push(id);
+            return;
+        }
         match self.ids.get_mut(usize::from(self.len)) {
             Some(slot) => {
                 *slot = id;
                 self.len += 1;
             }
-            None => self.overflow = true,
+            None => {
+                self.spilled.extend_from_slice(&self.ids);
+                self.spilled.push(id);
+            }
         }
     }
 
     pub fn as_slice(&self) -> &[u32] {
-        &self.ids[..usize::from(self.len)]
+        match self.spilled.is_empty() {
+            true => &self.ids[..usize::from(self.len)],
+            false => &self.spilled,
+        }
     }
 }
 
@@ -521,6 +532,11 @@ mod tests {
         assert_eq!(p.topic, b"a/b");
         assert_eq!(p.packet_id, Some(7));
         assert_eq!(p.identifiers.as_slice(), [2, 300]);
+        let mut many = Ids::default();
+        for id in 1..=10 {
+            many.push(id);
+        }
+        assert_eq!(many.as_slice(), (1..=10).collect::<Vec<_>>());
         assert_eq!(p.payload, b"hi");
         // The same bytes from a 3.1.1 broker: no properties.
         let Incoming::Publish(p) = parse(0x32, &body, Version::V311).unwrap() else {

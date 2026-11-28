@@ -1587,3 +1587,52 @@ async fn a_numeric_topic_is_published_as_its_text() {
     let sent = broker.take();
     assert_eq!(sent[0].1["topic"], "123");
 }
+
+/// A message reaches a wildcard subscription only if one of its
+/// subscription identifiers is that subscription's, however many it has
+/// (`_matching_subscriptions` checks every one): nine identifiers, none of
+/// them `homeassistant/sensor/+/config`'s, don't make a discovery.
+#[tokio::test(start_paused = true)]
+async fn every_subscription_identifier_is_checked() {
+    let broker = Broker::start(true).await;
+    let r = start(
+        &broker,
+        json!({"broker": "127.0.0.1", "port": 1883, "protocol": "5"}),
+    )
+    .await;
+    tokio::time::sleep(Duration::from_secs(1)).await;
+    let ids: Vec<u32> = (100..109).collect();
+    broker.state.lock().deliver(
+        0,
+        "homeassistant/sensor/x/config",
+        br#"{"stat_t": "x/state", "uniq_id": "x1", "name": "X"}"#,
+        0,
+        false,
+        &ids,
+    );
+    tokio::time::sleep(Duration::from_secs(1)).await;
+    assert!(
+        r.hass
+            .states()
+            .get(&EntityId::parse("sensor.x").unwrap())
+            .is_none()
+    );
+    // With its own among them, it does.
+    let mut ids = ids;
+    ids.push(24);
+    broker.state.lock().deliver(
+        0,
+        "homeassistant/sensor/x/config",
+        br#"{"stat_t": "x/state", "uniq_id": "x1", "name": "X"}"#,
+        0,
+        false,
+        &ids,
+    );
+    tokio::time::sleep(Duration::from_secs(1)).await;
+    assert!(
+        r.hass
+            .states()
+            .get(&EntityId::parse("sensor.x").unwrap())
+            .is_some()
+    );
+}

@@ -1272,7 +1272,7 @@ impl Client {
             );
             return;
         };
-        let filter_ids = self.identifiers && !ids.overflow && !ids.as_slice().is_empty();
+        let filter_ids = self.identifiers && !ids.as_slice().is_empty();
         let ids = ids.as_slice();
         // The owners of the subscriptions it reaches, in a buffer kept
         // between messages (`_matching_subscriptions`). A retained message
