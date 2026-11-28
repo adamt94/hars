@@ -177,6 +177,9 @@ struct Conn {
     dropped: bool,
     /// False: the broker stops reading (its buffer fills).
     reading: bool,
+    /// Bytes read from `hars`, and the last two.
+    read_bytes: usize,
+    tail: [u8; 2],
     v5: bool,
     connected: bool,
     subs: Vec<(String, u8, Option<u32>)>,
@@ -418,6 +421,8 @@ fn serve(st: Arc<Mutex<BrokerState>>, stream: tokio::io::DuplexStream) {
             write: tx,
             dropped: false,
             reading: true,
+            read_bytes: 0,
+            tail: [0; 2],
             v5: false,
             connected: false,
             subs: Vec::new(),
@@ -466,9 +471,15 @@ fn serve(st: Arc<Mutex<BrokerState>>, stream: tokio::io::DuplexStream) {
                     return;
                 }
                 Ok(n) => {
-                    if st.lock().conns[c].dropped {
+                    let mut s = st.lock();
+                    s.conns[c].read_bytes += n;
+                    if n >= 2 {
+                        s.conns[c].tail = [chunk[n - 2], chunk[n - 1]];
+                    }
+                    if s.conns[c].dropped {
                         return;
                     }
+                    drop(s);
                     buf.extend_from_slice(&chunk[..n]);
                 }
             }
@@ -1799,4 +1810,34 @@ async fn messages_in_flight_are_limited() {
         .send(Some(vec![0x40, 2, 0, 1]));
     tokio::time::sleep(Duration::from_millis(100)).await;
     assert_eq!(publishes(broker.take()), [json!("b")]);
+}
+
+/// An entry removed in the middle of writing a frame closes the
+/// connection without a `DISCONNECT`, which would land inside that frame.
+#[tokio::test(start_paused = true)]
+async fn a_removal_mid_frame_writes_no_disconnect() {
+    let broker = Broker::start(true).await;
+    let r = start(
+        &broker,
+        json!({"broker": "127.0.0.1", "port": 1883, "protocol": "5", "discovery": false}),
+    )
+    .await;
+    tokio::time::sleep(Duration::from_secs(6)).await;
+    let before = broker.state.lock().conns[0].read_bytes;
+    broker.state.lock().conns[0].reading = false;
+    drop(publish_call(
+        &r,
+        json!({"topic": "big", "payload": "x".repeat(200 * 1024)}),
+    ));
+    tokio::time::sleep(Duration::from_secs(1)).await;
+    let Running { task, .. } = r;
+    task.abort();
+    let _ = task.await;
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    broker.state.lock().conns[0].reading = true;
+    tokio::time::sleep(Duration::from_secs(2)).await;
+    // The frame as far as it went, and nothing after it.
+    let s = broker.state.lock();
+    assert!(s.conns[0].read_bytes - before >= 1 << 16);
+    assert_eq!(s.conns[0].tail, [b'x', b'x']);
 }

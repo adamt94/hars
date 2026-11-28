@@ -46,6 +46,11 @@
 //! debounce go out without waiting for each `SUBACK` (HA waits for each
 //! wildcard one before the next); only UTF-8 payloads are decoded (an entity's other
 //! `encoding` is read as UTF-8).
+//!
+//! Known gap: while a write waits on a broker that has stopped reading
+//! (up to the keepalive, then the connection is dropped), the entity
+//! timers (`off_delay`, `expire_after`) and the actions' 10 s wait for an
+//! acknowledgement wait with it.
 
 use super::discovery::{self, Dropped, Found};
 use super::entity::{self, Domain, Mode, Platform};
@@ -364,6 +369,8 @@ pub(crate) struct Client {
     acks_due: Vec<u16>,
     /// The broker's `Receive Maximum` (MQTT 5).
     receive_maximum: u16,
+    /// A frame is being written.
+    writing: bool,
     /// QoS 2 messages waiting for their `PUBREL`.
     incoming: HashMap<u16, (String, Vec<u8>, bool, packet::Ids)>,
     /// Their topics' and payloads' bytes.
@@ -456,6 +463,7 @@ impl Client {
             in_use: HashSet::new(),
             acks_due: Vec::new(),
             receive_maximum: u16::MAX,
+            writing: false,
             incoming: HashMap::new(),
             incoming_bytes: 0,
             subs: Vec::new(),
@@ -534,7 +542,12 @@ impl Client {
         let Link::Up { write, .. } = &mut self.link else {
             return false;
         };
-        match timeout(limit, write.write_all(bytes)).await {
+        // Marked while a frame is on its way: one cut off (the task
+        // aborted) can't be followed by a `DISCONNECT`.
+        self.writing = true;
+        let wrote = timeout(limit, write.write_all(bytes)).await;
+        self.writing = false;
+        match wrote {
             Ok(Ok(())) => {}
             Ok(Err(_)) => {
                 self.lost().await;
@@ -2638,13 +2651,21 @@ impl Drop for Client {
         for ent in self.ents.iter().flatten() {
             self.hass.remove_state(&ent.entity_id);
         }
+        // Only between frames (one cut off would take it in), and for a
+        // second at most; otherwise the connection just closes.
+        if self.writing {
+            return;
+        }
         if let (Link::Up { mut write, .. }, Ok(rt)) = (
             std::mem::replace(&mut self.link, Link::Down),
             tokio::runtime::Handle::try_current(),
         ) {
             rt.spawn(async move {
-                let _ = write.write_all(&packet::DISCONNECT).await;
-                let _ = write.shutdown().await;
+                let bye = async {
+                    write.write_all(&packet::DISCONNECT).await?;
+                    write.shutdown().await
+                };
+                let _ = timeout(Duration::from_secs(1), bye).await;
             });
         }
     }
