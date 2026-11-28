@@ -307,6 +307,11 @@ pub struct DeviceInfo {
     /// of its name but something else of itself (a "primary" device
     /// info), as HA names it. `None`: left unnamed.
     pub entry_title: Option<String>,
+    /// Typed as HA types a device info (`DEVICE_INFO_TYPES`): identifiers
+    /// and connections alone are a "link", which makes no entry the
+    /// device's primary one. Off, every device info is "primary", as the
+    /// callers before MQTT (`mobile_app`, plugins) have it.
+    pub typed: bool,
 }
 
 impl DeviceInfo {
@@ -1466,7 +1471,7 @@ impl Registry {
             let old_name = d.display_name().map(str::to_owned);
             let mut changes = Map::new();
             let entry = &info.config_entry_id;
-            let link = info.is_link();
+            let link = info.typed && info.is_link();
             // "If creating a new device, default to the config entry name".
             if is_new && !link && info.name.as_deref().is_none_or(str::is_empty) {
                 info.name.clone_from(&info.entry_title);

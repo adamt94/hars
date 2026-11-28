@@ -617,11 +617,9 @@ fn primary_config_entries_as_ha() {
             device("c", "gone-entry"),
         ];
     });
-    // A "primary" device info (more than identifiers), as `mobile_app`'s.
     let info = |id: &str| DeviceInfo {
         config_entry_id: ENTRY.into(),
         identifiers: vec![json!(["mobile_app", id])],
-        manufacturer: Some("Apple".into()),
         ..Default::default()
     };
     // Without knowing the entries, an existing primary stays.
@@ -1635,10 +1633,18 @@ fn asking_for_rows_that_match_copies_and_publishes_nothing() {
 fn link_and_primary_device_infos() {
     let hass = Hass::new();
     let reg = Registry::in_memory(&hass, Registries::default());
+    // Untyped (a plugin's upsert with its identifier alone): primary.
+    let untyped = reg.get_or_create_device(DeviceInfo {
+        config_entry_id: "plugin".into(),
+        identifiers: vec![json!(["plugin", "only-id"])],
+        ..Default::default()
+    });
+    assert_eq!(untyped.primary_config_entry.as_deref(), Some("plugin"));
     let link = reg.get_or_create_device(DeviceInfo {
         config_entry_id: "mqtt".into(),
         identifiers: vec![json!(["mqtt", "A1B2C3"])],
         entry_title: Some("127.0.0.1".into()),
+        typed: true,
         ..Default::default()
     });
     assert_eq!(link.primary_config_entry, None);
@@ -1652,6 +1658,7 @@ fn link_and_primary_device_infos() {
         serial_number: Some("WS01-0001".into()),
         configuration_url: Some("http://192.0.2.20/".into()),
         entry_title: Some("127.0.0.1".into()),
+        typed: true,
         ..Default::default()
     });
     assert_eq!(primary.primary_config_entry.as_deref(), Some("mqtt"));

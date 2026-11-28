@@ -2281,6 +2281,7 @@ impl Client {
                 registry.get_or_create_device(ha_registry::DeviceInfo {
                     config_entry_id: entry_id.clone(),
                     identifiers: vec![via_id],
+                    typed: true,
                     ..Default::default()
                 });
             }
@@ -2456,6 +2457,7 @@ impl Client {
                     registry.get_or_create_device(ha_registry::DeviceInfo {
                         config_entry_id: self.entry_id.clone(),
                         identifiers: vec![via_id],
+                        typed: true,
                         ..Default::default()
                     });
                 }
@@ -2563,6 +2565,7 @@ fn device_info(entry_id: &str, title: &str, d: &entity::Device) -> ha_registry::
         via_device: d.via_device.as_ref().map(|v| json!([super::DOMAIN, v])),
         suggested_area: d.suggested_area.clone(),
         entry_title: Some(title.to_owned()),
+        typed: true,
         ..Default::default()
     }
 }
