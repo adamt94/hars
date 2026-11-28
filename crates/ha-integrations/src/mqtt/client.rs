@@ -2788,11 +2788,11 @@ pub fn register_publish(hass: &Hass, tx: mpsc::Sender<Command>) {
             let tx = tx.clone();
             async move {
                 let data = &call.data;
+                // `cv.string`'s value, as the schema checked it.
                 let topic = data
                     .get("topic")
-                    .and_then(Value::as_str)
-                    .unwrap_or_default()
-                    .to_owned();
+                    .and_then(|t| entity::cv_string(t).ok())
+                    .unwrap_or_default();
                 let mut payload = match data.get("payload") {
                     None | Some(Value::Null) => Vec::new(),
                     Some(v) => entity::cv_string(v).unwrap_or_default().into_bytes(),

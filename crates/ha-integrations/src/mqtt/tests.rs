@@ -1569,3 +1569,23 @@ async fn a_wildcard_subscription_takes_a_retained_message_once() {
     let after = r.hass.states().get(&id).unwrap();
     assert_eq!(after.last_updated, first.last_updated);
 }
+
+/// `mqtt.publish` publishes to the topic as `cv.string` made it: a number
+/// is its text.
+#[tokio::test(start_paused = true)]
+async fn a_numeric_topic_is_published_as_its_text() {
+    let broker = Broker::start(true).await;
+    let r = start(
+        &broker,
+        json!({"broker": "127.0.0.1", "port": 1883, "protocol": "5", "discovery": false}),
+    )
+    .await;
+    tokio::time::sleep(Duration::from_secs(6)).await;
+    broker.take();
+    publish_call(&r, json!({"topic": 123, "payload": "x"}))
+        .await
+        .unwrap()
+        .unwrap();
+    let sent = broker.take();
+    assert_eq!(sent[0].1["topic"], "123");
+}
