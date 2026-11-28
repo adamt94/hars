@@ -2433,6 +2433,32 @@ impl Client {
     }
 }
 
+/// The entry's task ends: aborted when the entry is removed, or dropped
+/// with the runtime at stop. A removal is HA's `async_unload_entry`: the
+/// entities go with their states, and the client disconnects cleanly (a
+/// `DISCONNECT`, written on a task of its own, as `Drop` can't wait), so
+/// the broker doesn't publish the will. At stop HA leaves both: the
+/// states are the last ones, and the will tells the broker it went.
+impl Drop for Client {
+    fn drop(&mut self) {
+        if self.hass.core_state() != CoreState::Running {
+            return;
+        }
+        for ent in self.ents.iter().flatten() {
+            self.hass.remove_state(&ent.entity_id);
+        }
+        if let (Link::Up { mut write, .. }, Ok(rt)) = (
+            std::mem::replace(&mut self.link, Link::Down),
+            tokio::runtime::Handle::try_current(),
+        ) {
+            rt.spawn(async move {
+                let _ = write.write_all(&packet::DISCONNECT).await;
+                let _ = write.shutdown().await;
+            });
+        }
+    }
+}
+
 /// Whether two owners are the same kind of subscription for an entity.
 fn same_role(a: Owner, b: Owner) -> bool {
     matches!(

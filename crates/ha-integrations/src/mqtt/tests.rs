@@ -959,6 +959,7 @@ struct Running {
     hass: Hass,
     entries: Arc<ConfigEntries>,
     dials: Arc<Mutex<Vec<f64>>>,
+    task: tokio::task::JoinHandle<()>,
 }
 
 async fn start(broker: &Broker, data: Value) -> Running {
@@ -979,7 +980,7 @@ async fn start(broker: &Broker, data: Value) -> Running {
         log.lock().push(t0.elapsed().as_secs_f64());
         inner(host, port)
     });
-    tokio::spawn(run(
+    let task = tokio::spawn(run(
         components,
         entry,
         Some(entries.clone()),
@@ -992,6 +993,7 @@ async fn start(broker: &Broker, data: Value) -> Running {
         hass,
         entries,
         dials,
+        task,
     }
 }
 
@@ -1424,4 +1426,34 @@ async fn only_the_expected_acknowledgement_ends_a_publish() {
     ack(0x70);
     tokio::time::sleep(Duration::from_millis(100)).await;
     assert_eq!(call.await.unwrap(), Ok(()));
+}
+
+/// An entry stopped (its task aborted, as removing it does): every entity
+/// it ran goes with its state, one without a unique id (no registry row)
+/// too, and the client says goodbye with a `DISCONNECT`, so the broker
+/// doesn't publish the will (HA's `async_unload_entry`).
+#[tokio::test(start_paused = true)]
+async fn a_stopped_entry_takes_its_entities_and_disconnects() {
+    let broker = Broker::start(true).await;
+    broker.publish(
+        "homeassistant/sensor/n/config",
+        r#"{"stat_t": "n/state", "name": "N"}"#,
+        true,
+        0,
+    );
+    let r = start(
+        &broker,
+        json!({"broker": "127.0.0.1", "port": 1883, "protocol": "5"}),
+    )
+    .await;
+    tokio::time::sleep(Duration::from_secs(6)).await;
+    let id = EntityId::parse("sensor.n").unwrap();
+    assert!(r.hass.states().get(&id).is_some());
+    broker.take();
+    let Running { hass, task, .. } = r;
+    task.abort();
+    let _ = task.await;
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    assert!(hass.states().get(&id).is_none());
+    assert_eq!(types(&broker.take()), ["0:DISCONNECT"]);
 }
