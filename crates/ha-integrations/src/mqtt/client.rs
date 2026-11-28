@@ -805,12 +805,12 @@ impl Client {
                         // Delivered at its `PUBREL`, as paho does.
                         if let Some(id) = p.packet_id {
                             if let Ok(t) = std::str::from_utf8(topic) {
-                                let size = INCOMING_ENTRY + t.len() + p.payload.len();
-                                if let Some((t, b, ..)) = self.incoming.insert(
+                                let size = held(t, p.payload, &p.identifiers);
+                                if let Some((t, b, _, ids)) = self.incoming.insert(
                                     id,
                                     (t.to_owned(), p.payload.to_vec(), p.retain, p.identifiers),
                                 ) {
-                                    self.incoming_bytes -= INCOMING_ENTRY + t.len() + b.len();
+                                    self.incoming_bytes -= held(&t, &b, &ids);
                                 }
                                 self.incoming_bytes += size;
                                 if self.incoming_bytes > INCOMING_BYTES {
@@ -829,7 +829,7 @@ impl Client {
             }
             Incoming::PubRel(id) => {
                 if let Some((topic, payload, retain, ids)) = self.incoming.remove(&id) {
-                    self.incoming_bytes -= INCOMING_ENTRY + topic.len() + payload.len();
+                    self.incoming_bytes -= held(&topic, &payload, &ids);
                     self.message(topic.as_bytes(), &payload, retain, &ids).await;
                 }
                 self.send(&packet::ack(packet::PUBCOMP, id)).await;
@@ -856,6 +856,7 @@ impl Client {
                 if let Some(i) = self.acks_due.iter().position(|m| *m == id) {
                     self.acks_due.swap_remove(i);
                     self.in_use.remove(&id);
+                    self.id_freed();
                 }
             }
             Incoming::PingResp => self.ping_out = false,
@@ -875,9 +876,18 @@ impl Client {
         };
         let o = self.outbound.remove(i);
         self.in_use.remove(&o.mid);
+        self.id_freed();
         self.outbound_bytes -= o.message.topic.len() + o.message.payload.len();
         if let Some(reply) = o.reply {
             let _ = reply.send(Ok(()));
+        }
+    }
+
+    /// A packet id is free again: subscriptions that waited for one go at
+    /// the next debounce.
+    fn id_freed(&mut self) {
+        if !self.pending.is_empty() && self.subscribe_at.is_none() {
+            self.schedule_subscribe();
         }
     }
 
@@ -1301,9 +1311,18 @@ impl Client {
             }
         }
         let v = self.version();
-        for (topic, qos, id) in wild {
+        // With no packet id free, what is left stays pending, and goes
+        // once an acknowledgement frees one ([`Client::id_freed`]).
+        let mut wild = wild.into_iter();
+        while let Some((topic, qos, id)) = wild.next() {
             let Some(mid) = self.ack_mid() else {
                 tracing::error!("Error talking to MQTT: Message queue full");
+                let mut rest: Vec<(SmolStr, u8)> = std::iter::once((topic, qos))
+                    .chain(wild.map(|(t, q, _)| (t, q)))
+                    .collect();
+                rest.append(&mut pending);
+                rest.append(&mut self.pending);
+                self.pending = rest;
                 return;
             };
             let bytes = packet::subscribe(
@@ -1318,18 +1337,27 @@ impl Client {
                 return;
             }
         }
-        for chunk in pending.chunks(MAX_SUBSCRIBES_PER_CALL) {
+        let mut start = 0;
+        while start < pending.len() {
             let Some(mid) = self.ack_mid() else {
                 tracing::error!("Error talking to MQTT: Message queue full");
+                let mut rest = pending.split_off(start);
+                rest.append(&mut self.pending);
+                self.pending = rest;
                 return;
             };
-            let topics: Vec<(&str, u8)> = chunk.iter().map(|(t, q)| (t.as_str(), *q)).collect();
+            let end = (start + MAX_SUBSCRIBES_PER_CALL).min(pending.len());
+            let topics: Vec<(&str, u8)> = pending[start..end]
+                .iter()
+                .map(|(t, q)| (t.as_str(), *q))
+                .collect();
             let bytes = packet::subscribe(v, mid, &topics, self.identifiers.then_some(1));
             tracing::debug!("Subscribing with mid: {mid} to topics with qos: {topics:?}");
             self.last_subscribe = Instant::now();
             if !self.send(&bytes).await {
                 return;
             }
+            start = end;
         }
     }
 
@@ -1380,6 +1408,15 @@ impl Client {
             return;
         }
         let topics = std::mem::take(&mut self.unsubscribing);
+        // Disconnected: nothing to tell the broker (a clean session; the
+        // next connection subscribes only what is wanted then), and no id
+        // to take.
+        if !self.connected {
+            for t in &topics {
+                self.ids.release(t);
+            }
+            return;
+        }
         let v = self.version();
         for chunk in topics.chunks(MAX_SUBSCRIBES_PER_CALL) {
             let Some(mid) = self.ack_mid() else {
@@ -2671,6 +2708,12 @@ impl Drop for Client {
     }
 }
 
+/// What a held QoS 2 message costs: its entry, topic, payload and the
+/// subscription identifiers that spilled to the heap.
+fn held(topic: &str, payload: &[u8], ids: &packet::Ids) -> usize {
+    INCOMING_ENTRY + topic.len() + payload.len() + ids.heap_bytes()
+}
+
 /// Whether two owners are the same kind of subscription for an entity.
 fn same_role(a: Owner, b: Owner) -> bool {
     matches!(
@@ -3250,6 +3293,60 @@ mod unit {
             rx.await.unwrap().unwrap_err().to_string(),
             "Error talking to MQTT: Message queue full"
         );
+    }
+
+    /// An unsubscribe that comes due while disconnected takes no packet
+    /// id (the next connection subscribes only what is wanted then).
+    #[tokio::test]
+    async fn an_unsubscribe_while_disconnected_takes_no_id() {
+        let mut client = client();
+        client.unsubscribing.push(SmolStr::new("gone/state"));
+        client.perform_unsubscribes().await;
+        assert!(client.acks_due.is_empty());
+        assert!(client.in_use.is_empty());
+        assert!(client.unsubscribing.is_empty());
+    }
+
+    /// Subscriptions that find every packet id taken stay pending, and are
+    /// tried again once an acknowledgement frees one.
+    #[tokio::test]
+    async fn subscriptions_wait_for_a_free_id() {
+        let (ours, _theirs) = tokio::io::duplex(1 << 16);
+        let slot = Arc::new(parking_lot::Mutex::new(Some(ours)));
+        let dial: Dial = Arc::new(move |_, _| {
+            let stream = slot.lock().take();
+            Box::pin(async move { Ok(Box::new(stream.unwrap()) as Box<dyn Stream>) })
+        });
+        let mut client = client();
+        client.dial = dial;
+        client.connect().await;
+        client.connected = true;
+        client.in_use.extend(1..=65535);
+        client.outbound.push(Out {
+            mid: 5,
+            message: Message {
+                topic: "t".into(),
+                payload: Vec::new(),
+                qos: 1,
+                retain: false,
+            },
+            expiry: None,
+            stage: Stage::WaitPubAck,
+            dup: false,
+            reply: None,
+            deadline: None,
+        });
+        client.outbound_bytes = 1;
+        client.subscribe("a/+", 0, Owner::Discovery);
+        client.subscribe("b", 0, Owner::Discovery);
+        client.subscribe_at = None;
+        client.perform_subscriptions().await;
+        assert_eq!(client.pending.len(), 2);
+        client.packet(Incoming::PubAck(5)).await;
+        assert!(client.subscribe_at.is_some());
+        client.perform_subscriptions().await;
+        assert_eq!(client.acks_due, [5]);
+        assert_eq!(client.pending.len(), 1);
     }
 
     #[test]

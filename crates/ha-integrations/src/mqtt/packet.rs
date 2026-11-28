@@ -305,6 +305,11 @@ impl Ids {
         }
     }
 
+    /// The bytes they take on the heap (none while they fit inline).
+    pub fn heap_bytes(&self) -> usize {
+        self.spilled.capacity() * std::mem::size_of::<u32>()
+    }
+
     pub fn as_slice(&self) -> &[u32] {
         match self.spilled.is_empty() {
             true => &self.ids[..usize::from(self.len)],

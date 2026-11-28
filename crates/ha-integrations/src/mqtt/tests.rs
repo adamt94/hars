@@ -1841,3 +1841,41 @@ async fn a_removal_mid_frame_writes_no_disconnect() {
     assert!(s.conns[0].read_bytes - before >= 1 << 16);
     assert_eq!(s.conns[0].tail, [b'x', b'x']);
 }
+
+/// A held QoS 2 message is charged its subscription identifiers too, when
+/// there are more than fit inline: many with long lists reach the budget.
+#[tokio::test(start_paused = true)]
+async fn unreleased_qos_2_messages_with_many_identifiers_are_bounded() {
+    let broker = Broker::start(true).await;
+    let r = start(
+        &broker,
+        json!({"broker": "127.0.0.1", "port": 1883, "protocol": "5", "discovery": false}),
+    )
+    .await;
+    tokio::time::sleep(Duration::from_secs(1)).await;
+    let mut out = Vec::new();
+    for id in 1..=1500u16 {
+        let mut props = Vec::new();
+        for sub in 0..250u32 {
+            props.push(0x0B);
+            put_varint(&mut props, (sub % 100 + 2) as usize);
+        }
+        let mut body = vec![0, 1, b't'];
+        body.extend_from_slice(&id.to_be_bytes());
+        put_varint(&mut body, props.len());
+        body.extend(props);
+        body.push(b'x');
+        out.push(0x34);
+        put_varint(&mut out, body.len());
+        out.extend(body);
+    }
+    for chunk in out.chunks(32 * 1024) {
+        let _ = broker.state.lock().conns[0]
+            .write
+            .send(Some(chunk.to_vec()));
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    tokio::time::sleep(Duration::from_secs(11)).await;
+    let dials = r.dials.lock().clone();
+    assert_eq!(dials.len(), 2, "{dials:?}");
+}
