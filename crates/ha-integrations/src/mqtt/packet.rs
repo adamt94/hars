@@ -248,6 +248,9 @@ pub enum Incoming<'a> {
         /// MQTT 5: whether the broker said it has no subscription
         /// identifiers (`Subscription Identifier Available` 0).
         no_identifiers: bool,
+        /// MQTT 5's `Receive Maximum`: how many QoS 1 and 2 messages the
+        /// broker takes unacknowledged (65,535 when it doesn't say).
+        receive_maximum: u16,
     },
     Publish(Publish<'a>),
     PubAck(u16),
@@ -435,6 +438,7 @@ pub fn parse(first: u8, body: &[u8], version: Version) -> Result<Incoming<'_>, M
         2 => {
             let code = *body.get(1).ok_or(Malformed)?;
             let mut no_identifiers = false;
+            let mut receive_maximum = u16::MAX;
             // A broker without MQTT 5 answers a v5 `CONNECT` in 3.1.1's
             // two bytes (paho: "Unsupported protocol version").
             if v5 && body.len() > 2 {
@@ -443,11 +447,15 @@ pub fn parse(first: u8, body: &[u8], version: Version) -> Result<Incoming<'_>, M
                     if id == 0x29 && value == 0 {
                         no_identifiers = true;
                     }
+                    if id == 0x21 {
+                        receive_maximum = u16::try_from(value).unwrap_or(u16::MAX).max(1);
+                    }
                 })?;
             }
             Ok(Incoming::ConnAck {
                 code,
                 no_identifiers,
+                receive_maximum,
             })
         }
         3 => {
@@ -551,14 +559,16 @@ mod tests {
             parse(0x20, &[0, 1], Version::V5),
             Ok(Incoming::ConnAck {
                 code: 1,
-                no_identifiers: false
+                no_identifiers: false,
+                receive_maximum: u16::MAX
             })
         );
         assert_eq!(
-            parse(0x20, &[0, 0, 2, 0x29, 0], Version::V5),
+            parse(0x20, &[0, 0, 5, 0x29, 0, 0x21, 0, 1], Version::V5),
             Ok(Incoming::ConnAck {
                 code: 0,
-                no_identifiers: true
+                no_identifiers: true,
+                receive_maximum: 1
             })
         );
     }

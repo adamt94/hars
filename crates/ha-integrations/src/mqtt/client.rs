@@ -89,6 +89,13 @@ pub const INCOMING_BYTES: usize = 1 << 20;
 /// entry, its identifiers and the two allocations' headers.
 const INCOMING_ENTRY: usize =
     std::mem::size_of::<(u16, (String, Vec<u8>, bool, packet::Ids))>() + 32;
+/// paho's `max_inflight_messages` (HA keeps its default): QoS 1 and 2
+/// messages sent and not yet acknowledged, at most; the rest wait.
+const MAX_INFLIGHT: usize = 20;
+/// The topics and payloads of QoS 1 and 2 messages kept for the broker, at
+/// most: past it a publish fails as paho's does when its queue is full.
+/// (paho has no bound but the 65,535 packet ids.)
+pub const OUTBOUND_BYTES: usize = 16 << 20;
 /// `mqtt.publish` calls waiting for the client: a caller past these waits
 /// its turn.
 const COMMANDS: usize = 64;
@@ -349,6 +356,14 @@ pub(crate) struct Client {
     ping_out: bool,
     mid: u16,
     outbound: Vec<Out>,
+    /// Their topics' and payloads' bytes.
+    outbound_bytes: usize,
+    /// Packet ids taken: the kept messages', and those of `SUBSCRIBE`s and
+    /// `UNSUBSCRIBE`s not yet acknowledged (`acks_due`).
+    in_use: HashSet<u16>,
+    acks_due: Vec<u16>,
+    /// The broker's `Receive Maximum` (MQTT 5).
+    receive_maximum: u16,
     /// QoS 2 messages waiting for their `PUBREL`.
     incoming: HashMap<u16, (String, Vec<u8>, bool, packet::Ids)>,
     /// Their topics' and payloads' bytes.
@@ -437,6 +452,10 @@ impl Client {
             ping_out: false,
             mid: 0,
             outbound: Vec::new(),
+            outbound_bytes: 0,
+            in_use: HashSet::new(),
+            acks_due: Vec::new(),
+            receive_maximum: u16::MAX,
             incoming: HashMap::new(),
             incoming_bytes: 0,
             subs: Vec::new(),
@@ -470,15 +489,36 @@ impl Client {
         self.config.version
     }
 
-    /// paho's `_mid_generate`, past the ids of messages still in flight
-    /// (after a wrap, an id could otherwise be taken twice).
-    fn next_mid(&mut self) -> u16 {
-        loop {
-            self.mid = if self.mid == 65535 { 1 } else { self.mid + 1 };
-            if !self.outbound.iter().any(|o| o.mid == self.mid) {
-                return self.mid;
+    /// paho's `_mid_generate`: the next id, whoever has it (a QoS 0
+    /// publish's goes nowhere).
+    fn bump_mid(&mut self) -> u16 {
+        self.mid = if self.mid == 65535 { 1 } else { self.mid + 1 };
+        self.mid
+    }
+
+    /// The next id no message or subscription in flight has, taken; `None`
+    /// when all 65,535 are (paho's `MQTT_ERR_QUEUE_SIZE`).
+    fn take_mid(&mut self) -> Option<u16> {
+        for _ in 0..65535 {
+            let mid = self.bump_mid();
+            if self.in_use.insert(mid) {
+                return Some(mid);
             }
         }
+        None
+    }
+
+    /// An id for a `SUBSCRIBE` or `UNSUBSCRIBE`, held until its
+    /// acknowledgement or the connection's end.
+    fn ack_mid(&mut self) -> Option<u16> {
+        let mid = self.take_mid()?;
+        self.acks_due.push(mid);
+        Some(mid)
+    }
+
+    /// QoS 1 and 2 messages the broker may have unacknowledged now.
+    fn inflight_limit(&self) -> usize {
+        MAX_INFLIGHT.min(usize::from(self.receive_maximum))
     }
 
     // ------------------------------------------------------------ the wire
@@ -570,8 +610,13 @@ impl Client {
         self.birth_at = None;
         self.subscribe_at = None;
         self.ping_out = false;
-        // A clean session: QoS 2 messages waiting for their release go.
+        // A clean session: QoS 2 messages waiting for their release go, and
+        // so do the subscriptions' acknowledgements.
         self.incoming.clear();
+        for mid in self.acks_due.drain(..) {
+            self.in_use.remove(&mid);
+        }
+        self.receive_maximum = u16::MAX;
         self.incoming_bytes = 0;
         if !self.give_up && self.reconnect_at.is_none() {
             self.reconnect_at = Some(Instant::now() + RECONNECT_INTERVAL);
@@ -724,7 +769,11 @@ impl Client {
             Incoming::ConnAck {
                 code,
                 no_identifiers,
-            } => self.connack(code, no_identifiers).await,
+                receive_maximum,
+            } => {
+                self.receive_maximum = receive_maximum;
+                self.connack(code, no_identifiers).await
+            }
             Incoming::Publish(p) => {
                 let topic = p.topic;
                 match p.qos {
@@ -772,8 +821,14 @@ impl Client {
                 }
                 self.send(&packet::ack(packet::PUBCOMP, id)).await;
             }
-            Incoming::PubAck(id) => self.acked(id, Stage::WaitPubAck),
-            Incoming::PubComp(id) => self.acked(id, Stage::WaitPubComp),
+            Incoming::PubAck(id) => {
+                self.acked(id, Stage::WaitPubAck);
+                self.fill().await;
+            }
+            Incoming::PubComp(id) => {
+                self.acked(id, Stage::WaitPubComp);
+                self.fill().await;
+            }
             Incoming::PubRec(id) => {
                 if let Some(o) = self
                     .outbound
@@ -784,7 +839,12 @@ impl Client {
                 }
                 self.send(&packet::ack(packet::PUBREL, id)).await;
             }
-            Incoming::SubAck(_) | Incoming::UnsubAck(_) => {}
+            Incoming::SubAck(id) | Incoming::UnsubAck(id) => {
+                if let Some(i) = self.acks_due.iter().position(|m| *m == id) {
+                    self.acks_due.swap_remove(i);
+                    self.in_use.remove(&id);
+                }
+            }
             Incoming::PingResp => self.ping_out = false,
             Incoming::Disconnect => self.lost().await,
         }
@@ -800,23 +860,39 @@ impl Client {
         else {
             return;
         };
-        if let Some(reply) = self.outbound.remove(i).reply {
+        let o = self.outbound.remove(i);
+        self.in_use.remove(&o.mid);
+        self.outbound_bytes -= o.message.topic.len() + o.message.payload.len();
+        if let Some(reply) = o.reply {
             let _ = reply.send(Ok(()));
         }
     }
 
-    /// `_messages_reconnect_reset_out` and `_handle_connack`: on a clean
-    /// session every QoS 1 and 2 message the broker hasn't got is
-    /// published again, marked `dup` if it was sent before.
-    async fn resend(&mut self) {
+    /// `_update_inflight`: kept messages go out in order while fewer than
+    /// the limit are unacknowledged.
+    async fn fill(&mut self) {
+        if !self.connected {
+            return;
+        }
         let v = self.version();
+        let mut inflight = self
+            .outbound
+            .iter()
+            .filter(|o| o.stage != Stage::Unsent)
+            .count();
         for i in 0..self.outbound.len() {
+            if inflight >= self.inflight_limit() {
+                return;
+            }
             let o = &mut self.outbound[i];
-            o.dup |= o.stage != Stage::Unsent;
+            if o.stage != Stage::Unsent {
+                continue;
+            }
             o.stage = match o.message.qos {
                 1 => Stage::WaitPubAck,
                 _ => Stage::WaitPubRec,
             };
+            inflight += 1;
             let bytes = packet::publish(
                 v,
                 &packet::Out {
@@ -833,6 +909,17 @@ impl Client {
                 return;
             }
         }
+    }
+
+    /// `_messages_reconnect_reset_out` and `_handle_connack`: on a clean
+    /// session every QoS 1 and 2 message the broker hasn't got is
+    /// published again, marked `dup` if it was sent before.
+    async fn resend(&mut self) {
+        for o in &mut self.outbound {
+            o.dup |= o.stage != Stage::Unsent;
+            o.stage = Stage::Unsent;
+        }
+        self.fill().await;
     }
 
     /// `_async_mqtt_on_connect`.
@@ -1017,35 +1104,12 @@ impl Client {
         expiry: Option<u32>,
         reply: Option<oneshot::Sender<Result<(), ServiceError>>>,
     ) -> Result<(), String> {
-        let mid = self.next_mid();
-        tracing::debug!(
-            "Transmitting{} message on {}: '{}', mid: {mid}, qos: {}",
-            if m.retain { " retained" } else { "" },
-            m.topic,
-            String::from_utf8_lossy(&m.payload),
-            m.qos
-        );
-        if !self.connected {
-            // paho keeps a QoS 1 or 2 message to send at the next
-            // connection, and answers that it isn't connected.
-            if m.qos > 0 {
-                self.outbound.push(Out {
-                    mid,
-                    message: m.clone(),
-                    expiry,
-                    stage: Stage::Unsent,
-                    dup: false,
-                    reply: None,
-                    deadline: None,
-                });
-            }
-            let message = "Error talking to MQTT: The client is not currently connected".to_owned();
+        let fail = |reply: Option<oneshot::Sender<Result<(), ServiceError>>>, why: &str| {
+            // `_async_wait_for_mid_or_raise`'s `mqtt_broker_error`.
+            let message = format!("Error talking to MQTT: {}", why.trim_end_matches('.'));
             if let Some(reply) = reply {
                 let mut p = Map::new();
-                p.insert(
-                    "error_message".into(),
-                    json!("The client is not currently connected."),
-                );
+                p.insert("error_message".into(), json!(why));
                 let _ = reply.send(Err(ServiceError::translated(
                     super::DOMAIN,
                     "mqtt_broker_error",
@@ -1053,42 +1117,75 @@ impl Client {
                     message.clone(),
                 )));
             }
-            return Err(message);
-        }
-        let bytes = packet::publish(
-            self.version(),
-            &packet::Out {
-                topic: &m.topic,
-                payload: &m.payload,
-                qos: m.qos,
-                retain: m.retain,
-                dup: false,
-                packet_id: mid,
-                expiry,
-            },
-        );
+            Err(message)
+        };
         if m.qos == 0 {
+            let mid = self.bump_mid();
+            tracing::debug!(
+                "Transmitting{} message on {}: '{}', mid: {mid}, qos: 0",
+                if m.retain { " retained" } else { "" },
+                m.topic,
+                String::from_utf8_lossy(&m.payload),
+            );
+            if !self.connected {
+                return fail(reply, "The client is not currently connected.");
+            }
+            let bytes = packet::publish(
+                self.version(),
+                &packet::Out {
+                    topic: &m.topic,
+                    payload: &m.payload,
+                    qos: 0,
+                    retain: m.retain,
+                    dup: false,
+                    packet_id: mid,
+                    expiry,
+                },
+            );
             self.send(&bytes).await;
             if let Some(reply) = reply {
                 let _ = reply.send(Ok(()));
             }
             return Ok(());
         }
-        // Kept before it is sent: a connection lost on the way sends it
-        // again.
+        // paho's `MQTT_ERR_QUEUE_SIZE`: its packet id is taken (every one
+        // is), or the kept messages are as large as they may be.
+        let size = m.topic.len() + m.payload.len();
+        if self.outbound_bytes + size > OUTBOUND_BYTES {
+            return fail(reply, "Message queue full.");
+        }
+        let Some(mid) = self.take_mid() else {
+            return fail(reply, "Message queue full.");
+        };
+        tracing::debug!(
+            "Transmitting{} message on {}: '{}', mid: {mid}, qos: {}",
+            if m.retain { " retained" } else { "" },
+            m.topic,
+            String::from_utf8_lossy(&m.payload),
+            m.qos
+        );
+        self.outbound_bytes += size;
+        // Kept until the broker has it: sent now if fewer than the limit
+        // are unacknowledged, else when one is; a connection lost on the
+        // way sends it again. paho keeps one published while disconnected
+        // too, and answers that it isn't connected.
+        let (reply, refused) = match self.connected {
+            true => (reply, None),
+            false => (None, reply),
+        };
         self.outbound.push(Out {
             mid,
             message: m.clone(),
             expiry,
-            stage: match m.qos {
-                1 => Stage::WaitPubAck,
-                _ => Stage::WaitPubRec,
-            },
+            stage: Stage::Unsent,
             dup: false,
             deadline: reply.as_ref().map(|_| Instant::now() + TIMEOUT_ACK),
             reply,
         });
-        self.send(&bytes).await;
+        if !self.connected {
+            return fail(refused, "The client is not currently connected.");
+        }
+        self.fill().await;
         Ok(())
     }
 
@@ -1192,7 +1289,10 @@ impl Client {
         }
         let v = self.version();
         for (topic, qos, id) in wild {
-            let mid = self.next_mid();
+            let Some(mid) = self.ack_mid() else {
+                tracing::error!("Error talking to MQTT: Message queue full");
+                return;
+            };
             let bytes = packet::subscribe(
                 v,
                 mid,
@@ -1206,7 +1306,10 @@ impl Client {
             }
         }
         for chunk in pending.chunks(MAX_SUBSCRIBES_PER_CALL) {
-            let mid = self.next_mid();
+            let Some(mid) = self.ack_mid() else {
+                tracing::error!("Error talking to MQTT: Message queue full");
+                return;
+            };
             let topics: Vec<(&str, u8)> = chunk.iter().map(|(t, q)| (t.as_str(), *q)).collect();
             let bytes = packet::subscribe(v, mid, &topics, self.identifiers.then_some(1));
             tracing::debug!("Subscribing with mid: {mid} to topics with qos: {topics:?}");
@@ -1266,7 +1369,10 @@ impl Client {
         let topics = std::mem::take(&mut self.unsubscribing);
         let v = self.version();
         for chunk in topics.chunks(MAX_SUBSCRIBES_PER_CALL) {
-            let mid = self.next_mid();
+            let Some(mid) = self.ack_mid() else {
+                tracing::error!("Error talking to MQTT: Message queue full");
+                break;
+            };
             let list: Vec<&str> = chunk.iter().map(SmolStr::as_str).collect();
             let bytes = packet::unsubscribe(v, mid, &list);
             if !self.send(&bytes).await {
@@ -3026,6 +3132,7 @@ mod unit {
         let config = Config::of(entry.as_object().unwrap()).unwrap();
         let mut client = Client::new(hass, components, Arc::new(config), tcp());
         client.mid = 65534;
+        client.in_use.extend([65535, 1]);
         for mid in [65535, 1] {
             client.outbound.push(Out {
                 mid,
@@ -3042,7 +3149,10 @@ mod unit {
                 deadline: None,
             });
         }
-        assert_eq!(client.next_mid(), 2);
+        assert_eq!(client.take_mid(), Some(2));
+        // Every one taken: none, at once.
+        client.in_use.extend(1..=65535);
+        assert_eq!(client.take_mid(), None);
     }
 
     fn client() -> Client {
@@ -3072,6 +3182,52 @@ mod unit {
             client
                 .set_timer(Duration::from_secs(101 * year), Timer::Expire(0))
                 .is_none()
+        );
+    }
+
+    /// A `SUBSCRIBE`'s packet id stays taken until its `SUBACK` (or the
+    /// connection's end): after a wrap a publish doesn't take it.
+    #[tokio::test]
+    async fn subscribe_ids_stay_taken_until_acknowledged() {
+        let (ours, _theirs) = tokio::io::duplex(1 << 16);
+        let slot = Arc::new(parking_lot::Mutex::new(Some(ours)));
+        let dial: Dial = Arc::new(move |_, _| {
+            let stream = slot.lock().take();
+            Box::pin(async move { Ok(Box::new(stream.unwrap()) as Box<dyn Stream>) })
+        });
+        let mut client = client();
+        client.dial = dial;
+        client.connect().await;
+        client.connected = true;
+        client.subscribe("a/+", 0, Owner::Discovery);
+        client.perform_subscriptions().await;
+        assert_eq!(client.mid, 1);
+        client.mid = 65535;
+        assert_eq!(client.take_mid(), Some(2));
+        // Its `SUBACK` frees it.
+        client.packet(Incoming::SubAck(1)).await;
+        client.mid = 65535;
+        assert_eq!(client.take_mid(), Some(1));
+    }
+
+    /// Every packet id taken: a QoS 1 publish fails as paho's does
+    /// (`MQTT_ERR_QUEUE_SIZE`), at once.
+    #[tokio::test]
+    async fn a_publish_with_every_packet_id_taken_fails() {
+        let mut client = client();
+        client.connected = true;
+        client.in_use.extend(1..=65535);
+        let (tx, rx) = oneshot::channel();
+        let m = Message {
+            topic: "t".into(),
+            payload: Vec::new(),
+            qos: 1,
+            retain: false,
+        };
+        assert!(client.publish(&m, None, Some(tx)).await.is_err());
+        assert_eq!(
+            rx.await.unwrap().unwrap_err().to_string(),
+            "Error talking to MQTT: Message queue full"
         );
     }
 

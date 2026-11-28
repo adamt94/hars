@@ -198,6 +198,10 @@ struct BrokerState {
     down: bool,
     /// Take `PUBLISH`es without acknowledging them.
     no_ack: bool,
+    /// Take `SUBSCRIBE`s without acknowledging them.
+    no_suback: bool,
+    /// MQTT 5's `Receive Maximum` in the `CONNACK`.
+    receive_maximum: Option<u16>,
 }
 
 #[derive(Clone)]
@@ -293,11 +297,12 @@ impl BrokerState {
                     send(self, vec![0x20, 2, 0, code]);
                     return false;
                 }
+                let max = self.receive_maximum.unwrap_or(20).to_be_bytes();
                 let body = match self.conns[c].v5 {
                     // Properties as `mqtt.py`'s broker sends them.
                     true => vec![
-                        0, 0, 16, 0x22, 0, 10, 0x21, 0, 20, 0x25, 1, 0x24, 2, 0x28, 1, 0x29, 1,
-                        0x2A, 1,
+                        0, 0, 16, 0x22, 0, 10, 0x21, max[0], max[1], 0x25, 1, 0x24, 2, 0x28, 1,
+                        0x29, 1, 0x2A, 1,
                     ],
                     false => vec![0, 0],
                 };
@@ -332,7 +337,9 @@ impl BrokerState {
                 let mut out = vec![0x90];
                 put_varint(&mut out, body.len());
                 out.extend(body);
-                send(self, out);
+                if !self.no_suback {
+                    send(self, out);
+                }
                 for (t, q) in &topics {
                     self.conns[c].subs.retain(|s| s.0 != *t);
                     self.conns[c].subs.push((t.clone(), *q, id));
@@ -1685,4 +1692,111 @@ async fn an_oversized_qos_2_message_is_refused_from_its_header() {
     tokio::time::sleep(Duration::from_secs(11)).await;
     let dials = r.dials.lock().clone();
     assert_eq!(dials.len(), 2, "{dials:?}");
+}
+
+async fn call(r: &Running, data: Value) -> Result<(), String> {
+    r.hass
+        .call_service(
+            "mqtt",
+            "publish",
+            data.as_object().unwrap().clone(),
+            None,
+            false,
+            None,
+        )
+        .await
+        .map(drop)
+        .map_err(|e| e.to_string())
+}
+
+/// QoS 1 and 2 messages kept through an outage are bounded by their
+/// bytes: past 16 MiB a publish fails as paho's does when its queue is
+/// full (`MQTT_ERR_QUEUE_SIZE`). (Every packet id taken fails the same
+/// way: `client.rs`'s `a_publish_with_every_packet_id_taken_fails`.)
+#[tokio::test(start_paused = true)]
+async fn kept_messages_bytes_are_bounded() {
+    let broker = Broker::start(true).await;
+    broker.state.lock().down = true;
+    let r = start(
+        &broker,
+        json!({"broker": "127.0.0.1", "port": 1883, "protocol": "5", "discovery": false}),
+    )
+    .await;
+    let big = "x".repeat(1 << 20);
+    for _ in 0..15 {
+        assert!(
+            call(&r, json!({"topic": "a", "payload": big, "qos": 1}))
+                .await
+                .unwrap_err()
+                .contains("not currently connected")
+        );
+    }
+    assert_eq!(
+        call(&r, json!({"topic": "a", "payload": big, "qos": 1})).await,
+        Err("Error talking to MQTT: Message queue full".into())
+    );
+}
+
+/// At most 20 QoS 1 and 2 messages are unacknowledged at once (paho's
+/// `max_inflight_messages`, which HA keeps), or fewer if an MQTT 5 broker's
+/// `Receive Maximum` says so; the rest go as acknowledgements come, the
+/// ones kept through an outage too.
+#[tokio::test(start_paused = true)]
+async fn messages_in_flight_are_limited() {
+    // A 3.1.1 broker: HA's try at MQTT 5 is refused.
+    let broker = Broker::start(false).await;
+    let r = start(
+        &broker,
+        json!({"broker": "127.0.0.1", "port": 1883, "protocol": "3.1.1", "discovery": false}),
+    )
+    .await;
+    tokio::time::sleep(Duration::from_secs(6)).await;
+    broker.take();
+    broker.state.lock().no_ack = true;
+    for i in 0..25 {
+        drop(publish_call(
+            &r,
+            json!({"topic": format!("t{i}"), "qos": 1}),
+        ));
+    }
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    let sent = broker.take();
+    assert_eq!(sent.len(), 20);
+    let (conn, id) = (sent[0].0, sent[0].1["packet_id"].as_u64().unwrap() as u16);
+    let _ =
+        broker.state.lock().conns[conn]
+            .write
+            .send(Some(vec![0x40, 2, (id >> 8) as u8, id as u8]));
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    let sent = broker.take();
+    assert_eq!(sent.len(), 1);
+    assert_eq!(sent[0].1["topic"], "t20");
+
+    // MQTT 5, a broker that takes one at a time, two kept through an outage.
+    let broker = Broker::start(true).await;
+    broker.state.lock().receive_maximum = Some(1);
+    broker.state.lock().down = true;
+    let r = start(
+        &broker,
+        json!({"broker": "127.0.0.1", "port": 1883, "protocol": "5", "discovery": false}),
+    )
+    .await;
+    for t in ["a", "b"] {
+        let _ = call(&r, json!({"topic": t, "qos": 1})).await;
+    }
+    broker.state.lock().no_ack = true;
+    broker.state.lock().down = false;
+    tokio::time::sleep(Duration::from_secs(11)).await;
+    let publishes = |sent: Vec<(usize, Value)>| -> Vec<Value> {
+        sent.into_iter()
+            .filter(|(_, p)| p["type"] == "PUBLISH")
+            .map(|(_, p)| p["topic"].clone())
+            .collect()
+    };
+    assert_eq!(publishes(broker.take()), [json!("a")]);
+    let _ = broker.state.lock().conns[0]
+        .write
+        .send(Some(vec![0x40, 2, 0, 1]));
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    assert_eq!(publishes(broker.take()), [json!("b")]);
 }
