@@ -745,6 +745,42 @@ impl ConfigEntries {
         true
     }
 
+    /// `async_update_entry` with whatever `change` makes of the entry
+    /// (`true` if it changed it): `modified_at` moves and the save is
+    /// scheduled. `false` for no change (or no such entry).
+    pub fn update(
+        &self,
+        entry_id: &str,
+        change: impl FnOnce(&mut Map<String, Value>) -> bool,
+    ) -> bool {
+        #[cfg(test)]
+        tests::before_write();
+        let mut listeners = self.listeners.lock();
+        {
+            let mut guard = self.entries.write();
+            let Some(entry) = guard
+                .iter_mut()
+                .flatten()
+                .find(|e| e.get("entry_id").and_then(Value::as_str) == Some(entry_id))
+            else {
+                return false;
+            };
+            if !change(entry) {
+                return false;
+            }
+            entry.insert(
+                "modified_at".into(),
+                Value::String(ha_core::isoformat(self.hass.clock().now())),
+            );
+            self.bump(entry_id);
+        }
+        self.schedule();
+        if let Some(entry) = self.get(entry_id) {
+            tell(&mut listeners, Change::Updated, &entry);
+        }
+        true
+    }
+
     /// Write what's pending (at stop).
     pub async fn flush(&self) {
         if let Some(save) = &self.save {

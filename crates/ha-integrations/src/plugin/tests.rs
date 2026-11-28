@@ -841,6 +841,7 @@ async fn entity_store_guards_foreign_devices_duplicates_and_attribute_growth() {
         sw_version: None,
         via_device: None,
         suggested_area: None,
+        ..Default::default()
     });
 
     let components = Components::new(&hass, registry.clone(), Profiles::default());

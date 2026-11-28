@@ -617,9 +617,11 @@ fn primary_config_entries_as_ha() {
             device("c", "gone-entry"),
         ];
     });
+    // A "primary" device info (more than identifiers), as `mobile_app`'s.
     let info = |id: &str| DeviceInfo {
         config_entry_id: ENTRY.into(),
         identifiers: vec![json!(["mobile_app", id])],
+        manufacturer: Some("Apple".into()),
         ..Default::default()
     };
     // Without knowing the entries, an existing primary stays.
@@ -1621,4 +1623,65 @@ fn asking_for_rows_that_match_copies_and_publishes_nothing() {
         Some("Reading lamp")
     );
     assert!(events.try_recv().is_ok());
+}
+
+/// HA's device info types (`DEVICE_INFO_TYPES`), as MQTT's discovery
+/// makes them (`vectors/v5.json` and `v311.json` in `ha-integrations`'
+/// `mqtt`): identifiers alone are a "link", which makes no entry primary
+/// and names nothing; anything more is "primary", and a new device that
+/// has no name is named after the entry. And `remove_device_entry`: the
+/// device goes with its last entry.
+#[test]
+fn link_and_primary_device_infos() {
+    let hass = Hass::new();
+    let reg = Registry::in_memory(&hass, Registries::default());
+    let link = reg.get_or_create_device(DeviceInfo {
+        config_entry_id: "mqtt".into(),
+        identifiers: vec![json!(["mqtt", "A1B2C3"])],
+        entry_title: Some("127.0.0.1".into()),
+        ..Default::default()
+    });
+    assert_eq!(link.primary_config_entry, None);
+    assert_eq!(link.name, None);
+    assert_eq!(link.config_entries, ["mqtt"]);
+    let primary = reg.get_or_create_device(DeviceInfo {
+        config_entry_id: "mqtt".into(),
+        identifiers: vec![json!(["mqtt", "x"])],
+        manufacturer: Some("Acme".into()),
+        hw_version: Some("rev2".into()),
+        serial_number: Some("WS01-0001".into()),
+        configuration_url: Some("http://192.0.2.20/".into()),
+        entry_title: Some("127.0.0.1".into()),
+        ..Default::default()
+    });
+    assert_eq!(primary.primary_config_entry.as_deref(), Some("mqtt"));
+    assert_eq!(primary.name.as_deref(), Some("127.0.0.1"));
+    assert_eq!(primary.hw_version.as_deref(), Some("rev2"));
+    assert_eq!(primary.serial_number.as_deref(), Some("WS01-0001"));
+    assert_eq!(
+        primary.configuration_url.as_deref(),
+        Some("http://192.0.2.20/")
+    );
+    // A row's `suggested_object_id` is its id, without the device's name.
+    let row = reg.get_or_create_entity(
+        "sensor",
+        "mqtt",
+        "u",
+        None,
+        EntityPatch {
+            device_id: Some(Some(primary.id.clone())),
+            has_entity_name: Some(true),
+            object_id_base: Some(Some("Temperature".into())),
+            suggested_object_id: Some(Some("living_room_temperature".into())),
+            ..Default::default()
+        },
+    );
+    assert_eq!(row.entity_id, "sensor.living_room_temperature");
+    assert_eq!(
+        row.suggested_object_id.as_deref(),
+        Some("living_room_temperature")
+    );
+    reg.remove_device_entry(&link.id, "mqtt");
+    assert!(!reg.snapshot().devices.iter().any(|d| d.id == link.id));
+    assert!(reg.snapshot().devices.iter().any(|d| d.id == primary.id));
 }

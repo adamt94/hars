@@ -1,0 +1,5299 @@
+{
+ "entry": {
+  "data": {
+   "broker": "127.0.0.1",
+   "port": "<port>",
+   "username": "hars",
+   "password": "fake-password",
+   "protocol": "5"
+  },
+  "options": {},
+  "version": 2,
+  "minor_version": 1,
+  "title": "127.0.0.1"
+ },
+ "retained_before": [
+  {
+   "do": "publish",
+   "topic": "homeassistant/binary_sensor/1221051039810110150109113116116_0x00124b00a1b2c3d4/connection_state/config",
+   "payload": "{\"device\":{\"hw_version\":\"zStack3x0 20240710\",\"identifiers\":[\"zigbee2mqtt_bridge_0x00124b00a1b2c3d4\"],\"manufacturer\":\"Zigbee2MQTT\",\"model\":\"Bridge\",\"name\":\"Zigbee2MQTT Bridge\",\"sw_version\":\"2.6.3\",\"configuration_url\":\"http://192.0.2.20:8080/#/settings\"},\"origin\":{\"name\":\"Zigbee2MQTT\",\"sw\":\"2.6.3\",\"url\":\"https://www.zigbee2mqtt.io\"},\"device_class\":\"connectivity\",\"entity_category\":\"diagnostic\",\"name\":\"Connection state\",\"payload_on\":\"online\",\"payload_off\":\"offline\",\"state_topic\":\"zigbee2mqtt/bridge/state\",\"value_template\":\"{{ value_json.state }}\",\"unique_id\":\"bridge_0x00124b00a1b2c3d4_connection_state_zigbee2mqtt\",\"default_entity_id\":\"binary_sensor.zigbee2mqtt_bridge_connection_state\"}",
+   "retain": true,
+   "qos": 0
+  },
+  {
+   "do": "publish",
+   "topic": "homeassistant/sensor/0x00158d00a1b2c3e5/temperature/config",
+   "payload": "{\"availability\":[{\"topic\":\"zigbee2mqtt/bridge/state\",\"value_template\":\"{{ value_json.state }}\"},{\"topic\":\"zigbee2mqtt/Living room sensor/availability\",\"value_template\":\"{{ value_json.state }}\"}],\"availability_mode\":\"all\",\"device\":{\"identifiers\":[\"zigbee2mqtt_0x00158d00a1b2c3e5\"],\"manufacturer\":\"Aqara\",\"model\":\"Temperature and humidity sensor\",\"model_id\":\"WSDCGQ11LM\",\"name\":\"Living room sensor\",\"sw_version\":\"3000-0001\",\"via_device\":\"zigbee2mqtt_bridge_0x00124b00a1b2c3d4\"},\"origin\":{\"name\":\"Zigbee2MQTT\",\"sw\":\"2.6.3\",\"url\":\"https://www.zigbee2mqtt.io\"},\"state_topic\":\"zigbee2mqtt/Living room sensor\",\"unique_id\":\"0x00158d00a1b2c3e5_temperature_zigbee2mqtt\",\"value_template\":\"{{ value_json.temperature }}\",\"device_class\":\"temperature\",\"enabled_by_default\":true,\"state_class\":\"measurement\",\"unit_of_measurement\":\"°C\",\"default_entity_id\":\"sensor.living_room_sensor_temperature\"}",
+   "retain": true,
+   "qos": 0
+  },
+  {
+   "do": "publish",
+   "topic": "homeassistant/sensor/0x00158d00a1b2c3e5/humidity/config",
+   "payload": "{\"availability\":[{\"topic\":\"zigbee2mqtt/bridge/state\",\"value_template\":\"{{ value_json.state }}\"},{\"topic\":\"zigbee2mqtt/Living room sensor/availability\",\"value_template\":\"{{ value_json.state }}\"}],\"availability_mode\":\"all\",\"device\":{\"identifiers\":[\"zigbee2mqtt_0x00158d00a1b2c3e5\"],\"manufacturer\":\"Aqara\",\"model\":\"Temperature and humidity sensor\",\"model_id\":\"WSDCGQ11LM\",\"name\":\"Living room sensor\",\"sw_version\":\"3000-0001\",\"via_device\":\"zigbee2mqtt_bridge_0x00124b00a1b2c3d4\"},\"origin\":{\"name\":\"Zigbee2MQTT\",\"sw\":\"2.6.3\",\"url\":\"https://www.zigbee2mqtt.io\"},\"state_topic\":\"zigbee2mqtt/Living room sensor\",\"unique_id\":\"0x00158d00a1b2c3e5_humidity_zigbee2mqtt\",\"value_template\":\"{{ value_json.humidity }}\",\"device_class\":\"humidity\",\"enabled_by_default\":true,\"state_class\":\"measurement\",\"unit_of_measurement\":\"%\"}",
+   "retain": true,
+   "qos": 0
+  },
+  {
+   "do": "publish",
+   "topic": "homeassistant/sensor/0x00158d00a1b2c3e5/pressure/config",
+   "payload": "{\"availability\":[{\"topic\":\"zigbee2mqtt/bridge/state\",\"value_template\":\"{{ value_json.state }}\"},{\"topic\":\"zigbee2mqtt/Living room sensor/availability\",\"value_template\":\"{{ value_json.state }}\"}],\"availability_mode\":\"all\",\"device\":{\"identifiers\":[\"zigbee2mqtt_0x00158d00a1b2c3e5\"],\"manufacturer\":\"Aqara\",\"model\":\"Temperature and humidity sensor\",\"model_id\":\"WSDCGQ11LM\",\"name\":\"Living room sensor\",\"sw_version\":\"3000-0001\",\"via_device\":\"zigbee2mqtt_bridge_0x00124b00a1b2c3d4\"},\"origin\":{\"name\":\"Zigbee2MQTT\",\"sw\":\"2.6.3\",\"url\":\"https://www.zigbee2mqtt.io\"},\"state_topic\":\"zigbee2mqtt/Living room sensor\",\"unique_id\":\"0x00158d00a1b2c3e5_pressure_zigbee2mqtt\",\"value_template\":\"{{ value_json.pressure }}\",\"device_class\":\"atmospheric_pressure\",\"enabled_by_default\":true,\"state_class\":\"measurement\",\"unit_of_measurement\":\"hPa\"}",
+   "retain": true,
+   "qos": 0
+  },
+  {
+   "do": "publish",
+   "topic": "homeassistant/sensor/0x00158d00a1b2c3e5/battery/config",
+   "payload": "{\"availability\":[{\"topic\":\"zigbee2mqtt/bridge/state\",\"value_template\":\"{{ value_json.state }}\"},{\"topic\":\"zigbee2mqtt/Living room sensor/availability\",\"value_template\":\"{{ value_json.state }}\"}],\"availability_mode\":\"all\",\"device\":{\"identifiers\":[\"zigbee2mqtt_0x00158d00a1b2c3e5\"],\"manufacturer\":\"Aqara\",\"model\":\"Temperature and humidity sensor\",\"model_id\":\"WSDCGQ11LM\",\"name\":\"Living room sensor\",\"sw_version\":\"3000-0001\",\"via_device\":\"zigbee2mqtt_bridge_0x00124b00a1b2c3d4\"},\"origin\":{\"name\":\"Zigbee2MQTT\",\"sw\":\"2.6.3\",\"url\":\"https://www.zigbee2mqtt.io\"},\"state_topic\":\"zigbee2mqtt/Living room sensor\",\"unique_id\":\"0x00158d00a1b2c3e5_battery_zigbee2mqtt\",\"value_template\":\"{{ value_json.battery }}\",\"device_class\":\"battery\",\"enabled_by_default\":true,\"entity_category\":\"diagnostic\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"%\"}",
+   "retain": true,
+   "qos": 0
+  },
+  {
+   "do": "publish",
+   "topic": "homeassistant/sensor/0x00158d00a1b2c3e5/voltage/config",
+   "payload": "{\"availability\":[{\"topic\":\"zigbee2mqtt/bridge/state\",\"value_template\":\"{{ value_json.state }}\"},{\"topic\":\"zigbee2mqtt/Living room sensor/availability\",\"value_template\":\"{{ value_json.state }}\"}],\"availability_mode\":\"all\",\"device\":{\"identifiers\":[\"zigbee2mqtt_0x00158d00a1b2c3e5\"],\"manufacturer\":\"Aqara\",\"model\":\"Temperature and humidity sensor\",\"model_id\":\"WSDCGQ11LM\",\"name\":\"Living room sensor\",\"sw_version\":\"3000-0001\",\"via_device\":\"zigbee2mqtt_bridge_0x00124b00a1b2c3d4\"},\"origin\":{\"name\":\"Zigbee2MQTT\",\"sw\":\"2.6.3\",\"url\":\"https://www.zigbee2mqtt.io\"},\"state_topic\":\"zigbee2mqtt/Living room sensor\",\"unique_id\":\"0x00158d00a1b2c3e5_voltage_zigbee2mqtt\",\"value_template\":\"{{ value_json.voltage }}\",\"device_class\":\"voltage\",\"enabled_by_default\":false,\"entity_category\":\"diagnostic\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"mV\"}",
+   "retain": true,
+   "qos": 0
+  },
+  {
+   "do": "publish",
+   "topic": "homeassistant/sensor/0x00158d00a1b2c3e5/linkquality/config",
+   "payload": "{\"availability\":[{\"topic\":\"zigbee2mqtt/bridge/state\",\"value_template\":\"{{ value_json.state }}\"},{\"topic\":\"zigbee2mqtt/Living room sensor/availability\",\"value_template\":\"{{ value_json.state }}\"}],\"availability_mode\":\"all\",\"device\":{\"identifiers\":[\"zigbee2mqtt_0x00158d00a1b2c3e5\"],\"manufacturer\":\"Aqara\",\"model\":\"Temperature and humidity sensor\",\"model_id\":\"WSDCGQ11LM\",\"name\":\"Living room sensor\",\"sw_version\":\"3000-0001\",\"via_device\":\"zigbee2mqtt_bridge_0x00124b00a1b2c3d4\"},\"origin\":{\"name\":\"Zigbee2MQTT\",\"sw\":\"2.6.3\",\"url\":\"https://www.zigbee2mqtt.io\"},\"state_topic\":\"zigbee2mqtt/Living room sensor\",\"unique_id\":\"0x00158d00a1b2c3e5_linkquality_zigbee2mqtt\",\"value_template\":\"{{ value_json.linkquality }}\",\"enabled_by_default\":false,\"entity_category\":\"diagnostic\",\"icon\":\"mdi:signal\",\"name\":\"Linkquality\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"lqi\"}",
+   "retain": true,
+   "qos": 0
+  },
+  {
+   "do": "publish",
+   "topic": "homeassistant/binary_sensor/0x00158d00a1b2c3f6/contact/config",
+   "payload": "{\"availability\":[{\"topic\":\"zigbee2mqtt/bridge/state\",\"value_template\":\"{{ value_json.state }}\"},{\"topic\":\"zigbee2mqtt/Front door/availability\",\"value_template\":\"{{ value_json.state }}\"}],\"availability_mode\":\"all\",\"device\":{\"identifiers\":[\"zigbee2mqtt_0x00158d00a1b2c3f6\"],\"manufacturer\":\"Aqara\",\"model\":\"Door and window sensor\",\"model_id\":\"MCCGQ11LM\",\"name\":\"Front door\",\"sw_version\":\"3000-0001\",\"via_device\":\"zigbee2mqtt_bridge_0x00124b00a1b2c3d4\"},\"origin\":{\"name\":\"Zigbee2MQTT\",\"sw\":\"2.6.3\",\"url\":\"https://www.zigbee2mqtt.io\"},\"state_topic\":\"zigbee2mqtt/Front door\",\"unique_id\":\"0x00158d00a1b2c3f6_contact_zigbee2mqtt\",\"value_template\":\"{{ value_json.contact }}\",\"device_class\":\"door\",\"payload_off\":true,\"payload_on\":false}",
+   "retain": true,
+   "qos": 0
+  },
+  {
+   "do": "publish",
+   "topic": "homeassistant/sensor/0x00158d00a1b2c3f6/battery/config",
+   "payload": "{\"availability\":[{\"topic\":\"zigbee2mqtt/bridge/state\",\"value_template\":\"{{ value_json.state }}\"},{\"topic\":\"zigbee2mqtt/Front door/availability\",\"value_template\":\"{{ value_json.state }}\"}],\"availability_mode\":\"all\",\"device\":{\"identifiers\":[\"zigbee2mqtt_0x00158d00a1b2c3f6\"],\"manufacturer\":\"Aqara\",\"model\":\"Door and window sensor\",\"model_id\":\"MCCGQ11LM\",\"name\":\"Front door\",\"sw_version\":\"3000-0001\",\"via_device\":\"zigbee2mqtt_bridge_0x00124b00a1b2c3d4\"},\"origin\":{\"name\":\"Zigbee2MQTT\",\"sw\":\"2.6.3\",\"url\":\"https://www.zigbee2mqtt.io\"},\"state_topic\":\"zigbee2mqtt/Front door\",\"unique_id\":\"0x00158d00a1b2c3f6_battery_zigbee2mqtt\",\"value_template\":\"{{ value_json.battery }}\",\"device_class\":\"battery\",\"enabled_by_default\":true,\"entity_category\":\"diagnostic\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"%\"}",
+   "retain": true,
+   "qos": 0
+  },
+  {
+   "do": "publish",
+   "topic": "homeassistant/sensor/A1B2C3_status/config",
+   "payload": "{\"name\":\"Tasmota status\",\"stat_t\":\"tele/tasmota_A1B2C3/HASS_STATE\",\"avty_t\":\"tele/tasmota_A1B2C3/LWT\",\"pl_avail\":\"Online\",\"pl_not_avail\":\"Offline\",\"json_attr_t\":\"tele/tasmota_A1B2C3/HASS_STATE\",\"unit_of_meas\":\"%\",\"val_tpl\":\"{{value_json['RSSI']}}\",\"ic\":\"mdi:information-outline\",\"uniq_id\":\"A1B2C3_status\",\"dev\":{\"ids\":[\"A1B2C3\"],\"name\":\"Tasmota\",\"mdl\":\"Sonoff Basic\",\"sw\":\"9.1.0(tasmota)\",\"mf\":\"Tasmota\",\"cns\":[[\"mac\",\"02:00:00:A1:B2:C3\"]]}}",
+   "retain": true,
+   "qos": 0
+  },
+  {
+   "do": "publish",
+   "topic": "homeassistant/sensor/A1B2C3_DS18B20_Temperature/config",
+   "payload": "{\"name\":\"Tasmota DS18B20 Temperature\",\"stat_t\":\"tele/tasmota_A1B2C3/SENSOR\",\"avty_t\":\"tele/tasmota_A1B2C3/LWT\",\"pl_avail\":\"Online\",\"pl_not_avail\":\"Offline\",\"uniq_id\":\"A1B2C3_DS18B20_Temperature\",\"dev\":{\"ids\":[\"A1B2C3\"]},\"unit_of_meas\":\"°C\",\"dev_cla\":\"temperature\",\"frc_upd\":true,\"val_tpl\":\"{{value_json['DS18B20'].Temperature}}\"}",
+   "retain": true,
+   "qos": 0
+  },
+  {
+   "do": "publish",
+   "topic": "zigbee2mqtt/bridge/state",
+   "payload": "{\"state\":\"online\"}",
+   "retain": true,
+   "qos": 0
+  },
+  {
+   "do": "publish",
+   "topic": "zigbee2mqtt/Living room sensor/availability",
+   "payload": "{\"state\":\"online\"}",
+   "retain": true,
+   "qos": 0
+  },
+  {
+   "do": "publish",
+   "topic": "zigbee2mqtt/Front door/availability",
+   "payload": "{\"state\":\"online\"}",
+   "retain": true,
+   "qos": 0
+  },
+  {
+   "do": "publish",
+   "topic": "tele/tasmota_A1B2C3/LWT",
+   "payload": "Online",
+   "retain": true,
+   "qos": 0
+  }
+ ],
+ "steps": [
+  {
+   "do": "setup",
+   "received": [],
+   "sent": [
+    {
+     "conn": 0,
+     "at": 2.2,
+     "packet": {
+      "type": "CONNECT",
+      "protocol": "MQTT",
+      "level": 5,
+      "clean": true,
+      "keepalive": 60,
+      "properties": {},
+      "client_id": "<random>",
+      "will": {
+       "qos": 0,
+       "retain": false,
+       "properties": {},
+       "topic": "homeassistant/status",
+       "payload": "offline"
+      },
+      "username": "hars",
+      "password": "fake-password"
+     }
+    }
+   ],
+   "states": {},
+   "log": [],
+   "entry_state": "loaded"
+  },
+  {
+   "do": "start",
+   "waited": 7,
+   "received": [
+    {
+     "conn": 0,
+     "topic": "homeassistant/sensor/A1B2C3_status/config",
+     "payload": "{\"name\":\"Tasmota status\",\"stat_t\":\"tele/tasmota_A1B2C3/HASS_STATE\",\"avty_t\":\"tele/tasmota_A1B2C3/LWT\",\"pl_avail\":\"Online\",\"pl_not_avail\":\"Offline\",\"json_attr_t\":\"tele/tasmota_A1B2C3/HASS_STATE\",\"unit_of_meas\":\"%\",\"val_tpl\":\"{{value_json['RSSI']}}\",\"ic\":\"mdi:information-outline\",\"uniq_id\":\"A1B2C3_status\",\"dev\":{\"ids\":[\"A1B2C3\"],\"name\":\"Tasmota\",\"mdl\":\"Sonoff Basic\",\"sw\":\"9.1.0(tasmota)\",\"mf\":\"Tasmota\",\"cns\":[[\"mac\",\"02:00:00:A1:B2:C3\"]]}}",
+     "qos": 0,
+     "retain": true,
+     "ids": [
+      24
+     ]
+    },
+    {
+     "conn": 0,
+     "topic": "homeassistant/sensor/A1B2C3_DS18B20_Temperature/config",
+     "payload": "{\"name\":\"Tasmota DS18B20 Temperature\",\"stat_t\":\"tele/tasmota_A1B2C3/SENSOR\",\"avty_t\":\"tele/tasmota_A1B2C3/LWT\",\"pl_avail\":\"Online\",\"pl_not_avail\":\"Offline\",\"uniq_id\":\"A1B2C3_DS18B20_Temperature\",\"dev\":{\"ids\":[\"A1B2C3\"]},\"unit_of_meas\":\"°C\",\"dev_cla\":\"temperature\",\"frc_upd\":true,\"val_tpl\":\"{{value_json['DS18B20'].Temperature}}\"}",
+     "qos": 0,
+     "retain": true,
+     "ids": [
+      24
+     ]
+    },
+    {
+     "conn": 0,
+     "topic": "homeassistant/binary_sensor/1221051039810110150109113116116_0x00124b00a1b2c3d4/connection_state/config",
+     "payload": "{\"device\":{\"hw_version\":\"zStack3x0 20240710\",\"identifiers\":[\"zigbee2mqtt_bridge_0x00124b00a1b2c3d4\"],\"manufacturer\":\"Zigbee2MQTT\",\"model\":\"Bridge\",\"name\":\"Zigbee2MQTT Bridge\",\"sw_version\":\"2.6.3\",\"configuration_url\":\"http://192.0.2.20:8080/#/settings\"},\"origin\":{\"name\":\"Zigbee2MQTT\",\"sw\":\"2.6.3\",\"url\":\"https://www.zigbee2mqtt.io\"},\"device_class\":\"connectivity\",\"entity_category\":\"diagnostic\",\"name\":\"Connection state\",\"payload_on\":\"online\",\"payload_off\":\"offline\",\"state_topic\":\"zigbee2mqtt/bridge/state\",\"value_template\":\"{{ value_json.state }}\",\"unique_id\":\"bridge_0x00124b00a1b2c3d4_connection_state_zigbee2mqtt\",\"default_entity_id\":\"binary_sensor.zigbee2mqtt_bridge_connection_state\"}",
+     "qos": 0,
+     "retain": true,
+     "ids": [
+      34
+     ]
+    },
+    {
+     "conn": 0,
+     "topic": "homeassistant/binary_sensor/0x00158d00a1b2c3f6/contact/config",
+     "payload": "{\"availability\":[{\"topic\":\"zigbee2mqtt/bridge/state\",\"value_template\":\"{{ value_json.state }}\"},{\"topic\":\"zigbee2mqtt/Front door/availability\",\"value_template\":\"{{ value_json.state }}\"}],\"availability_mode\":\"all\",\"device\":{\"identifiers\":[\"zigbee2mqtt_0x00158d00a1b2c3f6\"],\"manufacturer\":\"Aqara\",\"model\":\"Door and window sensor\",\"model_id\":\"MCCGQ11LM\",\"name\":\"Front door\",\"sw_version\":\"3000-0001\",\"via_device\":\"zigbee2mqtt_bridge_0x00124b00a1b2c3d4\"},\"origin\":{\"name\":\"Zigbee2MQTT\",\"sw\":\"2.6.3\",\"url\":\"https://www.zigbee2mqtt.io\"},\"state_topic\":\"zigbee2mqtt/Front door\",\"unique_id\":\"0x00158d00a1b2c3f6_contact_zigbee2mqtt\",\"value_template\":\"{{ value_json.contact }}\",\"device_class\":\"door\",\"payload_off\":true,\"payload_on\":false}",
+     "qos": 0,
+     "retain": true,
+     "ids": [
+      34
+     ]
+    },
+    {
+     "conn": 0,
+     "topic": "homeassistant/sensor/0x00158d00a1b2c3e5/temperature/config",
+     "payload": "{\"availability\":[{\"topic\":\"zigbee2mqtt/bridge/state\",\"value_template\":\"{{ value_json.state }}\"},{\"topic\":\"zigbee2mqtt/Living room sensor/availability\",\"value_template\":\"{{ value_json.state }}\"}],\"availability_mode\":\"all\",\"device\":{\"identifiers\":[\"zigbee2mqtt_0x00158d00a1b2c3e5\"],\"manufacturer\":\"Aqara\",\"model\":\"Temperature and humidity sensor\",\"model_id\":\"WSDCGQ11LM\",\"name\":\"Living room sensor\",\"sw_version\":\"3000-0001\",\"via_device\":\"zigbee2mqtt_bridge_0x00124b00a1b2c3d4\"},\"origin\":{\"name\":\"Zigbee2MQTT\",\"sw\":\"2.6.3\",\"url\":\"https://www.zigbee2mqtt.io\"},\"state_topic\":\"zigbee2mqtt/Living room sensor\",\"unique_id\":\"0x00158d00a1b2c3e5_temperature_zigbee2mqtt\",\"value_template\":\"{{ value_json.temperature }}\",\"device_class\":\"temperature\",\"enabled_by_default\":true,\"state_class\":\"measurement\",\"unit_of_measurement\":\"°C\",\"default_entity_id\":\"sensor.living_room_sensor_temperature\"}",
+     "qos": 0,
+     "retain": true,
+     "ids": [
+      55
+     ]
+    },
+    {
+     "conn": 0,
+     "topic": "homeassistant/sensor/0x00158d00a1b2c3e5/humidity/config",
+     "payload": "{\"availability\":[{\"topic\":\"zigbee2mqtt/bridge/state\",\"value_template\":\"{{ value_json.state }}\"},{\"topic\":\"zigbee2mqtt/Living room sensor/availability\",\"value_template\":\"{{ value_json.state }}\"}],\"availability_mode\":\"all\",\"device\":{\"identifiers\":[\"zigbee2mqtt_0x00158d00a1b2c3e5\"],\"manufacturer\":\"Aqara\",\"model\":\"Temperature and humidity sensor\",\"model_id\":\"WSDCGQ11LM\",\"name\":\"Living room sensor\",\"sw_version\":\"3000-0001\",\"via_device\":\"zigbee2mqtt_bridge_0x00124b00a1b2c3d4\"},\"origin\":{\"name\":\"Zigbee2MQTT\",\"sw\":\"2.6.3\",\"url\":\"https://www.zigbee2mqtt.io\"},\"state_topic\":\"zigbee2mqtt/Living room sensor\",\"unique_id\":\"0x00158d00a1b2c3e5_humidity_zigbee2mqtt\",\"value_template\":\"{{ value_json.humidity }}\",\"device_class\":\"humidity\",\"enabled_by_default\":true,\"state_class\":\"measurement\",\"unit_of_measurement\":\"%\"}",
+     "qos": 0,
+     "retain": true,
+     "ids": [
+      55
+     ]
+    },
+    {
+     "conn": 0,
+     "topic": "homeassistant/sensor/0x00158d00a1b2c3e5/pressure/config",
+     "payload": "{\"availability\":[{\"topic\":\"zigbee2mqtt/bridge/state\",\"value_template\":\"{{ value_json.state }}\"},{\"topic\":\"zigbee2mqtt/Living room sensor/availability\",\"value_template\":\"{{ value_json.state }}\"}],\"availability_mode\":\"all\",\"device\":{\"identifiers\":[\"zigbee2mqtt_0x00158d00a1b2c3e5\"],\"manufacturer\":\"Aqara\",\"model\":\"Temperature and humidity sensor\",\"model_id\":\"WSDCGQ11LM\",\"name\":\"Living room sensor\",\"sw_version\":\"3000-0001\",\"via_device\":\"zigbee2mqtt_bridge_0x00124b00a1b2c3d4\"},\"origin\":{\"name\":\"Zigbee2MQTT\",\"sw\":\"2.6.3\",\"url\":\"https://www.zigbee2mqtt.io\"},\"state_topic\":\"zigbee2mqtt/Living room sensor\",\"unique_id\":\"0x00158d00a1b2c3e5_pressure_zigbee2mqtt\",\"value_template\":\"{{ value_json.pressure }}\",\"device_class\":\"atmospheric_pressure\",\"enabled_by_default\":true,\"state_class\":\"measurement\",\"unit_of_measurement\":\"hPa\"}",
+     "qos": 0,
+     "retain": true,
+     "ids": [
+      55
+     ]
+    },
+    {
+     "conn": 0,
+     "topic": "homeassistant/sensor/0x00158d00a1b2c3e5/battery/config",
+     "payload": "{\"availability\":[{\"topic\":\"zigbee2mqtt/bridge/state\",\"value_template\":\"{{ value_json.state }}\"},{\"topic\":\"zigbee2mqtt/Living room sensor/availability\",\"value_template\":\"{{ value_json.state }}\"}],\"availability_mode\":\"all\",\"device\":{\"identifiers\":[\"zigbee2mqtt_0x00158d00a1b2c3e5\"],\"manufacturer\":\"Aqara\",\"model\":\"Temperature and humidity sensor\",\"model_id\":\"WSDCGQ11LM\",\"name\":\"Living room sensor\",\"sw_version\":\"3000-0001\",\"via_device\":\"zigbee2mqtt_bridge_0x00124b00a1b2c3d4\"},\"origin\":{\"name\":\"Zigbee2MQTT\",\"sw\":\"2.6.3\",\"url\":\"https://www.zigbee2mqtt.io\"},\"state_topic\":\"zigbee2mqtt/Living room sensor\",\"unique_id\":\"0x00158d00a1b2c3e5_battery_zigbee2mqtt\",\"value_template\":\"{{ value_json.battery }}\",\"device_class\":\"battery\",\"enabled_by_default\":true,\"entity_category\":\"diagnostic\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"%\"}",
+     "qos": 0,
+     "retain": true,
+     "ids": [
+      55
+     ]
+    },
+    {
+     "conn": 0,
+     "topic": "homeassistant/sensor/0x00158d00a1b2c3e5/voltage/config",
+     "payload": "{\"availability\":[{\"topic\":\"zigbee2mqtt/bridge/state\",\"value_template\":\"{{ value_json.state }}\"},{\"topic\":\"zigbee2mqtt/Living room sensor/availability\",\"value_template\":\"{{ value_json.state }}\"}],\"availability_mode\":\"all\",\"device\":{\"identifiers\":[\"zigbee2mqtt_0x00158d00a1b2c3e5\"],\"manufacturer\":\"Aqara\",\"model\":\"Temperature and humidity sensor\",\"model_id\":\"WSDCGQ11LM\",\"name\":\"Living room sensor\",\"sw_version\":\"3000-0001\",\"via_device\":\"zigbee2mqtt_bridge_0x00124b00a1b2c3d4\"},\"origin\":{\"name\":\"Zigbee2MQTT\",\"sw\":\"2.6.3\",\"url\":\"https://www.zigbee2mqtt.io\"},\"state_topic\":\"zigbee2mqtt/Living room sensor\",\"unique_id\":\"0x00158d00a1b2c3e5_voltage_zigbee2mqtt\",\"value_template\":\"{{ value_json.voltage }}\",\"device_class\":\"voltage\",\"enabled_by_default\":false,\"entity_category\":\"diagnostic\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"mV\"}",
+     "qos": 0,
+     "retain": true,
+     "ids": [
+      55
+     ]
+    },
+    {
+     "conn": 0,
+     "topic": "homeassistant/sensor/0x00158d00a1b2c3e5/linkquality/config",
+     "payload": "{\"availability\":[{\"topic\":\"zigbee2mqtt/bridge/state\",\"value_template\":\"{{ value_json.state }}\"},{\"topic\":\"zigbee2mqtt/Living room sensor/availability\",\"value_template\":\"{{ value_json.state }}\"}],\"availability_mode\":\"all\",\"device\":{\"identifiers\":[\"zigbee2mqtt_0x00158d00a1b2c3e5\"],\"manufacturer\":\"Aqara\",\"model\":\"Temperature and humidity sensor\",\"model_id\":\"WSDCGQ11LM\",\"name\":\"Living room sensor\",\"sw_version\":\"3000-0001\",\"via_device\":\"zigbee2mqtt_bridge_0x00124b00a1b2c3d4\"},\"origin\":{\"name\":\"Zigbee2MQTT\",\"sw\":\"2.6.3\",\"url\":\"https://www.zigbee2mqtt.io\"},\"state_topic\":\"zigbee2mqtt/Living room sensor\",\"unique_id\":\"0x00158d00a1b2c3e5_linkquality_zigbee2mqtt\",\"value_template\":\"{{ value_json.linkquality }}\",\"enabled_by_default\":false,\"entity_category\":\"diagnostic\",\"icon\":\"mdi:signal\",\"name\":\"Linkquality\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"lqi\"}",
+     "qos": 0,
+     "retain": true,
+     "ids": [
+      55
+     ]
+    },
+    {
+     "conn": 0,
+     "topic": "homeassistant/sensor/0x00158d00a1b2c3f6/battery/config",
+     "payload": "{\"availability\":[{\"topic\":\"zigbee2mqtt/bridge/state\",\"value_template\":\"{{ value_json.state }}\"},{\"topic\":\"zigbee2mqtt/Front door/availability\",\"value_template\":\"{{ value_json.state }}\"}],\"availability_mode\":\"all\",\"device\":{\"identifiers\":[\"zigbee2mqtt_0x00158d00a1b2c3f6\"],\"manufacturer\":\"Aqara\",\"model\":\"Door and window sensor\",\"model_id\":\"MCCGQ11LM\",\"name\":\"Front door\",\"sw_version\":\"3000-0001\",\"via_device\":\"zigbee2mqtt_bridge_0x00124b00a1b2c3d4\"},\"origin\":{\"name\":\"Zigbee2MQTT\",\"sw\":\"2.6.3\",\"url\":\"https://www.zigbee2mqtt.io\"},\"state_topic\":\"zigbee2mqtt/Front door\",\"unique_id\":\"0x00158d00a1b2c3f6_battery_zigbee2mqtt\",\"value_template\":\"{{ value_json.battery }}\",\"device_class\":\"battery\",\"enabled_by_default\":true,\"entity_category\":\"diagnostic\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"%\"}",
+     "qos": 0,
+     "retain": true,
+     "ids": [
+      55
+     ]
+    },
+    {
+     "conn": 0,
+     "topic": "tele/tasmota_A1B2C3/LWT",
+     "payload": "Online",
+     "qos": 0,
+     "retain": true,
+     "ids": [
+      1
+     ]
+    },
+    {
+     "conn": 0,
+     "topic": "zigbee2mqtt/bridge/state",
+     "payload": "{\"state\":\"online\"}",
+     "qos": 0,
+     "retain": true,
+     "ids": [
+      1
+     ]
+    },
+    {
+     "conn": 0,
+     "topic": "zigbee2mqtt/Living room sensor/availability",
+     "payload": "{\"state\":\"online\"}",
+     "qos": 0,
+     "retain": true,
+     "ids": [
+      1
+     ]
+    },
+    {
+     "conn": 0,
+     "topic": "zigbee2mqtt/Front door/availability",
+     "payload": "{\"state\":\"online\"}",
+     "qos": 0,
+     "retain": true,
+     "ids": [
+      1
+     ]
+    }
+   ],
+   "sent": [
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 1,
+      "properties": {
+       "SubscriptionIdentifier": [
+        2
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/alarm_control_panel/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 2,
+      "properties": {
+       "SubscriptionIdentifier": [
+        3
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/binary_sensor/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 3,
+      "properties": {
+       "SubscriptionIdentifier": [
+        4
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/button/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 4,
+      "properties": {
+       "SubscriptionIdentifier": [
+        5
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/camera/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 5,
+      "properties": {
+       "SubscriptionIdentifier": [
+        6
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/climate/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 6,
+      "properties": {
+       "SubscriptionIdentifier": [
+        7
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/cover/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 7,
+      "properties": {
+       "SubscriptionIdentifier": [
+        8
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/date/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 8,
+      "properties": {
+       "SubscriptionIdentifier": [
+        9
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/datetime/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 9,
+      "properties": {
+       "SubscriptionIdentifier": [
+        10
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/device_automation/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 10,
+      "properties": {
+       "SubscriptionIdentifier": [
+        11
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/device_tracker/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 11,
+      "properties": {
+       "SubscriptionIdentifier": [
+        12
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/event/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 12,
+      "properties": {
+       "SubscriptionIdentifier": [
+        13
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/fan/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 13,
+      "properties": {
+       "SubscriptionIdentifier": [
+        14
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/humidifier/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 14,
+      "properties": {
+       "SubscriptionIdentifier": [
+        15
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/image/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 15,
+      "properties": {
+       "SubscriptionIdentifier": [
+        16
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/lawn_mower/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 16,
+      "properties": {
+       "SubscriptionIdentifier": [
+        17
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/light/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 17,
+      "properties": {
+       "SubscriptionIdentifier": [
+        18
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/lock/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 18,
+      "properties": {
+       "SubscriptionIdentifier": [
+        19
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/notify/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 19,
+      "properties": {
+       "SubscriptionIdentifier": [
+        20
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/number/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 20,
+      "properties": {
+       "SubscriptionIdentifier": [
+        21
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/scene/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 21,
+      "properties": {
+       "SubscriptionIdentifier": [
+        22
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/siren/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 22,
+      "properties": {
+       "SubscriptionIdentifier": [
+        23
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/select/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 23,
+      "properties": {
+       "SubscriptionIdentifier": [
+        24
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/sensor/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 24,
+      "properties": {
+       "SubscriptionIdentifier": [
+        25
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/switch/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 25,
+      "properties": {
+       "SubscriptionIdentifier": [
+        26
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/tag/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 26,
+      "properties": {
+       "SubscriptionIdentifier": [
+        27
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/text/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 27,
+      "properties": {
+       "SubscriptionIdentifier": [
+        28
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/time/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 28,
+      "properties": {
+       "SubscriptionIdentifier": [
+        29
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/update/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 29,
+      "properties": {
+       "SubscriptionIdentifier": [
+        30
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/vacuum/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 30,
+      "properties": {
+       "SubscriptionIdentifier": [
+        31
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/valve/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 31,
+      "properties": {
+       "SubscriptionIdentifier": [
+        32
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/water_heater/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 32,
+      "properties": {
+       "SubscriptionIdentifier": [
+        33
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/alarm_control_panel/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 33,
+      "properties": {
+       "SubscriptionIdentifier": [
+        34
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/binary_sensor/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 34,
+      "properties": {
+       "SubscriptionIdentifier": [
+        35
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/button/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 35,
+      "properties": {
+       "SubscriptionIdentifier": [
+        36
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/camera/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 36,
+      "properties": {
+       "SubscriptionIdentifier": [
+        37
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/climate/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 37,
+      "properties": {
+       "SubscriptionIdentifier": [
+        38
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/cover/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 38,
+      "properties": {
+       "SubscriptionIdentifier": [
+        39
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/date/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 39,
+      "properties": {
+       "SubscriptionIdentifier": [
+        40
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/datetime/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 40,
+      "properties": {
+       "SubscriptionIdentifier": [
+        41
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/device_automation/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 41,
+      "properties": {
+       "SubscriptionIdentifier": [
+        42
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/device_tracker/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 42,
+      "properties": {
+       "SubscriptionIdentifier": [
+        43
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/event/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 43,
+      "properties": {
+       "SubscriptionIdentifier": [
+        44
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/fan/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 44,
+      "properties": {
+       "SubscriptionIdentifier": [
+        45
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/humidifier/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 45,
+      "properties": {
+       "SubscriptionIdentifier": [
+        46
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/image/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 46,
+      "properties": {
+       "SubscriptionIdentifier": [
+        47
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/lawn_mower/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 47,
+      "properties": {
+       "SubscriptionIdentifier": [
+        48
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/light/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 48,
+      "properties": {
+       "SubscriptionIdentifier": [
+        49
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/lock/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 49,
+      "properties": {
+       "SubscriptionIdentifier": [
+        50
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/notify/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 50,
+      "properties": {
+       "SubscriptionIdentifier": [
+        51
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/number/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 51,
+      "properties": {
+       "SubscriptionIdentifier": [
+        52
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/scene/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 52,
+      "properties": {
+       "SubscriptionIdentifier": [
+        53
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/siren/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 53,
+      "properties": {
+       "SubscriptionIdentifier": [
+        54
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/select/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 54,
+      "properties": {
+       "SubscriptionIdentifier": [
+        55
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/sensor/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 55,
+      "properties": {
+       "SubscriptionIdentifier": [
+        56
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/switch/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 56,
+      "properties": {
+       "SubscriptionIdentifier": [
+        57
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/tag/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 57,
+      "properties": {
+       "SubscriptionIdentifier": [
+        58
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/text/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 58,
+      "properties": {
+       "SubscriptionIdentifier": [
+        59
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/time/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 59,
+      "properties": {
+       "SubscriptionIdentifier": [
+        60
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/update/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 60,
+      "properties": {
+       "SubscriptionIdentifier": [
+        61
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/vacuum/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 61,
+      "properties": {
+       "SubscriptionIdentifier": [
+        62
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/valve/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 62,
+      "properties": {
+       "SubscriptionIdentifier": [
+        63
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/water_heater/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 63,
+      "properties": {
+       "SubscriptionIdentifier": [
+        64
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/device/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 64,
+      "properties": {
+       "SubscriptionIdentifier": [
+        65
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/device/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 65,
+      "properties": {
+       "SubscriptionIdentifier": [
+        66
+       ]
+      },
+      "topics": [
+       [
+        "drop_connect/discovery/#",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 66,
+      "properties": {
+       "SubscriptionIdentifier": [
+        67
+       ]
+      },
+      "topics": [
+       [
+        "dsmr/#",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 67,
+      "properties": {
+       "SubscriptionIdentifier": [
+        68
+       ]
+      },
+      "topics": [
+       [
+        "esphome/discover/#",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 68,
+      "properties": {
+       "SubscriptionIdentifier": [
+        69
+       ]
+      },
+      "topics": [
+       [
+        "fully/deviceInfo/+",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 69,
+      "properties": {
+       "SubscriptionIdentifier": [
+        70
+       ]
+      },
+      "topics": [
+       [
+        "inels/status/#",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 70,
+      "properties": {
+       "SubscriptionIdentifier": [
+        71
+       ]
+      },
+      "topics": [
+       [
+        "pglab/discovery/#",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 71,
+      "properties": {
+       "SubscriptionIdentifier": [
+        72
+       ]
+      },
+      "topics": [
+       [
+        "cloudapp/QBUSMQTTGW/+/state",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 72,
+      "properties": {
+       "SubscriptionIdentifier": [
+        73
+       ]
+      },
+      "topics": [
+       [
+        "tasmota/discovery/#",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 2.7,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 73,
+      "properties": {
+       "SubscriptionIdentifier": [
+        1
+       ]
+      },
+      "topics": [
+       [
+        "cloudapp/QBUSMQTTGW/config",
+        0
+       ],
+       [
+        "cloudapp/QBUSMQTTGW/state",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 3.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 74,
+      "properties": {
+       "SubscriptionIdentifier": [
+        1
+       ]
+      },
+      "topics": [
+       [
+        "tele/tasmota_A1B2C3/LWT",
+        0
+       ],
+       [
+        "tele/tasmota_A1B2C3/HASS_STATE",
+        0
+       ],
+       [
+        "tele/tasmota_A1B2C3/SENSOR",
+        0
+       ],
+       [
+        "zigbee2mqtt/bridge/state",
+        0
+       ],
+       [
+        "zigbee2mqtt/Living room sensor/availability",
+        0
+       ],
+       [
+        "zigbee2mqtt/Living room sensor",
+        0
+       ],
+       [
+        "zigbee2mqtt/Front door/availability",
+        0
+       ],
+       [
+        "zigbee2mqtt/Front door",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 0,
+     "at": 8.5,
+     "packet": {
+      "type": "PUBLISH",
+      "topic": "homeassistant/status",
+      "qos": 0,
+      "retain": false,
+      "dup": false,
+      "properties": {},
+      "payload": "online"
+     }
+    }
+   ],
+   "states": {
+    "binary_sensor.front_door_door": {
+     "state": "unknown",
+     "attributes": {
+      "device_class": "door",
+      "friendly_name": "Front door Door"
+     }
+    },
+    "binary_sensor.zigbee2mqtt_bridge_connection_state": {
+     "state": "on",
+     "attributes": {
+      "device_class": "connectivity",
+      "friendly_name": "Zigbee2MQTT Bridge Connection state"
+     }
+    },
+    "sensor.front_door_battery": {
+     "state": "unknown",
+     "attributes": {
+      "state_class": "measurement",
+      "unit_of_measurement": "%",
+      "device_class": "battery",
+      "friendly_name": "Front door Battery"
+     }
+    },
+    "sensor.living_room_sensor_atmospheric_pressure": {
+     "state": "unknown",
+     "attributes": {
+      "state_class": "measurement",
+      "unit_of_measurement": "hPa",
+      "device_class": "atmospheric_pressure",
+      "friendly_name": "Living room sensor Atmospheric pressure"
+     }
+    },
+    "sensor.living_room_sensor_battery": {
+     "state": "unknown",
+     "attributes": {
+      "state_class": "measurement",
+      "unit_of_measurement": "%",
+      "device_class": "battery",
+      "friendly_name": "Living room sensor Battery"
+     }
+    },
+    "sensor.living_room_sensor_humidity": {
+     "state": "unknown",
+     "attributes": {
+      "state_class": "measurement",
+      "unit_of_measurement": "%",
+      "device_class": "humidity",
+      "friendly_name": "Living room sensor Humidity"
+     }
+    },
+    "sensor.living_room_sensor_temperature": {
+     "state": "unknown",
+     "attributes": {
+      "state_class": "measurement",
+      "unit_of_measurement": "°C",
+      "device_class": "temperature",
+      "friendly_name": "Living room sensor Temperature"
+     }
+    },
+    "sensor.tasmota_tasmota_ds18b20_temperature": {
+     "state": "unknown",
+     "attributes": {
+      "unit_of_measurement": "°C",
+      "device_class": "temperature",
+      "friendly_name": "Tasmota Tasmota DS18B20 Temperature"
+     }
+    },
+    "sensor.tasmota_tasmota_status": {
+     "state": "unknown",
+     "attributes": {
+      "unit_of_measurement": "%",
+      "icon": "mdi:information-outline",
+      "friendly_name": "Tasmota Tasmota status"
+     }
+    }
+   },
+   "log": []
+  },
+  {
+   "do": "publish",
+   "topic": "zigbee2mqtt/Living room sensor",
+   "payload": "{\"battery\":91,\"humidity\":52.84,\"linkquality\":120,\"power_outage_count\":3,\"pressure\":1013.4,\"temperature\":21.37,\"voltage\":2995}",
+   "retain": false,
+   "qos": 0,
+   "received": [
+    {
+     "conn": 0,
+     "topic": "zigbee2mqtt/Living room sensor",
+     "payload": "{\"battery\":91,\"humidity\":52.84,\"linkquality\":120,\"power_outage_count\":3,\"pressure\":1013.4,\"temperature\":21.37,\"voltage\":2995}",
+     "qos": 0,
+     "retain": false,
+     "ids": [
+      1
+     ]
+    }
+   ],
+   "sent": [],
+   "states": {
+    "sensor.living_room_sensor_atmospheric_pressure": {
+     "state": "1013.4",
+     "attributes": {
+      "state_class": "measurement",
+      "unit_of_measurement": "hPa",
+      "device_class": "atmospheric_pressure",
+      "friendly_name": "Living room sensor Atmospheric pressure"
+     },
+     "changed": true,
+     "updated": true
+    },
+    "sensor.living_room_sensor_battery": {
+     "state": "91",
+     "attributes": {
+      "state_class": "measurement",
+      "unit_of_measurement": "%",
+      "device_class": "battery",
+      "friendly_name": "Living room sensor Battery"
+     },
+     "changed": true,
+     "updated": true
+    },
+    "sensor.living_room_sensor_humidity": {
+     "state": "52.84",
+     "attributes": {
+      "state_class": "measurement",
+      "unit_of_measurement": "%",
+      "device_class": "humidity",
+      "friendly_name": "Living room sensor Humidity"
+     },
+     "changed": true,
+     "updated": true
+    },
+    "sensor.living_room_sensor_temperature": {
+     "state": "21.37",
+     "attributes": {
+      "state_class": "measurement",
+      "unit_of_measurement": "°C",
+      "device_class": "temperature",
+      "friendly_name": "Living room sensor Temperature"
+     },
+     "changed": true,
+     "updated": true
+    }
+   },
+   "log": []
+  },
+  {
+   "do": "publish",
+   "topic": "zigbee2mqtt/Front door",
+   "payload": "{\"battery\":100,\"contact\":true,\"linkquality\":87,\"voltage\":3025}",
+   "retain": false,
+   "qos": 0,
+   "received": [
+    {
+     "conn": 0,
+     "topic": "zigbee2mqtt/Front door",
+     "payload": "{\"battery\":100,\"contact\":true,\"linkquality\":87,\"voltage\":3025}",
+     "qos": 0,
+     "retain": false,
+     "ids": [
+      1
+     ]
+    }
+   ],
+   "sent": [],
+   "states": {
+    "binary_sensor.front_door_door": {
+     "state": "off",
+     "attributes": {
+      "device_class": "door",
+      "friendly_name": "Front door Door"
+     },
+     "changed": true,
+     "updated": true
+    },
+    "sensor.front_door_battery": {
+     "state": "100",
+     "attributes": {
+      "state_class": "measurement",
+      "unit_of_measurement": "%",
+      "device_class": "battery",
+      "friendly_name": "Front door Battery"
+     },
+     "changed": true,
+     "updated": true
+    }
+   },
+   "log": []
+  },
+  {
+   "do": "publish",
+   "topic": "zigbee2mqtt/Front door",
+   "payload": "{\"battery\":100,\"contact\":false,\"linkquality\":87,\"voltage\":3025}",
+   "retain": false,
+   "qos": 0,
+   "received": [
+    {
+     "conn": 0,
+     "topic": "zigbee2mqtt/Front door",
+     "payload": "{\"battery\":100,\"contact\":false,\"linkquality\":87,\"voltage\":3025}",
+     "qos": 0,
+     "retain": false,
+     "ids": [
+      1
+     ]
+    }
+   ],
+   "sent": [],
+   "states": {
+    "binary_sensor.front_door_door": {
+     "state": "on",
+     "attributes": {
+      "device_class": "door",
+      "friendly_name": "Front door Door"
+     },
+     "changed": true,
+     "updated": true
+    }
+   },
+   "log": []
+  },
+  {
+   "do": "publish",
+   "topic": "zigbee2mqtt/Living room sensor",
+   "payload": "{\"linkquality\":116}",
+   "retain": false,
+   "qos": 0,
+   "received": [
+    {
+     "conn": 0,
+     "topic": "zigbee2mqtt/Living room sensor",
+     "payload": "{\"linkquality\":116}",
+     "qos": 0,
+     "retain": false,
+     "ids": [
+      1
+     ]
+    }
+   ],
+   "sent": [],
+   "states": {},
+   "log": [
+    [
+     "WARNING",
+     "homeassistant.helpers.template",
+     "Template variable warning: 'dict object' has no attribute 'pressure' when rendering '{{ value_json.pressure }}'"
+    ],
+    [
+     "WARNING",
+     "homeassistant.helpers.template",
+     "Template variable warning: 'dict object' has no attribute 'temperature' when rendering '{{ value_json.temperature }}'"
+    ],
+    [
+     "WARNING",
+     "homeassistant.helpers.template",
+     "Template variable warning: 'dict object' has no attribute 'battery' when rendering '{{ value_json.battery }}'"
+    ],
+    [
+     "WARNING",
+     "homeassistant.helpers.template",
+     "Template variable warning: 'dict object' has no attribute 'humidity' when rendering '{{ value_json.humidity }}'"
+    ]
+   ]
+  },
+  {
+   "do": "publish",
+   "topic": "tele/tasmota_A1B2C3/SENSOR",
+   "payload": "{\"Time\":\"2026-06-01T12:00:00\",\"DS18B20\":{\"Id\":\"01144A0CB2AA\",\"Temperature\":19.4},\"TempUnit\":\"C\"}",
+   "retain": false,
+   "qos": 0,
+   "received": [
+    {
+     "conn": 0,
+     "topic": "tele/tasmota_A1B2C3/SENSOR",
+     "payload": "{\"Time\":\"2026-06-01T12:00:00\",\"DS18B20\":{\"Id\":\"01144A0CB2AA\",\"Temperature\":19.4},\"TempUnit\":\"C\"}",
+     "qos": 0,
+     "retain": false,
+     "ids": [
+      1
+     ]
+    }
+   ],
+   "sent": [],
+   "states": {
+    "sensor.tasmota_tasmota_ds18b20_temperature": {
+     "state": "19.4",
+     "attributes": {
+      "unit_of_measurement": "°C",
+      "device_class": "temperature",
+      "friendly_name": "Tasmota Tasmota DS18B20 Temperature"
+     },
+     "changed": true,
+     "updated": true
+    }
+   },
+   "log": []
+  },
+  {
+   "do": "publish",
+   "topic": "tele/tasmota_A1B2C3/HASS_STATE",
+   "payload": "{\"Version\":\"9.1.0(tasmota)\",\"BuildDateTime\":\"2020-11-23T09:00:00\",\"Module or Template\":\"Sonoff Basic\",\"RestartReason\":\"Software/System restart\",\"Uptime\":\"0T00:05:12\",\"Hostname\":\"tasmota-A1B2C3-0451\",\"IPAddress\":\"192.0.2.30\",\"RSSI\":\"100\",\"Signal (dBm)\":\"-48\",\"WiFi LinkCount\":1,\"WiFi Downtime\":\"0T00:00:03\",\"MqttCount\":1,\"LoadAvg\":19}",
+   "retain": false,
+   "qos": 0,
+   "received": [
+    {
+     "conn": 0,
+     "topic": "tele/tasmota_A1B2C3/HASS_STATE",
+     "payload": "{\"Version\":\"9.1.0(tasmota)\",\"BuildDateTime\":\"2020-11-23T09:00:00\",\"Module or Template\":\"Sonoff Basic\",\"RestartReason\":\"Software/System restart\",\"Uptime\":\"0T00:05:12\",\"Hostname\":\"tasmota-A1B2C3-0451\",\"IPAddress\":\"192.0.2.30\",\"RSSI\":\"100\",\"Signal (dBm)\":\"-48\",\"WiFi LinkCount\":1,\"WiFi Downtime\":\"0T00:00:03\",\"MqttCount\":1,\"LoadAvg\":19}",
+     "qos": 0,
+     "retain": false,
+     "ids": [
+      1
+     ]
+    }
+   ],
+   "sent": [],
+   "states": {
+    "sensor.tasmota_tasmota_status": {
+     "state": "100",
+     "attributes": {
+      "Version": "9.1.0(tasmota)",
+      "BuildDateTime": "2020-11-23T09:00:00",
+      "Module or Template": "Sonoff Basic",
+      "RestartReason": "Software/System restart",
+      "Uptime": "0T00:05:12",
+      "Hostname": "tasmota-A1B2C3-0451",
+      "IPAddress": "192.0.2.30",
+      "RSSI": "100",
+      "Signal (dBm)": "-48",
+      "WiFi LinkCount": 1,
+      "WiFi Downtime": "0T00:00:03",
+      "MqttCount": 1,
+      "LoadAvg": 19,
+      "unit_of_measurement": "%",
+      "icon": "mdi:information-outline",
+      "friendly_name": "Tasmota Tasmota status"
+     },
+     "changed": true,
+     "updated": true
+    }
+   },
+   "log": []
+  },
+  {
+   "do": "publish",
+   "topic": "tele/tasmota_A1B2C3/SENSOR",
+   "payload": "{\"Time\":\"2026-06-01T12:00:00\",\"DS18B20\":{\"Id\":\"01144A0CB2AA\",\"Temperature\":19.4},\"TempUnit\":\"C\"}",
+   "retain": false,
+   "qos": 0,
+   "received": [
+    {
+     "conn": 0,
+     "topic": "tele/tasmota_A1B2C3/SENSOR",
+     "payload": "{\"Time\":\"2026-06-01T12:00:00\",\"DS18B20\":{\"Id\":\"01144A0CB2AA\",\"Temperature\":19.4},\"TempUnit\":\"C\"}",
+     "qos": 0,
+     "retain": false,
+     "ids": [
+      1
+     ]
+    }
+   ],
+   "sent": [],
+   "states": {
+    "sensor.tasmota_tasmota_ds18b20_temperature": {
+     "state": "19.4",
+     "attributes": {
+      "unit_of_measurement": "°C",
+      "device_class": "temperature",
+      "friendly_name": "Tasmota Tasmota DS18B20 Temperature"
+     },
+     "changed": true,
+     "updated": true
+    }
+   },
+   "log": []
+  },
+  {
+   "do": "publish",
+   "topic": "zigbee2mqtt/Living room sensor/availability",
+   "payload": "{\"state\":\"offline\"}",
+   "retain": true,
+   "qos": 0,
+   "received": [
+    {
+     "conn": 0,
+     "topic": "zigbee2mqtt/Living room sensor/availability",
+     "payload": "{\"state\":\"offline\"}",
+     "qos": 0,
+     "retain": false,
+     "ids": [
+      1
+     ]
+    }
+   ],
+   "sent": [],
+   "states": {
+    "sensor.living_room_sensor_atmospheric_pressure": {
+     "state": "unavailable",
+     "attributes": {
+      "state_class": "measurement",
+      "unit_of_measurement": "hPa",
+      "device_class": "atmospheric_pressure",
+      "friendly_name": "Living room sensor Atmospheric pressure"
+     },
+     "changed": true,
+     "updated": true
+    },
+    "sensor.living_room_sensor_battery": {
+     "state": "unavailable",
+     "attributes": {
+      "state_class": "measurement",
+      "unit_of_measurement": "%",
+      "device_class": "battery",
+      "friendly_name": "Living room sensor Battery"
+     },
+     "changed": true,
+     "updated": true
+    },
+    "sensor.living_room_sensor_humidity": {
+     "state": "unavailable",
+     "attributes": {
+      "state_class": "measurement",
+      "unit_of_measurement": "%",
+      "device_class": "humidity",
+      "friendly_name": "Living room sensor Humidity"
+     },
+     "changed": true,
+     "updated": true
+    },
+    "sensor.living_room_sensor_temperature": {
+     "state": "unavailable",
+     "attributes": {
+      "state_class": "measurement",
+      "unit_of_measurement": "°C",
+      "device_class": "temperature",
+      "friendly_name": "Living room sensor Temperature"
+     },
+     "changed": true,
+     "updated": true
+    }
+   },
+   "log": []
+  },
+  {
+   "do": "publish",
+   "topic": "zigbee2mqtt/Living room sensor/availability",
+   "payload": "{\"state\":\"online\"}",
+   "retain": true,
+   "qos": 0,
+   "received": [
+    {
+     "conn": 0,
+     "topic": "zigbee2mqtt/Living room sensor/availability",
+     "payload": "{\"state\":\"online\"}",
+     "qos": 0,
+     "retain": false,
+     "ids": [
+      1
+     ]
+    }
+   ],
+   "sent": [],
+   "states": {
+    "sensor.living_room_sensor_atmospheric_pressure": {
+     "state": "1013.4",
+     "attributes": {
+      "state_class": "measurement",
+      "unit_of_measurement": "hPa",
+      "device_class": "atmospheric_pressure",
+      "friendly_name": "Living room sensor Atmospheric pressure"
+     },
+     "changed": true,
+     "updated": true
+    },
+    "sensor.living_room_sensor_battery": {
+     "state": "91",
+     "attributes": {
+      "state_class": "measurement",
+      "unit_of_measurement": "%",
+      "device_class": "battery",
+      "friendly_name": "Living room sensor Battery"
+     },
+     "changed": true,
+     "updated": true
+    },
+    "sensor.living_room_sensor_humidity": {
+     "state": "52.84",
+     "attributes": {
+      "state_class": "measurement",
+      "unit_of_measurement": "%",
+      "device_class": "humidity",
+      "friendly_name": "Living room sensor Humidity"
+     },
+     "changed": true,
+     "updated": true
+    },
+    "sensor.living_room_sensor_temperature": {
+     "state": "21.37",
+     "attributes": {
+      "state_class": "measurement",
+      "unit_of_measurement": "°C",
+      "device_class": "temperature",
+      "friendly_name": "Living room sensor Temperature"
+     },
+     "changed": true,
+     "updated": true
+    }
+   },
+   "log": []
+  },
+  {
+   "do": "publish",
+   "topic": "tele/tasmota_A1B2C3/LWT",
+   "payload": "Offline",
+   "retain": true,
+   "qos": 0,
+   "received": [
+    {
+     "conn": 0,
+     "topic": "tele/tasmota_A1B2C3/LWT",
+     "payload": "Offline",
+     "qos": 0,
+     "retain": false,
+     "ids": [
+      1
+     ]
+    }
+   ],
+   "sent": [],
+   "states": {
+    "sensor.tasmota_tasmota_ds18b20_temperature": {
+     "state": "unavailable",
+     "attributes": {
+      "unit_of_measurement": "°C",
+      "device_class": "temperature",
+      "friendly_name": "Tasmota Tasmota DS18B20 Temperature"
+     },
+     "changed": true,
+     "updated": true
+    },
+    "sensor.tasmota_tasmota_status": {
+     "state": "unavailable",
+     "attributes": {
+      "unit_of_measurement": "%",
+      "icon": "mdi:information-outline",
+      "friendly_name": "Tasmota Tasmota status"
+     },
+     "changed": true,
+     "updated": true
+    }
+   },
+   "log": []
+  },
+  {
+   "do": "publish",
+   "topic": "tele/tasmota_A1B2C3/LWT",
+   "payload": "Online",
+   "retain": true,
+   "qos": 0,
+   "received": [
+    {
+     "conn": 0,
+     "topic": "tele/tasmota_A1B2C3/LWT",
+     "payload": "Online",
+     "qos": 0,
+     "retain": false,
+     "ids": [
+      1
+     ]
+    }
+   ],
+   "sent": [],
+   "states": {
+    "sensor.tasmota_tasmota_ds18b20_temperature": {
+     "state": "19.4",
+     "attributes": {
+      "unit_of_measurement": "°C",
+      "device_class": "temperature",
+      "friendly_name": "Tasmota Tasmota DS18B20 Temperature"
+     },
+     "changed": true,
+     "updated": true
+    },
+    "sensor.tasmota_tasmota_status": {
+     "state": "100",
+     "attributes": {
+      "Version": "9.1.0(tasmota)",
+      "BuildDateTime": "2020-11-23T09:00:00",
+      "Module or Template": "Sonoff Basic",
+      "RestartReason": "Software/System restart",
+      "Uptime": "0T00:05:12",
+      "Hostname": "tasmota-A1B2C3-0451",
+      "IPAddress": "192.0.2.30",
+      "RSSI": "100",
+      "Signal (dBm)": "-48",
+      "WiFi LinkCount": 1,
+      "WiFi Downtime": "0T00:00:03",
+      "MqttCount": 1,
+      "LoadAvg": 19,
+      "unit_of_measurement": "%",
+      "icon": "mdi:information-outline",
+      "friendly_name": "Tasmota Tasmota status"
+     },
+     "changed": true,
+     "updated": true
+    }
+   },
+   "log": []
+  },
+  {
+   "do": "publish",
+   "topic": "zigbee2mqtt/Living room sensor",
+   "payload": "{\"temperature\":\"warm\"}",
+   "retain": false,
+   "qos": 0,
+   "received": [
+    {
+     "conn": 0,
+     "topic": "zigbee2mqtt/Living room sensor",
+     "payload": "{\"temperature\":\"warm\"}",
+     "qos": 0,
+     "retain": false,
+     "ids": [
+      1
+     ]
+    }
+   ],
+   "sent": [],
+   "states": {},
+   "log": [
+    [
+     "WARNING",
+     "homeassistant.helpers.template",
+     "Template variable warning: 'dict object' has no attribute 'pressure' when rendering '{{ value_json.pressure }}'"
+    ],
+    [
+     "WARNING",
+     "homeassistant.helpers.template",
+     "Template variable warning: 'dict object' has no attribute 'battery' when rendering '{{ value_json.battery }}'"
+    ],
+    [
+     "WARNING",
+     "homeassistant.helpers.template",
+     "Template variable warning: 'dict object' has no attribute 'humidity' when rendering '{{ value_json.humidity }}'"
+    ],
+    [
+     "ERROR",
+     "homeassistant.components.mqtt.models",
+     "Value error while updating state of sensor.living_room_sensor_temperature, topic: 'zigbee2mqtt/Living room sensor' with payload: b'{\"temperature\":\"warm\"}': Sensor sensor.living_room_sensor_temperature has device class 'temperature', state class 'measurement' unit '°C' and suggested precision 'None' thus indicating it has a numeric value; however, it has the non-numeric value: 'warm' (<class 'str'>)"
+    ]
+   ]
+  },
+  {
+   "do": "publish",
+   "topic": "homeassistant/device/acme_ws01/config",
+   "payload": "{\"dev\":{\"ids\":\"acme_ws01\",\"name\":\"Weather station\",\"mf\":\"Acme\",\"mdl\":\"WS-01\",\"sw\":\"1.0\",\"hw\":\"rev2\",\"sn\":\"WS01-0001\"},\"o\":{\"name\":\"acme2mqtt\",\"sw\":\"0.1\",\"url\":\"https://example.com/support\"},\"cmps\":{\"temp\":{\"p\":\"sensor\",\"dev_cla\":\"temperature\",\"unit_of_meas\":\"°C\",\"stat_cla\":\"measurement\",\"val_tpl\":\"{{ value_json.temperature }}\",\"uniq_id\":\"acme_ws01_temp\",\"exp_aft\":120},\"rain\":{\"p\":\"binary_sensor\",\"dev_cla\":\"moisture\",\"name\":\"Rain\",\"val_tpl\":\"{{ value_json.rain }}\",\"uniq_id\":\"acme_ws01_rain\",\"off_dly\":30},\"uptime\":{\"p\":\"sensor\",\"name\":null,\"stat_t\":\"acme/ws01/uptime\",\"uniq_id\":\"acme_ws01_uptime\",\"ent_cat\":\"diagnostic\"}},\"stat_t\":\"acme/ws01/state\",\"avty_t\":\"acme/ws01/availability\",\"qos\":1}",
+   "retain": true,
+   "qos": 0,
+   "received": [
+    {
+     "conn": 0,
+     "topic": "homeassistant/device/acme_ws01/config",
+     "payload": "{\"dev\":{\"ids\":\"acme_ws01\",\"name\":\"Weather station\",\"mf\":\"Acme\",\"mdl\":\"WS-01\",\"sw\":\"1.0\",\"hw\":\"rev2\",\"sn\":\"WS01-0001\"},\"o\":{\"name\":\"acme2mqtt\",\"sw\":\"0.1\",\"url\":\"https://example.com/support\"},\"cmps\":{\"temp\":{\"p\":\"sensor\",\"dev_cla\":\"temperature\",\"unit_of_meas\":\"°C\",\"stat_cla\":\"measurement\",\"val_tpl\":\"{{ value_json.temperature }}\",\"uniq_id\":\"acme_ws01_temp\",\"exp_aft\":120},\"rain\":{\"p\":\"binary_sensor\",\"dev_cla\":\"moisture\",\"name\":\"Rain\",\"val_tpl\":\"{{ value_json.rain }}\",\"uniq_id\":\"acme_ws01_rain\",\"off_dly\":30},\"uptime\":{\"p\":\"sensor\",\"name\":null,\"stat_t\":\"acme/ws01/uptime\",\"uniq_id\":\"acme_ws01_uptime\",\"ent_cat\":\"diagnostic\"}},\"stat_t\":\"acme/ws01/state\",\"avty_t\":\"acme/ws01/availability\",\"qos\":1}",
+     "qos": 0,
+     "retain": false,
+     "ids": [
+      64
+     ]
+    }
+   ],
+   "sent": [
+    {
+     "conn": 0,
+     "at": 15.1,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 76,
+      "properties": {
+       "SubscriptionIdentifier": [
+        1
+       ]
+      },
+      "topics": [
+       [
+        "acme/ws01/availability",
+        1
+       ],
+       [
+        "acme/ws01/state",
+        1
+       ],
+       [
+        "acme/ws01/uptime",
+        1
+       ]
+      ]
+     }
+    }
+   ],
+   "states": {
+    "binary_sensor.weather_station_rain": {
+     "state": "unavailable",
+     "attributes": {
+      "device_class": "moisture",
+      "friendly_name": "Weather station Rain"
+     }
+    },
+    "sensor.weather_station": {
+     "state": "unavailable",
+     "attributes": {
+      "friendly_name": "Weather station"
+     }
+    },
+    "sensor.weather_station_temperature": {
+     "state": "unavailable",
+     "attributes": {
+      "state_class": "measurement",
+      "unit_of_measurement": "°C",
+      "device_class": "temperature",
+      "friendly_name": "Weather station Temperature"
+     }
+    }
+   },
+   "log": []
+  },
+  {
+   "do": "publish",
+   "topic": "acme/ws01/availability",
+   "payload": "online",
+   "retain": true,
+   "qos": 0,
+   "received": [
+    {
+     "conn": 0,
+     "topic": "acme/ws01/availability",
+     "payload": "online",
+     "qos": 0,
+     "retain": false,
+     "ids": [
+      1
+     ]
+    }
+   ],
+   "sent": [],
+   "states": {
+    "binary_sensor.weather_station_rain": {
+     "state": "unknown",
+     "attributes": {
+      "device_class": "moisture",
+      "friendly_name": "Weather station Rain"
+     },
+     "changed": true,
+     "updated": true
+    },
+    "sensor.weather_station": {
+     "state": "unknown",
+     "attributes": {
+      "friendly_name": "Weather station"
+     },
+     "changed": true,
+     "updated": true
+    }
+   },
+   "log": []
+  },
+  {
+   "do": "publish",
+   "topic": "acme/ws01/state",
+   "payload": "{\"temperature\":12.5,\"rain\":\"ON\"}",
+   "retain": false,
+   "qos": 1,
+   "received": [
+    {
+     "conn": 0,
+     "topic": "acme/ws01/state",
+     "payload": "{\"temperature\":12.5,\"rain\":\"ON\"}",
+     "qos": 1,
+     "retain": false,
+     "ids": [
+      1
+     ]
+    }
+   ],
+   "sent": [
+    {
+     "conn": 0,
+     "at": 15.9,
+     "packet": {
+      "type": "PUBACK",
+      "packet_id": 1
+     }
+    }
+   ],
+   "states": {
+    "binary_sensor.weather_station_rain": {
+     "state": "on",
+     "attributes": {
+      "device_class": "moisture",
+      "friendly_name": "Weather station Rain"
+     },
+     "changed": true,
+     "updated": true
+    },
+    "sensor.weather_station_temperature": {
+     "state": "12.5",
+     "attributes": {
+      "state_class": "measurement",
+      "unit_of_measurement": "°C",
+      "device_class": "temperature",
+      "friendly_name": "Weather station Temperature"
+     },
+     "changed": true,
+     "updated": true
+    }
+   },
+   "log": []
+  },
+  {
+   "do": "publish",
+   "topic": "acme/ws01/uptime",
+   "payload": "3600",
+   "retain": false,
+   "qos": 0,
+   "received": [
+    {
+     "conn": 0,
+     "topic": "acme/ws01/uptime",
+     "payload": "3600",
+     "qos": 0,
+     "retain": false,
+     "ids": [
+      1
+     ]
+    }
+   ],
+   "sent": [],
+   "states": {
+    "sensor.weather_station": {
+     "state": "3600",
+     "attributes": {
+      "friendly_name": "Weather station"
+     },
+     "changed": true,
+     "updated": true
+    }
+   },
+   "log": []
+  },
+  {
+   "do": "wait",
+   "seconds": 31,
+   "received": [],
+   "sent": [],
+   "states": {
+    "binary_sensor.weather_station_rain": {
+     "state": "off",
+     "attributes": {
+      "device_class": "moisture",
+      "friendly_name": "Weather station Rain"
+     },
+     "changed": true,
+     "updated": true
+    }
+   },
+   "log": []
+  },
+  {
+   "do": "wait",
+   "seconds": 91,
+   "received": [],
+   "sent": [
+    {
+     "conn": 0,
+     "at": 62.3,
+     "packet": {
+      "type": "PINGREQ"
+     }
+    },
+    {
+     "conn": 0,
+     "at": 122.4,
+     "packet": {
+      "type": "PINGREQ"
+     }
+    }
+   ],
+   "states": {
+    "sensor.weather_station_temperature": {
+     "state": "unavailable",
+     "attributes": {
+      "state_class": "measurement",
+      "unit_of_measurement": "°C",
+      "device_class": "temperature",
+      "friendly_name": "Weather station Temperature"
+     },
+     "changed": true,
+     "updated": true
+    }
+   },
+   "log": []
+  },
+  {
+   "do": "publish",
+   "topic": "homeassistant/sensor/0x00158d00a1b2c3e5/humidity/config",
+   "payload": "{\"availability\":[{\"topic\":\"zigbee2mqtt/bridge/state\",\"value_template\":\"{{ value_json.state }}\"},{\"topic\":\"zigbee2mqtt/Living room sensor/availability\",\"value_template\":\"{{ value_json.state }}\"}],\"availability_mode\":\"all\",\"device\":{\"identifiers\":[\"zigbee2mqtt_0x00158d00a1b2c3e5\"],\"manufacturer\":\"Aqara\",\"model\":\"Temperature and humidity sensor\",\"model_id\":\"WSDCGQ11LM\",\"name\":\"Living room sensor\",\"sw_version\":\"3000-0001\",\"via_device\":\"zigbee2mqtt_bridge_0x00124b00a1b2c3d4\"},\"origin\":{\"name\":\"Zigbee2MQTT\",\"sw\":\"2.6.3\",\"url\":\"https://www.zigbee2mqtt.io\"},\"state_topic\":\"zigbee2mqtt/Living room sensor\",\"unique_id\":\"0x00158d00a1b2c3e5_humidity_zigbee2mqtt\",\"value_template\":\"{{ value_json.humidity }}\",\"device_class\":\"humidity\",\"enabled_by_default\":true,\"state_class\":\"measurement\",\"unit_of_measurement\":\"%\",\"name\":\"Relative humidity\"}",
+   "retain": true,
+   "qos": 0,
+   "received": [
+    {
+     "conn": 0,
+     "topic": "homeassistant/sensor/0x00158d00a1b2c3e5/humidity/config",
+     "payload": "{\"availability\":[{\"topic\":\"zigbee2mqtt/bridge/state\",\"value_template\":\"{{ value_json.state }}\"},{\"topic\":\"zigbee2mqtt/Living room sensor/availability\",\"value_template\":\"{{ value_json.state }}\"}],\"availability_mode\":\"all\",\"device\":{\"identifiers\":[\"zigbee2mqtt_0x00158d00a1b2c3e5\"],\"manufacturer\":\"Aqara\",\"model\":\"Temperature and humidity sensor\",\"model_id\":\"WSDCGQ11LM\",\"name\":\"Living room sensor\",\"sw_version\":\"3000-0001\",\"via_device\":\"zigbee2mqtt_bridge_0x00124b00a1b2c3d4\"},\"origin\":{\"name\":\"Zigbee2MQTT\",\"sw\":\"2.6.3\",\"url\":\"https://www.zigbee2mqtt.io\"},\"state_topic\":\"zigbee2mqtt/Living room sensor\",\"unique_id\":\"0x00158d00a1b2c3e5_humidity_zigbee2mqtt\",\"value_template\":\"{{ value_json.humidity }}\",\"device_class\":\"humidity\",\"enabled_by_default\":true,\"state_class\":\"measurement\",\"unit_of_measurement\":\"%\",\"name\":\"Relative humidity\"}",
+     "qos": 0,
+     "retain": false,
+     "ids": [
+      55
+     ]
+    }
+   ],
+   "sent": [],
+   "states": {
+    "sensor.living_room_sensor_humidity": {
+     "state": "52.84",
+     "attributes": {
+      "state_class": "measurement",
+      "unit_of_measurement": "%",
+      "device_class": "humidity",
+      "friendly_name": "Living room sensor Relative humidity"
+     },
+     "changed": false,
+     "updated": true
+    }
+   },
+   "log": []
+  },
+  {
+   "do": "publish",
+   "topic": "homeassistant/sensor/0x00158d00a1b2c3e5/humidity/config",
+   "payload": "{\"availability\":[{\"topic\":\"zigbee2mqtt/bridge/state\",\"value_template\":\"{{ value_json.state }}\"},{\"topic\":\"zigbee2mqtt/Living room sensor/availability\",\"value_template\":\"{{ value_json.state }}\"}],\"availability_mode\":\"all\",\"device\":{\"identifiers\":[\"zigbee2mqtt_0x00158d00a1b2c3e5\"],\"manufacturer\":\"Aqara\",\"model\":\"Temperature and humidity sensor\",\"model_id\":\"WSDCGQ11LM\",\"name\":\"Living room sensor\",\"sw_version\":\"3000-0001\",\"via_device\":\"zigbee2mqtt_bridge_0x00124b00a1b2c3d4\"},\"origin\":{\"name\":\"Zigbee2MQTT\",\"sw\":\"2.6.3\",\"url\":\"https://www.zigbee2mqtt.io\"},\"state_topic\":\"zigbee2mqtt/Living room sensor\",\"unique_id\":\"0x00158d00a1b2c3e5_humidity_zigbee2mqtt\",\"value_template\":\"{{ value_json.humidity }}\",\"device_class\":\"humidity\",\"enabled_by_default\":true,\"state_class\":\"measurement\",\"unit_of_measurement\":\"%\",\"name\":\"Relative humidity\"}",
+   "retain": true,
+   "qos": 0,
+   "received": [
+    {
+     "conn": 0,
+     "topic": "homeassistant/sensor/0x00158d00a1b2c3e5/humidity/config",
+     "payload": "{\"availability\":[{\"topic\":\"zigbee2mqtt/bridge/state\",\"value_template\":\"{{ value_json.state }}\"},{\"topic\":\"zigbee2mqtt/Living room sensor/availability\",\"value_template\":\"{{ value_json.state }}\"}],\"availability_mode\":\"all\",\"device\":{\"identifiers\":[\"zigbee2mqtt_0x00158d00a1b2c3e5\"],\"manufacturer\":\"Aqara\",\"model\":\"Temperature and humidity sensor\",\"model_id\":\"WSDCGQ11LM\",\"name\":\"Living room sensor\",\"sw_version\":\"3000-0001\",\"via_device\":\"zigbee2mqtt_bridge_0x00124b00a1b2c3d4\"},\"origin\":{\"name\":\"Zigbee2MQTT\",\"sw\":\"2.6.3\",\"url\":\"https://www.zigbee2mqtt.io\"},\"state_topic\":\"zigbee2mqtt/Living room sensor\",\"unique_id\":\"0x00158d00a1b2c3e5_humidity_zigbee2mqtt\",\"value_template\":\"{{ value_json.humidity }}\",\"device_class\":\"humidity\",\"enabled_by_default\":true,\"state_class\":\"measurement\",\"unit_of_measurement\":\"%\",\"name\":\"Relative humidity\"}",
+     "qos": 0,
+     "retain": false,
+     "ids": [
+      55
+     ]
+    }
+   ],
+   "sent": [],
+   "states": {},
+   "log": []
+  },
+  {
+   "do": "publish",
+   "topic": "homeassistant/device/acme_ws01/config",
+   "payload": "{\"dev\":{\"ids\":\"acme_ws01\",\"name\":\"Weather station\",\"mf\":\"Acme\",\"mdl\":\"WS-01\",\"sw\":\"1.0\",\"hw\":\"rev2\",\"sn\":\"WS01-0001\"},\"o\":{\"name\":\"acme2mqtt\",\"sw\":\"0.1\",\"url\":\"https://example.com/support\"},\"cmps\":{\"temp\":{\"p\":\"sensor\",\"dev_cla\":\"temperature\",\"unit_of_meas\":\"°C\",\"stat_cla\":\"measurement\",\"val_tpl\":\"{{ value_json.temperature }}\",\"uniq_id\":\"acme_ws01_temp\",\"exp_aft\":120},\"rain\":{\"p\":\"binary_sensor\"},\"uptime\":{\"p\":\"sensor\",\"name\":null,\"stat_t\":\"acme/ws01/uptime\",\"uniq_id\":\"acme_ws01_uptime\",\"ent_cat\":\"diagnostic\"}},\"stat_t\":\"acme/ws01/state\",\"avty_t\":\"acme/ws01/availability\",\"qos\":1}",
+   "retain": true,
+   "qos": 0,
+   "received": [
+    {
+     "conn": 0,
+     "topic": "homeassistant/device/acme_ws01/config",
+     "payload": "{\"dev\":{\"ids\":\"acme_ws01\",\"name\":\"Weather station\",\"mf\":\"Acme\",\"mdl\":\"WS-01\",\"sw\":\"1.0\",\"hw\":\"rev2\",\"sn\":\"WS01-0001\"},\"o\":{\"name\":\"acme2mqtt\",\"sw\":\"0.1\",\"url\":\"https://example.com/support\"},\"cmps\":{\"temp\":{\"p\":\"sensor\",\"dev_cla\":\"temperature\",\"unit_of_meas\":\"°C\",\"stat_cla\":\"measurement\",\"val_tpl\":\"{{ value_json.temperature }}\",\"uniq_id\":\"acme_ws01_temp\",\"exp_aft\":120},\"rain\":{\"p\":\"binary_sensor\"},\"uptime\":{\"p\":\"sensor\",\"name\":null,\"stat_t\":\"acme/ws01/uptime\",\"uniq_id\":\"acme_ws01_uptime\",\"ent_cat\":\"diagnostic\"}},\"stat_t\":\"acme/ws01/state\",\"avty_t\":\"acme/ws01/availability\",\"qos\":1}",
+     "qos": 0,
+     "retain": false,
+     "ids": [
+      64
+     ]
+    }
+   ],
+   "sent": [],
+   "states": {
+    "binary_sensor.weather_station_rain": null
+   },
+   "log": []
+  },
+  {
+   "do": "publish",
+   "topic": "homeassistant/sensor/0x00158d00a1b2c3f6/battery/config",
+   "payload": "",
+   "retain": true,
+   "qos": 0,
+   "received": [
+    {
+     "conn": 0,
+     "topic": "homeassistant/sensor/0x00158d00a1b2c3f6/battery/config",
+     "payload": "",
+     "qos": 0,
+     "retain": false,
+     "ids": [
+      55
+     ]
+    }
+   ],
+   "sent": [],
+   "states": {
+    "sensor.front_door_battery": null
+   },
+   "log": []
+  },
+  {
+   "do": "service",
+   "service": "publish",
+   "data": {
+    "topic": "hars/test",
+    "payload": "hello"
+   },
+   "result": "ok",
+   "received": [],
+   "sent": [
+    {
+     "conn": 0,
+     "at": 141.0,
+     "packet": {
+      "type": "PUBLISH",
+      "topic": "hars/test",
+      "qos": 0,
+      "retain": false,
+      "dup": false,
+      "properties": {},
+      "payload": "hello"
+     }
+    }
+   ],
+   "states": {},
+   "log": []
+  },
+  {
+   "do": "service",
+   "service": "publish",
+   "data": {
+    "topic": "hars/test",
+    "payload": "{\"on\": true}",
+    "qos": "1",
+    "retain": true
+   },
+   "result": "ok",
+   "received": [],
+   "sent": [
+    {
+     "conn": 0,
+     "at": 141.4,
+     "packet": {
+      "type": "PUBLISH",
+      "topic": "hars/test",
+      "qos": 1,
+      "retain": true,
+      "dup": false,
+      "packet_id": 78,
+      "properties": {},
+      "payload": "{\"on\": true}"
+     }
+    }
+   ],
+   "states": {},
+   "log": []
+  },
+  {
+   "do": "service",
+   "service": "publish",
+   "data": {
+    "topic": "hars/test",
+    "payload": "b'\\x01\\x02'",
+    "evaluate_payload": true,
+    "qos": 2
+   },
+   "result": "ok",
+   "received": [],
+   "sent": [
+    {
+     "conn": 0,
+     "at": 141.9,
+     "packet": {
+      "type": "PUBLISH",
+      "topic": "hars/test",
+      "qos": 2,
+      "retain": false,
+      "dup": false,
+      "packet_id": 79,
+      "properties": {},
+      "payload": "\u0001\u0002"
+     }
+    },
+    {
+     "conn": 0,
+     "at": 141.9,
+     "packet": {
+      "type": "PUBREL",
+      "packet_id": 79
+     }
+    }
+   ],
+   "states": {},
+   "log": []
+  },
+  {
+   "do": "service",
+   "service": "publish",
+   "data": {
+    "topic": "hars/test",
+    "payload": 21.5
+   },
+   "result": "ok",
+   "received": [],
+   "sent": [
+    {
+     "conn": 0,
+     "at": 142.4,
+     "packet": {
+      "type": "PUBLISH",
+      "topic": "hars/test",
+      "qos": 0,
+      "retain": false,
+      "dup": false,
+      "properties": {},
+      "payload": "21.5"
+     }
+    }
+   ],
+   "states": {},
+   "log": []
+  },
+  {
+   "do": "service",
+   "service": "publish",
+   "data": {
+    "topic": "hars/empty"
+   },
+   "result": "ok",
+   "received": [],
+   "sent": [
+    {
+     "conn": 0,
+     "at": 142.8,
+     "packet": {
+      "type": "PUBLISH",
+      "topic": "hars/empty",
+      "qos": 0,
+      "retain": false,
+      "dup": false,
+      "properties": {},
+      "payload": ""
+     }
+    }
+   ],
+   "states": {},
+   "log": []
+  },
+  {
+   "do": "service",
+   "service": "publish",
+   "data": {
+    "topic": "hars/expiry",
+    "payload": "x",
+    "message_expiry_interval": {
+     "minutes": 1,
+     "seconds": 5
+    }
+   },
+   "result": "ok",
+   "received": [],
+   "sent": [
+    {
+     "conn": 0,
+     "at": 143.3,
+     "packet": {
+      "type": "PUBLISH",
+      "topic": "hars/expiry",
+      "qos": 0,
+      "retain": false,
+      "dup": false,
+      "properties": {
+       "MessageExpiryInterval": 65
+      },
+      "payload": "x"
+     }
+    }
+   ],
+   "states": {},
+   "log": []
+  },
+  {
+   "do": "service",
+   "service": "publish",
+   "data": {
+    "topic": "hars/+",
+    "payload": "x"
+   },
+   "result": {
+    "error": "MultipleInvalid",
+    "message": "Wildcards cannot be used in topic names for dictionary value @ data['topic']"
+   },
+   "received": [],
+   "sent": [],
+   "states": {},
+   "log": []
+  },
+  {
+   "do": "service",
+   "service": "publish",
+   "data": {
+    "topic": "hars/test",
+    "payload": "x",
+    "qos": 3
+   },
+   "result": {
+    "error": "MultipleInvalid",
+    "message": "value must be one of [0, 1, 2] for dictionary value @ data['qos']"
+   },
+   "received": [],
+   "sent": [],
+   "states": {},
+   "log": []
+  },
+  {
+   "do": "drop",
+   "received": [],
+   "sent": [],
+   "states": {
+    "binary_sensor.front_door_door": {
+     "state": "unavailable",
+     "attributes": {
+      "device_class": "door",
+      "friendly_name": "Front door Door"
+     },
+     "changed": true,
+     "updated": true
+    },
+    "binary_sensor.zigbee2mqtt_bridge_connection_state": {
+     "state": "unavailable",
+     "attributes": {
+      "device_class": "connectivity",
+      "friendly_name": "Zigbee2MQTT Bridge Connection state"
+     },
+     "changed": true,
+     "updated": true
+    },
+    "sensor.living_room_sensor_atmospheric_pressure": {
+     "state": "unavailable",
+     "attributes": {
+      "state_class": "measurement",
+      "unit_of_measurement": "hPa",
+      "device_class": "atmospheric_pressure",
+      "friendly_name": "Living room sensor Atmospheric pressure"
+     },
+     "changed": true,
+     "updated": true
+    },
+    "sensor.living_room_sensor_battery": {
+     "state": "unavailable",
+     "attributes": {
+      "state_class": "measurement",
+      "unit_of_measurement": "%",
+      "device_class": "battery",
+      "friendly_name": "Living room sensor Battery"
+     },
+     "changed": true,
+     "updated": true
+    },
+    "sensor.living_room_sensor_humidity": {
+     "state": "unavailable",
+     "attributes": {
+      "state_class": "measurement",
+      "unit_of_measurement": "%",
+      "device_class": "humidity",
+      "friendly_name": "Living room sensor Relative humidity"
+     },
+     "changed": true,
+     "updated": true
+    },
+    "sensor.living_room_sensor_temperature": {
+     "state": "unavailable",
+     "attributes": {
+      "state_class": "measurement",
+      "unit_of_measurement": "°C",
+      "device_class": "temperature",
+      "friendly_name": "Living room sensor Temperature"
+     },
+     "changed": true,
+     "updated": true
+    },
+    "sensor.tasmota_tasmota_ds18b20_temperature": {
+     "state": "unavailable",
+     "attributes": {
+      "unit_of_measurement": "°C",
+      "device_class": "temperature",
+      "friendly_name": "Tasmota Tasmota DS18B20 Temperature"
+     },
+     "changed": true,
+     "updated": true
+    },
+    "sensor.tasmota_tasmota_status": {
+     "state": "unavailable",
+     "attributes": {
+      "unit_of_measurement": "%",
+      "icon": "mdi:information-outline",
+      "friendly_name": "Tasmota Tasmota status"
+     },
+     "changed": true,
+     "updated": true
+    },
+    "sensor.weather_station": {
+     "state": "unavailable",
+     "attributes": {
+      "friendly_name": "Weather station"
+     },
+     "changed": true,
+     "updated": true
+    }
+   },
+   "log": [
+    [
+     "WARNING",
+     "homeassistant.components.mqtt.client",
+     "Error returned from MQTT server: The connection was lost."
+    ]
+   ]
+  },
+  {
+   "do": "wait",
+   "seconds": 17,
+   "received": [
+    {
+     "conn": 1,
+     "topic": "homeassistant/sensor/A1B2C3_status/config",
+     "payload": "{\"name\":\"Tasmota status\",\"stat_t\":\"tele/tasmota_A1B2C3/HASS_STATE\",\"avty_t\":\"tele/tasmota_A1B2C3/LWT\",\"pl_avail\":\"Online\",\"pl_not_avail\":\"Offline\",\"json_attr_t\":\"tele/tasmota_A1B2C3/HASS_STATE\",\"unit_of_meas\":\"%\",\"val_tpl\":\"{{value_json['RSSI']}}\",\"ic\":\"mdi:information-outline\",\"uniq_id\":\"A1B2C3_status\",\"dev\":{\"ids\":[\"A1B2C3\"],\"name\":\"Tasmota\",\"mdl\":\"Sonoff Basic\",\"sw\":\"9.1.0(tasmota)\",\"mf\":\"Tasmota\",\"cns\":[[\"mac\",\"02:00:00:A1:B2:C3\"]]}}",
+     "qos": 0,
+     "retain": true,
+     "ids": [
+      24
+     ]
+    },
+    {
+     "conn": 1,
+     "topic": "homeassistant/sensor/A1B2C3_DS18B20_Temperature/config",
+     "payload": "{\"name\":\"Tasmota DS18B20 Temperature\",\"stat_t\":\"tele/tasmota_A1B2C3/SENSOR\",\"avty_t\":\"tele/tasmota_A1B2C3/LWT\",\"pl_avail\":\"Online\",\"pl_not_avail\":\"Offline\",\"uniq_id\":\"A1B2C3_DS18B20_Temperature\",\"dev\":{\"ids\":[\"A1B2C3\"]},\"unit_of_meas\":\"°C\",\"dev_cla\":\"temperature\",\"frc_upd\":true,\"val_tpl\":\"{{value_json['DS18B20'].Temperature}}\"}",
+     "qos": 0,
+     "retain": true,
+     "ids": [
+      24
+     ]
+    },
+    {
+     "conn": 1,
+     "topic": "homeassistant/binary_sensor/1221051039810110150109113116116_0x00124b00a1b2c3d4/connection_state/config",
+     "payload": "{\"device\":{\"hw_version\":\"zStack3x0 20240710\",\"identifiers\":[\"zigbee2mqtt_bridge_0x00124b00a1b2c3d4\"],\"manufacturer\":\"Zigbee2MQTT\",\"model\":\"Bridge\",\"name\":\"Zigbee2MQTT Bridge\",\"sw_version\":\"2.6.3\",\"configuration_url\":\"http://192.0.2.20:8080/#/settings\"},\"origin\":{\"name\":\"Zigbee2MQTT\",\"sw\":\"2.6.3\",\"url\":\"https://www.zigbee2mqtt.io\"},\"device_class\":\"connectivity\",\"entity_category\":\"diagnostic\",\"name\":\"Connection state\",\"payload_on\":\"online\",\"payload_off\":\"offline\",\"state_topic\":\"zigbee2mqtt/bridge/state\",\"value_template\":\"{{ value_json.state }}\",\"unique_id\":\"bridge_0x00124b00a1b2c3d4_connection_state_zigbee2mqtt\",\"default_entity_id\":\"binary_sensor.zigbee2mqtt_bridge_connection_state\"}",
+     "qos": 0,
+     "retain": true,
+     "ids": [
+      34
+     ]
+    },
+    {
+     "conn": 1,
+     "topic": "homeassistant/binary_sensor/0x00158d00a1b2c3f6/contact/config",
+     "payload": "{\"availability\":[{\"topic\":\"zigbee2mqtt/bridge/state\",\"value_template\":\"{{ value_json.state }}\"},{\"topic\":\"zigbee2mqtt/Front door/availability\",\"value_template\":\"{{ value_json.state }}\"}],\"availability_mode\":\"all\",\"device\":{\"identifiers\":[\"zigbee2mqtt_0x00158d00a1b2c3f6\"],\"manufacturer\":\"Aqara\",\"model\":\"Door and window sensor\",\"model_id\":\"MCCGQ11LM\",\"name\":\"Front door\",\"sw_version\":\"3000-0001\",\"via_device\":\"zigbee2mqtt_bridge_0x00124b00a1b2c3d4\"},\"origin\":{\"name\":\"Zigbee2MQTT\",\"sw\":\"2.6.3\",\"url\":\"https://www.zigbee2mqtt.io\"},\"state_topic\":\"zigbee2mqtt/Front door\",\"unique_id\":\"0x00158d00a1b2c3f6_contact_zigbee2mqtt\",\"value_template\":\"{{ value_json.contact }}\",\"device_class\":\"door\",\"payload_off\":true,\"payload_on\":false}",
+     "qos": 0,
+     "retain": true,
+     "ids": [
+      34
+     ]
+    },
+    {
+     "conn": 1,
+     "topic": "homeassistant/sensor/0x00158d00a1b2c3e5/temperature/config",
+     "payload": "{\"availability\":[{\"topic\":\"zigbee2mqtt/bridge/state\",\"value_template\":\"{{ value_json.state }}\"},{\"topic\":\"zigbee2mqtt/Living room sensor/availability\",\"value_template\":\"{{ value_json.state }}\"}],\"availability_mode\":\"all\",\"device\":{\"identifiers\":[\"zigbee2mqtt_0x00158d00a1b2c3e5\"],\"manufacturer\":\"Aqara\",\"model\":\"Temperature and humidity sensor\",\"model_id\":\"WSDCGQ11LM\",\"name\":\"Living room sensor\",\"sw_version\":\"3000-0001\",\"via_device\":\"zigbee2mqtt_bridge_0x00124b00a1b2c3d4\"},\"origin\":{\"name\":\"Zigbee2MQTT\",\"sw\":\"2.6.3\",\"url\":\"https://www.zigbee2mqtt.io\"},\"state_topic\":\"zigbee2mqtt/Living room sensor\",\"unique_id\":\"0x00158d00a1b2c3e5_temperature_zigbee2mqtt\",\"value_template\":\"{{ value_json.temperature }}\",\"device_class\":\"temperature\",\"enabled_by_default\":true,\"state_class\":\"measurement\",\"unit_of_measurement\":\"°C\",\"default_entity_id\":\"sensor.living_room_sensor_temperature\"}",
+     "qos": 0,
+     "retain": true,
+     "ids": [
+      55
+     ]
+    },
+    {
+     "conn": 1,
+     "topic": "homeassistant/sensor/0x00158d00a1b2c3e5/humidity/config",
+     "payload": "{\"availability\":[{\"topic\":\"zigbee2mqtt/bridge/state\",\"value_template\":\"{{ value_json.state }}\"},{\"topic\":\"zigbee2mqtt/Living room sensor/availability\",\"value_template\":\"{{ value_json.state }}\"}],\"availability_mode\":\"all\",\"device\":{\"identifiers\":[\"zigbee2mqtt_0x00158d00a1b2c3e5\"],\"manufacturer\":\"Aqara\",\"model\":\"Temperature and humidity sensor\",\"model_id\":\"WSDCGQ11LM\",\"name\":\"Living room sensor\",\"sw_version\":\"3000-0001\",\"via_device\":\"zigbee2mqtt_bridge_0x00124b00a1b2c3d4\"},\"origin\":{\"name\":\"Zigbee2MQTT\",\"sw\":\"2.6.3\",\"url\":\"https://www.zigbee2mqtt.io\"},\"state_topic\":\"zigbee2mqtt/Living room sensor\",\"unique_id\":\"0x00158d00a1b2c3e5_humidity_zigbee2mqtt\",\"value_template\":\"{{ value_json.humidity }}\",\"device_class\":\"humidity\",\"enabled_by_default\":true,\"state_class\":\"measurement\",\"unit_of_measurement\":\"%\",\"name\":\"Relative humidity\"}",
+     "qos": 0,
+     "retain": true,
+     "ids": [
+      55
+     ]
+    },
+    {
+     "conn": 1,
+     "topic": "homeassistant/sensor/0x00158d00a1b2c3e5/pressure/config",
+     "payload": "{\"availability\":[{\"topic\":\"zigbee2mqtt/bridge/state\",\"value_template\":\"{{ value_json.state }}\"},{\"topic\":\"zigbee2mqtt/Living room sensor/availability\",\"value_template\":\"{{ value_json.state }}\"}],\"availability_mode\":\"all\",\"device\":{\"identifiers\":[\"zigbee2mqtt_0x00158d00a1b2c3e5\"],\"manufacturer\":\"Aqara\",\"model\":\"Temperature and humidity sensor\",\"model_id\":\"WSDCGQ11LM\",\"name\":\"Living room sensor\",\"sw_version\":\"3000-0001\",\"via_device\":\"zigbee2mqtt_bridge_0x00124b00a1b2c3d4\"},\"origin\":{\"name\":\"Zigbee2MQTT\",\"sw\":\"2.6.3\",\"url\":\"https://www.zigbee2mqtt.io\"},\"state_topic\":\"zigbee2mqtt/Living room sensor\",\"unique_id\":\"0x00158d00a1b2c3e5_pressure_zigbee2mqtt\",\"value_template\":\"{{ value_json.pressure }}\",\"device_class\":\"atmospheric_pressure\",\"enabled_by_default\":true,\"state_class\":\"measurement\",\"unit_of_measurement\":\"hPa\"}",
+     "qos": 0,
+     "retain": true,
+     "ids": [
+      55
+     ]
+    },
+    {
+     "conn": 1,
+     "topic": "homeassistant/sensor/0x00158d00a1b2c3e5/battery/config",
+     "payload": "{\"availability\":[{\"topic\":\"zigbee2mqtt/bridge/state\",\"value_template\":\"{{ value_json.state }}\"},{\"topic\":\"zigbee2mqtt/Living room sensor/availability\",\"value_template\":\"{{ value_json.state }}\"}],\"availability_mode\":\"all\",\"device\":{\"identifiers\":[\"zigbee2mqtt_0x00158d00a1b2c3e5\"],\"manufacturer\":\"Aqara\",\"model\":\"Temperature and humidity sensor\",\"model_id\":\"WSDCGQ11LM\",\"name\":\"Living room sensor\",\"sw_version\":\"3000-0001\",\"via_device\":\"zigbee2mqtt_bridge_0x00124b00a1b2c3d4\"},\"origin\":{\"name\":\"Zigbee2MQTT\",\"sw\":\"2.6.3\",\"url\":\"https://www.zigbee2mqtt.io\"},\"state_topic\":\"zigbee2mqtt/Living room sensor\",\"unique_id\":\"0x00158d00a1b2c3e5_battery_zigbee2mqtt\",\"value_template\":\"{{ value_json.battery }}\",\"device_class\":\"battery\",\"enabled_by_default\":true,\"entity_category\":\"diagnostic\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"%\"}",
+     "qos": 0,
+     "retain": true,
+     "ids": [
+      55
+     ]
+    },
+    {
+     "conn": 1,
+     "topic": "homeassistant/sensor/0x00158d00a1b2c3e5/voltage/config",
+     "payload": "{\"availability\":[{\"topic\":\"zigbee2mqtt/bridge/state\",\"value_template\":\"{{ value_json.state }}\"},{\"topic\":\"zigbee2mqtt/Living room sensor/availability\",\"value_template\":\"{{ value_json.state }}\"}],\"availability_mode\":\"all\",\"device\":{\"identifiers\":[\"zigbee2mqtt_0x00158d00a1b2c3e5\"],\"manufacturer\":\"Aqara\",\"model\":\"Temperature and humidity sensor\",\"model_id\":\"WSDCGQ11LM\",\"name\":\"Living room sensor\",\"sw_version\":\"3000-0001\",\"via_device\":\"zigbee2mqtt_bridge_0x00124b00a1b2c3d4\"},\"origin\":{\"name\":\"Zigbee2MQTT\",\"sw\":\"2.6.3\",\"url\":\"https://www.zigbee2mqtt.io\"},\"state_topic\":\"zigbee2mqtt/Living room sensor\",\"unique_id\":\"0x00158d00a1b2c3e5_voltage_zigbee2mqtt\",\"value_template\":\"{{ value_json.voltage }}\",\"device_class\":\"voltage\",\"enabled_by_default\":false,\"entity_category\":\"diagnostic\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"mV\"}",
+     "qos": 0,
+     "retain": true,
+     "ids": [
+      55
+     ]
+    },
+    {
+     "conn": 1,
+     "topic": "homeassistant/sensor/0x00158d00a1b2c3e5/linkquality/config",
+     "payload": "{\"availability\":[{\"topic\":\"zigbee2mqtt/bridge/state\",\"value_template\":\"{{ value_json.state }}\"},{\"topic\":\"zigbee2mqtt/Living room sensor/availability\",\"value_template\":\"{{ value_json.state }}\"}],\"availability_mode\":\"all\",\"device\":{\"identifiers\":[\"zigbee2mqtt_0x00158d00a1b2c3e5\"],\"manufacturer\":\"Aqara\",\"model\":\"Temperature and humidity sensor\",\"model_id\":\"WSDCGQ11LM\",\"name\":\"Living room sensor\",\"sw_version\":\"3000-0001\",\"via_device\":\"zigbee2mqtt_bridge_0x00124b00a1b2c3d4\"},\"origin\":{\"name\":\"Zigbee2MQTT\",\"sw\":\"2.6.3\",\"url\":\"https://www.zigbee2mqtt.io\"},\"state_topic\":\"zigbee2mqtt/Living room sensor\",\"unique_id\":\"0x00158d00a1b2c3e5_linkquality_zigbee2mqtt\",\"value_template\":\"{{ value_json.linkquality }}\",\"enabled_by_default\":false,\"entity_category\":\"diagnostic\",\"icon\":\"mdi:signal\",\"name\":\"Linkquality\",\"state_class\":\"measurement\",\"unit_of_measurement\":\"lqi\"}",
+     "qos": 0,
+     "retain": true,
+     "ids": [
+      55
+     ]
+    },
+    {
+     "conn": 1,
+     "topic": "homeassistant/device/acme_ws01/config",
+     "payload": "{\"dev\":{\"ids\":\"acme_ws01\",\"name\":\"Weather station\",\"mf\":\"Acme\",\"mdl\":\"WS-01\",\"sw\":\"1.0\",\"hw\":\"rev2\",\"sn\":\"WS01-0001\"},\"o\":{\"name\":\"acme2mqtt\",\"sw\":\"0.1\",\"url\":\"https://example.com/support\"},\"cmps\":{\"temp\":{\"p\":\"sensor\",\"dev_cla\":\"temperature\",\"unit_of_meas\":\"°C\",\"stat_cla\":\"measurement\",\"val_tpl\":\"{{ value_json.temperature }}\",\"uniq_id\":\"acme_ws01_temp\",\"exp_aft\":120},\"rain\":{\"p\":\"binary_sensor\"},\"uptime\":{\"p\":\"sensor\",\"name\":null,\"stat_t\":\"acme/ws01/uptime\",\"uniq_id\":\"acme_ws01_uptime\",\"ent_cat\":\"diagnostic\"}},\"stat_t\":\"acme/ws01/state\",\"avty_t\":\"acme/ws01/availability\",\"qos\":1}",
+     "qos": 0,
+     "retain": true,
+     "ids": [
+      64
+     ]
+    },
+    {
+     "conn": 1,
+     "topic": "acme/ws01/availability",
+     "payload": "online",
+     "qos": 0,
+     "retain": true,
+     "ids": [
+      1
+     ]
+    },
+    {
+     "conn": 1,
+     "topic": "tele/tasmota_A1B2C3/LWT",
+     "payload": "Online",
+     "qos": 0,
+     "retain": true,
+     "ids": [
+      1
+     ]
+    },
+    {
+     "conn": 1,
+     "topic": "zigbee2mqtt/Front door/availability",
+     "payload": "{\"state\":\"online\"}",
+     "qos": 0,
+     "retain": true,
+     "ids": [
+      1
+     ]
+    },
+    {
+     "conn": 1,
+     "topic": "zigbee2mqtt/Living room sensor/availability",
+     "payload": "{\"state\":\"online\"}",
+     "qos": 0,
+     "retain": true,
+     "ids": [
+      1
+     ]
+    },
+    {
+     "conn": 1,
+     "topic": "zigbee2mqtt/bridge/state",
+     "payload": "{\"state\":\"online\"}",
+     "qos": 0,
+     "retain": true,
+     "ids": [
+      1
+     ]
+    }
+   ],
+   "sent": [
+    {
+     "conn": 1,
+     "at": 154.7,
+     "packet": {
+      "type": "CONNECT",
+      "protocol": "MQTT",
+      "level": 5,
+      "clean": true,
+      "keepalive": 60,
+      "properties": {},
+      "client_id": "<random>",
+      "will": {
+       "qos": 0,
+       "retain": false,
+       "properties": {},
+       "topic": "homeassistant/status",
+       "payload": "offline"
+      },
+      "username": "hars",
+      "password": "fake-password"
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 83,
+      "properties": {
+       "SubscriptionIdentifier": [
+        2
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/alarm_control_panel/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 84,
+      "properties": {
+       "SubscriptionIdentifier": [
+        3
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/binary_sensor/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 85,
+      "properties": {
+       "SubscriptionIdentifier": [
+        4
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/button/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 86,
+      "properties": {
+       "SubscriptionIdentifier": [
+        5
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/camera/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 87,
+      "properties": {
+       "SubscriptionIdentifier": [
+        6
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/climate/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 88,
+      "properties": {
+       "SubscriptionIdentifier": [
+        7
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/cover/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 89,
+      "properties": {
+       "SubscriptionIdentifier": [
+        8
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/date/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 90,
+      "properties": {
+       "SubscriptionIdentifier": [
+        9
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/datetime/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 91,
+      "properties": {
+       "SubscriptionIdentifier": [
+        10
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/device_automation/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 92,
+      "properties": {
+       "SubscriptionIdentifier": [
+        11
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/device_tracker/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 93,
+      "properties": {
+       "SubscriptionIdentifier": [
+        12
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/event/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 94,
+      "properties": {
+       "SubscriptionIdentifier": [
+        13
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/fan/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 95,
+      "properties": {
+       "SubscriptionIdentifier": [
+        14
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/humidifier/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 96,
+      "properties": {
+       "SubscriptionIdentifier": [
+        15
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/image/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 97,
+      "properties": {
+       "SubscriptionIdentifier": [
+        16
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/lawn_mower/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 98,
+      "properties": {
+       "SubscriptionIdentifier": [
+        17
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/light/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 99,
+      "properties": {
+       "SubscriptionIdentifier": [
+        18
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/lock/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 100,
+      "properties": {
+       "SubscriptionIdentifier": [
+        19
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/notify/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 101,
+      "properties": {
+       "SubscriptionIdentifier": [
+        20
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/number/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 102,
+      "properties": {
+       "SubscriptionIdentifier": [
+        21
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/scene/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 103,
+      "properties": {
+       "SubscriptionIdentifier": [
+        22
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/siren/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 104,
+      "properties": {
+       "SubscriptionIdentifier": [
+        23
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/select/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 105,
+      "properties": {
+       "SubscriptionIdentifier": [
+        24
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/sensor/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 106,
+      "properties": {
+       "SubscriptionIdentifier": [
+        25
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/switch/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 107,
+      "properties": {
+       "SubscriptionIdentifier": [
+        26
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/tag/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 108,
+      "properties": {
+       "SubscriptionIdentifier": [
+        27
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/text/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 109,
+      "properties": {
+       "SubscriptionIdentifier": [
+        28
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/time/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 110,
+      "properties": {
+       "SubscriptionIdentifier": [
+        29
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/update/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 111,
+      "properties": {
+       "SubscriptionIdentifier": [
+        30
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/vacuum/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 112,
+      "properties": {
+       "SubscriptionIdentifier": [
+        31
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/valve/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 113,
+      "properties": {
+       "SubscriptionIdentifier": [
+        32
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/water_heater/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 114,
+      "properties": {
+       "SubscriptionIdentifier": [
+        33
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/alarm_control_panel/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 115,
+      "properties": {
+       "SubscriptionIdentifier": [
+        34
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/binary_sensor/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 116,
+      "properties": {
+       "SubscriptionIdentifier": [
+        35
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/button/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 117,
+      "properties": {
+       "SubscriptionIdentifier": [
+        36
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/camera/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 118,
+      "properties": {
+       "SubscriptionIdentifier": [
+        37
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/climate/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 119,
+      "properties": {
+       "SubscriptionIdentifier": [
+        38
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/cover/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 120,
+      "properties": {
+       "SubscriptionIdentifier": [
+        39
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/date/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 121,
+      "properties": {
+       "SubscriptionIdentifier": [
+        40
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/datetime/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 122,
+      "properties": {
+       "SubscriptionIdentifier": [
+        41
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/device_automation/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 123,
+      "properties": {
+       "SubscriptionIdentifier": [
+        42
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/device_tracker/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 124,
+      "properties": {
+       "SubscriptionIdentifier": [
+        43
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/event/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 125,
+      "properties": {
+       "SubscriptionIdentifier": [
+        44
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/fan/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 126,
+      "properties": {
+       "SubscriptionIdentifier": [
+        45
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/humidifier/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 127,
+      "properties": {
+       "SubscriptionIdentifier": [
+        46
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/image/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 128,
+      "properties": {
+       "SubscriptionIdentifier": [
+        47
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/lawn_mower/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 129,
+      "properties": {
+       "SubscriptionIdentifier": [
+        48
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/light/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 130,
+      "properties": {
+       "SubscriptionIdentifier": [
+        49
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/lock/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 131,
+      "properties": {
+       "SubscriptionIdentifier": [
+        50
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/notify/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 132,
+      "properties": {
+       "SubscriptionIdentifier": [
+        51
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/number/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 133,
+      "properties": {
+       "SubscriptionIdentifier": [
+        52
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/scene/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 134,
+      "properties": {
+       "SubscriptionIdentifier": [
+        53
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/siren/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 135,
+      "properties": {
+       "SubscriptionIdentifier": [
+        54
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/select/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 136,
+      "properties": {
+       "SubscriptionIdentifier": [
+        55
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/sensor/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 137,
+      "properties": {
+       "SubscriptionIdentifier": [
+        56
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/switch/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 138,
+      "properties": {
+       "SubscriptionIdentifier": [
+        57
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/tag/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 139,
+      "properties": {
+       "SubscriptionIdentifier": [
+        58
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/text/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 140,
+      "properties": {
+       "SubscriptionIdentifier": [
+        59
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/time/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 141,
+      "properties": {
+       "SubscriptionIdentifier": [
+        60
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/update/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 142,
+      "properties": {
+       "SubscriptionIdentifier": [
+        61
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/vacuum/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 143,
+      "properties": {
+       "SubscriptionIdentifier": [
+        62
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/valve/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 144,
+      "properties": {
+       "SubscriptionIdentifier": [
+        63
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/water_heater/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 145,
+      "properties": {
+       "SubscriptionIdentifier": [
+        64
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/device/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 146,
+      "properties": {
+       "SubscriptionIdentifier": [
+        65
+       ]
+      },
+      "topics": [
+       [
+        "homeassistant/device/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 147,
+      "properties": {
+       "SubscriptionIdentifier": [
+        66
+       ]
+      },
+      "topics": [
+       [
+        "drop_connect/discovery/#",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 148,
+      "properties": {
+       "SubscriptionIdentifier": [
+        67
+       ]
+      },
+      "topics": [
+       [
+        "dsmr/#",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 149,
+      "properties": {
+       "SubscriptionIdentifier": [
+        68
+       ]
+      },
+      "topics": [
+       [
+        "esphome/discover/#",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 150,
+      "properties": {
+       "SubscriptionIdentifier": [
+        69
+       ]
+      },
+      "topics": [
+       [
+        "fully/deviceInfo/+",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 151,
+      "properties": {
+       "SubscriptionIdentifier": [
+        70
+       ]
+      },
+      "topics": [
+       [
+        "inels/status/#",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 152,
+      "properties": {
+       "SubscriptionIdentifier": [
+        71
+       ]
+      },
+      "topics": [
+       [
+        "pglab/discovery/#",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 153,
+      "properties": {
+       "SubscriptionIdentifier": [
+        72
+       ]
+      },
+      "topics": [
+       [
+        "cloudapp/QBUSMQTTGW/+/state",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 154,
+      "properties": {
+       "SubscriptionIdentifier": [
+        73
+       ]
+      },
+      "topics": [
+       [
+        "tasmota/discovery/#",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 154.9,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 155,
+      "properties": {
+       "SubscriptionIdentifier": [
+        1
+       ]
+      },
+      "topics": [
+       [
+        "acme/ws01/availability",
+        1
+       ],
+       [
+        "acme/ws01/state",
+        1
+       ],
+       [
+        "acme/ws01/uptime",
+        1
+       ],
+       [
+        "cloudapp/QBUSMQTTGW/config",
+        0
+       ],
+       [
+        "cloudapp/QBUSMQTTGW/state",
+        0
+       ],
+       [
+        "tele/tasmota_A1B2C3/HASS_STATE",
+        0
+       ],
+       [
+        "tele/tasmota_A1B2C3/LWT",
+        0
+       ],
+       [
+        "tele/tasmota_A1B2C3/SENSOR",
+        0
+       ],
+       [
+        "zigbee2mqtt/Front door",
+        0
+       ],
+       [
+        "zigbee2mqtt/Front door/availability",
+        0
+       ],
+       [
+        "zigbee2mqtt/Living room sensor",
+        0
+       ],
+       [
+        "zigbee2mqtt/Living room sensor/availability",
+        0
+       ],
+       [
+        "zigbee2mqtt/bridge/state",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 159.9,
+     "packet": {
+      "type": "PUBLISH",
+      "topic": "homeassistant/status",
+      "qos": 0,
+      "retain": false,
+      "dup": false,
+      "properties": {},
+      "payload": "online"
+     }
+    }
+   ],
+   "states": {
+    "binary_sensor.front_door_door": {
+     "state": "on",
+     "attributes": {
+      "device_class": "door",
+      "friendly_name": "Front door Door"
+     },
+     "changed": true,
+     "updated": true
+    },
+    "binary_sensor.zigbee2mqtt_bridge_connection_state": {
+     "state": "on",
+     "attributes": {
+      "device_class": "connectivity",
+      "friendly_name": "Zigbee2MQTT Bridge Connection state"
+     },
+     "changed": true,
+     "updated": true
+    },
+    "sensor.living_room_sensor_atmospheric_pressure": {
+     "state": "1013.4",
+     "attributes": {
+      "state_class": "measurement",
+      "unit_of_measurement": "hPa",
+      "device_class": "atmospheric_pressure",
+      "friendly_name": "Living room sensor Atmospheric pressure"
+     },
+     "changed": true,
+     "updated": true
+    },
+    "sensor.living_room_sensor_battery": {
+     "state": "91",
+     "attributes": {
+      "state_class": "measurement",
+      "unit_of_measurement": "%",
+      "device_class": "battery",
+      "friendly_name": "Living room sensor Battery"
+     },
+     "changed": true,
+     "updated": true
+    },
+    "sensor.living_room_sensor_humidity": {
+     "state": "52.84",
+     "attributes": {
+      "state_class": "measurement",
+      "unit_of_measurement": "%",
+      "device_class": "humidity",
+      "friendly_name": "Living room sensor Relative humidity"
+     },
+     "changed": true,
+     "updated": true
+    },
+    "sensor.tasmota_tasmota_ds18b20_temperature": {
+     "state": "19.4",
+     "attributes": {
+      "unit_of_measurement": "°C",
+      "device_class": "temperature",
+      "friendly_name": "Tasmota Tasmota DS18B20 Temperature"
+     },
+     "changed": true,
+     "updated": true
+    },
+    "sensor.tasmota_tasmota_status": {
+     "state": "100",
+     "attributes": {
+      "Version": "9.1.0(tasmota)",
+      "BuildDateTime": "2020-11-23T09:00:00",
+      "Module or Template": "Sonoff Basic",
+      "RestartReason": "Software/System restart",
+      "Uptime": "0T00:05:12",
+      "Hostname": "tasmota-A1B2C3-0451",
+      "IPAddress": "192.0.2.30",
+      "RSSI": "100",
+      "Signal (dBm)": "-48",
+      "WiFi LinkCount": 1,
+      "WiFi Downtime": "0T00:00:03",
+      "MqttCount": 1,
+      "LoadAvg": 19,
+      "unit_of_measurement": "%",
+      "icon": "mdi:information-outline",
+      "friendly_name": "Tasmota Tasmota status"
+     },
+     "changed": true,
+     "updated": true
+    },
+    "sensor.weather_station": {
+     "state": "3600",
+     "attributes": {
+      "friendly_name": "Weather station"
+     },
+     "changed": true,
+     "updated": true
+    }
+   },
+   "log": []
+  },
+  {
+   "do": "publish",
+   "topic": "zigbee2mqtt/Living room sensor",
+   "payload": "{\"temperature\":21.9}",
+   "retain": false,
+   "qos": 0,
+   "received": [
+    {
+     "conn": 1,
+     "topic": "zigbee2mqtt/Living room sensor",
+     "payload": "{\"temperature\":21.9}",
+     "qos": 0,
+     "retain": false,
+     "ids": [
+      1
+     ]
+    }
+   ],
+   "sent": [],
+   "states": {
+    "sensor.living_room_sensor_temperature": {
+     "state": "21.9",
+     "attributes": {
+      "state_class": "measurement",
+      "unit_of_measurement": "°C",
+      "device_class": "temperature",
+      "friendly_name": "Living room sensor Temperature"
+     },
+     "changed": true,
+     "updated": true
+    }
+   },
+   "log": [
+    [
+     "WARNING",
+     "homeassistant.helpers.template",
+     "Template variable warning: 'dict object' has no attribute 'pressure' when rendering '{{ value_json.pressure }}'"
+    ],
+    [
+     "WARNING",
+     "homeassistant.helpers.template",
+     "Template variable warning: 'dict object' has no attribute 'battery' when rendering '{{ value_json.battery }}'"
+    ],
+    [
+     "WARNING",
+     "homeassistant.helpers.template",
+     "Template variable warning: 'dict object' has no attribute 'humidity' when rendering '{{ value_json.humidity }}'"
+    ]
+   ]
+  }
+ ],
+ "stored_entry": {
+  "data": {
+   "broker": "127.0.0.1",
+   "port": "<port>",
+   "username": "hars",
+   "password": "fake-password",
+   "protocol": "5"
+  },
+  "options": {},
+  "version": 2,
+  "minor_version": 1
+ },
+ "devices": [
+  {
+   "id": "<device 1>",
+   "identifiers": [
+    [
+     "mqtt",
+     "A1B2C3"
+    ]
+   ],
+   "connections": [
+    [
+     "mac",
+     "02:00:00:a1:b2:c3"
+    ]
+   ],
+   "manufacturer": "Tasmota",
+   "model": "Sonoff Basic",
+   "model_id": null,
+   "name": "Tasmota",
+   "name_by_user": null,
+   "sw_version": "9.1.0(tasmota)",
+   "hw_version": null,
+   "serial_number": null,
+   "configuration_url": null,
+   "via_device_id": null,
+   "entry_type": null,
+   "area_id": null,
+   "primary_config_entry": "<entry>"
+  },
+  {
+   "id": "<device 2>",
+   "identifiers": [
+    [
+     "mqtt",
+     "zigbee2mqtt_bridge_0x00124b00a1b2c3d4"
+    ]
+   ],
+   "connections": [],
+   "manufacturer": "Zigbee2MQTT",
+   "model": "Bridge",
+   "model_id": null,
+   "name": "Zigbee2MQTT Bridge",
+   "name_by_user": null,
+   "sw_version": "2.6.3",
+   "hw_version": "zStack3x0 20240710",
+   "serial_number": null,
+   "configuration_url": "http://192.0.2.20:8080/#/settings",
+   "via_device_id": null,
+   "entry_type": null,
+   "area_id": null,
+   "primary_config_entry": "<entry>"
+  },
+  {
+   "id": "<device 3>",
+   "identifiers": [
+    [
+     "mqtt",
+     "zigbee2mqtt_0x00158d00a1b2c3e5"
+    ]
+   ],
+   "connections": [],
+   "manufacturer": "Aqara",
+   "model": "Temperature and humidity sensor",
+   "model_id": "WSDCGQ11LM",
+   "name": "Living room sensor",
+   "name_by_user": null,
+   "sw_version": "3000-0001",
+   "hw_version": null,
+   "serial_number": null,
+   "configuration_url": null,
+   "via_device_id": "<device 2>",
+   "entry_type": null,
+   "area_id": null,
+   "primary_config_entry": "<entry>"
+  },
+  {
+   "id": "<device 4>",
+   "identifiers": [
+    [
+     "mqtt",
+     "zigbee2mqtt_0x00158d00a1b2c3f6"
+    ]
+   ],
+   "connections": [],
+   "manufacturer": "Aqara",
+   "model": "Door and window sensor",
+   "model_id": "MCCGQ11LM",
+   "name": "Front door",
+   "name_by_user": null,
+   "sw_version": "3000-0001",
+   "hw_version": null,
+   "serial_number": null,
+   "configuration_url": null,
+   "via_device_id": "<device 2>",
+   "entry_type": null,
+   "area_id": null,
+   "primary_config_entry": "<entry>"
+  },
+  {
+   "id": "<device 5>",
+   "identifiers": [
+    [
+     "mqtt",
+     "acme_ws01"
+    ]
+   ],
+   "connections": [],
+   "manufacturer": "Acme",
+   "model": "WS-01",
+   "model_id": null,
+   "name": "Weather station",
+   "name_by_user": null,
+   "sw_version": "1.0",
+   "hw_version": "rev2",
+   "serial_number": "WS01-0001",
+   "configuration_url": null,
+   "via_device_id": null,
+   "entry_type": null,
+   "area_id": null,
+   "primary_config_entry": "<entry>"
+  }
+ ],
+ "entities": [
+  {
+   "entity_id": "binary_sensor.front_door_door",
+   "unique_id": "0x00158d00a1b2c3f6_contact_zigbee2mqtt",
+   "platform": "mqtt",
+   "config_entry_id": "<entry>",
+   "device_id": "<device 4>",
+   "disabled_by": null,
+   "hidden_by": null,
+   "entity_category": null,
+   "has_entity_name": true,
+   "original_name": "Door",
+   "original_device_class": "door",
+   "original_icon": null,
+   "object_id_base": "Door",
+   "suggested_object_id": null,
+   "capabilities": null,
+   "supported_features": 0,
+   "unit_of_measurement": null,
+   "options": {},
+   "translation_key": null
+  },
+  {
+   "entity_id": "binary_sensor.zigbee2mqtt_bridge_connection_state",
+   "unique_id": "bridge_0x00124b00a1b2c3d4_connection_state_zigbee2mqtt",
+   "platform": "mqtt",
+   "config_entry_id": "<entry>",
+   "device_id": "<device 2>",
+   "disabled_by": null,
+   "hidden_by": null,
+   "entity_category": "diagnostic",
+   "has_entity_name": true,
+   "original_name": "Connection state",
+   "original_device_class": "connectivity",
+   "original_icon": null,
+   "object_id_base": null,
+   "suggested_object_id": "zigbee2mqtt_bridge_connection_state",
+   "capabilities": null,
+   "supported_features": 0,
+   "unit_of_measurement": null,
+   "options": {},
+   "translation_key": null
+  },
+  {
+   "entity_id": "sensor.living_room_sensor_atmospheric_pressure",
+   "unique_id": "0x00158d00a1b2c3e5_pressure_zigbee2mqtt",
+   "platform": "mqtt",
+   "config_entry_id": "<entry>",
+   "device_id": "<device 3>",
+   "disabled_by": null,
+   "hidden_by": null,
+   "entity_category": null,
+   "has_entity_name": true,
+   "original_name": "Atmospheric pressure",
+   "original_device_class": "atmospheric_pressure",
+   "original_icon": null,
+   "object_id_base": "Atmospheric pressure",
+   "suggested_object_id": null,
+   "capabilities": {
+    "state_class": "measurement"
+   },
+   "supported_features": 0,
+   "unit_of_measurement": "hPa",
+   "options": {
+    "sensor": {
+     "suggested_display_precision": 2
+    }
+   },
+   "translation_key": null
+  },
+  {
+   "entity_id": "sensor.living_room_sensor_battery",
+   "unique_id": "0x00158d00a1b2c3e5_battery_zigbee2mqtt",
+   "platform": "mqtt",
+   "config_entry_id": "<entry>",
+   "device_id": "<device 3>",
+   "disabled_by": null,
+   "hidden_by": null,
+   "entity_category": "diagnostic",
+   "has_entity_name": true,
+   "original_name": "Battery",
+   "original_device_class": "battery",
+   "original_icon": null,
+   "object_id_base": "Battery",
+   "suggested_object_id": null,
+   "capabilities": {
+    "state_class": "measurement"
+   },
+   "supported_features": 0,
+   "unit_of_measurement": "%",
+   "options": {},
+   "translation_key": null
+  },
+  {
+   "entity_id": "sensor.living_room_sensor_humidity",
+   "unique_id": "0x00158d00a1b2c3e5_humidity_zigbee2mqtt",
+   "platform": "mqtt",
+   "config_entry_id": "<entry>",
+   "device_id": "<device 3>",
+   "disabled_by": null,
+   "hidden_by": null,
+   "entity_category": null,
+   "has_entity_name": true,
+   "original_name": "Relative humidity",
+   "original_device_class": "humidity",
+   "original_icon": null,
+   "object_id_base": "Humidity",
+   "suggested_object_id": null,
+   "capabilities": {
+    "state_class": "measurement"
+   },
+   "supported_features": 0,
+   "unit_of_measurement": "%",
+   "options": {},
+   "translation_key": null
+  },
+  {
+   "entity_id": "sensor.living_room_sensor_linkquality",
+   "unique_id": "0x00158d00a1b2c3e5_linkquality_zigbee2mqtt",
+   "platform": "mqtt",
+   "config_entry_id": "<entry>",
+   "device_id": "<device 3>",
+   "disabled_by": "integration",
+   "hidden_by": null,
+   "entity_category": "diagnostic",
+   "has_entity_name": true,
+   "original_name": "Linkquality",
+   "original_device_class": null,
+   "original_icon": "mdi:signal",
+   "object_id_base": "Linkquality",
+   "suggested_object_id": null,
+   "capabilities": {
+    "state_class": "measurement"
+   },
+   "supported_features": 0,
+   "unit_of_measurement": "lqi",
+   "options": {},
+   "translation_key": null
+  },
+  {
+   "entity_id": "sensor.living_room_sensor_temperature",
+   "unique_id": "0x00158d00a1b2c3e5_temperature_zigbee2mqtt",
+   "platform": "mqtt",
+   "config_entry_id": "<entry>",
+   "device_id": "<device 3>",
+   "disabled_by": null,
+   "hidden_by": null,
+   "entity_category": null,
+   "has_entity_name": true,
+   "original_name": "Temperature",
+   "original_device_class": "temperature",
+   "original_icon": null,
+   "object_id_base": null,
+   "suggested_object_id": "living_room_sensor_temperature",
+   "capabilities": {
+    "state_class": "measurement"
+   },
+   "supported_features": 0,
+   "unit_of_measurement": "°C",
+   "options": {
+    "sensor": {
+     "suggested_display_precision": 1
+    }
+   },
+   "translation_key": null
+  },
+  {
+   "entity_id": "sensor.living_room_sensor_voltage",
+   "unique_id": "0x00158d00a1b2c3e5_voltage_zigbee2mqtt",
+   "platform": "mqtt",
+   "config_entry_id": "<entry>",
+   "device_id": "<device 3>",
+   "disabled_by": "integration",
+   "hidden_by": null,
+   "entity_category": "diagnostic",
+   "has_entity_name": true,
+   "original_name": "Voltage",
+   "original_device_class": "voltage",
+   "original_icon": null,
+   "object_id_base": "Voltage",
+   "suggested_object_id": null,
+   "capabilities": {
+    "state_class": "measurement"
+   },
+   "supported_features": 0,
+   "unit_of_measurement": "mV",
+   "options": {},
+   "translation_key": null
+  },
+  {
+   "entity_id": "sensor.tasmota_tasmota_ds18b20_temperature",
+   "unique_id": "A1B2C3_DS18B20_Temperature",
+   "platform": "mqtt",
+   "config_entry_id": "<entry>",
+   "device_id": "<device 1>",
+   "disabled_by": null,
+   "hidden_by": null,
+   "entity_category": null,
+   "has_entity_name": true,
+   "original_name": "Tasmota DS18B20 Temperature",
+   "original_device_class": "temperature",
+   "original_icon": null,
+   "object_id_base": "Tasmota DS18B20 Temperature",
+   "suggested_object_id": null,
+   "capabilities": null,
+   "supported_features": 0,
+   "unit_of_measurement": "°C",
+   "options": {
+    "sensor": {
+     "suggested_display_precision": 1
+    }
+   },
+   "translation_key": null
+  },
+  {
+   "entity_id": "sensor.tasmota_tasmota_status",
+   "unique_id": "A1B2C3_status",
+   "platform": "mqtt",
+   "config_entry_id": "<entry>",
+   "device_id": "<device 1>",
+   "disabled_by": null,
+   "hidden_by": null,
+   "entity_category": null,
+   "has_entity_name": true,
+   "original_name": "Tasmota status",
+   "original_device_class": null,
+   "original_icon": "mdi:information-outline",
+   "object_id_base": "Tasmota status",
+   "suggested_object_id": null,
+   "capabilities": null,
+   "supported_features": 0,
+   "unit_of_measurement": "%",
+   "options": {},
+   "translation_key": null
+  },
+  {
+   "entity_id": "sensor.weather_station",
+   "unique_id": "acme_ws01_uptime",
+   "platform": "mqtt",
+   "config_entry_id": "<entry>",
+   "device_id": "<device 5>",
+   "disabled_by": null,
+   "hidden_by": null,
+   "entity_category": "diagnostic",
+   "has_entity_name": true,
+   "original_name": null,
+   "original_device_class": null,
+   "original_icon": null,
+   "object_id_base": null,
+   "suggested_object_id": null,
+   "capabilities": null,
+   "supported_features": 0,
+   "unit_of_measurement": null,
+   "options": {},
+   "translation_key": null
+  },
+  {
+   "entity_id": "sensor.weather_station_temperature",
+   "unique_id": "acme_ws01_temp",
+   "platform": "mqtt",
+   "config_entry_id": "<entry>",
+   "device_id": "<device 5>",
+   "disabled_by": null,
+   "hidden_by": null,
+   "entity_category": null,
+   "has_entity_name": true,
+   "original_name": "Temperature",
+   "original_device_class": "temperature",
+   "original_icon": null,
+   "object_id_base": "Temperature",
+   "suggested_object_id": null,
+   "capabilities": {
+    "state_class": "measurement"
+   },
+   "supported_features": 0,
+   "unit_of_measurement": "°C",
+   "options": {
+    "sensor": {
+     "suggested_display_precision": 1
+    }
+   },
+   "translation_key": null
+  }
+ ],
+ "deleted_entities": [
+  [
+   "binary_sensor",
+   "mqtt",
+   "acme_ws01_rain"
+  ],
+  [
+   "sensor",
+   "mqtt",
+   "0x00158d00a1b2c3f6_battery_zigbee2mqtt"
+  ]
+ ]
+}

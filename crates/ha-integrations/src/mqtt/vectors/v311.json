@@ -1,0 +1,1346 @@
+{
+ "entry": {
+  "data": {
+   "broker": "127.0.0.1",
+   "port": "<port>",
+   "client_id": "hars-test",
+   "keepalive": 15,
+   "discovery": true,
+   "discovery_prefix": "hass",
+   "birth_message": {
+    "topic": "hass/status",
+    "payload": "up",
+    "qos": 1,
+    "retain": true
+   },
+   "will_message": {
+    "topic": "hass/status",
+    "payload": "down",
+    "qos": 1,
+    "retain": true
+   }
+  },
+  "options": {},
+  "version": 1,
+  "minor_version": 1,
+  "title": "127.0.0.1"
+ },
+ "retained_before": [
+  {
+   "do": "publish",
+   "topic": "hass/sensor/A1B2C3_DS18B20_Temperature/config",
+   "payload": "{\"name\":\"Tasmota DS18B20 Temperature\",\"stat_t\":\"tele/tasmota_A1B2C3/SENSOR\",\"avty_t\":\"tele/tasmota_A1B2C3/LWT\",\"pl_avail\":\"Online\",\"pl_not_avail\":\"Offline\",\"uniq_id\":\"A1B2C3_DS18B20_Temperature\",\"dev\":{\"ids\":[\"A1B2C3\"]},\"unit_of_meas\":\"°C\",\"dev_cla\":\"temperature\",\"frc_upd\":true,\"val_tpl\":\"{{value_json['DS18B20'].Temperature}}\"}",
+   "retain": true,
+   "qos": 0
+  }
+ ],
+ "steps": [
+  {
+   "do": "setup",
+   "received": [],
+   "sent": [
+    {
+     "conn": 0,
+     "at": 0.0,
+     "packet": {
+      "type": "CONNECT",
+      "protocol": "MQTT",
+      "level": 5,
+      "clean": true,
+      "keepalive": 60,
+      "properties": {},
+      "client_id": "hars-test"
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.0,
+     "packet": {
+      "type": "CONNECT",
+      "protocol": "MQTT",
+      "level": 4,
+      "clean": true,
+      "keepalive": 15,
+      "client_id": "hars-test",
+      "will": {
+       "qos": 1,
+       "retain": true,
+       "topic": "hass/status",
+       "payload": "down"
+      }
+     }
+    }
+   ],
+   "states": {},
+   "log": [],
+   "entry_state": "loaded"
+  },
+  {
+   "do": "start",
+   "waited": 7,
+   "received": [
+    {
+     "conn": 1,
+     "topic": "hass/sensor/A1B2C3_DS18B20_Temperature/config",
+     "payload": "{\"name\":\"Tasmota DS18B20 Temperature\",\"stat_t\":\"tele/tasmota_A1B2C3/SENSOR\",\"avty_t\":\"tele/tasmota_A1B2C3/LWT\",\"pl_avail\":\"Online\",\"pl_not_avail\":\"Offline\",\"uniq_id\":\"A1B2C3_DS18B20_Temperature\",\"dev\":{\"ids\":[\"A1B2C3\"]},\"unit_of_meas\":\"°C\",\"dev_cla\":\"temperature\",\"frc_upd\":true,\"val_tpl\":\"{{value_json['DS18B20'].Temperature}}\"}",
+     "qos": 0,
+     "retain": true,
+     "ids": []
+    }
+   ],
+   "sent": [
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 1,
+      "topics": [
+       [
+        "hass/alarm_control_panel/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 2,
+      "topics": [
+       [
+        "hass/binary_sensor/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 3,
+      "topics": [
+       [
+        "hass/button/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 4,
+      "topics": [
+       [
+        "hass/camera/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 5,
+      "topics": [
+       [
+        "hass/climate/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 6,
+      "topics": [
+       [
+        "hass/cover/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 7,
+      "topics": [
+       [
+        "hass/date/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 8,
+      "topics": [
+       [
+        "hass/datetime/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 9,
+      "topics": [
+       [
+        "hass/device_automation/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 10,
+      "topics": [
+       [
+        "hass/device_tracker/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 11,
+      "topics": [
+       [
+        "hass/event/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 12,
+      "topics": [
+       [
+        "hass/fan/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 13,
+      "topics": [
+       [
+        "hass/humidifier/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 14,
+      "topics": [
+       [
+        "hass/image/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 15,
+      "topics": [
+       [
+        "hass/lawn_mower/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 16,
+      "topics": [
+       [
+        "hass/light/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 17,
+      "topics": [
+       [
+        "hass/lock/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 18,
+      "topics": [
+       [
+        "hass/notify/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 19,
+      "topics": [
+       [
+        "hass/number/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 20,
+      "topics": [
+       [
+        "hass/scene/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 21,
+      "topics": [
+       [
+        "hass/siren/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 22,
+      "topics": [
+       [
+        "hass/select/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 23,
+      "topics": [
+       [
+        "hass/sensor/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 24,
+      "topics": [
+       [
+        "hass/switch/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 25,
+      "topics": [
+       [
+        "hass/tag/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 26,
+      "topics": [
+       [
+        "hass/text/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 27,
+      "topics": [
+       [
+        "hass/time/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 28,
+      "topics": [
+       [
+        "hass/update/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 29,
+      "topics": [
+       [
+        "hass/vacuum/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 30,
+      "topics": [
+       [
+        "hass/valve/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 31,
+      "topics": [
+       [
+        "hass/water_heater/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 32,
+      "topics": [
+       [
+        "hass/alarm_control_panel/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 33,
+      "topics": [
+       [
+        "hass/binary_sensor/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 34,
+      "topics": [
+       [
+        "hass/button/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 35,
+      "topics": [
+       [
+        "hass/camera/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 36,
+      "topics": [
+       [
+        "hass/climate/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 37,
+      "topics": [
+       [
+        "hass/cover/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 38,
+      "topics": [
+       [
+        "hass/date/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 39,
+      "topics": [
+       [
+        "hass/datetime/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 40,
+      "topics": [
+       [
+        "hass/device_automation/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 41,
+      "topics": [
+       [
+        "hass/device_tracker/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 42,
+      "topics": [
+       [
+        "hass/event/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 43,
+      "topics": [
+       [
+        "hass/fan/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 44,
+      "topics": [
+       [
+        "hass/humidifier/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 45,
+      "topics": [
+       [
+        "hass/image/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 46,
+      "topics": [
+       [
+        "hass/lawn_mower/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 47,
+      "topics": [
+       [
+        "hass/light/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 48,
+      "topics": [
+       [
+        "hass/lock/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 49,
+      "topics": [
+       [
+        "hass/notify/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 50,
+      "topics": [
+       [
+        "hass/number/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 51,
+      "topics": [
+       [
+        "hass/scene/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 52,
+      "topics": [
+       [
+        "hass/siren/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 53,
+      "topics": [
+       [
+        "hass/select/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 54,
+      "topics": [
+       [
+        "hass/sensor/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 55,
+      "topics": [
+       [
+        "hass/switch/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 56,
+      "topics": [
+       [
+        "hass/tag/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 57,
+      "topics": [
+       [
+        "hass/text/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 58,
+      "topics": [
+       [
+        "hass/time/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 59,
+      "topics": [
+       [
+        "hass/update/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 60,
+      "topics": [
+       [
+        "hass/vacuum/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 61,
+      "topics": [
+       [
+        "hass/valve/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 62,
+      "topics": [
+       [
+        "hass/water_heater/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 63,
+      "topics": [
+       [
+        "hass/device/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 64,
+      "topics": [
+       [
+        "hass/device/+/+/config",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 65,
+      "topics": [
+       [
+        "drop_connect/discovery/#",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 66,
+      "topics": [
+       [
+        "dsmr/#",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 67,
+      "topics": [
+       [
+        "esphome/discover/#",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 68,
+      "topics": [
+       [
+        "fully/deviceInfo/+",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 69,
+      "topics": [
+       [
+        "inels/status/#",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 70,
+      "topics": [
+       [
+        "pglab/discovery/#",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 71,
+      "topics": [
+       [
+        "cloudapp/QBUSMQTTGW/+/state",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 72,
+      "topics": [
+       [
+        "tasmota/discovery/#",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 0.5,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 73,
+      "topics": [
+       [
+        "cloudapp/QBUSMQTTGW/config",
+        0
+       ],
+       [
+        "cloudapp/QBUSMQTTGW/state",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 1.0,
+     "packet": {
+      "type": "SUBSCRIBE",
+      "packet_id": 74,
+      "topics": [
+       [
+        "tele/tasmota_A1B2C3/LWT",
+        0
+       ],
+       [
+        "tele/tasmota_A1B2C3/SENSOR",
+        0
+       ]
+      ]
+     }
+    },
+    {
+     "conn": 1,
+     "at": 6.0,
+     "packet": {
+      "type": "PUBLISH",
+      "topic": "hass/status",
+      "qos": 1,
+      "retain": true,
+      "dup": false,
+      "packet_id": 75,
+      "payload": "up"
+     }
+    }
+   ],
+   "states": {
+    "sensor.tasmota_ds18b20_temperature": {
+     "state": "unavailable",
+     "attributes": {
+      "unit_of_measurement": "°C",
+      "device_class": "temperature",
+      "friendly_name": "Tasmota DS18B20 Temperature"
+     }
+    }
+   },
+   "log": []
+  },
+  {
+   "do": "publish",
+   "topic": "tele/tasmota_A1B2C3/LWT",
+   "payload": "Online",
+   "retain": true,
+   "qos": 0,
+   "received": [
+    {
+     "conn": 1,
+     "topic": "tele/tasmota_A1B2C3/LWT",
+     "payload": "Online",
+     "qos": 0,
+     "retain": false,
+     "ids": []
+    }
+   ],
+   "sent": [],
+   "states": {
+    "sensor.tasmota_ds18b20_temperature": {
+     "state": "unknown",
+     "attributes": {
+      "unit_of_measurement": "°C",
+      "device_class": "temperature",
+      "friendly_name": "Tasmota DS18B20 Temperature"
+     },
+     "changed": true,
+     "updated": true
+    }
+   },
+   "log": []
+  },
+  {
+   "do": "publish",
+   "topic": "tele/tasmota_A1B2C3/SENSOR",
+   "payload": "{\"DS18B20\":{\"Temperature\":18.9}}",
+   "retain": false,
+   "qos": 0,
+   "received": [
+    {
+     "conn": 1,
+     "topic": "tele/tasmota_A1B2C3/SENSOR",
+     "payload": "{\"DS18B20\":{\"Temperature\":18.9}}",
+     "qos": 0,
+     "retain": false,
+     "ids": []
+    }
+   ],
+   "sent": [],
+   "states": {
+    "sensor.tasmota_ds18b20_temperature": {
+     "state": "18.9",
+     "attributes": {
+      "unit_of_measurement": "°C",
+      "device_class": "temperature",
+      "friendly_name": "Tasmota DS18B20 Temperature"
+     },
+     "changed": true,
+     "updated": true
+    }
+   },
+   "log": []
+  },
+  {
+   "do": "wait",
+   "seconds": 33,
+   "received": [],
+   "sent": [
+    {
+     "conn": 1,
+     "at": 15.1,
+     "packet": {
+      "type": "PINGREQ"
+     }
+    },
+    {
+     "conn": 1,
+     "at": 30.1,
+     "packet": {
+      "type": "PINGREQ"
+     }
+    }
+   ],
+   "states": {},
+   "log": []
+  },
+  {
+   "do": "service",
+   "service": "publish",
+   "data": {
+    "topic": "hars/expiry",
+    "payload": "x",
+    "message_expiry_interval": {
+     "seconds": 5
+    }
+   },
+   "result": {
+    "error": "ServiceValidationError",
+    "message": "Publishing to topic hars/expiry with a Message Expiry Interval is not supported for protocol version 3.1.1"
+   },
+   "received": [],
+   "sent": [],
+   "states": {},
+   "log": []
+  }
+ ],
+ "stored_entry": {
+  "data": {
+   "broker": "127.0.0.1",
+   "port": "<port>",
+   "client_id": "hars-test",
+   "keepalive": 15
+  },
+  "options": {
+   "discovery": true,
+   "discovery_prefix": "hass",
+   "birth_message": {
+    "topic": "hass/status",
+    "payload": "up",
+    "qos": 1,
+    "retain": true
+   },
+   "will_message": {
+    "topic": "hass/status",
+    "payload": "down",
+    "qos": 1,
+    "retain": true
+   }
+  },
+  "version": 1,
+  "minor_version": 2
+ },
+ "devices": [
+  {
+   "id": "<device 1>",
+   "identifiers": [
+    [
+     "mqtt",
+     "A1B2C3"
+    ]
+   ],
+   "connections": [],
+   "manufacturer": null,
+   "model": null,
+   "model_id": null,
+   "name": null,
+   "name_by_user": null,
+   "sw_version": null,
+   "hw_version": null,
+   "serial_number": null,
+   "configuration_url": null,
+   "via_device_id": null,
+   "entry_type": null,
+   "area_id": null,
+   "primary_config_entry": null
+  }
+ ],
+ "entities": [
+  {
+   "entity_id": "sensor.tasmota_ds18b20_temperature",
+   "unique_id": "A1B2C3_DS18B20_Temperature",
+   "platform": "mqtt",
+   "config_entry_id": "<entry>",
+   "device_id": "<device 1>",
+   "disabled_by": null,
+   "hidden_by": null,
+   "entity_category": null,
+   "has_entity_name": true,
+   "original_name": "Tasmota DS18B20 Temperature",
+   "original_device_class": "temperature",
+   "original_icon": null,
+   "object_id_base": "Tasmota DS18B20 Temperature",
+   "suggested_object_id": null,
+   "capabilities": null,
+   "supported_features": 0,
+   "unit_of_measurement": "°C",
+   "options": {
+    "sensor": {
+     "suggested_display_precision": 1
+    }
+   },
+   "translation_key": null
+  }
+ ],
+ "deleted_entities": []
+}

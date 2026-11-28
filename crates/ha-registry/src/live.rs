@@ -129,6 +129,9 @@ pub struct EntityPatch {
     pub original_device_class: Option<Option<String>>,
     pub original_icon: Option<Option<String>>,
     pub original_name: Option<Option<String>>,
+    /// `suggested_object_id`: a new row's id, as it is (without the
+    /// device's name), and kept on the row.
+    pub suggested_object_id: Option<Option<String>>,
     pub supported_features: Option<i64>,
     pub translation_key: Option<Option<String>>,
     pub unit_of_measurement: Option<Option<String>>,
@@ -291,12 +294,37 @@ pub struct DeviceInfo {
     pub model_id: Option<String>,
     pub name: Option<String>,
     pub sw_version: Option<String>,
+    pub hw_version: Option<String>,
+    pub serial_number: Option<String>,
+    pub configuration_url: Option<String>,
     /// `via_device`: an identifier of the device this one is reached
     /// through. `Some` sets the link, to nothing if no device has it.
     pub via_device: Option<Value>,
     /// `suggested_area`: a new device goes in the area of this name,
     /// which is made if there is none.
     pub suggested_area: Option<String>,
+    /// The entry's title: what a new device is named that says nothing
+    /// of its name but something else of itself (a "primary" device
+    /// info), as HA names it. `None`: left unnamed.
+    pub entry_title: Option<String>,
+}
+
+impl DeviceInfo {
+    /// HA's "link" device info: identifiers and connections only. It
+    /// makes no entry the device's primary one.
+    fn is_link(&self) -> bool {
+        self.entry_type.is_none()
+            && self.manufacturer.is_none()
+            && self.model.is_none()
+            && self.model_id.is_none()
+            && self.name.is_none()
+            && self.sw_version.is_none()
+            && self.hw_version.is_none()
+            && self.serial_number.is_none()
+            && self.configuration_url.is_none()
+            && self.via_device.is_none()
+            && self.suggested_area.is_none()
+    }
 }
 
 fn now_iso(hass: &Hass) -> String {
@@ -1016,8 +1044,18 @@ impl Registry {
                         .ok()
                         .is_none_or(|id| self.hass.states().get(&id).is_none())
             };
+            let suggested_object_id = patch.suggested_object_id.clone().flatten();
+            let user_name = deleted.as_ref().and_then(|d| d.name.as_deref());
             let entity_id = match &deleted {
                 Some(d) if available(&d.entity_id) => d.entity_id.clone(),
+                // `suggested_object_id` comes after the user's name and
+                // before `object_id_base`, without the device's name.
+                _ if user_name.is_none() && suggested_object_id.is_some() => available_entity_id(
+                    &tx.r,
+                    &self.hass,
+                    domain,
+                    suggested_object_id.as_deref().unwrap_or_default(),
+                ),
                 _ => generate_entity_id(
                     &tx.r,
                     &self.hass,
@@ -1061,6 +1099,7 @@ impl Registry {
                 platform: platform.to_owned(),
                 supported_features: json!(patch.supported_features.unwrap_or(0)),
                 translation_key: patch.translation_key.clone().flatten(),
+                suggested_object_id,
                 unique_id: Some(Value::String(unique_id.to_owned())),
                 unit_of_measurement: patch.unit_of_measurement.clone().flatten(),
                 ..Default::default()
@@ -1142,6 +1181,129 @@ impl Registry {
         });
     }
 
+    /// `async_update_device(remove_config_entry_id=…)`: the entry leaves
+    /// the device; a device left with no entry is removed, with its
+    /// entities.
+    pub fn remove_device_entry(&self, device_id: &str, entry_id: &str) {
+        let now = self.hass.clock().now();
+        let now_iso = ha_core::isoformat(now);
+        self.write(|tx| {
+            let device =
+                tx.r.devices
+                    .iter()
+                    .find(|d| d.id == device_id && d.config_entries.iter().any(|e| e == entry_id))
+                    .cloned();
+            if let Some(device) = device {
+                self.leave_device(tx, &device, entry_id, now, &now_iso);
+            }
+        });
+    }
+
+    /// `entry_id` leaves `device` (one of the registry's).
+    fn leave_device(
+        &self,
+        tx: &mut Tx,
+        device: &Arc<Device>,
+        entry_id: &str,
+        now: jiff::Timestamp,
+        now_iso: &str,
+    ) {
+        let Some(i) = tx.r.devices.iter().position(|d| d.id == device.id) else {
+            return;
+        };
+        if device.config_entries.len() == 1 {
+            // `async_remove_device`.
+            tx.r.devices.remove(i);
+            let deleted = DeletedDevice {
+                area_id: device.area_id.clone(),
+                config_entries: device.config_entries.clone(),
+                config_entries_subentries: device.config_entries_subentries.clone(),
+                connections: device.connections.clone(),
+                created_at: device.created_at.clone(),
+                disabled_by: device.disabled_by.clone(),
+                disabled_by_undefined: false,
+                identifiers: device.identifiers.clone(),
+                id: device.id.clone(),
+                labels: device.labels.clone(),
+                modified_at: Some(now_iso.to_owned()),
+                name_by_user: device.name_by_user.clone(),
+                orphaned_timestamp: None,
+                extra: Map::new(),
+            };
+            let mut rows: Vec<RawRow> =
+                tx.r.device_file
+                    .deleted
+                    .iter()
+                    .filter(|raw| DeletedDevice::parse(raw).is_none_or(|d| d.id != device.id))
+                    .cloned()
+                    .collect();
+            rows.extend(deleted.raw());
+            tx.r.device_file.deleted = Arc::new(rows);
+            // Devices connected via it lose the link first.
+            for i in 0..tx.r.devices.len() {
+                if tx.r.devices[i].via_device_id.as_deref() == Some(device.id.as_str()) {
+                    let mut child = (*tx.r.devices[i]).clone();
+                    child.via_device_id = None;
+                    child.modified_at = Some(now_iso.to_owned());
+                    let id = child.id.clone();
+                    tx.r.devices[i] = Arc::new(child);
+                    tx.device_event(json!({"action": "update", "device_id": id,
+                                               "changes": {"via_device_id": device.id}}));
+                }
+            }
+            tx.device_event(json!({"action": "remove", "device_id": device.id,
+                                       "device": device.json()}));
+            // The entity registry removes the device's entities of
+            // its entries, and unlinks any other.
+            while let Some(e) = tx.r.entities.iter().position(|e| {
+                e.device_id.as_deref() == Some(device.id.as_str())
+                    && e.config_entry_id
+                        .as_ref()
+                        .is_some_and(|c| device.config_entries.contains(c))
+            }) {
+                remove_row(tx, e, now);
+            }
+            let unlink = EntityPatch {
+                device_id: Some(None),
+                ..Default::default()
+            };
+            while let Some(e) =
+                tx.r.entities
+                    .iter()
+                    .position(|e| e.device_id.as_deref() == Some(device.id.as_str()))
+            {
+                update_row(tx, e, &unlink, now_iso, None);
+            }
+        } else {
+            let mut d = (**device).clone();
+            let mut changes = Map::new();
+            if d.primary_config_entry.as_deref() == Some(entry_id) {
+                changes.insert("primary_config_entry".into(), json!(entry_id));
+                d.primary_config_entry = None;
+            }
+            changes.insert("config_entries".into(), json!(d.config_entries));
+            changes.insert(
+                "config_entries_subentries".into(),
+                Value::Object(d.config_entries_subentries.clone()),
+            );
+            d.config_entries.retain(|e| e != entry_id);
+            d.config_entries_subentries.remove(entry_id);
+            // Every remaining entry disabled: so is the device.
+            if d.disabled_by.is_none()
+                && d.config_entries
+                    .iter()
+                    .all(|e| self.entry_disabled(Some(e)))
+            {
+                changes.insert("disabled_by".into(), Value::Null);
+                d.disabled_by = Some("config_entry".into());
+            }
+            d.modified_at = Some(now_iso.to_owned());
+            tx.r.devices[i] = Arc::new(d);
+            tx.device_event(json!({"action": "update", "device_id": device.id,
+                                       "changes": changes}));
+        }
+    }
+
     /// A config entry goes away (`async_clear_config_entry` in both
     /// registries): devices lose it (one left with no entry is removed,
     /// with its entities); its other entities are removed; its deleted
@@ -1158,101 +1320,7 @@ impl Registry {
                     .cloned()
                     .collect();
             for device in devices {
-                let Some(i) = tx.r.devices.iter().position(|d| d.id == device.id) else {
-                    continue;
-                };
-                if device.config_entries.len() == 1 {
-                    // `async_remove_device`.
-                    tx.r.devices.remove(i);
-                    let deleted = DeletedDevice {
-                        area_id: device.area_id.clone(),
-                        config_entries: device.config_entries.clone(),
-                        config_entries_subentries: device.config_entries_subentries.clone(),
-                        connections: device.connections.clone(),
-                        created_at: device.created_at.clone(),
-                        disabled_by: device.disabled_by.clone(),
-                        disabled_by_undefined: false,
-                        identifiers: device.identifiers.clone(),
-                        id: device.id.clone(),
-                        labels: device.labels.clone(),
-                        modified_at: Some(now_iso.clone()),
-                        name_by_user: device.name_by_user.clone(),
-                        orphaned_timestamp: None,
-                        extra: Map::new(),
-                    };
-                    let mut rows: Vec<RawRow> = tx
-                        .r
-                        .device_file
-                        .deleted
-                        .iter()
-                        .filter(|raw| DeletedDevice::parse(raw).is_none_or(|d| d.id != device.id))
-                        .cloned()
-                        .collect();
-                    rows.extend(deleted.raw());
-                    tx.r.device_file.deleted = Arc::new(rows);
-                    // Devices connected via it lose the link first.
-                    for i in 0..tx.r.devices.len() {
-                        if tx.r.devices[i].via_device_id.as_deref() == Some(device.id.as_str()) {
-                            let mut child = (*tx.r.devices[i]).clone();
-                            child.via_device_id = None;
-                            child.modified_at = Some(now_iso.clone());
-                            let id = child.id.clone();
-                            tx.r.devices[i] = Arc::new(child);
-                            tx.device_event(json!({"action": "update", "device_id": id,
-                                                   "changes": {"via_device_id": device.id}}));
-                        }
-                    }
-                    tx.device_event(json!({"action": "remove", "device_id": device.id,
-                                           "device": device.json()}));
-                    // The entity registry removes the device's entities of
-                    // its entries, and unlinks any other.
-                    while let Some(e) = tx.r.entities.iter().position(|e| {
-                        e.device_id.as_deref() == Some(device.id.as_str())
-                            && e.config_entry_id
-                                .as_ref()
-                                .is_some_and(|c| device.config_entries.contains(c))
-                    }) {
-                        remove_row(tx, e, now);
-                    }
-                    let unlink = EntityPatch {
-                        device_id: Some(None),
-                        ..Default::default()
-                    };
-                    while let Some(e) =
-                        tx.r.entities
-                            .iter()
-                            .position(|e| e.device_id.as_deref() == Some(device.id.as_str()))
-                    {
-                        update_row(tx, e, &unlink, &now_iso, None);
-                    }
-                } else {
-                    let mut d = (*device).clone();
-                    let mut changes = Map::new();
-                    if d.primary_config_entry.as_deref() == Some(entry_id) {
-                        changes.insert("primary_config_entry".into(), json!(entry_id));
-                        d.primary_config_entry = None;
-                    }
-                    changes.insert("config_entries".into(), json!(d.config_entries));
-                    changes.insert(
-                        "config_entries_subentries".into(),
-                        Value::Object(d.config_entries_subentries.clone()),
-                    );
-                    d.config_entries.retain(|e| e != entry_id);
-                    d.config_entries_subentries.remove(entry_id);
-                    // Every remaining entry disabled: so is the device.
-                    if d.disabled_by.is_none()
-                        && d.config_entries
-                            .iter()
-                            .all(|e| self.entry_disabled(Some(e)))
-                    {
-                        changes.insert("disabled_by".into(), Value::Null);
-                        d.disabled_by = Some("config_entry".into());
-                    }
-                    d.modified_at = Some(now_iso.clone());
-                    tx.r.devices[i] = Arc::new(d);
-                    tx.device_event(json!({"action": "update", "device_id": device.id,
-                                           "changes": changes}));
-                }
+                self.leave_device(tx, &device, entry_id, now, &now_iso);
             }
             while let Some(e) =
                 tx.r.entities
@@ -1398,7 +1466,12 @@ impl Registry {
             let old_name = d.display_name().map(str::to_owned);
             let mut changes = Map::new();
             let entry = &info.config_entry_id;
-            if d.primary_config_entry.as_ref() != Some(entry) {
+            let link = info.is_link();
+            // "If creating a new device, default to the config entry name".
+            if is_new && !link && info.name.as_deref().is_none_or(str::is_empty) {
+                info.name.clone_from(&info.entry_title);
+            }
+            if !link && d.primary_config_entry.as_ref() != Some(entry) {
                 let replace = match (&d.primary_config_entry, &domains) {
                     (None, _) => true,
                     (Some(primary), Some(domains)) => domains(primary)
@@ -1450,6 +1523,13 @@ impl Registry {
             set("model_id", &mut d.model_id, &info.model_id);
             set("name", &mut d.name, &info.name);
             set("sw_version", &mut d.sw_version, &info.sw_version);
+            set("hw_version", &mut d.hw_version, &info.hw_version);
+            set("serial_number", &mut d.serial_number, &info.serial_number);
+            set(
+                "configuration_url",
+                &mut d.configuration_url,
+                &info.configuration_url,
+            );
             let new_connections: Vec<Value> = info
                 .connections
                 .iter()
