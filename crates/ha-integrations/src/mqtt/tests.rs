@@ -175,6 +175,8 @@ struct Conn {
     write: mpsc::UnboundedSender<Option<Vec<u8>>>,
     /// Closed by the broker: what comes after isn't read.
     dropped: bool,
+    /// False: the broker stops reading (its buffer fills).
+    reading: bool,
     v5: bool,
     connected: bool,
     subs: Vec<(String, u8, Option<u32>)>,
@@ -404,6 +406,7 @@ fn serve(st: Arc<Mutex<BrokerState>>, stream: tokio::io::DuplexStream) {
         s.conns.push(Conn {
             write: tx,
             dropped: false,
+            reading: true,
             v5: false,
             connected: false,
             subs: Vec::new(),
@@ -442,6 +445,9 @@ fn serve(st: Arc<Mutex<BrokerState>>, stream: tokio::io::DuplexStream) {
                     let _ = s.conns[c].write.send(None);
                     return;
                 }
+            }
+            while !st.lock().conns[c].reading {
+                tokio::time::sleep(Duration::from_millis(100)).await;
             }
             match read.read(&mut chunk).await {
                 Ok(0) | Err(_) => {
@@ -1233,4 +1239,78 @@ async fn timers_too_far_off_never_fire() {
     tokio::time::sleep(Duration::from_secs(365 * 86400)).await;
     assert_eq!(state("sensor.s"), "21");
     assert_eq!(state("binary_sensor.b"), "on");
+}
+
+/// A broker that stops reading: once the connection's buffer is full a
+/// write waits at most `keepalive` (paho's queue is cut off by its
+/// keepalive check then), the connection is dropped and tried again 10 s
+/// later; the action that waited on it fails as a disconnected publish
+/// does, and the client goes on.
+#[tokio::test(start_paused = true)]
+async fn a_broker_that_stops_reading_is_left() {
+    let broker = Broker::start(true).await;
+    let r = start(
+        &broker,
+        json!({"broker": "127.0.0.1", "port": 1883, "protocol": "5", "keepalive": 15,
+               "discovery": false}),
+    )
+    .await;
+    tokio::time::sleep(Duration::from_secs(6)).await;
+    broker.state.lock().conns[0].reading = false;
+    let t0 = tokio::time::Instant::now();
+    let big = "x".repeat(200 * 1024);
+    let hass = r.hass.clone();
+    let call = tokio::spawn(async move {
+        hass.call_service(
+            "mqtt",
+            "publish",
+            json!({"topic": "big", "payload": big})
+                .as_object()
+                .unwrap()
+                .clone(),
+            None,
+            false,
+            None,
+        )
+        .await
+    });
+    tokio::time::sleep(Duration::from_secs(16)).await;
+    assert!(
+        call.is_finished(),
+        "the call still waits after {:?}",
+        t0.elapsed()
+    );
+    tokio::time::sleep(Duration::from_secs(10)).await;
+    let dials = r.dials.lock().clone();
+    assert_eq!(dials.len(), 2, "{dials:?}");
+}
+
+/// QoS 2 messages a broker never releases are held up to a budget; past
+/// it the connection is a protocol error, dropped and tried again.
+#[tokio::test(start_paused = true)]
+async fn unreleased_qos_2_messages_are_bounded() {
+    let broker = Broker::start(true).await;
+    let r = start(
+        &broker,
+        json!({"broker": "127.0.0.1", "port": 1883, "protocol": "5", "discovery": false}),
+    )
+    .await;
+    tokio::time::sleep(Duration::from_secs(1)).await;
+    let payload = vec![b'x'; 60 * 1024];
+    for id in 1..=40u16 {
+        let s = broker.state.lock();
+        let mut body = vec![0, 1, b't'];
+        body.extend_from_slice(&id.to_be_bytes());
+        body.push(0);
+        body.extend_from_slice(&payload);
+        let mut out = vec![0x34];
+        put_varint(&mut out, body.len());
+        out.extend(body);
+        let _ = s.conns[0].write.send(Some(out));
+        drop(s);
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    tokio::time::sleep(Duration::from_secs(11)).await;
+    let dials = r.dials.lock().clone();
+    assert_eq!(dials.len(), 2, "{dials:?}");
 }

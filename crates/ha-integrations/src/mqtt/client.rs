@@ -80,6 +80,13 @@ pub const DISCOVERY_COOLDOWN: Duration = Duration::from_secs(5);
 const MAX_SUBSCRIBES_PER_CALL: usize = 500;
 /// `MAX_LENGTH_STATE_STATE`.
 const MAX_STATE: usize = 255;
+/// QoS 2 messages a broker hasn't released yet, held at most this many
+/// bytes (paho holds any number); past it the broker is in breach of the
+/// protocol and the connection is dropped.
+pub const INCOMING_BYTES: usize = 1 << 20;
+/// `mqtt.publish` calls waiting for the client: a caller past these waits
+/// its turn.
+const COMMANDS: usize = 64;
 
 /// A connection to a broker: TCP in `hars`, an in-memory pipe in tests.
 pub trait Stream: AsyncRead + AsyncWrite + Send + Unpin {}
@@ -320,6 +327,8 @@ pub(crate) struct Client {
     waiting: HashMap<u16, Waiting>,
     /// QoS 2 messages waiting for their `PUBREL`.
     incoming: HashMap<u16, (String, Vec<u8>, bool, Vec<u32>)>,
+    /// Their topics' and payloads' bytes.
+    incoming_bytes: usize,
     subs: Vec<Option<Sub>>,
     free_subs: Vec<usize>,
     plain: HashMap<SmolStr, Vec<usize>>,
@@ -357,7 +366,7 @@ pub(crate) async fn run(
     ready: SetupGuard,
     status: Status,
 ) {
-    let (tx, rx) = mpsc::unbounded_channel();
+    let (tx, rx) = mpsc::channel(COMMANDS);
     register_publish(&hass, tx);
     let mut client = Client::new(hass, components, config, dial);
     client.start_discovery();
@@ -403,6 +412,7 @@ impl Client {
             mid: 0,
             waiting: HashMap::new(),
             incoming: HashMap::new(),
+            incoming_bytes: 0,
             subs: Vec::new(),
             free_subs: Vec::new(),
             plain: HashMap::new(),
@@ -441,13 +451,28 @@ impl Client {
 
     // ------------------------------------------------------------ the wire
 
+    /// Write `bytes`, waiting at most the keepalive (60 s without one) for
+    /// a broker that doesn't read: then the connection is given up, as
+    /// paho's keepalive check gives it up.
     async fn send(&mut self, bytes: &[u8]) -> bool {
+        let limit = Duration::from_secs(match self.config.keepalive {
+            0 => 60,
+            k => u64::from(k),
+        });
         let Link::Up { write, .. } = &mut self.link else {
             return false;
         };
-        if write.write_all(bytes).await.is_err() {
-            self.lost().await;
-            return false;
+        match timeout(limit, write.write_all(bytes)).await {
+            Ok(Ok(())) => {}
+            Ok(Err(_)) => {
+                self.lost().await;
+                return false;
+            }
+            Err(_) => {
+                tracing::warn!("Error returned from MQTT server: The connection was lost.");
+                self.lost().await;
+                return false;
+            }
         }
         self.last_out = Instant::now();
         true
@@ -515,6 +540,7 @@ impl Client {
         self.ping_out = false;
         // A clean session: QoS 2 messages waiting for their release go.
         self.incoming.clear();
+        self.incoming_bytes = 0;
         if !self.give_up && self.reconnect_at.is_none() {
             self.reconnect_at = Some(Instant::now() + RECONNECT_INTERVAL);
         }
@@ -557,7 +583,7 @@ impl Client {
     }
 
     /// Sleep on the socket, the commands and the next deadline.
-    async fn serve(&mut self, mut rx: mpsc::UnboundedReceiver<Command>) {
+    async fn serve(&mut self, mut rx: mpsc::Receiver<Command>) {
         let hass = self.hass.clone();
         loop {
             let deadline = self.deadline();
@@ -672,10 +698,22 @@ impl Client {
                         // Delivered at its `PUBREL`, as paho does.
                         if let Some(id) = p.packet_id {
                             if let Ok(t) = std::str::from_utf8(&topic) {
-                                self.incoming.insert(
+                                let size = t.len() + p.payload.len();
+                                if let Some((t, b, ..)) = self.incoming.insert(
                                     id,
                                     (t.to_owned(), p.payload.to_vec(), p.retain, p.identifiers),
-                                );
+                                ) {
+                                    self.incoming_bytes -= t.len() + b.len();
+                                }
+                                self.incoming_bytes += size;
+                                if self.incoming_bytes > INCOMING_BYTES {
+                                    tracing::warn!(
+                                        "Error returned from MQTT server: A network protocol \
+                                         error occurred when communicating with the broker."
+                                    );
+                                    self.lost().await;
+                                    return;
+                                }
                             }
                             self.send(&packet::ack(packet::PUBREC, id)).await;
                         }
@@ -684,6 +722,7 @@ impl Client {
             }
             Incoming::PubRel(id) => {
                 if let Some((topic, payload, retain, ids)) = self.incoming.remove(&id) {
+                    self.incoming_bytes -= topic.len() + payload.len();
                     self.message(topic.as_bytes(), &payload, retain, &ids).await;
                 }
                 self.send(&packet::ack(packet::PUBCOMP, id)).await;
@@ -2559,7 +2598,7 @@ pub fn matches(filter: &str, topic: &str) -> bool {
 
 /// `mqtt.publish`, registered once: HA's schema
 /// (`MQTT_PUBLISH_SCHEMA`), handed to the client.
-pub fn register_publish(hass: &Hass, tx: mpsc::UnboundedSender<Command>) {
+pub fn register_publish(hass: &Hass, tx: mpsc::Sender<Command>) {
     use ha_core::{Kind, Schema, SupportsResponse};
     let schema = Schema::new()
         .pre_validate(publish_pre_validate)
@@ -2614,7 +2653,7 @@ pub fn register_publish(hass: &Hass, tx: mpsc::UnboundedSender<Command>) {
                     expiry,
                     reply,
                 };
-                if tx.send(cmd).is_err() {
+                if tx.send(cmd).await.is_err() {
                     return Err(ServiceError::Failed("MQTT is not running".into()));
                 }
                 rx.await
