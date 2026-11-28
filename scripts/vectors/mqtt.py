@@ -49,14 +49,17 @@ and the tables `hars` compiles in, from 2026.6.1's sources:
 
 Packet ids, subscription identifiers, client ids and times are kept as Home
 Assistant sent them (client ids are random: written as `<random>`); the
-Rust test numbers ids by order of appearance on both sides. Run it twice:
-only times in `at` may change.
+Rust test numbers ids by order of appearance on both sides. A step's
+SUBSCRIBEs of plain topics, what the broker sent and the log lines are
+sorted: HA's order there follows its tasks and Python's set order. Run it
+twice: only times in `at` may change.
 """
 
 import asyncio
 import importlib.metadata
 import json
 import logging
+import os
 import pathlib
 import shutil
 import socket
@@ -752,13 +755,13 @@ def rows(hass, entry_id, port):
     entities = er.async_get(hass)
     names = {}
     out_devices = []
-    for d in devices.devices.values():
-        if entry_id not in d.config_entries:
-            continue
+    # Named in the order of their identifiers: HA makes them in the order
+    # its tasks run.
+    ours = sorted((d for d in devices.devices.values() if entry_id in d.config_entries),
+                  key=lambda d: sorted(list(i) for i in d.identifiers))
+    for d in ours:
         names[d.id] = f"<device {len(names) + 1}>"
-    for d in devices.devices.values():
-        if d.id not in names:
-            continue
+    for d in ours:
         out_devices.append({
             "id": names[d.id],
             "identifiers": sorted(list(i) for i in d.identifiers),
@@ -803,8 +806,21 @@ def clean_packets(sent, port, entry):
         if p["type"] == "CONNECT" and "client_id" not in entry["data"]:
             assert len(p["client_id"]) == 22, p
             p["client_id"] = "<random>"
+        # The plain topics of one SUBSCRIBE are in the order HA's tasks
+        # subscribed them, which changes from run to run: sorted.
+        if p["type"] == "SUBSCRIBE" and not any("+" in t or "#" in t for t, _ in p["topics"]):
+            p["topics"].sort()
         out.append({"conn": conn, "at": at, "packet": p})
     return out
+
+
+def steady(record):
+    """What the broker sent HA, and HA's log lines, in an order of their own:
+    HA's comes from its tasks and from Python's set order (a message's
+    subscriptions), which change from run to run."""
+    record["received"].sort(key=lambda r: json.dumps(r, sort_keys=True))
+    record["log"].sort()
+    return record
 
 
 async def run(name, make):
@@ -833,19 +849,19 @@ async def run(name, make):
         await settle(hass)
         states = {}
         changed, states = mqtt_states(hass, states)
-        out_steps.append({"do": "setup", "received": broker.received(),
-                          "sent": clean_packets(broker.take(), broker.port, entry_in),
-                          "states": changed, "log": logs.take(),
-                          "entry_state": entry.state.value})
+        out_steps.append(steady({"do": "setup", "received": broker.received(),
+                                 "sent": clean_packets(broker.take(), broker.port, entry_in),
+                                 "states": changed, "log": logs.take(),
+                                 "entry_state": entry.state.value}))
         await hass.async_start()
         # The birth message waits for start, then for discovery to be
         # quiet for 5 s.
         await asyncio.sleep(7)
         await settle(hass)
         changed, states = mqtt_states(hass, states)
-        out_steps.append({"do": "start", "waited": 7, "received": broker.received(),
-                          "sent": clean_packets(broker.take(), broker.port, entry_in),
-                          "states": changed, "log": logs.take()})
+        out_steps.append(steady({"do": "start", "waited": 7, "received": broker.received(),
+                                 "sent": clean_packets(broker.take(), broker.port, entry_in),
+                                 "states": changed, "log": logs.take()}))
         for step in after:
             record = dict(step)
             if step["do"] == "publish":
@@ -870,7 +886,7 @@ async def run(name, make):
             record |= {"received": broker.received(),
                        "sent": clean_packets(broker.take(), broker.port, entry_in),
                        "states": changed, "log": logs.take()}
-            out_steps.append(record)
+            out_steps.append(steady(record))
         stored = hass.config_entries.async_get_entry(entry.entry_id)
         stored_entry = {"data": {k: ("<port>" if k == "port" else v)
                                  for k, v in stored.data.items()},
@@ -1006,3 +1022,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+    # paho's and HA's threads can crash the interpreter's shutdown once
+    # everything is written: leave at once.
+    sys.stdout.flush()
+    os._exit(0)

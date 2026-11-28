@@ -22,7 +22,9 @@
 //! config flow; the `subscribe` side of other integrations (HA subscribes
 //! to the topics other integrations' manifests list, to start their config
 //! flows: `hars` has none of those flows and doesn't); restoring an
-//! `expire_after` sensor's last value across a restart; `last_reset`.
+//! `expire_after` sensor's last value across a restart; `last_reset`
+//! (`last_reset_value_template`) and `group`, which the schema takes and
+//! nothing uses.
 //! Deliberate differences are listed on [`client`].
 
 pub mod client;

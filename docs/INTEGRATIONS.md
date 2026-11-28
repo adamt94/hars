@@ -260,8 +260,10 @@ WebSockets, client certificates, the other discovered entity types
 them), MQTT triggers in automations, entities from `mqtt:` in
 `configuration.yaml`, the `mqtt.dump` and `mqtt.reload` actions, the MQTT
 pages of the UI, and Tasmota's and other integrations that are set up
-through MQTT. An `expire_after` sensor starts unavailable after a restart
-until a new value comes (Home Assistant restores its last value).
+through MQTT. Of a sensor's options, `last_reset_value_template` and
+`group` aren't used yet, and payloads are read as UTF-8 whatever its
+`encoding` says. An `expire_after` sensor starts unavailable after a
+restart until a new value comes (Home Assistant restores its last value).
 
 ### Sun
 
