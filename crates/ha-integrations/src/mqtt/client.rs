@@ -1403,11 +1403,14 @@ impl Client {
         }
     }
 
-    fn set_timer(&mut self, at: Instant, timer: Timer) -> TimerKey {
+    /// A timer `after` from now; `None` for one past what the clock can
+    /// hold, which never comes due (`cv.positive_int` has no bound).
+    fn set_timer(&mut self, after: Duration, timer: Timer) -> Option<TimerKey> {
+        let at = Instant::now().checked_add(after)?;
         self.timer_seq += 1;
         let key = (at, self.timer_seq);
         self.timers.insert(key, timer);
-        key
+        Some(key)
     }
 
     fn timer(&mut self, timer: Timer, key: TimerKey) {
@@ -1447,19 +1450,15 @@ impl Client {
         if let Some(k) = ent.expire_timer {
             self.timers.remove(&k);
         }
-        let key = self.set_timer(
-            Instant::now() + Duration::from_secs(after),
-            Timer::Expire(e),
-        );
+        let key = self.set_timer(Duration::from_secs(after), Timer::Expire(e));
         if let Some(Some(ent)) = self.ents.get_mut(e) {
-            ent.expire_timer = Some(key);
+            ent.expire_timer = key;
             ent.expired = Some(false);
         }
     }
 
     /// A state message's value (`_update_state`, `_state_message_received`).
     fn on_state(&mut self, e: usize, topic: &str, raw: &[u8], value: &str) {
-        let now = Instant::now();
         let Some(Some(ent)) = self.ents.get_mut(e) else {
             return;
         };
@@ -1572,9 +1571,9 @@ impl Client {
                 if on == Some(true)
                     && let Some(delay) = off_delay
                 {
-                    let key = self.set_timer(now + Duration::from_secs(delay), Timer::OffDelay(e));
+                    let key = self.set_timer(Duration::from_secs(delay), Timer::OffDelay(e));
                     if let Some(Some(ent)) = self.ents.get_mut(e) {
-                        ent.off_timer = Some(key);
+                        ent.off_timer = key;
                     }
                 }
             }

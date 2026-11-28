@@ -1189,3 +1189,48 @@ async fn qos_2_and_expire_after() {
     tokio::time::sleep(Duration::from_secs(61)).await;
     assert_eq!(state(&r), "unavailable");
 }
+
+/// `cv.positive_int` has no upper bound: an `expire_after` or `off_delay`
+/// past what a clock can hold is a timer that never fires (HA's
+/// `async_call_later` with such a delay never comes due), not a panic.
+#[tokio::test(start_paused = true)]
+async fn timers_too_far_off_never_fire() {
+    let broker = Broker::start(true).await;
+    let huge = u64::MAX;
+    broker.publish(
+        "homeassistant/sensor/s/config",
+        &json!({"stat_t": "s/state", "uniq_id": "s1", "exp_aft": huge, "name": "S"}).to_string(),
+        true,
+        0,
+    );
+    broker.publish(
+        "homeassistant/binary_sensor/b/config",
+        &json!({"stat_t": "b/state", "uniq_id": "b1", "off_dly": huge, "name": "B"}).to_string(),
+        true,
+        0,
+    );
+    // No keepalive: nothing else wakes the client over the year below.
+    let r = start(
+        &broker,
+        json!({"broker": "127.0.0.1", "port": 1883, "protocol": "5", "keepalive": 0}),
+    )
+    .await;
+    // Subscribed 0.5 s after the discovery subscriptions' retained configs.
+    tokio::time::sleep(Duration::from_secs(2)).await;
+    broker.publish("s/state", "21", false, 0);
+    broker.publish("b/state", "ON", false, 0);
+    tokio::time::sleep(Duration::from_secs(1)).await;
+    let state = |id: &str| {
+        r.hass
+            .states()
+            .get(&EntityId::parse(id).unwrap())
+            .unwrap()
+            .state
+            .to_string()
+    };
+    assert_eq!(state("sensor.s"), "21");
+    assert_eq!(state("binary_sensor.b"), "on");
+    tokio::time::sleep(Duration::from_secs(365 * 86400)).await;
+    assert_eq!(state("sensor.s"), "21");
+    assert_eq!(state("binary_sensor.b"), "on");
+}
