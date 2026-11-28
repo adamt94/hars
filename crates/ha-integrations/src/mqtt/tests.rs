@@ -1304,7 +1304,6 @@ async fn unreleased_qos_2_messages_are_bounded() {
     tokio::time::sleep(Duration::from_secs(1)).await;
     let payload = vec![b'x'; 60 * 1024];
     for id in 1..=40u16 {
-        let s = broker.state.lock();
         let mut body = vec![0, 1, b't'];
         body.extend_from_slice(&id.to_be_bytes());
         body.push(0);
@@ -1312,8 +1311,7 @@ async fn unreleased_qos_2_messages_are_bounded() {
         let mut out = vec![0x34];
         put_varint(&mut out, body.len());
         out.extend(body);
-        let _ = s.conns[0].write.send(Some(out));
-        drop(s);
+        let _ = broker.state.lock().conns[0].write.send(Some(out));
         tokio::time::sleep(Duration::from_millis(10)).await;
     }
     tokio::time::sleep(Duration::from_secs(11)).await;

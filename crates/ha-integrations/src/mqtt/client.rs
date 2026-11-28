@@ -1322,8 +1322,8 @@ impl Client {
         };
         // Discovery first: it doesn't share topics with entities.
         let mut entities = false;
-        for k in 0..owners.len() {
-            match owners[k] {
+        for &owner in &owners {
+            match owner {
                 Owner::Discovery => self.discovery_message(topic, text),
                 _ => entities = true,
             }
