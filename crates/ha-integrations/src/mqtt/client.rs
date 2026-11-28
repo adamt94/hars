@@ -361,13 +361,15 @@ pub(crate) async fn run(
     register_publish(&hass, tx);
     let mut client = Client::new(hass, components, config, dial);
     client.start_discovery();
+    // `async_setup_entry` waits for the first try only: the reconnect loop
+    // runs on its own.
     client.connect().await;
+    status.set(EntryState::Loaded, None);
+    ready.done();
     if client.reconnect_at.is_some() && !client.give_up {
         // `_reconnect_loop`'s first pass: at once.
         client.connect().await;
     }
-    status.set(EntryState::Loaded, None);
-    ready.done();
     client.serve(rx).await;
 }
 
@@ -511,6 +513,8 @@ impl Client {
         self.birth_at = None;
         self.subscribe_at = None;
         self.ping_out = false;
+        // A clean session: QoS 2 messages waiting for their release go.
+        self.incoming.clear();
         if !self.give_up && self.reconnect_at.is_none() {
             self.reconnect_at = Some(Instant::now() + RECONNECT_INTERVAL);
         }
@@ -633,6 +637,10 @@ impl Client {
             if let Link::Up { buf, .. } = &mut self.link {
                 // Anything read meanwhile came after.
                 taken.extend_from_slice(buf);
+                // Don't hold a large message's buffer while idle.
+                if taken.is_empty() && taken.capacity() > 64 * 1024 {
+                    taken = Vec::new();
+                }
                 *buf = taken;
             } else {
                 return;
@@ -1252,9 +1260,18 @@ impl Client {
             rendered = out.into_iter().map(Some).collect();
         }
         for (k, owner) in owners.iter().enumerate() {
-            let render = slot[k]
-                .and_then(|j| rendered.get_mut(j))
-                .and_then(Option::take);
+            let render = match slot[k] {
+                None => None,
+                Some(j) => match rendered.get_mut(j).and_then(Option::take) {
+                    Some(r) => Some(r),
+                    // No render thread could be had: the message isn't
+                    // taken as it is in the template's place.
+                    None => {
+                        tracing::error!("Could not render the template for a message on {topic}");
+                        continue;
+                    }
+                },
+            };
             self.callback(*owner, topic, raw, text, render);
         }
     }
@@ -1305,8 +1322,19 @@ impl Client {
         // The value the callback sees, or `None` to stop (an error
         // logged).
         let default = is_sensor && matches!(owner, Owner::State(_));
-        let value: Option<String> = match render {
-            None => Some(text.to_owned()),
+        // A state message makes an `expire_after` value fresh before its
+        // template is rendered.
+        let before = (ent.native.clone(), ent.expired);
+        if matches!(owner, Owner::State(_)) {
+            self.fresh(e);
+        }
+        let Some(ent) = self.ents.get(e).and_then(Option::as_ref) else {
+            return;
+        };
+        // `Some(None)`: the message is ignored (what the callback tracks
+        // is still compared); `None`: an error, logged, and no write.
+        let value: Option<Option<String>> = match render {
+            None => Some(Some(text.to_owned())),
             Some(r) => {
                 for (_, line) in &r.log {
                     tracing::warn!("{line}");
@@ -1324,17 +1352,17 @@ impl Client {
                 .map(|t| t.source().to_owned())
                 .unwrap_or_default();
                 match r.result {
-                    Ok(out) => Some(out.as_text().unwrap_or_default().to_owned()),
+                    Ok(out) => Some(Some(out.as_text().unwrap_or_default().to_owned())),
                     Err(err) if jinja_error(&err.0) => match default {
                         // `PayloadSentinel.DEFAULT`: the message is
                         // ignored.
-                        true => None,
+                        true => Some(None),
                         false => {
                             tracing::error!(
                                 "Error parsing value: {} (value: {text}, template: {source})",
                                 err.0.split_once(": ").map_or(err.0.as_str(), |(_, m)| m)
                             );
-                            Some(text.to_owned())
+                            Some(Some(text.to_owned()))
                         }
                     },
                     Err(err) => {
@@ -1356,11 +1384,18 @@ impl Client {
         let Some(value) = value else {
             return;
         };
-        let changed = match owner {
-            Owner::State(_) => self.on_state(e, topic, raw, &value),
-            Owner::Availability(_, a) => self.on_availability(e, a, &value),
-            Owner::Attributes(_) => self.on_attributes(e, &value),
-            Owner::Discovery => false,
+        let changed = match (owner, value) {
+            (Owner::State(_), Some(value)) => {
+                self.on_state(e, topic, raw, &value);
+                self.ent(e)
+                    .is_some_and(|ent| before != (ent.native.clone(), ent.expired))
+            }
+            (Owner::State(_), None) => self
+                .ent(e)
+                .is_some_and(|ent| before != (ent.native.clone(), ent.expired)),
+            (Owner::Availability(_, a), Some(value)) => self.on_availability(e, a, &value),
+            (Owner::Attributes(_), Some(value)) => self.on_attributes(e, &value),
+            _ => false,
         };
         if changed || force {
             self.writes.retain(|&w| w != e);
@@ -1400,26 +1435,33 @@ impl Client {
 
     /// A state message (`_state_message_received`). True if what it
     /// tracks changed.
-    fn on_state(&mut self, e: usize, topic: &str, raw: &[u8], value: &str) -> bool {
-        let now = Instant::now();
+    /// `expire_after`: a state message makes the value fresh, and its
+    /// timer starts again.
+    fn fresh(&mut self, e: usize) {
         let Some(ent) = self.ents.get(e).and_then(Option::as_ref) else {
-            return false;
+            return;
         };
-        let before = (ent.native.clone(), ent.expired);
-        // `expire_after`: the value is fresh, its timer starts again.
-        if let Some(after) = ent.cfg.expire_after.filter(|a| *a > 0) {
-            let old = ent.expire_timer;
-            if let Some(k) = old {
-                self.timers.remove(&k);
-            }
-            let key = self.set_timer(now + Duration::from_secs(after), Timer::Expire(e));
-            if let Some(Some(ent)) = self.ents.get_mut(e) {
-                ent.expire_timer = Some(key);
-                ent.expired = Some(false);
-            }
+        let Some(after) = ent.cfg.expire_after.filter(|a| *a > 0) else {
+            return;
+        };
+        if let Some(k) = ent.expire_timer {
+            self.timers.remove(&k);
         }
+        let key = self.set_timer(
+            Instant::now() + Duration::from_secs(after),
+            Timer::Expire(e),
+        );
+        if let Some(Some(ent)) = self.ents.get_mut(e) {
+            ent.expire_timer = Some(key);
+            ent.expired = Some(false);
+        }
+    }
+
+    /// A state message's value (`_update_state`, `_state_message_received`).
+    fn on_state(&mut self, e: usize, topic: &str, raw: &[u8], value: &str) {
+        let now = Instant::now();
         let Some(Some(ent)) = self.ents.get_mut(e) else {
-            return false;
+            return;
         };
         match &ent.cfg.platform {
             Platform::Sensor {
@@ -1497,7 +1539,7 @@ impl Client {
                         ent.entity_id,
                         String::from_utf8_lossy(raw)
                     );
-                    return before != (ent.native.clone(), ent.expired);
+                    return;
                 }
                 let on = if value == payload_on {
                     Some(true)
@@ -1519,7 +1561,7 @@ impl Client {
                             None => String::new(),
                         }
                     );
-                    return before != (ent.native.clone(), ent.expired);
+                    return;
                 };
                 ent.native = Native::Binary(on);
                 let off_delay = *off_delay;
@@ -1537,10 +1579,6 @@ impl Client {
                 }
             }
         }
-        let Some(ent) = self.ent(e) else {
-            return false;
-        };
-        before != (ent.native.clone(), ent.expired)
     }
 
     fn on_availability(&mut self, e: usize, a: usize, value: &str) -> bool {
@@ -1789,6 +1827,23 @@ impl Client {
                  information is shared between multiple entities, the device name must be \
                  included in each entity's device configuration"
             );
+        }
+        // A unique id another running entity has: HA's platform refuses it.
+        if let (Some(unique_id), Some(registry)) = (&cfg.unique_id, self.components.registry())
+            && let Some(row) =
+                registry.entity_by_unique_id(cfg.domain.as_str(), super::DOMAIN, unique_id)
+            && self
+                .ents
+                .iter()
+                .flatten()
+                .any(|x| x.entity_id.as_str() == row.entity_id)
+        {
+            tracing::error!(
+                "Platform mqtt does not generate unique IDs. ID {unique_id} already exists - \
+                 ignoring {}",
+                row.entity_id
+            );
+            return;
         }
         let name = cfg.entity_name();
         let Some(Shown {

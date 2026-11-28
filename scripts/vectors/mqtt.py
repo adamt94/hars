@@ -3,9 +3,13 @@
 and the `mqtt.publish` action, as Home Assistant 2026.6.1 runs them.
 
     python3.14 -m venv .venv-mqtt
-    .venv-mqtt/bin/pip install homeassistant==2026.6.1 paho-mqtt==2.1.0
-    .venv-mqtt/bin/python -I scripts/vectors/mqtt.py
+    .venv-mqtt/bin/pip install homeassistant==2026.6.1 paho-mqtt==2.1.0 \
+        aiohasupervisor==0.4.3
+    .venv-mqtt/bin/python -I scripts/vectors/mqtt.py          # everything
+    .venv-mqtt/bin/python -I scripts/vectors/mqtt.py tables   # tables.rs only
     cargo test -p ha-integrations mqtt
+
+(`aiohasupervisor` because `mqtt`'s config flow imports `hassio`.)
 
 Home Assistant 2026.6.1's `components/mqtt` on paho-mqtt 2.1.0 is started
 with one `mqtt` config entry against a fake broker on 127.0.0.1 (in this
@@ -57,12 +61,13 @@ import pathlib
 import shutil
 import socket
 import struct
+import subprocess
 import sys
 import tempfile
 import time
 from types import MappingProxyType
 
-PINNED = {"homeassistant": "2026.6.1", "paho-mqtt": "2.1.0"}
+PINNED = {"homeassistant": "2026.6.1", "paho-mqtt": "2.1.0", "aiohasupervisor": "0.4.3"}
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 OUT = ROOT / "crates/ha-integrations/src/mqtt/vectors"
 TABLES = ROOT / "crates/ha-integrations/src/mqtt/tables.rs"
@@ -980,6 +985,9 @@ def tables():
             sorted(se.NON_NUMERIC_DEVICE_CLASSES, key=lambda c: c.value)]
     out += ["];", ""]
     TABLES.write_text("\n".join(out))
+    # As `cargo fmt` leaves it (the toolchain's rustfmt, from
+    # `rust-toolchain.toml`).
+    subprocess.run(["rustfmt", "--edition", "2024", str(TABLES)], check=True, cwd=ROOT)
 
 
 async def main():

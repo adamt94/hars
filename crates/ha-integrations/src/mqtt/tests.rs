@@ -7,7 +7,7 @@
 use super::*;
 use crate::config_entries::ConfigEntries;
 use crate::light::Profiles;
-use ha_core::Hass;
+use ha_core::{EntityId, Hass};
 use ha_registry::{Registries, Registry};
 use parking_lot::Mutex;
 use serde_json::json;
@@ -939,4 +939,253 @@ async fn mqtt_5_matches_ha() {
 async fn mqtt_3_1_1_matches_ha() {
     let r = replay("v311").await;
     check_rows("v311", &r);
+}
+
+// ---------------------------------------------------------------- timing and failures
+
+/// An entry with `data`, started against `broker`; the times it dialled
+/// are recorded (seconds since start).
+struct Running {
+    hass: Hass,
+    entries: Arc<ConfigEntries>,
+    dials: Arc<Mutex<Vec<f64>>>,
+}
+
+async fn start(broker: &Broker, data: Value) -> Running {
+    let hass = Hass::with_clock(
+        ha_core::SimulatedClock::new("2026-06-01T12:00:00Z".parse().unwrap()).clock(),
+    );
+    hass.start();
+    let registry = Registry::in_memory(&hass, Registries::default());
+    let components = crate::components::Components::new(&hass, registry, Profiles::default());
+    let entry = json!({"entry_id": "e", "domain": "mqtt", "title": "127.0.0.1",
+                       "version": 2, "minor_version": 1, "data": data, "options": {}});
+    let entry = entry.as_object().unwrap().clone();
+    let entries = ConfigEntries::in_memory(&hass, vec![entry.clone()]);
+    let status = crate::config_entries::Status::new(entries.clone(), "e");
+    let dials = Arc::new(Mutex::new(Vec::new()));
+    let (inner, log, t0) = (broker.dial(), dials.clone(), tokio::time::Instant::now());
+    let dial: client::Dial = Arc::new(move |host, port| {
+        log.lock().push(t0.elapsed().as_secs_f64());
+        inner(host, port)
+    });
+    tokio::spawn(run(
+        components,
+        entry,
+        Some(entries.clone()),
+        dial,
+        hass.setup_guard(),
+        status,
+    ));
+    hass.setups_done().await;
+    Running {
+        hass,
+        entries,
+        dials,
+    }
+}
+
+fn types(packets: &[(usize, Value)]) -> Vec<String> {
+    packets
+        .iter()
+        .map(|(c, p)| format!("{c}:{}", p["type"].as_str().unwrap()))
+        .collect()
+}
+
+/// A `PINGREQ` once `keepalive` seconds have passed with nothing sent or
+/// nothing received (paho's test, on `hars`'s own send times); a broker
+/// that doesn't answer one is left after another `keepalive`, and tried
+/// again 10 s later.
+#[tokio::test(start_paused = true)]
+async fn pings_when_idle_and_leaves_a_broker_that_stops_answering() {
+    let broker = Broker::start(true).await;
+    let r = start(
+        &broker,
+        json!({"broker": "127.0.0.1", "port": 1883, "protocol": "5", "keepalive": 15,
+               "discovery": false}),
+    )
+    .await;
+    let t0 = tokio::time::Instant::now();
+    let at = |t: u64| t0 + Duration::from_secs(t);
+    // Connected at 0, the birth message at 5: nothing received since 0.
+    tokio::time::sleep_until(at(14)).await;
+    assert_eq!(types(&broker.take()), ["0:CONNECT", "0:PUBLISH"]);
+    tokio::time::sleep_until(at(16)).await;
+    assert_eq!(types(&broker.take()), ["0:PINGREQ"]);
+    tokio::time::sleep_until(at(31)).await;
+    assert_eq!(types(&broker.take()), ["0:PINGREQ"]);
+    // A message each way at 33: the next ping at 48.
+    tokio::time::sleep_until(at(33)).await;
+    broker
+        .state
+        .lock()
+        .deliver(0, "anything", b"x", 0, false, &[]);
+    r.hass
+        .call_service(
+            "mqtt",
+            "publish",
+            json!({"topic": "a", "payload": "b"})
+                .as_object()
+                .unwrap()
+                .clone(),
+            None,
+            false,
+            None,
+        )
+        .await
+        .unwrap();
+    tokio::time::sleep_until(at(47)).await;
+    assert_eq!(types(&broker.take()), ["0:PUBLISH"]);
+    // The broker stops answering: the ping at 48 isn't, and at 63 the
+    // connection is given up; 10 s later, tried again.
+    broker.state.lock().conns[0].dropped = true;
+    tokio::time::sleep_until(at(72)).await;
+    assert_eq!(*r.dials.lock(), [0.0]);
+    tokio::time::sleep_until(at(74)).await;
+    assert_eq!(*r.dials.lock(), [0.0, 73.0]);
+    assert_eq!(types(&broker.take())[0], "1:CONNECT");
+}
+
+/// A connection lost is tried again 10 s later, then every 10 s; a first
+/// connection that fails is tried again at once. Entities are unavailable
+/// meanwhile, and `mqtt.publish` fails as HA's does.
+#[tokio::test(start_paused = true)]
+async fn reconnects_on_has_schedule() {
+    let broker = Broker::start(true).await;
+    broker.state.lock().down = true;
+    let r = start(
+        &broker,
+        json!({"broker": "127.0.0.1", "port": 1883, "protocol": "5"}),
+    )
+    .await;
+    assert_eq!(*r.dials.lock(), [0.0, 0.0]);
+    assert_eq!(
+        r.entries.runtime("e").map(|x| x.state),
+        Some(crate::config_entries::EntryState::Loaded)
+    );
+    let err = r
+        .hass
+        .call_service(
+            "mqtt",
+            "publish",
+            json!({"topic": "a", "payload": "b"})
+                .as_object()
+                .unwrap()
+                .clone(),
+            None,
+            false,
+            None,
+        )
+        .await
+        .unwrap_err();
+    assert_eq!(
+        err.to_string(),
+        "Error talking to MQTT: The client is not currently connected"
+    );
+    tokio::time::sleep(Duration::from_secs(25)).await;
+    assert_eq!(*r.dials.lock(), [0.0, 0.0, 10.0, 20.0]);
+    broker.state.lock().down = false;
+    tokio::time::sleep(Duration::from_secs(10)).await;
+    assert_eq!(types(&broker.take())[0], "0:CONNECT");
+    let lost = r.dials.lock().len();
+    broker.drop_all();
+    tokio::time::sleep(Duration::from_millis(9900)).await;
+    assert_eq!(r.dials.lock().len(), lost);
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    assert_eq!(r.dials.lock().len(), lost + 1);
+}
+
+/// Bad credentials end the tries (HA starts a reauthentication there).
+#[tokio::test(start_paused = true)]
+async fn refused_credentials_are_not_tried_again() {
+    let broker = Broker::start(true).await;
+    broker.state.lock().refuse = Some(0x86);
+    let r = start(
+        &broker,
+        json!({"broker": "127.0.0.1", "port": 1883, "protocol": "5", "username": "u",
+               "password": "wrong"}),
+    )
+    .await;
+    tokio::time::sleep(Duration::from_secs(120)).await;
+    assert_eq!(*r.dials.lock(), [0.0]);
+}
+
+/// What `hars` doesn't do yet is said, and the entry isn't set up.
+#[tokio::test(start_paused = true)]
+async fn tls_and_websockets_entries_are_not_set_up() {
+    for data in [
+        json!({"broker": "b", "port": 8883, "protocol": "5", "certificate": "auto"}),
+        json!({"broker": "b", "port": 80, "protocol": "5", "transport": "websockets"}),
+    ] {
+        let broker = Broker::start(true).await;
+        let r = start(&broker, data).await;
+        assert!(r.dials.lock().is_empty());
+        assert_eq!(
+            r.entries.runtime("e").map(|x| x.state),
+            Some(crate::config_entries::EntryState::SetupError)
+        );
+    }
+}
+
+/// `async_migrate_entry`: 1.x and 2.1 are set up; a later 2.x or 3 isn't.
+#[test]
+fn entry_versions() {
+    let entry = |v: u64, m: u64| {
+        json!({"domain": "mqtt", "version": v, "minor_version": m})
+            .as_object()
+            .unwrap()
+            .clone()
+    };
+    assert!(!crate::entry_too_new(&entry(1, 1)));
+    assert!(!crate::entry_too_new(&entry(1, 2)));
+    assert!(!crate::entry_too_new(&entry(2, 1)));
+    assert!(crate::entry_too_new(&entry(2, 2)));
+    assert!(crate::entry_too_new(&entry(3, 1)));
+}
+
+/// A QoS 2 message reaches its entity at its `PUBREL`, as paho delivers
+/// it; an `expire_after` sensor is unavailable until a value comes, and
+/// again once it is that old.
+#[tokio::test(start_paused = true)]
+async fn qos_2_and_expire_after() {
+    let broker = Broker::start(true).await;
+    broker.publish(
+        "homeassistant/sensor/s/config",
+        r#"{"stat_t": "s/state", "uniq_id": "s1", "exp_aft": 60, "qos": 2, "name": "S"}"#,
+        true,
+        0,
+    );
+    let r = start(
+        &broker,
+        json!({"broker": "127.0.0.1", "port": 1883, "protocol": "5"}),
+    )
+    .await;
+    tokio::time::sleep(Duration::from_secs(1)).await;
+    let id = EntityId::parse("sensor.s").unwrap();
+    let state = |r: &Running| r.hass.states().get(&id).unwrap().state.to_string();
+    assert_eq!(state(&r), "unavailable");
+    // Delivered at QoS 2: held until the broker's `PUBREL`.
+    {
+        let mut s = broker.state.lock();
+        let conn = &mut s.conns[0];
+        let mut body = vec![0, 7];
+        body.extend_from_slice(b"s/state");
+        body.extend_from_slice(&[0, 9, 0]);
+        body.extend_from_slice(b"21");
+        let mut out = vec![0x34, body.len() as u8];
+        out.extend(body);
+        let _ = conn.write.send(Some(out));
+    }
+    tokio::time::sleep(Duration::from_millis(10)).await;
+    assert_eq!(state(&r), "unavailable");
+    assert!(broker.take().iter().any(|(_, p)| p["type"] == "PUBREC"));
+    {
+        let s = broker.state.lock();
+        let _ = s.conns[0].write.send(Some(vec![0x62, 2, 0, 9]));
+    }
+    tokio::time::sleep(Duration::from_millis(10)).await;
+    assert_eq!(state(&r), "21");
+    assert!(broker.take().iter().any(|(_, p)| p["type"] == "PUBCOMP"));
+    tokio::time::sleep(Duration::from_secs(61)).await;
+    assert_eq!(state(&r), "unavailable");
 }

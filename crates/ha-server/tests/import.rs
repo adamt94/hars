@@ -1008,7 +1008,7 @@ fn imports_every_release() {
             .filter(|e| e["supported"] == false)
             .map(|e| e["domain"].as_str().unwrap())
             .collect();
-        assert_eq!(unsupported, ["radio_browser", "homekit_controller", "mqtt"]);
+        assert_eq!(unsupported, ["radio_browser", "homekit_controller"]);
         // 2026.10 removes the `lifx` entry from before one entry per bulb.
         let entries = if month >= 10 { 10 } else { 11 };
         assert_eq!(report["config_entries"].as_array().unwrap().len(), entries);
@@ -1101,11 +1101,11 @@ fn a_2026_7_install_runs() {
     assert!(out.status.success(), "{out:?}");
 
     // No test reaches the network: the integrations that would call a
-    // bridge, a bulb or a cloud stay off.
+    // bridge, a bulb, a broker or a cloud stay off.
     edit_store(&dest, "core.config_entries", |store| {
         for entry in store["data"]["entries"].as_array_mut().unwrap() {
             let domain = entry["domain"].as_str().unwrap();
-            if ["met", "hue", "lifx", "switchbot_cloud"].contains(&domain) {
+            if ["met", "hue", "lifx", "switchbot_cloud", "mqtt"].contains(&domain) {
                 entry["disabled_by"] = json!("user");
             }
         }
@@ -2400,12 +2400,12 @@ fn a_2026_11_install_runs() {
         .collect();
 
     // No test reaches the network: the integrations that would call a
-    // bridge, a bulb or a cloud stay off. Their entities are then shown
+    // bridge, a bulb, a broker or a cloud stay off. Their entities are then shown
     // from the registry alone, as `unavailable`.
     edit_store(&dest, "core.config_entries", |store| {
         for entry in store["data"]["entries"].as_array_mut().unwrap() {
             let domain = entry["domain"].as_str().unwrap();
-            if ["met", "hue", "lifx", "switchbot_cloud"].contains(&domain) {
+            if ["met", "hue", "lifx", "switchbot_cloud", "mqtt"].contains(&domain) {
                 entry["disabled_by"] = json!("user");
             }
         }
