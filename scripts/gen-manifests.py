@@ -26,7 +26,7 @@ DOMAINS = set(
     """api auth automation binary_sensor brands button climate config cover
     default_config device_tracker event fan frontend group history
     homeassistant http hue input_boolean labs lifx light lock logbook lovelace
-    media_player met mobile_app notify number onboarding person
+    media_player met mobile_app mqtt notify number onboarding person
     persistent_notification recorder remote repairs scene script select sensor
     sun switch switchbot_cloud system_log vacuum weather websocket_api zone
     analytics backup shopping_list google_translate radio_browser tts

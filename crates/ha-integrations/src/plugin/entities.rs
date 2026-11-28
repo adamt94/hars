@@ -142,6 +142,7 @@ impl PluginEntityStore {
                 sw_version: params.sw_version,
                 via_device: None,
                 suggested_area: params.suggested_area,
+                ..Default::default()
             });
             device.id.clone()
         } else {

@@ -20,9 +20,9 @@ Home Assistant Core 2026.6.1
   hars reproduces the behaviour, storage formats, HTTP and WebSocket API,
   and service schemas of Home Assistant's core and of these components:
   api, auth, automation, brands, button, climate, config, frontend, history,
-  hue, lifx, light, logbook, lovelace, met, mobile_app, notify, onboarding,
-  person, recorder, scene, sun, switch, switchbot_cloud, system_log,
-  weather, websocket_api, and zone. The translations, icons, manifests, and
+  hue, lifx, light, logbook, lovelace, met, mobile_app, mqtt, notify,
+  onboarding, person, recorder, scene, sun, switch, switchbot_cloud,
+  system_log, weather, websocket_api, and zone. The translations, icons, manifests, and
   the country, currency, language, unit, and light-profile tables that hars
   compiles in are generated from Home Assistant's release files. The test
   vectors under each crate's `vectors` directory are the output of Home
@@ -60,6 +60,14 @@ switchbot-api 2.11.0
   MIT License. Copyright (c) 2023 Seraphic Corp.
   The request signing, response envelope, and error classes in
   crates/ha-integrations/src/switchbot_cloud are a port.
+
+Eclipse Paho MQTT Python Client 2.1.0
+  https://github.com/eclipse-paho/paho.mqtt.python
+  Eclipse Distribution License 1.0 (a BSD 3-Clause licence), offered with
+  the Eclipse Public License 2.0. Copyright (c) 2012-2019 Roger Light and
+  others.
+  The MQTT client's packets, keepalive test, packet ids and made-up client
+  ids in crates/ha-integrations/src/mqtt reproduce its behaviour.
 
 PyYAML 6.0.3 and annotatedyaml 1.0.2
   https://github.com/yaml/pyyaml

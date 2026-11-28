@@ -18,6 +18,7 @@ memory and wakeup cost is measured before it merges.
 | [Philips Hue](#philips-hue) | `hue` | Local, pushed by the bridge | The UI, or import |
 | [LIFX](#lifx) | `lifx` | Local, polled every 10 s | The UI, or import |
 | [SwitchBot Cloud](#switchbot-cloud) | `switchbot_cloud` | Cloud, polled every 600 s | The UI, or import |
+| [MQTT](#mqtt) | `mqtt` | Local, pushed by your broker | Import |
 | [Weather](#weather) | `met` | Cloud, fetched about once an hour | Onboarding |
 | [Sun](#sun) | `sun` | None, calculated | On by default |
 | [Companion app](#companion-app) | `mobile_app` | The app calls hars | Log in from the app |
@@ -231,6 +232,39 @@ shows, and the `weather.get_forecasts` service.
 
 Not yet: a change of the forecast's settings from the UI.
 
+### MQTT
+
+hars connects to your MQTT broker as Home Assistant does: the same client
+settings, the same birth and will messages on `homeassistant/status`, and
+reconnects 10 s after the broker goes away. Entities are unavailable while
+the broker is gone.
+
+- **Discovery:** `sensor` and `binary_sensor` entities that devices announce
+  on the discovery topic (`homeassistant/...` by default), one entity per
+  message or several in one device message. Zigbee2MQTT and Tasmota (with
+  `SetOption19 1`) announce their sensors this way. Changed and removed
+  announcements update and remove the entity, its registry entry and its
+  device.
+- **What a sensor does:** value templates, units, device and state classes,
+  availability topics, JSON attributes, `expire_after`, `force_update`,
+  `off_delay`, icons, entity categories, and entities that start disabled.
+- **The `mqtt.publish` action**, with QoS 0, 1 and 2, retain, and a
+  message expiry on MQTT 5.
+
+hars speaks MQTT 3.1, 3.1.1 and 5 over plain TCP. Like Home Assistant, it
+moves an entry to MQTT 5 if your broker takes it.
+
+Not yet: adding MQTT from the UI (it comes across in an import), TLS,
+WebSockets, client certificates, the other discovered entity types
+(switches, lights, covers, climate and the rest: hars logs that it skipped
+them), MQTT triggers in automations, entities from `mqtt:` in
+`configuration.yaml`, the `mqtt.dump` and `mqtt.reload` actions, the MQTT
+pages of the UI, and Tasmota's and other integrations that are set up
+through MQTT. Of a sensor's options, `last_reset_value_template` and
+`group` aren't used yet, and payloads are read as UTF-8 whatever its
+`encoding` says. An `expire_after` sensor starts unavailable after a
+restart until a new value comes (Home Assistant restores its last value).
+
 ### Sun
 
 `sun.sun` and the six `sensor.sun_next_*` sensors are calculated from your
@@ -305,16 +339,15 @@ New integrations and features:
 
 | Planned | What it brings |
 |---|---|
-| MQTT (`mqtt`) | Devices that publish to an MQTT broker |
-| zigbee2mqtt | Zigbee devices, through MQTT |
+| MQTT, what remains | Switches, lights, covers, climate and the other MQTT discovery types, so all of Zigbee2MQTT's devices; MQTT triggers, TLS, adding MQTT from the UI |
 | ESPHome (`esphome`) | ESPHome devices, over their native API |
 | Helpers (`input_*`, `template`) | Toggles, numbers, and template entities |
 | To-do lists (`todo`) | Shopping and to-do lists |
 | Text-to-speech | Spoken announcements |
 | SwitchBot webhooks, remote access | Features that need a public URL |
 
-A large integration that not everyone uses, such as an MQTT or a Zigbee
-stack, goes behind a Cargo feature. People who don't use the integration
+A large integration that not everyone uses, such as a Zigbee stack, goes
+behind a Cargo feature. People who don't use the integration
 don't carry its code in memory
 ([performance rule 10](PERF.md#rules)).
 

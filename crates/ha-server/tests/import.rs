@@ -1008,7 +1008,7 @@ fn imports_every_release() {
             .filter(|e| e["supported"] == false)
             .map(|e| e["domain"].as_str().unwrap())
             .collect();
-        assert_eq!(unsupported, ["radio_browser", "homekit_controller", "mqtt"]);
+        assert_eq!(unsupported, ["radio_browser", "homekit_controller"]);
         // 2026.10 removes the `lifx` entry from before one entry per bulb.
         let entries = if month >= 10 { 10 } else { 11 };
         assert_eq!(report["config_entries"].as_array().unwrap().len(), entries);
@@ -1101,11 +1101,11 @@ fn a_2026_7_install_runs() {
     assert!(out.status.success(), "{out:?}");
 
     // No test reaches the network: the integrations that would call a
-    // bridge, a bulb or a cloud stay off.
+    // bridge, a bulb, a broker or a cloud stay off.
     edit_store(&dest, "core.config_entries", |store| {
         for entry in store["data"]["entries"].as_array_mut().unwrap() {
             let domain = entry["domain"].as_str().unwrap();
-            if ["met", "hue", "lifx", "switchbot_cloud"].contains(&domain) {
+            if ["met", "hue", "lifx", "switchbot_cloud", "mqtt"].contains(&domain) {
                 entry["disabled_by"] = json!("user");
             }
         }
@@ -1294,6 +1294,17 @@ fn what_hars_cannot_convert_is_refused() {
             "lifx-2.2",
             |src| entry(src, "lifx", |e| e["minor_version"] = json!(2)),
             "the lifx integration's config entry \"Desk\" is version 2.2".into(),
+        ),
+        // `mqtt`'s migration reads 1.x and 2.1 (`async_migrate_entry`).
+        (
+            "mqtt-2.2",
+            |src| {
+                entry(src, "mqtt", |e| {
+                    e["version"] = json!(2);
+                    e["minor_version"] = json!(2);
+                })
+            },
+            "the mqtt integration's config entry".into(),
         ),
         (
             "hue-2",
@@ -2400,12 +2411,12 @@ fn a_2026_11_install_runs() {
         .collect();
 
     // No test reaches the network: the integrations that would call a
-    // bridge, a bulb or a cloud stay off. Their entities are then shown
+    // bridge, a bulb, a broker or a cloud stay off. Their entities are then shown
     // from the registry alone, as `unavailable`.
     edit_store(&dest, "core.config_entries", |store| {
         for entry in store["data"]["entries"].as_array_mut().unwrap() {
             let domain = entry["domain"].as_str().unwrap();
-            if ["met", "hue", "lifx", "switchbot_cloud"].contains(&domain) {
+            if ["met", "hue", "lifx", "switchbot_cloud", "mqtt"].contains(&domain) {
                 entry["disabled_by"] = json!("user");
             }
         }
@@ -3772,5 +3783,35 @@ fn a_detached_entity_is_written_detached() {
     );
     for d in [temp("detached-src"), temp("detached-dest"), src, dest] {
         let _ = std::fs::remove_dir_all(d);
+    }
+}
+
+/// An `mqtt` entry as Home Assistant 2026.6.1 leaves it: 1.2 after its own
+/// migration (`async_migrate_entry` moves the options out of `data`), or
+/// 2.1 as its config flow writes it. Both import.
+#[test]
+fn mqtt_entries_of_every_version_2026_6_1_writes_import() {
+    for (version, minor) in [(1, 2), (2, 1)] {
+        let src = temp(&format!("mqtt-{version}.{minor}"));
+        let dest = temp(&format!("mqtt-{version}.{minor}-dest"));
+        release("2026.6.1", &src, &[]);
+        edit_store(&src, "core.config_entries", |s| {
+            let entries = s["data"]["entries"].as_array_mut().unwrap();
+            let e = entries.iter_mut().find(|e| e["domain"] == "mqtt").unwrap();
+            e["version"] = json!(version);
+            e["minor_version"] = json!(minor);
+            e["options"] = json!({"discovery": true});
+        });
+        let out = hars(&dest, &["import", src.to_str().unwrap()]);
+        assert!(out.status.success(), "{version}.{minor}: {out:?}");
+        let report = read_json(&dest.join("import-report.json"));
+        let mqtt = report["config_entries"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|e| e["domain"] == "mqtt")
+            .unwrap()
+            .clone();
+        assert_eq!(mqtt["supported"], true, "{version}.{minor}");
     }
 }

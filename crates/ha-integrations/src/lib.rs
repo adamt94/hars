@@ -15,6 +15,7 @@ pub mod lock;
 pub mod media_player;
 pub mod met;
 pub mod mobile_app;
+pub mod mqtt;
 pub mod naming;
 pub mod notify;
 pub mod num;
@@ -43,6 +44,7 @@ pub const SUPPORTED: &[&str] = &[
     hue::DOMAIN,
     switchbot_cloud::DOMAIN,
     lifx::DOMAIN,
+    mqtt::DOMAIN,
 ];
 
 /// The config flow `VERSION` of every integration `hars` runs (and of
@@ -56,6 +58,10 @@ pub const ENTRY_VERSION: u64 = 1;
 /// (`migration_error`), and neither does `hars`. A newer `minor_version`
 /// is compatible by Home Assistant's rule, and runs.
 pub fn entry_too_new(entry: &Map<String, Value>) -> bool {
+    // `mqtt`'s flow writes version 2.1, and its migration takes 1.x.
+    if entry.get("domain").and_then(Value::as_str) == Some(mqtt::DOMAIN) {
+        return mqtt::entry_too_new(entry);
+    }
     entry
         .get("version")
         .and_then(Value::as_u64)
@@ -213,6 +219,24 @@ pub(crate) fn spawn_switchbot(
     ))
 }
 
+/// Start an `mqtt` entry. `store` is where it is stored, for its
+/// migrations.
+pub(crate) fn spawn_mqtt(
+    components: &Arc<components::Components>,
+    entry: Map<String, Value>,
+    store: Option<Arc<config_entries::ConfigEntries>>,
+    status: config_entries::Status,
+) -> tokio::task::JoinHandle<()> {
+    tokio::spawn(mqtt::run(
+        components.clone(),
+        entry,
+        store,
+        mqtt::client::tcp(),
+        components.hass().setup_guard(),
+        status,
+    ))
+}
+
 /// A fresh install (no `core.config_entries` file) gets the entries HA's
 /// default configuration imports at its first start: `sun`'s (`sun`'s
 /// `async_setup` runs its import flow when it has no entry). Saved like
@@ -336,6 +360,18 @@ pub fn start(
             spawn_lifx(&components, entry, endpoints, status)
         }));
         running.extend(lifx::COMPONENTS);
+    }
+    // `single_config_entry`: one client.
+    if let Some(entry) = enabled(mqtt::DOMAIN).next().cloned() {
+        let entry_id = field(&entry, "entry_id").unwrap_or_default();
+        let status = match store {
+            Some(store) => config_entries::Status::new(store.clone(), &entry_id),
+            None => config_entries::Status::none(),
+        };
+        tasks.push(Running::start(&entry_id, status, |status| {
+            spawn_mqtt(&components, entry, store.cloned(), status)
+        }));
+        running.extend(mqtt::COMPONENTS);
     }
     running.sort_unstable();
     running.dedup();
