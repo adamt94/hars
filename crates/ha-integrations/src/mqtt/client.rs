@@ -57,6 +57,7 @@ use ha_core::template::{Mode as TplMode, Render, Var, Vars};
 use ha_core::{CoreState, EntityId, Hass, ServiceError, SetupGuard};
 use serde_json::{Map, Value, json};
 use smol_str::SmolStr;
+use std::borrow::Cow;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::future::Future;
 use std::pin::Pin;
@@ -185,6 +186,8 @@ struct Sub {
     /// `_retained_topics`: a plain subscription takes a retained message
     /// once (until the next connection).
     got_retained: bool,
+    /// And a wildcard one once per topic.
+    retained_topics: HashSet<SmolStr>,
 }
 
 /// `SubscriptionID`: identifiers for wildcard filters, from 2.
@@ -341,7 +344,7 @@ pub(crate) struct Client {
     mid: u16,
     outbound: Vec<Out>,
     /// QoS 2 messages waiting for their `PUBREL`.
-    incoming: HashMap<u16, (String, Vec<u8>, bool, Vec<u32>)>,
+    incoming: HashMap<u16, (String, Vec<u8>, bool, packet::Ids)>,
     /// Their topics' and payloads' bytes.
     incoming_bytes: usize,
     subs: Vec<Option<Sub>>,
@@ -370,6 +373,8 @@ pub(crate) struct Client {
     timers: BTreeMap<TimerKey, Timer>,
     timer_seq: u64,
     writes: Vec<usize>,
+    /// A message's subscriptions' owners: kept between messages.
+    scratch: Vec<Owner>,
 }
 
 /// Run the client for an entry, forever.
@@ -451,6 +456,7 @@ impl Client {
             timers: BTreeMap::new(),
             timer_seq: 0,
             writes: Vec::new(),
+            scratch: Vec::new(),
         }
     }
 
@@ -701,14 +707,14 @@ impl Client {
                 no_identifiers,
             } => self.connack(code, no_identifiers).await,
             Incoming::Publish(p) => {
-                let topic = p.topic.to_vec();
+                let topic = p.topic;
                 match p.qos {
                     0 => {
-                        self.message(&topic, p.payload, p.retain, &p.identifiers)
+                        self.message(topic, p.payload, p.retain, &p.identifiers)
                             .await
                     }
                     1 => {
-                        self.message(&topic, p.payload, p.retain, &p.identifiers)
+                        self.message(topic, p.payload, p.retain, &p.identifiers)
                             .await;
                         if let Some(id) = p.packet_id {
                             self.send(&packet::ack(packet::PUBACK, id)).await;
@@ -717,7 +723,7 @@ impl Client {
                     _ => {
                         // Delivered at its `PUBREL`, as paho does.
                         if let Some(id) = p.packet_id {
-                            if let Ok(t) = std::str::from_utf8(&topic) {
+                            if let Ok(t) = std::str::from_utf8(topic) {
                                 let size = t.len() + p.payload.len();
                                 if let Some((t, b, ..)) = self.incoming.insert(
                                     id,
@@ -1085,6 +1091,7 @@ impl Client {
             id,
             owner,
             got_retained: false,
+            retained_topics: HashSet::new(),
         };
         let i = match self.free_subs.pop() {
             Some(i) => {
@@ -1136,6 +1143,7 @@ impl Client {
         self.max_qos.clear();
         for sub in self.subs.iter_mut().flatten() {
             sub.got_retained = false;
+            sub.retained_topics = HashSet::new();
         }
         let mut topics: Vec<(SmolStr, u8)> = Vec::new();
         for sub in self.subs.iter().flatten() {
@@ -1255,7 +1263,7 @@ impl Client {
 
     /// `_async_mqtt_on_message`: every matching subscription's callback,
     /// then the entities' state writes.
-    async fn message(&mut self, topic: &[u8], payload: &[u8], retain: bool, ids: &[u32]) {
+    async fn message(&mut self, topic: &[u8], payload: &[u8], retain: bool, ids: &packet::Ids) {
         let Ok(topic) = std::str::from_utf8(topic) else {
             tracing::warn!(
                 "Skipping received{} message on invalid topic {:?}",
@@ -1264,60 +1272,91 @@ impl Client {
             );
             return;
         };
-        let filter_ids = self.identifiers && !ids.is_empty();
-        let mut matched: Vec<usize> = Vec::new();
+        let filter_ids = self.identifiers && !ids.overflow && !ids.as_slice().is_empty();
+        let ids = ids.as_slice();
+        // The owners of the subscriptions it reaches, in a buffer kept
+        // between messages (`_matching_subscriptions`). A retained message
+        // reaches a subscription once per topic (`_retained_topics`).
+        let mut owners = std::mem::take(&mut self.scratch);
+        owners.clear();
+        let take = |sub: &mut Sub| -> bool {
+            if !retain {
+                return true;
+            }
+            if !sub.wildcard {
+                return !std::mem::replace(&mut sub.got_retained, true);
+            }
+            sub.retained_topics.insert(SmolStr::new(topic))
+        };
         if let Some(list) = self.plain.get(topic)
             && !(filter_ids && !ids.contains(&1))
         {
-            matched.extend(list.iter().copied());
-        }
-        for &i in &self.wildcards {
-            if let Some(sub) = &self.subs[i]
-                && matches(&sub.topic, topic)
-                && !(filter_ids && !ids.contains(&sub.id))
-            {
-                matched.push(i);
+            for &i in list {
+                if let Some(sub) = &mut self.subs[i]
+                    && take(sub)
+                {
+                    owners.push(sub.owner);
+                }
             }
         }
-        if matched.is_empty() {
-            return;
+        for &i in &self.wildcards {
+            if let Some(sub) = &mut self.subs[i]
+                && matches(&sub.topic, topic)
+                && !(filter_ids && !ids.contains(&sub.id))
+                && take(sub)
+            {
+                owners.push(sub.owner);
+            }
         }
-        if retain {
-            matched.retain(|&i| match &mut self.subs[i] {
-                Some(sub) if !sub.wildcard => !std::mem::replace(&mut sub.got_retained, true),
-                Some(_) => true,
-                None => false,
-            });
+        if owners.is_empty() {
+            self.scratch = owners;
+            return;
         }
         let Ok(text) = std::str::from_utf8(payload) else {
             tracing::warn!(
                 "Can't decode payload {:?} on {topic} with encoding utf-8",
                 String::from_utf8_lossy(&payload[..payload.len().min(8192)])
             );
+            self.scratch = owners;
             return;
         };
-        let owners: Vec<Owner> = matched
-            .iter()
-            .filter_map(|&i| self.subs[i].as_ref().map(|s| s.owner))
-            .collect();
         // Discovery first: it doesn't share topics with entities.
-        let mut entity_owners = Vec::with_capacity(owners.len());
-        for owner in owners {
-            match owner {
+        let mut entities = false;
+        for k in 0..owners.len() {
+            match owners[k] {
                 Owner::Discovery => self.discovery_message(topic, text),
-                other => entity_owners.push(other),
+                _ => entities = true,
             }
         }
-        if !entity_owners.is_empty() {
-            self.entity_messages(topic, payload, text, &entity_owners)
-                .await;
+        if entities {
+            owners.retain(|o| *o != Owner::Discovery);
+            self.entity_messages(topic, payload, text, &owners).await;
         }
+        self.scratch = owners;
         self.flush_writes();
     }
 
     /// Every entity callback for one message: templates rendered together
     /// on a render thread, then applied in order.
     async fn entity_messages(&mut self, topic: &str, raw: &[u8], text: &str, owners: &[Owner]) {
+        // No template: nothing to render, nothing to set up for it.
+        let templated = |o: &Owner| match *o {
+            Owner::State(e) => self.ent(e).is_some_and(|e| e.cfg.value_template.is_some()),
+            Owner::Availability(e, a) => self
+                .ent(e)
+                .and_then(|e| e.cfg.availability.get(a))
+                .is_some_and(|a| a.template.is_some()),
+            Owner::Attributes(e) => self
+                .ent(e)
+                .is_some_and(|e| e.cfg.attributes_template.is_some()),
+            Owner::Discovery => false,
+        };
+        if !owners.iter().any(templated) {
+            for owner in owners {
+                self.callback(*owner, topic, raw, text, None);
+            }
+            return;
+        }
         let mut jobs: Vec<(Arc<ha_core::template::Template>, Vars)> = Vec::new();
         let mut slot: Vec<Option<usize>> = Vec::with_capacity(owners.len());
         let mut value_json: Option<Option<Var>> = None;
@@ -1437,24 +1476,17 @@ impl Client {
             return;
         };
         let force = ent.cfg.force_update;
-        let entity_id = ent.entity_id.clone();
-        let is_sensor = ent.cfg.domain == Domain::Sensor;
-        // The value the callback sees, or `None` to stop (an error
-        // logged).
-        let default = is_sensor && matches!(owner, Owner::State(_));
+        let default = ent.cfg.domain == Domain::Sensor && matches!(owner, Owner::State(_));
         // A state message makes an `expire_after` value fresh before its
         // template is rendered.
-        let before = (ent.native.clone(), ent.expired);
-        if matches!(owner, Owner::State(_)) {
-            self.fresh(e);
-        }
+        let mut changed = matches!(owner, Owner::State(_)) && self.fresh(e);
         let Some(ent) = self.ents.get(e).and_then(Option::as_ref) else {
             return;
         };
         // `Some(None)`: the message is ignored (what the callback tracks
         // is still compared); `None`: an error, logged, and no write.
-        let value: Option<Option<String>> = match render {
-            None => Some(Some(text.to_owned())),
+        let value: Option<Option<Cow<'_, str>>> = match render {
+            None => Some(Some(Cow::Borrowed(text))),
             Some(r) => {
                 for (_, line) in &r.log {
                     tracing::warn!("{line}");
@@ -1469,10 +1501,11 @@ impl Client {
                     Owner::Attributes(_) => ent.cfg.attributes_template.as_ref(),
                     Owner::Discovery => None,
                 }
-                .map(|t| t.source().to_owned())
-                .unwrap_or_default();
+                .map_or("", |t| t.source());
                 match r.result {
-                    Ok(out) => Some(Some(out.as_text().unwrap_or_default().to_owned())),
+                    Ok(out) => Some(Some(Cow::Owned(
+                        out.as_text().unwrap_or_default().to_owned(),
+                    ))),
                     Err(err) if jinja_error(&err.0) => match default {
                         // `PayloadSentinel.DEFAULT`: the message is
                         // ignored.
@@ -1482,14 +1515,15 @@ impl Client {
                                 "Error parsing value: {} (value: {text}, template: {source})",
                                 err.0.split_once(": ").map_or(err.0.as_str(), |(_, m)| m)
                             );
-                            Some(Some(text.to_owned()))
+                            Some(Some(Cow::Borrowed(text)))
                         }
                     },
                     Err(err) => {
                         tracing::warn!(
-                            "{} rendering template for entity '{entity_id}', template: \
+                            "{} rendering template for entity '{}', template: \
                              '{source}'{} and payload: {text}",
                             err.0,
+                            ent.entity_id,
                             if default {
                                 ", default value: default"
                             } else {
@@ -1504,15 +1538,8 @@ impl Client {
         let Some(value) = value else {
             return;
         };
-        let changed = match (owner, value) {
-            (Owner::State(_), Some(value)) => {
-                self.on_state(e, topic, raw, &value);
-                self.ent(e)
-                    .is_some_and(|ent| before != (ent.native.clone(), ent.expired))
-            }
-            (Owner::State(_), None) => self
-                .ent(e)
-                .is_some_and(|ent| before != (ent.native.clone(), ent.expired)),
+        changed |= match (owner, value) {
+            (Owner::State(_), Some(value)) => self.on_state(e, topic, raw, &value),
             (Owner::Availability(_, a), Some(value)) => self.on_availability(e, a, &value),
             (Owner::Attributes(_), Some(value)) => self.on_attributes(e, &value),
             _ => false,
@@ -1556,32 +1583,40 @@ impl Client {
         }
     }
 
-    /// A state message (`_state_message_received`). True if what it
-    /// tracks changed.
     /// `expire_after`: a state message makes the value fresh, and its
-    /// timer starts again.
-    fn fresh(&mut self, e: usize) {
+    /// timer starts again. True if it had expired.
+    fn fresh(&mut self, e: usize) -> bool {
         let Some(ent) = self.ents.get(e).and_then(Option::as_ref) else {
-            return;
+            return false;
         };
         let Some(after) = ent.cfg.expire_after.filter(|a| *a > 0) else {
-            return;
+            return false;
         };
         if let Some(k) = ent.expire_timer {
             self.timers.remove(&k);
         }
         let key = self.set_timer(Duration::from_secs(after), Timer::Expire(e));
-        if let Some(Some(ent)) = self.ents.get_mut(e) {
-            ent.expire_timer = key;
-            ent.expired = Some(false);
-        }
+        let Some(Some(ent)) = self.ents.get_mut(e) else {
+            return false;
+        };
+        ent.expire_timer = key;
+        ent.expired.replace(false) != Some(false)
     }
 
     /// A state message's value (`_update_state`, `_state_message_received`).
-    fn on_state(&mut self, e: usize, topic: &str, raw: &[u8], value: &str) {
+    /// True if the value changed.
+    fn on_state(&mut self, e: usize, topic: &str, raw: &[u8], value: &str) -> bool {
         let Some(Some(ent)) = self.ents.get_mut(e) else {
-            return;
+            return false;
         };
+        // The sensor's value, set without a copy when it is the same.
+        fn put(native: &mut Native, value: Option<&str>) -> bool {
+            if matches!(native, Native::Sensor(old) if old.as_deref() == value) {
+                return false;
+            }
+            *native = Native::Sensor(value.map(str::to_owned));
+            true
+        }
         match &ent.cfg.platform {
             Platform::Sensor {
                 device_class,
@@ -1591,7 +1626,7 @@ impl Client {
                 options,
             } => {
                 if value == "None" {
-                    ent.native = Native::Sensor(None);
+                    put(&mut ent.native, None)
                 } else if entity::numeric_expected(
                     device_class.as_deref(),
                     state_class.as_deref(),
@@ -1600,8 +1635,9 @@ impl Client {
                 ) {
                     if value.is_empty() {
                         tracing::debug!("Ignore empty state from '{topic}'");
+                        false
                     } else {
-                        ent.native = Native::Sensor(Some(value.to_owned()));
+                        put(&mut ent.native, Some(value))
                     }
                 } else if let Some(o) = options
                     && !o.iter().any(|x| x == value)
@@ -1611,6 +1647,7 @@ impl Client {
                          allowed: {}",
                         o.join(", ")
                     );
+                    false
                 } else if matches!(device_class.as_deref(), None | Some("enum")) {
                     if value.chars().count() > MAX_STATE {
                         tracing::warn!(
@@ -1623,23 +1660,39 @@ impl Client {
                             value.chars().take(8192).collect::<String>()
                         );
                         tracing::warn!("Invalid state message '{value}' from '{topic}'");
-                        ent.native = Native::Sensor(None);
+                        put(&mut ent.native, None)
                     } else {
-                        ent.native = Native::Sensor(Some(value.to_owned()));
+                        put(&mut ent.native, Some(value))
                     }
                 } else {
-                    // `timestamp` and `date`.
+                    // `timestamp` and `date`: `dt_util.parse_datetime`,
+                    // then a date in the payload's own offset, or the time
+                    // in UTC.
+                    let date = device_class.as_deref() == Some("date");
                     match parse_datetime(value) {
-                        Some(iso) => {
-                            let v = match device_class.as_deref() {
-                                Some("date") => iso.split('T').next().unwrap_or(&iso).to_owned(),
-                                _ => iso,
-                            };
-                            ent.native = Native::Sensor(Some(v));
+                        Some((local, _)) if date => {
+                            put(&mut ent.native, Some(&local.date().to_string()))
+                        }
+                        Some((local, Some(offset))) => {
+                            let utc = offset
+                                .to_timestamp(local)
+                                .map(|t| t.strftime("%Y-%m-%dT%H:%M:%S+00:00").to_string());
+                            match utc {
+                                Ok(utc) => put(&mut ent.native, Some(&utc)),
+                                Err(_) => put(&mut ent.native, None),
+                            }
+                        }
+                        Some((_, None)) => {
+                            tracing::error!(
+                                "Invalid datetime: {} provides state '{value}', which is \
+                                 missing timezone information",
+                                ent.entity_id
+                            );
+                            false
                         }
                         None => {
                             tracing::warn!("Invalid state message '{value}' from '{topic}'");
-                            ent.native = Native::Sensor(None);
+                            put(&mut ent.native, None)
                         }
                     }
                 }
@@ -1658,7 +1711,7 @@ impl Client {
                         ent.entity_id,
                         String::from_utf8_lossy(raw)
                     );
-                    return;
+                    return false;
                 }
                 let on = if value == payload_on {
                     Some(true)
@@ -1680,8 +1733,9 @@ impl Client {
                             None => String::new(),
                         }
                     );
-                    return;
+                    return false;
                 };
+                let changed = ent.native != Native::Binary(on);
                 ent.native = Native::Binary(on);
                 let off_delay = *off_delay;
                 let old = ent.off_timer.take();
@@ -1696,6 +1750,7 @@ impl Client {
                         ent.off_timer = key;
                     }
                 }
+                changed
             }
         }
     }
@@ -1831,14 +1886,19 @@ impl Client {
             return;
         }
         let prefix = self.config.prefix.clone();
+        let qos = self.config.discovery_qos;
         for c in super::tables::SUPPORTED_COMPONENTS {
-            self.subscribe(&format!("{prefix}/{c}/+/config"), 0, Owner::Discovery);
+            self.subscribe(&format!("{prefix}/{c}/+/config"), qos, Owner::Discovery);
         }
         for c in super::tables::SUPPORTED_COMPONENTS {
-            self.subscribe(&format!("{prefix}/{c}/+/+/config"), 0, Owner::Discovery);
+            self.subscribe(&format!("{prefix}/{c}/+/+/config"), qos, Owner::Discovery);
         }
-        self.subscribe(&format!("{prefix}/device/+/config"), 0, Owner::Discovery);
-        self.subscribe(&format!("{prefix}/device/+/+/config"), 0, Owner::Discovery);
+        self.subscribe(&format!("{prefix}/device/+/config"), qos, Owner::Discovery);
+        self.subscribe(
+            &format!("{prefix}/device/+/+/config"),
+            qos,
+            Owner::Discovery,
+        );
         self.last_discovery = Instant::now();
     }
 
@@ -2626,11 +2686,15 @@ fn sensor_state(ent: &Ent, value: &str) -> Result<String, String> {
     Ok(value.to_owned())
 }
 
-/// `dt_util.parse_datetime` then `isoformat(timespec="seconds")` in UTC;
-/// `None` for no offset (HA raises for a naive timestamp).
-fn parse_datetime(s: &str) -> Option<String> {
-    let ts: jiff::Timestamp = s.trim().parse().ok()?;
-    Some(ts.strftime("%Y-%m-%dT%H:%M:%S+00:00").to_string())
+/// `dt_util.parse_datetime`: the time as written, and its offset if it
+/// has one.
+fn parse_datetime(s: &str) -> Option<(jiff::civil::DateTime, Option<jiff::tz::Offset>)> {
+    let pieces = jiff::fmt::temporal::Pieces::parse(s.trim()).ok()?;
+    let time = pieces.time().unwrap_or(jiff::civil::Time::midnight());
+    Some((
+        pieces.date().to_datetime(time),
+        pieces.offset().map(|o| o.to_numeric_offset()),
+    ))
 }
 
 /// Whether a template error is one of Jinja's (`jinja2.TemplateError`),

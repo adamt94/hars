@@ -102,6 +102,9 @@ pub struct Config {
     pub keepalive: u16,
     pub version: Version,
     pub discovery: bool,
+    /// `discovery_qos`: the discovery subscriptions' QoS, from the
+    /// entry's options only (`discovery.py`).
+    pub discovery_qos: u8,
     pub prefix: String,
     pub birth: Option<Message>,
     pub will: Option<Message>,
@@ -208,6 +211,11 @@ impl Config {
             keepalive,
             version,
             discovery: get("discovery").and_then(Value::as_bool).unwrap_or(true),
+            discovery_qos: options
+                .get("discovery_qos")
+                .and_then(Value::as_u64)
+                .unwrap_or(0)
+                .min(2) as u8,
             prefix: str_of("discovery_prefix").unwrap_or_else(|| "homeassistant".into()),
             birth: message(get("birth_message"), "online")?,
             will: message(get("will_message"), "offline")?,

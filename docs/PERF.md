@@ -165,6 +165,11 @@ entry's set-up does about the registries at a start (about 100 devices
 and 400 entities among 3,300 rows of other integrations), when its rows
 are there and when they are not.
 
+`crates/ha-integrations/tests/mqtt_allocations.rs` (`cargo test -p
+ha-integrations --test mqtt_allocations -- --nocapture`) counts the
+allocations of MQTT readings that change nothing, from the socket to the
+sensor: none (it fails at 100 for 10,000 readings).
+
 ### Binary size
 
 `ls -l target/release/hars` after `cargo build --release`, on `main` and on

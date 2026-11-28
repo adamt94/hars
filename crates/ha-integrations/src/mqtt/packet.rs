@@ -270,7 +270,33 @@ pub struct Publish<'a> {
     pub retain: bool,
     pub packet_id: Option<u16>,
     /// MQTT 5's subscription identifiers (each matching subscription's).
-    pub identifiers: Vec<u32>,
+    pub identifiers: Ids,
+}
+
+/// A message's subscription identifiers, held inline: a broker sends one
+/// per subscription the message matches, rarely more than a few.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Ids {
+    ids: [u32; 8],
+    len: u8,
+    /// More than fit: the message isn't filtered by them.
+    pub overflow: bool,
+}
+
+impl Ids {
+    pub fn push(&mut self, id: u32) {
+        match self.ids.get_mut(usize::from(self.len)) {
+            Some(slot) => {
+                *slot = id;
+                self.len += 1;
+            }
+            None => self.overflow = true,
+        }
+    }
+
+    pub fn as_slice(&self) -> &[u32] {
+        &self.ids[..usize::from(self.len)]
+    }
 }
 
 /// One whole packet at the start of `buf`: its first byte, where its body
@@ -429,7 +455,7 @@ pub fn parse(first: u8, body: &[u8], version: Version) -> Result<Incoming<'_>, M
                     Some(id)
                 }
             };
-            let mut identifiers = Vec::new();
+            let mut identifiers = Ids::default();
             if v5 {
                 properties(body, &mut i, |id, value| {
                     if id == 0x0B {
@@ -494,7 +520,7 @@ mod tests {
         };
         assert_eq!(p.topic, b"a/b");
         assert_eq!(p.packet_id, Some(7));
-        assert_eq!(p.identifiers, [2, 300]);
+        assert_eq!(p.identifiers.as_slice(), [2, 300]);
         assert_eq!(p.payload, b"hi");
         // The same bytes from a 3.1.1 broker: no properties.
         let Incoming::Publish(p) = parse(0x32, &body, Version::V311).unwrap() else {

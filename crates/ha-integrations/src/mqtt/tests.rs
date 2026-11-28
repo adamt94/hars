@@ -1457,3 +1457,115 @@ async fn a_stopped_entry_takes_its_entities_and_disconnects() {
     assert!(hass.states().get(&id).is_none());
     assert_eq!(types(&broker.take()), ["0:DISCONNECT"]);
 }
+
+/// `date` and `timestamp` sensors (`sensor.py`'s `_update_state`): a date
+/// is the payload's own, in its own offset; a timestamp is shown in UTC.
+/// Expected values from HA 2026.6.1's `dt_util.parse_datetime`, run on
+/// these payloads: `2026-11-28T00:30:00+02:00` is the date `2026-11-28`
+/// and the time `2026-11-27T22:30:00+00:00`; `2026-11-28` is the date
+/// `2026-11-28`.
+#[tokio::test(start_paused = true)]
+async fn dates_keep_their_offset_and_timestamps_are_utc() {
+    let broker = Broker::start(true).await;
+    broker.publish(
+        "homeassistant/sensor/d/config",
+        r#"{"stat_t": "d/state", "uniq_id": "d1", "name": "D", "dev_cla": "date"}"#,
+        true,
+        0,
+    );
+    broker.publish(
+        "homeassistant/sensor/t/config",
+        r#"{"stat_t": "t/state", "uniq_id": "t1", "name": "T", "dev_cla": "timestamp"}"#,
+        true,
+        0,
+    );
+    let r = start(
+        &broker,
+        json!({"broker": "127.0.0.1", "port": 1883, "protocol": "5"}),
+    )
+    .await;
+    tokio::time::sleep(Duration::from_secs(2)).await;
+    let state = |id: &str| {
+        r.hass
+            .states()
+            .get(&EntityId::parse(id).unwrap())
+            .unwrap()
+            .state
+            .to_string()
+    };
+    broker.publish("d/state", "2026-11-28T00:30:00+02:00", false, 0);
+    broker.publish("t/state", "2026-11-28T00:30:00+02:00", false, 0);
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    assert_eq!(state("sensor.d"), "2026-11-28");
+    assert_eq!(state("sensor.t"), "2026-11-27T22:30:00+00:00");
+    broker.publish("d/state", "2026-11-29", false, 0);
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    assert_eq!(state("sensor.d"), "2026-11-29");
+}
+
+/// The discovery subscriptions take the entry's `discovery_qos` option
+/// (`discovery.py`: `config_entry.options.get(CONF_DISCOVERY_QOS, 0)`).
+#[tokio::test(start_paused = true)]
+async fn discovery_subscribes_at_the_entrys_qos() {
+    let broker = Broker::start(true).await;
+    let hass = Hass::new();
+    hass.start();
+    let registry = Registry::in_memory(&hass, Registries::default());
+    let components = crate::components::Components::new(&hass, registry, Profiles::default());
+    let entry = json!({"entry_id": "e", "domain": "mqtt", "title": "t", "version": 2,
+                       "minor_version": 1, "options": {"discovery_qos": 1},
+                       "data": {"broker": "127.0.0.1", "port": 1883, "protocol": "5"}});
+    tokio::spawn(run(
+        components,
+        entry.as_object().unwrap().clone(),
+        None,
+        broker.dial(),
+        hass.setup_guard(),
+        crate::config_entries::Status::none(),
+    ));
+    tokio::time::sleep(Duration::from_secs(1)).await;
+    let qos: Vec<u64> = broker
+        .take()
+        .iter()
+        .filter(|(_, p)| p["type"] == "SUBSCRIBE")
+        .map(|(_, p)| p["topics"][0][1].as_u64().unwrap())
+        .collect();
+    assert_eq!(qos.len(), 64);
+    assert!(qos.iter().all(|q| *q == 1), "{qos:?}");
+}
+
+/// A subscription takes a retained message once per topic, a wildcard one
+/// too (`_retained_topics`): a second sensor on the same wildcard topic
+/// brings the retained reading again, which the first doesn't take (its
+/// `force_update` would write it again).
+#[tokio::test(start_paused = true)]
+async fn a_wildcard_subscription_takes_a_retained_message_once() {
+    let broker = Broker::start(true).await;
+    broker.publish(
+        "homeassistant/sensor/a/config",
+        r#"{"stat_t": "w/+", "uniq_id": "a1", "name": "A", "frc_upd": true}"#,
+        true,
+        0,
+    );
+    broker.publish("w/x", "5", true, 0);
+    let r = start(
+        &broker,
+        json!({"broker": "127.0.0.1", "port": 1883, "protocol": "5"}),
+    )
+    .await;
+    tokio::time::sleep(Duration::from_secs(2)).await;
+    let id = EntityId::parse("sensor.a").unwrap();
+    let first = r.hass.states().get(&id).unwrap();
+    assert_eq!(first.state, "5");
+    broker.publish(
+        "homeassistant/sensor/b/config",
+        r#"{"stat_t": "w/+", "uniq_id": "b1", "name": "B"}"#,
+        true,
+        0,
+    );
+    tokio::time::sleep(Duration::from_secs(2)).await;
+    let id_b = EntityId::parse("sensor.b").unwrap();
+    assert_eq!(r.hass.states().get(&id_b).unwrap().state, "5");
+    let after = r.hass.states().get(&id).unwrap();
+    assert_eq!(after.last_updated, first.last_updated);
+}
