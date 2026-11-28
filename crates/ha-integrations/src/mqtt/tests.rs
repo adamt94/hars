@@ -196,6 +196,8 @@ struct BrokerState {
     refuse: Option<u8>,
     /// Refuse connections.
     down: bool,
+    /// Take `PUBLISH`es without acknowledging them.
+    no_ack: bool,
 }
 
 #[derive(Clone)]
@@ -368,6 +370,7 @@ impl BrokerState {
             "PUBLISH" => {
                 let id = p["packet_id"].as_u64().unwrap_or(0) as u16;
                 match p["qos"].as_u64().unwrap() {
+                    _ if self.no_ack => {}
                     1 => send(self, vec![0x40, 2, (id >> 8) as u8, id as u8]),
                     2 => send(self, vec![0x50, 2, (id >> 8) as u8, id as u8]),
                     _ => {}
@@ -385,6 +388,7 @@ impl BrokerState {
                     p["retain"].as_bool().unwrap(),
                 );
             }
+            "PUBREL" if self.no_ack => {}
             "PUBREL" => {
                 let id = p["packet_id"].as_u64().unwrap() as u16;
                 send(self, vec![0x70, 2, (id >> 8) as u8, id as u8]);
@@ -1313,4 +1317,111 @@ async fn unreleased_qos_2_messages_are_bounded() {
     tokio::time::sleep(Duration::from_secs(11)).await;
     let dials = r.dials.lock().clone();
     assert_eq!(dials.len(), 2, "{dials:?}");
+}
+
+fn publish_call(r: &Running, data: Value) -> tokio::task::JoinHandle<Result<(), String>> {
+    let hass = r.hass.clone();
+    tokio::spawn(async move {
+        hass.call_service(
+            "mqtt",
+            "publish",
+            data.as_object().unwrap().clone(),
+            None,
+            false,
+            None,
+        )
+        .await
+        .map(drop)
+        .map_err(|e| e.to_string())
+    })
+}
+
+/// paho keeps a QoS 1 or 2 message until the broker has it: one in flight
+/// when the connection is lost, and one published while disconnected,
+/// are published again after the reconnect (on HA's clean session, a
+/// QoS 2 one as a `PUBLISH` even after its `PUBREC`), the first marked
+/// `dup`, under its packet id (`_messages_reconnect_reset_out`,
+/// `_handle_connack`).
+#[tokio::test(start_paused = true)]
+async fn messages_in_flight_are_sent_again_after_a_reconnect() {
+    let broker = Broker::start(true).await;
+    let r = start(
+        &broker,
+        json!({"broker": "127.0.0.1", "port": 1883, "protocol": "5", "discovery": false}),
+    )
+    .await;
+    tokio::time::sleep(Duration::from_secs(6)).await;
+    broker.take();
+    broker.state.lock().no_ack = true;
+    let one = publish_call(&r, json!({"topic": "a", "payload": "1", "qos": 1}));
+    let two = publish_call(&r, json!({"topic": "b", "payload": "2", "qos": 2}));
+    tokio::time::sleep(Duration::from_secs(1)).await;
+    let sent = broker.take();
+    let ids: Vec<u64> = sent
+        .iter()
+        .map(|(_, p)| p["packet_id"].as_u64().unwrap())
+        .collect();
+    broker.drop_all();
+    tokio::time::sleep(Duration::from_secs(1)).await;
+    let queued = publish_call(&r, json!({"topic": "c", "payload": "3", "qos": 1}));
+    tokio::time::sleep(Duration::from_millis(10)).await;
+    assert_eq!(
+        queued.await.unwrap(),
+        Err("Error talking to MQTT: The client is not currently connected".into())
+    );
+    broker.state.lock().no_ack = false;
+    tokio::time::sleep(Duration::from_secs(10)).await;
+    let again: Vec<Value> = broker
+        .take()
+        .into_iter()
+        .filter(|(c, p)| *c == 1 && p["type"] == "PUBLISH")
+        .map(|(_, p)| json!([p["topic"], p["qos"], p["dup"], p["packet_id"]]))
+        .collect();
+    assert_eq!(
+        again,
+        [
+            json!(["a", 1, true, ids[0]]),
+            json!(["b", 2, true, ids[1]]),
+            json!(["c", 1, false, ids[1] + 1]),
+        ]
+    );
+    // HA's actions had stopped waiting after 10 s, with its warning, and
+    // succeeded (`_async_wait_for_mid_or_raise`).
+    assert_eq!(one.await.unwrap(), Ok(()));
+    assert_eq!(two.await.unwrap(), Ok(()));
+}
+
+/// An acknowledgement of the wrong kind doesn't end a publish: a
+/// `PUBACK` or `PUBCOMP` for a QoS 2 message before its `PUBREC`.
+#[tokio::test(start_paused = true)]
+async fn only_the_expected_acknowledgement_ends_a_publish() {
+    let broker = Broker::start(true).await;
+    let r = start(
+        &broker,
+        json!({"broker": "127.0.0.1", "port": 1883, "protocol": "5", "discovery": false}),
+    )
+    .await;
+    tokio::time::sleep(Duration::from_secs(6)).await;
+    broker.take();
+    broker.state.lock().no_ack = true;
+    let call = publish_call(&r, json!({"topic": "a", "payload": "1", "qos": 2}));
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    let id = broker.take()[0].1["packet_id"].as_u64().unwrap() as u16;
+    let ack = |first: u8| {
+        let s = broker.state.lock();
+        let _ = s.conns[0]
+            .write
+            .send(Some(vec![first, 2, (id >> 8) as u8, id as u8]));
+    };
+    ack(0x40);
+    ack(0x70);
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    assert!(!call.is_finished());
+    ack(0x50);
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    assert!(!call.is_finished());
+    assert!(broker.take().iter().any(|(_, p)| p["type"] == "PUBREL"));
+    ack(0x70);
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    assert_eq!(call.await.unwrap(), Ok(()));
 }

@@ -144,24 +144,30 @@ pub fn connect(c: &Connect) -> Vec<u8> {
     packet(0x10, &body)
 }
 
-/// `PUBLISH`. `packet_id` for QoS 1 and 2; `expiry` is MQTT 5's Message
-/// Expiry Interval.
-pub fn publish(
-    version: Version,
-    topic: &str,
-    payload: &[u8],
-    qos: u8,
-    retain: bool,
-    packet_id: u16,
-    expiry: Option<u32>,
-) -> Vec<u8> {
-    let mut body = Vec::with_capacity(topic.len() + payload.len() + 10);
-    str16(&mut body, topic.as_bytes());
-    if qos > 0 {
-        body.extend_from_slice(&packet_id.to_be_bytes());
+/// An outgoing `PUBLISH`.
+#[derive(Debug, Clone, Copy)]
+pub struct Out<'a> {
+    pub topic: &'a str,
+    pub payload: &'a [u8],
+    pub qos: u8,
+    pub retain: bool,
+    /// Sent again after a reconnect (paho's `dup`).
+    pub dup: bool,
+    /// For QoS 1 and 2.
+    pub packet_id: u16,
+    /// MQTT 5's Message Expiry Interval.
+    pub expiry: Option<u32>,
+}
+
+/// `PUBLISH`.
+pub fn publish(version: Version, m: &Out) -> Vec<u8> {
+    let mut body = Vec::with_capacity(m.topic.len() + m.payload.len() + 10);
+    str16(&mut body, m.topic.as_bytes());
+    if m.qos > 0 {
+        body.extend_from_slice(&m.packet_id.to_be_bytes());
     }
     if version.is_v5() {
-        match expiry {
+        match m.expiry {
             Some(seconds) => {
                 body.push(5);
                 body.push(0x02);
@@ -170,8 +176,9 @@ pub fn publish(
             None => body.push(0),
         }
     }
-    body.extend_from_slice(payload);
-    packet(0x30 | (qos << 1) | u8::from(retain), &body)
+    body.extend_from_slice(m.payload);
+    let dup = if m.dup && m.qos > 0 { 0x08 } else { 0 };
+    packet(0x30 | dup | (m.qos << 1) | u8::from(m.retain), &body)
 }
 
 /// `SUBSCRIBE` for `topics` (filter, QoS), with MQTT 5's subscription

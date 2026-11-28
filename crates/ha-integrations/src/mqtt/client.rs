@@ -44,9 +44,7 @@
 //! else was sent: its send time moves only on a ping), so `hars` pings
 //! less, never later than the broker needs; the subscriptions of one
 //! debounce go out without waiting for each `SUBACK` (HA waits for each
-//! wildcard one before the next); a QoS 1 or 2 message published while
-//! disconnected fails as in HA but isn't kept to send after reconnecting
-//! (paho keeps it); only UTF-8 payloads are decoded (an entity's other
+//! wildcard one before the next); only UTF-8 payloads are decoded (an entity's other
 //! `encoding` is read as UTF-8).
 
 use super::discovery::{self, Dropped, Found};
@@ -277,12 +275,29 @@ enum Timer {
     OffDelay(usize),
 }
 
-/// A publish waiting for its acknowledgement.
-struct Waiting {
-    deadline: Instant,
-    /// QoS 2: `PUBREC` came, `PUBCOMP` is next.
-    qos: u8,
+/// Where an outgoing QoS 1 or 2 message is (paho's `mqtt_ms_*`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Stage {
+    /// Published while disconnected: sent at the next connection.
+    Unsent,
+    WaitPubAck,
+    WaitPubRec,
+    WaitPubComp,
+}
+
+/// A QoS 1 or 2 message until the broker has it (paho's
+/// `_out_messages`): kept across a reconnect and sent again then.
+struct Out {
+    mid: u16,
+    message: Message,
+    expiry: Option<u32>,
+    stage: Stage,
+    /// Sent before: a resend is marked `dup`.
+    dup: bool,
+    /// The action waiting for it, and when HA stops waiting
+    /// (`TIMEOUT_ACK`: a warning, and the action succeeds).
     reply: Option<oneshot::Sender<Result<(), ServiceError>>>,
+    deadline: Option<Instant>,
 }
 
 /// The connection.
@@ -324,7 +339,7 @@ pub(crate) struct Client {
     last_in: Instant,
     ping_out: bool,
     mid: u16,
-    waiting: HashMap<u16, Waiting>,
+    outbound: Vec<Out>,
     /// QoS 2 messages waiting for their `PUBREL`.
     incoming: HashMap<u16, (String, Vec<u8>, bool, Vec<u32>)>,
     /// Their topics' and payloads' bytes.
@@ -410,7 +425,7 @@ impl Client {
             last_in: now,
             ping_out: false,
             mid: 0,
-            waiting: HashMap::new(),
+            outbound: Vec::new(),
             incoming: HashMap::new(),
             incoming_bytes: 0,
             subs: Vec::new(),
@@ -443,10 +458,15 @@ impl Client {
         self.config.version
     }
 
-    /// paho's `_mid_generate`.
+    /// paho's `_mid_generate`, past the ids of messages still in flight
+    /// (after a wrap, an id could otherwise be taken twice).
     fn next_mid(&mut self) -> u16 {
-        self.mid = if self.mid == 65535 { 1 } else { self.mid + 1 };
-        self.mid
+        loop {
+            self.mid = if self.mid == 65535 { 1 } else { self.mid + 1 };
+            if !self.outbound.iter().any(|o| o.mid == self.mid) {
+                return self.mid;
+            }
+        }
     }
 
     // ------------------------------------------------------------ the wire
@@ -578,7 +598,7 @@ impl Client {
         at(self.unsubscribe_at);
         at(self.birth_at);
         at(self.timers.keys().next().map(|k| k.0));
-        at(self.waiting.values().map(|w| w.deadline).min());
+        at(self.outbound.iter().filter_map(|o| o.deadline).min());
         next
     }
 
@@ -727,10 +747,15 @@ impl Client {
                 }
                 self.send(&packet::ack(packet::PUBCOMP, id)).await;
             }
-            Incoming::PubAck(id) | Incoming::PubComp(id) => self.acked(id),
+            Incoming::PubAck(id) => self.acked(id, Stage::WaitPubAck),
+            Incoming::PubComp(id) => self.acked(id, Stage::WaitPubComp),
             Incoming::PubRec(id) => {
-                if let Some(w) = self.waiting.get_mut(&id) {
-                    w.qos = 3;
+                if let Some(o) = self
+                    .outbound
+                    .iter_mut()
+                    .find(|o| o.mid == id && o.stage == Stage::WaitPubRec)
+                {
+                    o.stage = Stage::WaitPubComp;
                 }
                 self.send(&packet::ack(packet::PUBREL, id)).await;
             }
@@ -740,11 +765,48 @@ impl Client {
         }
     }
 
-    fn acked(&mut self, id: u16) {
-        if let Some(w) = self.waiting.remove(&id)
-            && let Some(reply) = w.reply
-        {
+    /// The broker has message `id`, if it is at `stage` (a `PUBACK` for a
+    /// QoS 2 message, or a `PUBCOMP` before its `PUBREC`, isn't one).
+    fn acked(&mut self, id: u16, stage: Stage) {
+        let Some(i) = self
+            .outbound
+            .iter()
+            .position(|o| o.mid == id && o.stage == stage)
+        else {
+            return;
+        };
+        if let Some(reply) = self.outbound.remove(i).reply {
             let _ = reply.send(Ok(()));
+        }
+    }
+
+    /// `_messages_reconnect_reset_out` and `_handle_connack`: on a clean
+    /// session every QoS 1 and 2 message the broker hasn't got is
+    /// published again, marked `dup` if it was sent before.
+    async fn resend(&mut self) {
+        let v = self.version();
+        for i in 0..self.outbound.len() {
+            let o = &mut self.outbound[i];
+            o.dup |= o.stage != Stage::Unsent;
+            o.stage = match o.message.qos {
+                1 => Stage::WaitPubAck,
+                _ => Stage::WaitPubRec,
+            };
+            let bytes = packet::publish(
+                v,
+                &packet::Out {
+                    topic: &o.message.topic,
+                    payload: &o.message.payload,
+                    qos: o.message.qos,
+                    retain: o.message.retain,
+                    dup: o.dup,
+                    packet_id: o.mid,
+                    expiry: o.expiry,
+                },
+            );
+            if !self.send(&bytes).await {
+                return;
+            }
         }
     }
 
@@ -777,6 +839,7 @@ impl Client {
             self.config.broker,
             self.config.port
         );
+        self.resend().await;
         self.write_all_entities();
         self.queue_resubscribe();
         self.schedule_subscribe();
@@ -862,19 +925,17 @@ impl Client {
             self.timer(timer, key);
         }
         self.flush_writes();
-        let late: Vec<u16> = self
-            .waiting
-            .iter()
-            .filter(|(_, w)| w.deadline <= now)
-            .map(|(id, _)| *id)
-            .collect();
-        for id in late {
-            if let Some(w) = self.waiting.remove(&id) {
+        // `_async_wait_for_mid_or_raise`: HA stops waiting (the message
+        // stays with paho until the broker has it).
+        for o in &mut self.outbound {
+            if o.deadline.is_some_and(|d| d <= now) {
+                o.deadline = None;
                 tracing::warn!(
-                    "No ACK from MQTT server in {} seconds (mid: {id})",
-                    TIMEOUT_ACK.as_secs()
+                    "No ACK from MQTT server in {} seconds (mid: {})",
+                    TIMEOUT_ACK.as_secs(),
+                    o.mid
                 );
-                if let Some(reply) = w.reply {
+                if let Some(reply) = o.reply.take() {
                     let _ = reply.send(Ok(()));
                 }
             }
@@ -940,6 +1001,19 @@ impl Client {
             m.qos
         );
         if !self.connected {
+            // paho keeps a QoS 1 or 2 message to send at the next
+            // connection, and answers that it isn't connected.
+            if m.qos > 0 {
+                self.outbound.push(Out {
+                    mid,
+                    message: m.clone(),
+                    expiry,
+                    stage: Stage::Unsent,
+                    dup: false,
+                    reply: None,
+                    deadline: None,
+                });
+            }
             let message = "Error talking to MQTT: The client is not currently connected".to_owned();
             if let Some(reply) = reply {
                 let mut p = Map::new();
@@ -958,31 +1032,38 @@ impl Client {
         }
         let bytes = packet::publish(
             self.version(),
-            &m.topic,
-            &m.payload,
-            m.qos,
-            m.retain,
-            mid,
-            expiry,
+            &packet::Out {
+                topic: &m.topic,
+                payload: &m.payload,
+                qos: m.qos,
+                retain: m.retain,
+                dup: false,
+                packet_id: mid,
+                expiry,
+            },
         );
-        let sent = self.send(&bytes).await;
-        match (m.qos, sent) {
-            (0, _) => {
-                if let Some(reply) = reply {
-                    let _ = reply.send(Ok(()));
-                }
+        if m.qos == 0 {
+            self.send(&bytes).await;
+            if let Some(reply) = reply {
+                let _ = reply.send(Ok(()));
             }
-            (qos, _) => {
-                self.waiting.insert(
-                    mid,
-                    Waiting {
-                        deadline: Instant::now() + TIMEOUT_ACK,
-                        qos,
-                        reply,
-                    },
-                );
-            }
+            return Ok(());
         }
+        // Kept before it is sent: a connection lost on the way sends it
+        // again.
+        self.outbound.push(Out {
+            mid,
+            message: m.clone(),
+            expiry,
+            stage: match m.qos {
+                1 => Stage::WaitPubAck,
+                _ => Stage::WaitPubRec,
+            },
+            dup: false,
+            deadline: reply.as_ref().map(|_| Instant::now() + TIMEOUT_ACK),
+            reply,
+        });
+        self.send(&bytes).await;
         Ok(())
     }
 
@@ -2814,6 +2895,38 @@ mod unit {
         assert_eq!(bytes_literal(r"b'\x01\x02'"), Some(vec![1, 2]));
         assert_eq!(bytes_literal(r#"b"a\n""#), Some(b"a\n".to_vec()));
         assert_eq!(bytes_literal("hello"), None);
+    }
+
+    /// After a wrap, the ids of messages still in flight are passed over.
+    #[tokio::test]
+    async fn packet_ids_in_flight_are_not_taken_again() {
+        let hass = Hass::new();
+        let components = crate::components::Components::new(
+            &hass,
+            Arc::new(ha_registry::Registries::default()),
+            crate::light::Profiles::default(),
+        );
+        let entry = json!({"entry_id": "e", "data": {"broker": "b"}});
+        let config = Config::of(entry.as_object().unwrap()).unwrap();
+        let mut client = Client::new(hass, components, Arc::new(config), tcp());
+        client.mid = 65534;
+        for mid in [65535, 1] {
+            client.outbound.push(Out {
+                mid,
+                message: Message {
+                    topic: "t".into(),
+                    payload: Vec::new(),
+                    qos: 1,
+                    retain: false,
+                },
+                expiry: None,
+                stage: Stage::WaitPubAck,
+                dup: false,
+                reply: None,
+                deadline: None,
+            });
+        }
+        assert_eq!(client.next_mid(), 2);
     }
 
     #[test]
