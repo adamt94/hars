@@ -1636,3 +1636,53 @@ async fn every_subscription_identifier_is_checked() {
             .is_some()
     );
 }
+
+/// The QoS 2 budget counts what each held message costs, not only its
+/// payload: many tiny unreleased messages reach it too.
+#[tokio::test(start_paused = true)]
+async fn many_tiny_unreleased_qos_2_messages_are_bounded() {
+    let broker = Broker::start(true).await;
+    let r = start(
+        &broker,
+        json!({"broker": "127.0.0.1", "port": 1883, "protocol": "5", "discovery": false}),
+    )
+    .await;
+    tokio::time::sleep(Duration::from_secs(1)).await;
+    let mut out = Vec::new();
+    for id in 1..=10_000u16 {
+        out.extend_from_slice(&[0x34, 7, 0, 1, b't']);
+        out.extend_from_slice(&id.to_be_bytes());
+        out.extend_from_slice(&[0, b'x']);
+    }
+    for chunk in out.chunks(32 * 1024) {
+        let _ = broker.state.lock().conns[0]
+            .write
+            .send(Some(chunk.to_vec()));
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    tokio::time::sleep(Duration::from_secs(11)).await;
+    let dials = r.dials.lock().clone();
+    assert_eq!(dials.len(), 2, "{dials:?}");
+}
+
+/// A QoS 2 message too large for the budget is refused from its header,
+/// before its payload is read.
+#[tokio::test(start_paused = true)]
+async fn an_oversized_qos_2_message_is_refused_from_its_header() {
+    let broker = Broker::start(true).await;
+    let r = start(
+        &broker,
+        json!({"broker": "127.0.0.1", "port": 1883, "protocol": "5", "discovery": false}),
+    )
+    .await;
+    tokio::time::sleep(Duration::from_secs(1)).await;
+    // The header of a 2 MiB message, and the start of its body.
+    let mut out = vec![0x34];
+    put_varint(&mut out, 2 << 20);
+    out.extend_from_slice(&[0, 1, b't', 0, 1, 0]);
+    out.extend_from_slice(&[b'x'; 1000]);
+    let _ = broker.state.lock().conns[0].write.send(Some(out));
+    tokio::time::sleep(Duration::from_secs(11)).await;
+    let dials = r.dials.lock().clone();
+    assert_eq!(dials.len(), 2, "{dials:?}");
+}

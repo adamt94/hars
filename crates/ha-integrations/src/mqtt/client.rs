@@ -85,6 +85,10 @@ const MAX_STATE: usize = 255;
 /// bytes (paho holds any number); past it the broker is in breach of the
 /// protocol and the connection is dropped.
 pub const INCOMING_BYTES: usize = 1 << 20;
+/// What a held QoS 2 message costs beyond its topic and payload: its map
+/// entry, its identifiers and the two allocations' headers.
+const INCOMING_ENTRY: usize =
+    std::mem::size_of::<(u16, (String, Vec<u8>, bool, packet::Ids))>() + 32;
 /// `mqtt.publish` calls waiting for the client: a caller past these waits
 /// its turn.
 const COMMANDS: usize = 64;
@@ -661,6 +665,19 @@ impl Client {
                 return;
             };
             let mut taken = std::mem::take(buf);
+            // A QoS 2 message past what may be held is refused from its
+            // header, before its body is read in.
+            if taken.first().is_some_and(|b| b & 0xF6 == 0x34)
+                && packet::needed(&taken)
+                    .is_some_and(|n| self.incoming_bytes + INCOMING_ENTRY + n > INCOMING_BYTES)
+            {
+                tracing::warn!(
+                    "Error returned from MQTT server: A network protocol error occurred when \
+                     communicating with the broker."
+                );
+                self.lost().await;
+                return;
+            }
             let framed = packet::frame(&taken);
             let (first, body) = match framed {
                 Ok(Some(f)) => f,
@@ -726,12 +743,12 @@ impl Client {
                         // Delivered at its `PUBREL`, as paho does.
                         if let Some(id) = p.packet_id {
                             if let Ok(t) = std::str::from_utf8(topic) {
-                                let size = t.len() + p.payload.len();
+                                let size = INCOMING_ENTRY + t.len() + p.payload.len();
                                 if let Some((t, b, ..)) = self.incoming.insert(
                                     id,
                                     (t.to_owned(), p.payload.to_vec(), p.retain, p.identifiers),
                                 ) {
-                                    self.incoming_bytes -= t.len() + b.len();
+                                    self.incoming_bytes -= INCOMING_ENTRY + t.len() + b.len();
                                 }
                                 self.incoming_bytes += size;
                                 if self.incoming_bytes > INCOMING_BYTES {
@@ -750,7 +767,7 @@ impl Client {
             }
             Incoming::PubRel(id) => {
                 if let Some((topic, payload, retain, ids)) = self.incoming.remove(&id) {
-                    self.incoming_bytes -= topic.len() + payload.len();
+                    self.incoming_bytes -= INCOMING_ENTRY + topic.len() + payload.len();
                     self.message(topic.as_bytes(), &payload, retain, &ids).await;
                 }
                 self.send(&packet::ack(packet::PUBCOMP, id)).await;
